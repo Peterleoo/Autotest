@@ -1,0 +1,30 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Pytest / 测试报告与中间产物
+.pytest_cache/
+reports/*.html
+reports/*.json
+reports/allure_results/*
+reports/screenshots/*
+!reports/screenshots/.gitkeep
+
+# APK 大二进制包 (避免超过 GitHub 100MB 限制)
+apps/*.apk
+*.apk
+
+# 临时调试图片与截图
+*.png
+pgyer_dom.html
+
+# 环境变量敏感配置 (请使用 .env.example)
+.env
+.DS_Store
+Thumbs.db

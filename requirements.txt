@@ -1,0 +1,8 @@
+Appium-Python-Client>=4.0.0
+pytest>=8.0.0
+requests>=2.31.0
+allure-pytest>=2.13.0
+anthropic>=0.30.0
+openai>=1.30.0
+Pillow>=10.0.0
+python-dotenv>=1.0.0
