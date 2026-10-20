@@ -14,6 +14,11 @@ class AIConfig:
     def PROVIDER(self) -> str:
         return os.getenv("AI_PROVIDER", "hermes").lower()
 
+    @PROVIDER.setter
+    def PROVIDER(self, value: str):
+        if value:
+            os.environ["AI_PROVIDER"] = str(value).lower()
+
     # 1. 象盒企业 Hermes 网关（DeepSeek-Flash，实测连通）
     @property
     def HERMES_API_KEY(self) -> str:

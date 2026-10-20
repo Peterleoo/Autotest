@@ -392,6 +392,9 @@ async def update_config(
         if v:
             os.environ[k] = str(v)
 
+    # 核心：实时同步内存中全局 ai_config 单例
+    ai_config.PROVIDER = provider
+
     if env_path.exists():
         existing_env = env_path.read_text(encoding="utf-8")
     else:
@@ -432,12 +435,13 @@ async def switch_antigravity_model(model: str = Form(...)):
     return {"success": True, "model": model, "message": f"Google Antigravity 模型已切换为: {model}"}
 
 @app.get("/api/solidified_cases/content")
+@app.get("/api/solidified_cases/{filename}/content")
 async def get_solidified_case_content(filename: str):
-    """读取指定自动化测试脚本的源码内容"""
+    """读取指定自动化测试脚本的源码内容，供右侧工作台内嵌直接阅览与审查"""
     target = settings.SOLIDIFIED_DIR / filename
     if target.exists() and target.is_file():
-        return {"filename": filename, "content": target.read_text(encoding="utf-8")}
-    return JSONResponse(status_code=404, content={"message": "脚本不存在"})
+        return {"success": True, "filename": filename, "content": target.read_text(encoding="utf-8")}
+    return JSONResponse(status_code=404, content={"success": False, "message": "脚本不存在"})
 
 @app.post("/api/solidified_cases/delete")
 async def delete_solidified_case(filename: str = Form(...)):
