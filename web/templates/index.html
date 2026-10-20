@@ -442,8 +442,8 @@
             font-weight: 500;
         }
         .env-alert-banner {
-            background-color: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-strong);
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-hover);
             border-radius: 8px;
             padding: 9px 13px;
             margin: 10px 16px 0 16px;
@@ -451,9 +451,16 @@
             display: flex;
             align-items: flex-start;
             gap: 8px;
-            color: #ffffff;
+            color: var(--text-main);
             line-height: 1.5;
             flex-shrink: 0;
+        }
+        .env-alert-banner code {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.08);
+            padding: 1px 4px;
+            border-radius: 4px;
+            font-size: 11px;
         }
 
         /* 本地测试用例资产工作台 (Local Cases Workspace) */
@@ -2722,9 +2729,10 @@
 
             let hasOfflineDevice = false;
             let offlineDeviceList = [];
-            if (isReal && boundDeviceIds.length > 0) {
+            const isLocalTask = (data.test_mode === "local" || (data.goal && (data.goal.includes("本地") || data.goal.includes("固化"))));
+            if (isReal && !isLocalTask && boundDeviceIds.length > 0) {
                 boundDeviceIds.forEach(devId => {
-                    if (devId !== "default" && devId !== "local-simulator") {
+                    if (devId !== "default" && devId !== "local-simulator" && devId !== "mock-device") {
                         const isOnline = availableDevices.some(d => d.id === devId);
                         if (!isOnline) {
                             hasOfflineDevice = true;
@@ -3628,17 +3636,7 @@
                     });
                     conclusionText += `\n所有规划交互与界面转场断言校验达成率 100%。业务操作时序已成功固化为本地零 Token 自动化回归脚本，后续可随时调用批量回归。`;
 
-                    linksHtml = `
-                        <div class="mt-2 pt-1 d-flex align-items-center flex-wrap">
-                            <span class="conclusion-inline-link" onclick="openEmbeddedCode('${sessionData.case_name || 'test_beike_search_p0.py'}', '固化脚本源码')">
-                                <i class="bi bi-code-slash"></i> 查看固化脚本源码
-                            </span>
-                            ${sessionData.report_url ? `
-                            <span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '全景评测报告')">
-                                <i class="bi bi-file-earmark-bar-graph"></i> 查看全景评测报告
-                            </span>` : ''}
-                        </div>
-                    `;
+                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3"><span class="conclusion-inline-link" onclick="openEmbeddedCode('${sessionData.case_name || 'test_beike_search_p0.py'}', '固化脚本源码')"><i class="bi bi-code-slash"></i> 查看固化脚本源码</span>${sessionData.report_url ? `<span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '全景评测报告')"><i class="bi bi-file-earmark-bar-graph"></i> 查看全景评测报告</span>` : ''}</div>`;
                 } else {
                     let failedStepIndex = -1;
                     let failedStepTitle = "";
@@ -3681,17 +3679,7 @@
                     conclusionText += `• 阻断关键原因：${failReason}\n`;
                     conclusionText += `• 排错建议：请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查网络连接与待测应用前台运行状态后重新执行。`;
 
-                    linksHtml = `
-                        <div class="mt-2 pt-1 d-flex align-items-center flex-wrap">
-                            <span class="conclusion-inline-link" onclick="openCanvasLogs()">
-                                <i class="bi bi-terminal"></i> 查看终端详细日志
-                            </span>
-                            ${sessionData.report_url ? `
-                            <span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '失败现场排错报告')">
-                                <i class="bi bi-file-earmark-bar-graph"></i> 查看现场排错报告
-                            </span>` : ''}
-                        </div>
-                    `;
+                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3"><span class="conclusion-inline-link" onclick="openCanvasLogs()"><i class="bi bi-terminal"></i> 查看终端详细日志</span>${sessionData.report_url ? `<span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '失败现场排错报告')"><i class="bi bi-file-earmark-bar-graph"></i> 查看现场排错报告</span>` : ''}</div>`;
                 }
 
                 completionBannerHtml = `

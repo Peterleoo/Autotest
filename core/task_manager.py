@@ -748,6 +748,7 @@ class TaskManager:
         self._finish_pipeline(session, cur_idx, is_success=is_success, final_error=last_error_line)
 
         # 生成该设备独立交付物报告
+        plan_steps = session.get("plan_steps", [])
         steps = [
             {"action": f"Step {s['step_id']}: {s['title']}", "reason": s['desc'], "detail": "真机实测断言", "status": "PASS" if is_success else "FAIL"}
             for s in plan_steps
