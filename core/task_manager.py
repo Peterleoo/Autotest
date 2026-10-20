@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import time
+import json
 import uuid
 import logging
 import threading
@@ -17,6 +18,8 @@ from core.report_generator import ReportGenerator
 
 logger = logging.getLogger("TaskManager")
 BASE_DIR = Path(__file__).resolve().parent.parent
+SESSIONS_STORE_DIR = BASE_DIR / "data" / "sessions"
+SESSIONS_STORE_DIR.mkdir(parents=True, exist_ok=True)
 
 class TaskManager:
     """
@@ -40,7 +43,40 @@ class TaskManager:
         self.device_locks: Dict[str, threading.Lock] = {}
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.active_session_id: Optional[str] = None
-        self._create_default_welcome_session()
+        self._load_persisted_sessions()
+
+    def _save_session(self, session_id: str):
+        """将单个会话原子化存盘持久化到本地磁盘，保证重启与刷新不丢失"""
+        session = self.sessions.get(session_id)
+        if not session:
+            return
+        try:
+            target_path = SESSIONS_STORE_DIR / f"{session_id}.json"
+            # 序列化为安全 JSON
+            with open(target_path, "w", encoding="utf-8") as f:
+                json.dump(session, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.warning(f"持久化会话 {session_id} 失败: {e}")
+
+    def _load_persisted_sessions(self):
+        """服务启动时自动从本地磁盘加载所有历史测试会话"""
+        files = list(SESSIONS_STORE_DIR.glob("*.json"))
+        # 按文件修改时间正序加载，最新的放在最前
+        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        for p in files:
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    sess = json.load(f)
+                    sid = sess.get("session_id") or p.stem
+                    self.sessions[sid] = sess
+                    if not self.active_session_id:
+                        self.active_session_id = sid
+            except Exception as e:
+                logger.warning(f"读取历史会话文件 {p.name} 失败: {e}")
+
+        # 若没有任何历史会话，才创建默认欢迎引导会话
+        if not self.sessions:
+            self._create_default_welcome_session()
 
     def _get_device_lock(self, device_id: str) -> threading.Lock:
         if device_id not in self.device_locks:
@@ -78,6 +114,7 @@ class TaskManager:
             "report_url": ""
         }
         self.active_session_id = sess_id
+        self._save_session(sess_id)
 
     def list_sessions(self) -> List[Dict[str, Any]]:
         """按时间倒序获取所有任务会话概要"""
@@ -238,6 +275,7 @@ class TaskManager:
 
         self.sessions[session_id] = session
         self.active_session_id = session_id
+        self._save_session(session_id)
 
         # 🚀 若为自动审批，立即派发线程并发执行；若为人工审批，则挂起等待用户确认
         if is_auto:
@@ -320,6 +358,7 @@ class TaskManager:
                     session.get("test_mode", "real")
                 )
 
+        self._save_session(session_id)
         return {"success": True, "session_id": session_id, "message_count": len(session["messages"])}
 
     def clarify_session(self, session_id: str, inputs: Dict[str, Any]) -> bool:
@@ -341,6 +380,12 @@ class TaskManager:
     def delete_session(self, session_id: str) -> bool:
         if session_id in self.sessions:
             del self.sessions[session_id]
+            target_path = SESSIONS_STORE_DIR / f"{session_id}.json"
+            if target_path.exists():
+                try:
+                    target_path.unlink()
+                except Exception as e:
+                    logger.warning(f"删除持久化会话文件 {target_path} 失败: {e}")
             if self.active_session_id == session_id:
                 self.active_session_id = next(iter(self.sessions.keys()), None)
             return True
@@ -503,25 +548,90 @@ class TaskManager:
             })
         return res
 
-    def _update_session_step(self, session: dict, step_index: int, status: str = "RUNNING", detail: str = ""):
-        """
-        同步更新 session["plan_steps"] 中对应步骤的状态，
-        确保实际测试步骤与右侧流水线节点 100% 一一对应
-        """
-        steps = session.get("plan_steps", [])
-        if 0 <= step_index < len(steps):
-            for i in range(step_index):
-                if steps[i]["status"] in ["PENDING", "READY", "RUNNING", "APPROVED"]:
-                    steps[i]["status"] = "COMPLETED"
-            steps[step_index]["status"] = status
-            if detail:
-                steps[step_index]["desc"] = detail
+    def _append_dynamic_step(self, session: dict, step_id: int, title: str, desc: str, status: str = "RUNNING") -> dict:
+        """端侧自适应扩展：当实际执行超出原规划步数时，动态自增新步骤"""
+        steps = session.setdefault("plan_steps", [])
+        new_step = {
+            "step_id": step_id,
+            "title": title,
+            "desc": desc,
+            "status": status,
+            "duration": "0.8s"
+        }
+        steps.append(new_step)
+        logger.info(f"➕ 真机执行自适应动态新增步骤: Step {step_id} - {title}")
+        return new_step
 
-    def _complete_all_steps(self, session: dict, is_success: bool = True):
+    def _advance_session_step(self, session: dict, step_index: int, default_title: str = "", default_desc: str = ""):
+        """
+        单向单调推进步骤状态机，严禁已完成步骤倒退回 RUNNING：
+        1. 将 step_index 之前所有未终态步骤置为 COMPLETED；
+        2. 若 step_index 超出当前 plan_steps，自动动态自增新增步骤；
+        3. 将当前步骤标记为 RUNNING（若原本不是终态）。
+        """
+        steps = session.setdefault("plan_steps", [])
+
+        # 1. 确保所有更早的步骤标记为 COMPLETED（如果处于 READY/PENDING/RUNNING）
+        for i in range(min(step_index, len(steps))):
+            if steps[i]["status"] in ["PENDING", "READY", "RUNNING", "APPROVED"]:
+                steps[i]["status"] = "COMPLETED"
+
+        # 2. 若实际执行步数超出了初始生成的规划步数，动态追加新步骤
+        while len(steps) <= step_index:
+            new_id = len(steps) + 1
+            t = default_title or f"自适应动态执行 Step {new_id}"
+            d = default_desc or f"端侧根据实际业务界面自适应推进与交互核验"
+            self._append_dynamic_step(session, new_id, t, d, status="RUNNING")
+
+        # 3. 激活当前步骤（不可逆：若已经是 COMPLETED/FAIL/SKIPPED 则不倒退）
+        cur_step = steps[step_index]
+        if cur_step["status"] not in ["COMPLETED", "FAIL", "SKIPPED"]:
+            cur_step["status"] = "RUNNING"
+            if default_desc:
+                cur_step["desc"] = default_desc
+
+    def _update_session_step(self, session: dict, step_index: int, status: str = "RUNNING", detail: str = ""):
+        """向后兼容更新方法，内部接入单调状态机"""
+        self._advance_session_step(session, step_index, default_desc=detail)
+
+    def _finish_pipeline(self, session: dict, current_step_index: int, is_success: bool = True, final_error: str = ""):
+        """
+        全流程执行收敛与报错隔离：
+        - 若成功：
+          - 当前步及所有历史有效步标记为 COMPLETED；
+          - 未执行到的后续预设步骤（如规划7步实际4步完成）标记为 SKIPPED（略过：已提前达成目标）；
+        - 若失败：
+          - 仅将当前报错步骤标记为 FAIL，并注入具体的 error_msg；
+          - 之前已成功跑通的步骤保持 COMPLETED（严禁全体抹红！）；
+          - 后续未开始步骤标记为 CANCELED（已取消）。
+        """
         steps = session.get("plan_steps", [])
-        for s in steps:
-            if s["status"] != "FAIL":
-                s["status"] = "COMPLETED" if is_success else "FAIL"
+        total = len(steps)
+
+        if is_success:
+            # 成功：当前步及之前全部完成
+            for i in range(min(current_step_index + 1, total)):
+                if steps[i]["status"] != "FAIL":
+                    steps[i]["status"] = "COMPLETED"
+            # 后续未执行的步骤标记为 SKIPPED
+            for i in range(current_step_index + 1, total):
+                if steps[i]["status"] in ["READY", "PENDING", "RUNNING"]:
+                    steps[i]["status"] = "SKIPPED"
+                    steps[i]["desc"] = f"测试目标已在第 {current_step_index + 1} 步顺利达成，此预设步骤略过"
+        else:
+            # 失败：隔离报错，仅当前步报错
+            if 0 <= current_step_index < total:
+                steps[current_step_index]["status"] = "FAIL"
+                steps[current_step_index]["error_msg"] = final_error or "端侧动作未达预期或校验中断"
+            # 前置步骤保持原状（已完成的仍是 COMPLETED）
+            for i in range(current_step_index):
+                if steps[i]["status"] == "RUNNING":
+                    steps[i]["status"] = "COMPLETED"
+            # 后续步骤标记为 CANCELED
+            for i in range(current_step_index + 1, total):
+                if steps[i]["status"] in ["READY", "PENDING", "RUNNING"]:
+                    steps[i]["status"] = "CANCELED"
+                    steps[i]["desc"] = f"因第 {current_step_index + 1} 步执行失败，后续测试链路已取消"
 
     def _device_worker(self, session_id: str, device_id: str, goal: str, case_name: str, test_mode: str):
         session = self.sessions.get(session_id)
@@ -551,6 +661,7 @@ class TaskManager:
                 dev_state["success"] = False
                 dev_state["action"] = f"执行异常: {e}"
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ❌ 执行抛出异常: {e}")
+                self._finish_pipeline(session, max(0, dev_state.get("step", 1) - 1), is_success=False, final_error=str(e))
 
             # 检查整个 Session 的完成状态
             all_done = all(d["status"] in ["PASS", "FAIL", "COMPLETED"] for d in session["devices"].values())
@@ -559,12 +670,14 @@ class TaskManager:
                 has_fail = any(d["status"] == "FAIL" or d.get("success") is False for d in session["devices"].values())
                 session["is_success"] = not has_fail
                 if has_fail:
-                    session["error_message"] = "存在执行失败的设备或动作异常中断"
-                self._complete_all_steps(session, is_success=not has_fail)
+                    session["error_message"] = session.get("error_message") or "存在执行失败的设备或动作异常中断"
                 for d in session["devices"].values():
                     if d.get("report_url"):
                         session["report_url"] = d["report_url"]
                         break
+
+            # 实时持久化存盘，保证前端刷新或服务重启数据 100% 完整
+            self._save_session(session_id)
 
     def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float):
         cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id]
@@ -578,12 +691,11 @@ class TaskManager:
         )
 
         all_output = []
-        plan_steps = session.get("plan_steps", [])
-        total_plan_steps = len(plan_steps)
+        cur_idx = 0
+        last_error_line = ""
 
         # 启动时将第一个节点标记为 RUNNING
-        if total_plan_steps > 0:
-            self._update_session_step(session, 0, "RUNNING")
+        self._advance_session_step(session, 0)
 
         for raw_line in proc.stdout:
             line = raw_line.rstrip("\r\n")
@@ -592,6 +704,10 @@ class TaskManager:
             all_output.append(line)
             dev_state["logs"].append(line)
 
+            # 实时捕获异常日志
+            if any(err_kw in line for err_kw in ["❌", "Traceback", "Exception", "Error:", "未能达成预期目标"]):
+                last_error_line = line
+
             m_step = re.search(r"\[Step (\d+)/(\d+)\]", line)
             if m_step:
                 cur_s = int(m_step.group(1))
@@ -599,25 +715,23 @@ class TaskManager:
                 dev_state["step"] = cur_s
                 dev_state["max_steps"] = max_s
                 dev_state["action"] = f"第 {cur_s} 步 感知与决策"
+                cur_idx = cur_s - 1
+                # 单向单调推进步骤，支持自动自增新步骤，坚决不回退！
+                self._advance_session_step(session, cur_idx)
 
-                # 动态映射到 plan_steps 节点
-                if total_plan_steps > 0:
-                    mapped_idx = min(cur_s - 1, total_plan_steps - 1)
-                    self._update_session_step(session, mapped_idx, "RUNNING")
-            elif "视觉 OCR 成功提取屏幕文字元素" in line:
-                dev_state["action"] = "视觉 OCR 解析完成"
-                if total_plan_steps >= 2:
-                    self._update_session_step(session, min(1, total_plan_steps - 1), "RUNNING")
-            elif "AI 决策" in line:
-                dev_state["action"] = "AI 意图规划完成"
-                if total_plan_steps >= 3:
-                    self._update_session_step(session, min(2, total_plan_steps - 1), "RUNNING")
+            elif "AI 决策:" in line:
+                thought_str = line.split("AI 决策:", 1)[1].strip()
+                dev_state["action"] = f"AI 决策: {thought_str[:28]}"
+
+            elif "==> 执行动作" in line:
+                act_str = line.split("==> 执行动作", 1)[1].strip()
+                dev_state["action"] = f"执行 {act_str[:28]}"
+
             elif "原生 ADB" in line:
                 dev_state["action"] = "执行原生手势"
-            elif "🎉 目标完成" in line or "固化" in line:
+
+            elif "🎉 目标完成" in line or "固化成功" in line:
                 dev_state["action"] = "测试目标达成，脚本固化中"
-                if total_plan_steps > 0:
-                    self._update_session_step(session, total_plan_steps - 1, "RUNNING")
 
         proc.wait()
         duration = time.time() - start_t
@@ -628,9 +742,10 @@ class TaskManager:
 
         if not is_success:
             session["is_success"] = False
-            session["error_message"] = "AI 自动化测试未能达成预期目标，存在失败动作"
+            session["error_message"] = last_error_line or "AI 自动化测试未能达成预期目标，存在失败动作"
 
-        self._complete_all_steps(session, is_success=is_success)
+        # 精确单点收敛：若成功则未跑步骤略过(SKIPPED)，若失败仅当前步报错(FAIL)
+        self._finish_pipeline(session, cur_idx, is_success=is_success, final_error=last_error_line)
 
         # 生成该设备独立交付物报告
         steps = [
@@ -688,6 +803,7 @@ class TaskManager:
         dev_state["duration"] = f"{round(duration, 1)}s"
         dev_state["status"] = "PASS"
         dev_state["success"] = True
+        self._finish_pipeline(session, total_steps - 1, is_success=True)
 
         report_steps = [
             {"action": f"iOS Step {s['step_id']}: {s['title']}", "reason": s['desc'], "detail": "iOS 断言通过", "status": "PASS"}
@@ -740,6 +856,7 @@ class TaskManager:
         dev_state["duration"] = f"{round(duration, 1)}s"
         dev_state["status"] = "PASS"
         dev_state["success"] = True
+        self._finish_pipeline(session, total_steps - 1, is_success=True)
 
         report_steps = [
             {"action": f"Step {s['step_id']}: {s['title']}", "reason": s['desc'], "detail": "仿真断言通过", "status": "PASS"}

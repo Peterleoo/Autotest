@@ -2855,7 +2855,7 @@
             updateDeviceSummary();
         }
 
-        // ================= 5. 会话列表管理 (设备种类矢量微标渲染) =================
+        // ================= 5. 会话列表管理 (设备种类矢量微标渲染与持久化还原) =================
         async function loadSessions() {
             try {
                 const res = await fetch("/api/sessions");
@@ -2863,7 +2863,10 @@
                 currentSessions = data.sessions || [];
                 renderSessionList();
 
-                if (!activeSessionId && currentSessions.length > 0) {
+                const savedId = localStorage.getItem("autotest_active_session_id");
+                if (savedId && currentSessions.some(s => s.session_id === savedId)) {
+                    switchSession(savedId);
+                } else if (!activeSessionId && currentSessions.length > 0) {
                     switchSession(data.active_id || currentSessions[0].session_id);
                 }
             } catch (e) {}
@@ -2964,6 +2967,7 @@
 
         function startNewChat() {
             activeSessionId = null;
+            localStorage.removeItem("autotest_active_session_id");
             if (sessionPollTimer) clearInterval(sessionPollTimer);
             renderSessionList();
             document.getElementById("emptyStateBox").classList.remove("d-none");
@@ -3018,6 +3022,7 @@
 
         async function switchSession(sessionId) {
             activeSessionId = sessionId;
+            localStorage.setItem("autotest_active_session_id", sessionId);
             renderSessionList();
 
             deviceLogsCache = {};
@@ -3180,7 +3185,9 @@
             steps.forEach((st, idx) => {
                 const isCompleted = (st.status === "COMPLETED");
                 const isFailed = (st.status === "FAIL" || st.status === "FAILED");
-                const isRunning = (st.status === "RUNNING" || (!isCompleted && !isFailed && idx === 0 && sessionData.status === "RUNNING"));
+                const isSkipped = (st.status === "SKIPPED");
+                const isCanceled = (st.status === "CANCELED");
+                const isRunning = (st.status === "RUNNING");
                 const stepNum = st.step_id || (idx + 1);
                 const stepTitle = st.title || st.name || `业务规划阶段 ${stepNum}`;
                 const stepDesc = st.desc || st.action || '执行业务规划逻辑并校验页面响应。';
@@ -3196,6 +3203,14 @@
                 } else if (isFailed) {
                     stateDotHtml = `<i class="bi bi-x-circle text-danger" style="font-size: 12px;"></i>`;
                     statusTagHtml = `<span class="mono-tag text-danger" style="font-size: 9px; border-color: rgba(239, 68, 68, 0.4);">失败</span>`;
+                } else if (isSkipped) {
+                    stateDotHtml = `<i class="bi bi-dash-circle text-muted" style="font-size: 11px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px; opacity: 0.75;">略过</span>`;
+                    rowClass += " opacity-75";
+                } else if (isCanceled) {
+                    stateDotHtml = `<i class="bi bi-slash-circle text-muted" style="font-size: 11px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px; opacity: 0.6;">取消</span>`;
+                    rowClass += " opacity-75";
                 } else if (isRunning) {
                     stateDotHtml = `<span class="spinner-border spinner-border-sm" style="width: 11px; height: 11px; border-width: 1.5px; color: var(--text-main);"></span>`;
                     statusTagHtml = `<span class="mono-tag mono-tag-active" style="font-size: 9px;">执行中</span>`;
@@ -3203,6 +3218,23 @@
                 } else {
                     stateDotHtml = `<i class="bi bi-circle text-muted" style="font-size: 8px;"></i>`;
                     statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px;">等待中</span>`;
+                }
+
+                let errorBannerHtml = "";
+                if (isFailed || st.error_msg) {
+                    const errMsg = st.error_msg || sessionData.error_message || "端侧动作未达预期或校验断言不通过";
+                    errorBannerHtml = `
+                        <div class="mb-2 p-2 rounded" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; font-size: 11.5px;">
+                            <div class="fw-semibold mb-1" style="color: #f87171;"><i class="bi bi-exclamation-triangle-fill me-1"></i> 失败原因分析：</div>
+                            <div style="line-height: 1.5; color: #fecaca;">${escapeHtml(errMsg)}</div>
+                        </div>
+                    `;
+                } else if (isSkipped) {
+                    errorBannerHtml = `
+                        <div class="mb-2 p-2 rounded" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(255, 255, 255, 0.15); color: var(--text-sub); font-size: 11.5px;">
+                            <i class="bi bi-check2-circle text-success me-1"></i> 目标已在前期步骤中顺利达成，此预设步骤自动略过。
+                        </div>
+                    `;
                 }
 
                 const detailLogs = st.raw_logs || latestLogsSnippet || `端侧底层调用: 原生 ADB / 视觉判定置信度 0.98 (耗时 ${st.duration || '0.6s'})`;
@@ -3223,6 +3255,7 @@
                             </div>
                         </div>
                         <div class="dsh-code-expanded">
+                            ${errorBannerHtml}
                             ${isRunning && currentLiveAction ? `<div class="mb-1" style="color: #38bdf8; font-weight: 500;"><i class="bi bi-play-fill me-1"></i>实时交互: ${escapeHtml(currentLiveAction)}</div>` : ''}
                             ${escapeHtml(detailLogs)}
                         </div>
