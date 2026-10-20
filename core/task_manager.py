@@ -251,7 +251,10 @@ class TaskManager:
             ],
             "plan_steps": plan_steps,
             "devices": {},
-            "report_url": ""
+            "report_url": "",
+            "is_solidified": False,
+            "solidified_filename": "",
+            "solidified_module": ""
         }
 
         # 构建各个设备的执行上下文
@@ -680,7 +683,7 @@ class TaskManager:
             self._save_session(session_id)
 
     def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float):
-        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id]
+        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--no-solidify"]
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -848,7 +851,7 @@ class TaskManager:
             elif idx == 3:
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 异步数据渲染完成，首项卡片内容断言比对命中 100%")
             elif idx == total_steps - 1:
-                dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 正在生成零 Token 本地自动化固化用例 tests/solidified/test_{case_name}.py")
+                dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 业务测试全链路验证通过，可根据需要主动保存入库为本地用例")
 
             self._update_session_step(session, idx, "COMPLETED")
             dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ Step {step_no} 断言通过")

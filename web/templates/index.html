@@ -1453,39 +1453,58 @@
             font-weight: 600;
         }
 
-        /* Canvas 内部子分段选单 (Deliverables vs Solidified Cases) */
-        .canvas-subtabs-nav {
-            display: inline-flex;
-            align-items: center;
-            background-color: var(--bg-main);
-            border: 1px solid var(--border-subtle);
-            border-radius: 9999px;
-            padding: 2px;
-            gap: 2px;
+        /* Canvas 屏幕显示与真机实时投屏样式 */
+        .phone-mockup-frame {
+            width: 250px;
+            height: 500px;
+            max-height: 75vh;
+            background-color: #000000;
+            border-radius: 34px;
+            border: 7px solid #27272a;
+            box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+            transition: all 0.2s ease;
         }
-        .canvas-subtab-btn {
-            background: transparent;
-            border: 1px solid transparent;
-            color: var(--text-sub);
-            font-size: 11px;
-            font-weight: 500;
-            padding: 3px 9px;
+        .phone-mockup-camera {
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 48px;
+            height: 10px;
+            background-color: #18181b;
             border-radius: 9999px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            display: inline-flex;
+            z-index: 10;
+        }
+        .phone-mockup-screen {
+            width: 100%;
+            height: 100%;
+            background-color: #09090b;
+            position: relative;
+            overflow: hidden;
+            display: flex;
             align-items: center;
-            gap: 4px;
+            justify-content: center;
+        }
+        .phone-screen-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: var(--text-muted);
             user-select: none;
         }
-        .canvas-subtab-btn:hover {
-            color: var(--text-main);
-        }
-        .canvas-subtab-btn.active {
-            color: var(--text-main);
-            background-color: var(--bg-surface);
-            border-color: var(--border-strong);
-            font-weight: 600;
+        .phone-screen-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: #000000;
         }
 
         /* 节点流水线卡片 */
@@ -1887,16 +1906,16 @@
     <!-- 右侧可拖拽分割条 (Right Resizer: 左右拖动改变中栏/右栏宽度，高度锁定 100vh) -->
     <div class="pane-resizer" id="resizerRight" title="按住左右拖拽调节工作台宽度"></div>
 
-    <!-- ======================= 4. 右侧工作台 Canvas (Logs / Deliverables / Embedded Preview) ======================= -->
+    <!-- ======================= 4. 右侧工作台 Canvas (全量日志 / 屏幕显示) ======================= -->
     <aside class="gpt-canvas collapsed" id="gptCanvas">
-        <!-- 头部导航双 Tab (全量日志与交付产物) -->
+        <!-- 头部导航双 Tab：全量日志 与 屏幕显示 -->
         <div class="canvas-header" id="canvasHeaderNav">
             <div class="canvas-tabs-nav">
                 <button class="canvas-tab-btn active" id="btnTabLogs" onclick="switchCanvasTab('logs')">
                     <i class="bi bi-terminal"></i> 全量日志
                 </button>
-                <button class="canvas-tab-btn" id="btnTabDeliverables" onclick="switchCanvasTab('deliverables')">
-                    <i class="bi bi-box-seam"></i> 交付物与脚本
+                <button class="canvas-tab-btn" id="btnTabScreen" onclick="switchCanvasTab('screen')">
+                    <i class="bi bi-display"></i> 屏幕显示
                 </button>
             </div>
             <button class="icon-btn" onclick="toggleCanvas()" title="收起工作台">
@@ -1904,7 +1923,7 @@
             </button>
         </div>
 
-        <!-- View 1: 💻 全量测试日志 (Terminal Logs - 经典黑色背景控制台) -->
+        <!-- View 1: 💻 全量测试日志 (Terminal Logs - 经典深色终端) -->
         <div class="d-flex flex-column flex-grow-1 overflow-hidden" id="canvasLogsView" style="background-color: var(--console-bg);">
             <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
                 <div class="d-flex align-items-center gap-2" id="consoleDeviceTabs">
@@ -1923,57 +1942,52 @@
 [System] 提示：在中间输入框输入测试目标后，按 Enter 即可启动。</div>
         </div>
 
-        <!-- View 2 (备用兼容): 📋 测试节点 (Pipeline Nodes) -->
-        <div class="p-3 flex-grow-1 overflow-y-auto d-none" id="canvasNodesView">
-            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                <span class="small fw-semibold text-muted" style="font-size: 11px;">PIPELINE EXECUTION NODES</span>
-                <span class="mono-tag" id="nodesSummaryBadge">0 节点</span>
-            </div>
-            <div id="pipelineNodesList" class="d-flex flex-column gap-1"></div>
-        </div>
-
-        <!-- View 3: 📦 交付物与本地回归脚本 (Deliverables & Local Cases) -->
-        <div class="d-flex flex-column flex-grow-1 overflow-hidden d-none" id="canvasDeliverablesView" style="min-height: 0;">
-            <!-- 顶部子分段控制器 (已固化用例 / 全景评测报告) - 永久吸顶锁定 -->
-            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom flex-shrink-0" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
-                <div class="canvas-subtabs-nav">
-                    <button class="canvas-subtab-btn active" id="btnSubTabCases" onclick="switchDeliverablesSubTab('cases')">
-                        <i class="bi bi-file-earmark-code"></i> 本地用例脚本 <span class="mono-tag ms-1" id="subtabCaseCount">17</span>
-                    </button>
-                    <button class="canvas-subtab-btn" id="btnSubTabReports" onclick="switchDeliverablesSubTab('reports')">
-                        <i class="bi bi-file-earmark-bar-graph"></i> 交付报告 <span class="mono-tag ms-1" id="subtabReportCount">20+</span>
-                    </button>
+        <!-- View 2: 📱 真机自动化屏幕显示与实时投屏 (Screen Display) -->
+        <div class="d-flex flex-column flex-grow-1 overflow-hidden d-none" id="canvasScreenView" style="background-color: var(--bg-surface);">
+            <!-- 控制顶栏：设备切换与自动同步 -->
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom flex-shrink-0" style="border-color: var(--border-subtle) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 10px; font-weight: 500;" id="screenDeviceBadge">
+                        <i class="bi bi-phone me-1"></i>真机屏幕
+                    </span>
+                    <select class="form-select form-select-sm py-0 px-2" id="screenDeviceSelect" onchange="onScreenDeviceSelectChange()" style="font-size: 11px; height: 25px; max-width: 170px;">
+                        <option value="">自动跟随主设备</option>
+                    </select>
                 </div>
-                <div class="d-flex align-items-center gap-1">
-                    <button class="icon-btn" onclick="refreshCurrentDeliverablesSubTab()" title="刷新数据"><i class="bi bi-arrow-clockwise"></i></button>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="form-check form-switch m-0 d-flex align-items-center gap-1" style="font-size: 11px;">
+                        <input class="form-check-input mt-0" type="checkbox" id="switchAutoSyncScreen" onchange="toggleAutoSyncScreen()" checked style="cursor: pointer; width: 28px; height: 15px;">
+                        <label class="form-check-label text-muted" for="switchAutoSyncScreen" style="font-size: 10.5px; cursor: pointer;">自动同步</label>
+                    </div>
+                    <button class="icon-btn" onclick="refreshDeviceScreenManual()" title="手动捕获最新屏幕"><i class="bi bi-arrow-clockwise"></i></button>
                 </div>
             </div>
 
-            <!-- 子视图 A: 本地固化用例列表 (独立内部局部平滑滚动，永不撑高父级) -->
-            <div class="p-3 flex-grow-1 overflow-y-auto" id="subViewCases" style="min-height: 0;">
-                <div id="solidifiedCasesList" class="d-flex flex-column gap-2">正在加载本地脚本...</div>
-            </div>
-
-            <!-- 子视图 B: 交付报告列表 (独立内部局部平滑滚动，永不撑高父级) -->
-            <div class="p-3 flex-grow-1 overflow-y-auto d-none" id="subViewReports" style="min-height: 0;">
-                <div id="deliverablesReportsList" class="d-flex flex-column gap-2">正在加载报告...</div>
-            </div>
-        </div>
-
-        <!-- View 4: 📄 内嵌交付物/报告/脚本全景预览 (无新开页面直接在工作台展现) -->
-        <div class="d-flex flex-column flex-grow-1 overflow-hidden d-none" id="canvasEmbedPreviewView" style="background-color: var(--bg-surface); min-height: 0;">
-            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom flex-shrink-0" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
-                <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 320px;">
-                    <button class="icon-btn" onclick="closeEmbedPreview()" title="返回上级列表"><i class="bi bi-arrow-left"></i></button>
-                    <span class="small fw-semibold text-truncate" id="embedPreviewTitle" style="font-size: 12px; color: var(--text-main);">预览内容</span>
+            <!-- 手机投屏展示主体区 -->
+            <div class="flex-grow-1 overflow-auto p-3 d-flex flex-column align-items-center justify-content-center" id="phoneMirrorOuterBox" style="background: var(--bg-main);">
+                <!-- 真实手机拟物化投屏外框 -->
+                <div class="phone-mockup-frame" id="phoneMockupFrame">
+                    <div class="phone-mockup-camera"></div>
+                    <div class="phone-mockup-screen" id="phoneMockupScreen">
+                        <!-- 实时屏幕图片 -->
+                        <img id="screenMirrorImg" src="" alt="真机屏幕投屏" class="d-none phone-screen-img">
+                        
+                        <!-- 待机 / 空状态占位 -->
+                        <div class="phone-screen-empty" id="screenEmptyPlaceholder">
+                            <i class="bi bi-phone" style="font-size: 38px; color: var(--text-muted); opacity: 0.6;"></i>
+                            <div class="mt-2 fw-semibold" style="font-size: 12px; color: var(--text-main);">真机屏幕画面已就绪</div>
+                            <div class="mt-1 text-muted text-center px-3" style="font-size: 10.5px; line-height: 1.5;">
+                                发起测试或在上方选择设备<br>即可实时镜像查看端侧视觉动作
+                            </div>
+                            <button class="btn btn-sm btn-outline-light mt-3 py-0.5 px-2.5 rounded-pill" onclick="refreshDeviceScreenManual()" style="font-size: 11px;">
+                                <i class="bi bi-camera me-1"></i>抓取当前画面
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center gap-1">
-                    <button class="icon-btn" onclick="refreshEmbedPreview()" title="重新加载"><i class="bi bi-arrow-clockwise"></i></button>
+                <div class="mt-2 text-muted text-center font-monospace" id="screenStatusFooter" style="font-size: 10px;">
+                    等待自动化测试推进中...
                 </div>
-            </div>
-            <div class="flex-grow-1 overflow-hidden position-relative" id="embedPreviewBody" style="min-height: 0;">
-                <iframe id="embedReportIframe" src="" style="width: 100%; height: 100%; border: none; display: none;"></iframe>
-                <pre id="embedCodePre" class="terminal-screen m-0" style="width: 100%; height: 100%; overflow: auto; display: none; background: #0d1117; color: #e2e8f0; font-size: 12px; line-height: 1.6; padding: 14px;"></pre>
             </div>
         </div>
     </aside>
@@ -2343,164 +2357,157 @@
             const viewCases = document.getElementById("subViewCases");
             const viewReports = document.getElementById("subViewReports");
 
-            if (btnCases) btnCases.classList.toggle("active", subTab === "cases");
-            if (btnReports) btnReports.classList.toggle("active", subTab === "reports");
-
-            if (viewCases) viewCases.classList.toggle("d-none", subTab !== "cases");
-            if (viewReports) viewReports.classList.toggle("d-none", subTab !== "reports");
-
-            if (subTab === "cases") {
-                loadSolidifiedCases();
-            } else {
-                loadReports();
-            }
-        }
-
-        function refreshCurrentDeliverablesSubTab() {
-            if (currentDeliverablesSubTab === "cases") {
-                loadSolidifiedCases();
-            } else {
-                loadReports();
-            }
-        }
+        // ================= 右侧工作台：双 Tab 切换 (全量日志 vs 屏幕显示) =================
+        let currentScreenDeviceId = null;
+        let screenAutoSyncTimer = null;
+        let isScreenAutoSyncEnabled = true;
 
         function switchCanvasTab(tab) {
-            let targetSubTab = null;
-            if (tab === "cases" || tab === "reports") {
-                targetSubTab = tab;
-                tab = "deliverables";
-            }
+            if (!["logs", "screen"].includes(tab)) tab = "logs";
 
             const btnLogs = document.getElementById("btnTabLogs");
-            const btnDeliv = document.getElementById("btnTabDeliverables");
+            const btnScreen = document.getElementById("btnTabScreen");
 
             const viewLogs = document.getElementById("canvasLogsView");
-            const viewNodes = document.getElementById("canvasNodesView");
-            const viewDeliv = document.getElementById("canvasDeliverablesView");
-
-            if (!["logs", "deliverables", "nodes"].includes(tab)) tab = "logs";
+            const viewScreen = document.getElementById("canvasScreenView");
 
             if (btnLogs) btnLogs.classList.toggle("active", tab === "logs");
-            if (btnDeliv) btnDeliv.classList.toggle("active", tab === "deliverables");
+            if (btnScreen) btnScreen.classList.toggle("active", tab === "screen");
 
             if (viewLogs) viewLogs.classList.toggle("d-none", tab !== "logs");
-            if (viewNodes) viewNodes.classList.toggle("d-none", tab !== "nodes");
-            if (viewDeliv) viewDeliv.classList.toggle("d-none", tab !== "deliverables");
+            if (viewScreen) viewScreen.classList.toggle("d-none", tab !== "screen");
 
-            if (tab === "deliverables") {
-                if (targetSubTab) {
-                    switchDeliverablesSubTab(targetSubTab);
-                } else {
-                    switchDeliverablesSubTab(currentDeliverablesSubTab);
-                }
-                loadReports();
-                loadSolidifiedCases();
-            } else if (tab === "logs") {
+            if (tab === "logs") {
                 updateConsoleLogs();
+                if (screenAutoSyncTimer) {
+                    clearInterval(screenAutoSyncTimer);
+                    screenAutoSyncTimer = null;
+                }
+            } else if (tab === "screen") {
+                loadScreenDevices();
+                refreshDeviceScreen(false);
+                setupScreenAutoSync();
             }
         }
 
-        // ================= 右侧工作台内嵌预览引擎 (不再跳出额外新页面) =================
-        let currentEmbedType = null; // 'report' or 'code'
-        let currentEmbedTarget = null;
+        // ================= 屏幕显示 (Screen Mirroring) 控制器 =================
+        function loadScreenDevices() {
+            const sel = document.getElementById("screenDeviceSelect");
+            if (!sel) return;
 
-        function openEmbeddedReport(url, title) {
-            const canvas = document.getElementById("gptCanvas");
-            if (canvas && canvas.classList.contains("collapsed")) {
-                canvas.classList.remove("collapsed");
+            const oldVal = sel.value;
+            let optionsHtml = '<option value="">自动跟随主设备</option>';
+
+            if (availableDevices && availableDevices.length > 0) {
+                availableDevices.forEach(d => {
+                    const selAttr = (d.id === oldVal) ? "selected" : "";
+                    optionsHtml += `<option value="${d.id}" ${selAttr}>${d.model} (${d.id})</option>`;
+                });
             }
+            sel.innerHTML = optionsHtml;
+        }
 
-            currentEmbedType = "report";
-            currentEmbedTarget = url;
+        function onScreenDeviceSelectChange() {
+            const sel = document.getElementById("screenDeviceSelect");
+            currentScreenDeviceId = sel ? sel.value : null;
+            refreshDeviceScreen(true);
+        }
 
-            const headerNav = document.getElementById("canvasHeaderNav");
-            const viewLogs = document.getElementById("canvasLogsView");
-            const viewNodes = document.getElementById("canvasNodesView");
-            const viewDeliv = document.getElementById("canvasDeliverablesView");
-            const viewEmbed = document.getElementById("canvasEmbedPreviewView");
-            const embedTitle = document.getElementById("embedPreviewTitle");
-            const iframe = document.getElementById("embedReportIframe");
-            const preCode = document.getElementById("embedCodePre");
+        function toggleAutoSyncScreen() {
+            const sw = document.getElementById("switchAutoSyncScreen");
+            isScreenAutoSyncEnabled = sw ? sw.checked : false;
+            setupScreenAutoSync();
+        }
 
-            if (headerNav) headerNav.classList.add("d-none");
-            if (viewLogs) viewLogs.classList.add("d-none");
-            if (viewNodes) viewNodes.classList.add("d-none");
-            if (viewDeliv) viewDeliv.classList.add("d-none");
+        function setupScreenAutoSync() {
+            if (screenAutoSyncTimer) {
+                clearInterval(screenAutoSyncTimer);
+                screenAutoSyncTimer = null;
+            }
+            const viewScreen = document.getElementById("canvasScreenView");
+            const isScreenTabActive = viewScreen && !viewScreen.classList.contains("d-none");
+            const isCanvasOpen = !document.getElementById("gptCanvas")?.classList.contains("collapsed");
 
-            if (viewEmbed) viewEmbed.classList.remove("d-none");
-            if (embedTitle) embedTitle.innerText = title || "全景评测报告";
-
-            if (preCode) preCode.style.display = "none";
-            if (iframe) {
-                iframe.style.display = "block";
-                iframe.src = url;
+            if (isScreenAutoSyncEnabled && isScreenTabActive && isCanvasOpen) {
+                screenAutoSyncTimer = setInterval(() => {
+                    refreshDeviceScreen(false);
+                }, 1800);
             }
         }
 
-        async function openEmbeddedCode(filename, title) {
-            const canvas = document.getElementById("gptCanvas");
-            if (canvas && canvas.classList.contains("collapsed")) {
-                canvas.classList.remove("collapsed");
+        async function refreshDeviceScreenManual() {
+            await refreshDeviceScreen(true);
+        }
+
+        async function refreshDeviceScreen(isManual = false) {
+            const imgEl = document.getElementById("screenMirrorImg");
+            const emptyEl = document.getElementById("screenEmptyPlaceholder");
+            const statusFooter = document.getElementById("screenStatusFooter");
+            if (!imgEl) return;
+
+            // 1. 确定目标设备 ID
+            let devId = currentScreenDeviceId;
+            if (!devId) {
+                if (activeConsoleDeviceId && activeConsoleDeviceId !== "mock-device") {
+                    devId = activeConsoleDeviceId;
+                } else if (availableDevices && availableDevices.length > 0) {
+                    devId = availableDevices[0].id;
+                }
             }
 
-            currentEmbedType = "code";
-            currentEmbedTarget = filename;
-
-            const headerNav = document.getElementById("canvasHeaderNav");
-            const viewLogs = document.getElementById("canvasLogsView");
-            const viewNodes = document.getElementById("canvasNodesView");
-            const viewDeliv = document.getElementById("canvasDeliverablesView");
-            const viewEmbed = document.getElementById("canvasEmbedPreviewView");
-            const embedTitle = document.getElementById("embedPreviewTitle");
-            const iframe = document.getElementById("embedReportIframe");
-            const preCode = document.getElementById("embedCodePre");
-
-            if (headerNav) headerNav.classList.add("d-none");
-            if (viewLogs) viewLogs.classList.add("d-none");
-            if (viewNodes) viewNodes.classList.add("d-none");
-            if (viewDeliv) viewDeliv.classList.add("d-none");
-
-            if (viewEmbed) viewEmbed.classList.remove("d-none");
-            if (embedTitle) embedTitle.innerText = title || `用例代码: ${filename}`;
-
-            if (iframe) iframe.style.display = "none";
-            if (preCode) {
-                preCode.style.display = "block";
-                preCode.innerText = `正在从服务器读取固化脚本 ${filename}...`;
+            if (!devId || devId === "mock-device" || devId === "local-simulator") {
+                if (isManual && statusFooter) {
+                    statusFooter.innerText = "未检测到可连接的物理真机设备";
+                }
+                return;
             }
 
             try {
-                const res = await fetch(`/api/solidified_cases/${encodeURIComponent(filename)}/content`);
-                const data = await res.json();
-                if (data.success && preCode) {
-                    preCode.innerText = data.content;
-                } else if (preCode) {
-                    preCode.innerText = `# 读取脚本失败: ${data.message || '文件不存在'}`;
+                if (statusFooter && isManual) {
+                    statusFooter.innerText = `正在同步 [${devId}] 实时屏幕...`;
                 }
+
+                // 添加防缓存时间戳
+                const timestamp = Date.now();
+                const screenshotUrl = `/api/devices/${encodeURIComponent(devId)}/screenshot?t=${timestamp}`;
+
+                // 预加载检测图片
+                const testImg = new Image();
+                testImg.onload = () => {
+                    imgEl.src = screenshotUrl;
+                    imgEl.classList.remove("d-none");
+                    if (emptyEl) emptyEl.classList.add("d-none");
+                    if (statusFooter) {
+                        const nowStr = new Date().toLocaleTimeString();
+                        statusFooter.innerText = `画面实时同步正常 · ${nowStr}`;
+                    }
+                };
+                testImg.onerror = () => {
+                    if (isManual && statusFooter) {
+                        statusFooter.innerText = `设备 [${devId}] 正在准备或处于锁屏黑屏`;
+                    }
+                };
+                testImg.src = screenshotUrl;
             } catch (e) {
-                if (preCode) preCode.innerText = `# 读取脚本异常: ${e}`;
+                if (statusFooter) statusFooter.innerText = `捕获屏幕异常: ${e}`;
             }
         }
 
-        function closeEmbedPreview() {
-            const viewEmbed = document.getElementById("canvasEmbedPreviewView");
-            const headerNav = document.getElementById("canvasHeaderNav");
-            const iframe = document.getElementById("embedReportIframe");
-
-            if (viewEmbed) viewEmbed.classList.add("d-none");
-            if (iframe) iframe.src = "";
-            if (headerNav) headerNav.classList.remove("d-none");
-
-            // 恢复常规 Tab 显示
-            switchCanvasTab("logs");
+        // 兼容外部旧调用：openEmbeddedReport / openEmbeddedCode 优雅转为新窗口或本地用例看板
+        function openEmbeddedReport(url, title) {
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                alert("全景评测报告查看：请在本地用例看板中查看已归档的报告资产。");
+            }
         }
 
-        function refreshEmbedPreview() {
-            if (currentEmbedType === "report" && currentEmbedTarget) {
-                const iframe = document.getElementById("embedReportIframe");
-                if (iframe) iframe.src = currentEmbedTarget;
-            } else if (currentEmbedType === "code" && currentEmbedTarget) {
-                openEmbeddedCode(currentEmbedTarget, document.getElementById("embedPreviewTitle").innerText);
+        function openEmbeddedCode(filename, title) {
+            switchMainWorkspaceMode('local');
+            const searchInput = document.getElementById('localCaseSearchInput');
+            if (searchInput && filename) {
+                searchInput.value = filename;
+                onSearchLocalCases(filename);
             }
         }
 
@@ -3392,6 +3399,12 @@
 
                 updateConsoleLogs();
 
+                const viewScreen = document.getElementById("canvasScreenView");
+                const isScreenTabActive = viewScreen && !viewScreen.classList.contains("d-none");
+                if (isScreenTabActive && isScreenAutoSyncEnabled) {
+                    refreshDeviceScreen(false);
+                }
+
                 if (data.status === "COMPLETED" || data.status === "FAILED") {
                     clearInterval(sessionPollTimer);
                 }
@@ -3411,6 +3424,14 @@
                 canvas.classList.remove("collapsed");
             }
             switchCanvasTab('logs');
+        }
+
+        function openCanvasScreen() {
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && canvas.classList.contains("collapsed")) {
+                canvas.classList.remove("collapsed");
+            }
+            switchCanvasTab('screen');
         }
 
         // 渲染对话流 (无头像/无名称)
@@ -3634,9 +3655,16 @@
                         const stepTitle = st.title || `阶段 ${stepNum}`;
                         conclusionText += `${idx + 1}. Step ${stepNum}：${stepTitle}（耗时 ${st.duration || '0.8s'}，验证通过）\n`;
                     });
-                    conclusionText += `\n所有规划交互与界面转场断言校验达成率 100%。业务操作时序已成功固化为本地零 Token 自动化回归脚本，后续可随时调用批量回归。`;
+                    conclusionText += `\n所有规划交互与界面转场断言校验达成率 100%。测试结果已就绪，您可点击下方【保存为本地案例】将其自动分类并沉淀入本地回归用例库。`;
 
-                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3"><span class="conclusion-inline-link" onclick="openEmbeddedCode('${sessionData.case_name || 'test_beike_search_p0.py'}', '固化脚本源码')"><i class="bi bi-code-slash"></i> 查看固化脚本源码</span>${sessionData.report_url ? `<span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '全景评测报告')"><i class="bi bi-file-earmark-bar-graph"></i> 查看全景评测报告</span>` : ''}</div>`;
+                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3">
+                        <span class="conclusion-inline-link" onclick="openCanvasLogs()"><i class="bi bi-terminal"></i> 查看全量日志</span>
+                        <span class="conclusion-inline-link" onclick="openCanvasScreen()"><i class="bi bi-display"></i> 查看端侧屏幕</span>
+                        ${(sessionData.is_solidified && sessionData.solidified_filename)
+                            ? `<span class="conclusion-inline-link text-success" onclick="openEmbeddedCode('${sessionData.solidified_filename}', '本地用例代码')"><i class="bi bi-file-earmark-check-fill text-success"></i> 已入库【${escapeHtml(sessionData.solidified_module || '通用')}】</span>`
+                            : `<span class="conclusion-inline-link text-primary fw-semibold" onclick="saveSessionToLocalCase('${sessionData.session_id}')"><i class="bi bi-bookmark-plus-fill"></i> 保存为本地案例</span>`
+                        }
+                    </div>`;
                 } else {
                     let failedStepIndex = -1;
                     let failedStepTitle = "";
@@ -3679,7 +3707,10 @@
                     conclusionText += `• 阻断关键原因：${failReason}\n`;
                     conclusionText += `• 排错建议：请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查网络连接与待测应用前台运行状态后重新执行。`;
 
-                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3"><span class="conclusion-inline-link" onclick="openCanvasLogs()"><i class="bi bi-terminal"></i> 查看终端详细日志</span>${sessionData.report_url ? `<span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '失败现场排错报告')"><i class="bi bi-file-earmark-bar-graph"></i> 查看现场排错报告</span>` : ''}</div>`;
+                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3">
+                        <span class="conclusion-inline-link" onclick="openCanvasLogs()"><i class="bi bi-terminal"></i> 查看终端详细日志</span>
+                        <span class="conclusion-inline-link" onclick="openCanvasScreen()"><i class="bi bi-display"></i> 查看端侧现场屏幕</span>
+                    </div>`;
                 }
 
                 completionBannerHtml = `
@@ -3690,6 +3721,21 @@
             // ⑤ 轮次尾部精简操作与指标栏 (DeepSeek Harness Turn Tail)
             let turnTailHtml = "";
             if (isFinished) {
+                const isSolidified = (sessionData.is_solidified === true && sessionData.solidified_filename);
+                const solidifyTagHtml = isSolidified
+                    ? `<span class="text-success"><i class="bi bi-shield-check me-1"></i>已入库本地案例 · 【${escapeHtml(sessionData.solidified_module || '通用')}】</span>`
+                    : (isSuccess 
+                        ? `<span class="text-muted"><i class="bi bi-check2-circle me-1"></i>测试验证完成 (待用户主动入库)</span>`
+                        : `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>测试未达成</span>`
+                    );
+
+                const saveOrViewBtnHtml = isSolidified
+                    ? `<button class="dsh-tail-btn ms-2 text-success" onclick="openEmbeddedCode('${sessionData.solidified_filename}', '查看本地用例代码')" title="查看已归档的自动化用例代码"><i class="bi bi-code-slash me-1"></i> 查看入库脚本</button>`
+                    : (isSuccess
+                        ? `<button class="dsh-tail-btn ms-2 text-primary" id="saveCaseBtn_${sessionData.session_id}" onclick="saveSessionToLocalCase('${sessionData.session_id}')" title="经测试验证满意后，主动保存为本地确定性用例并自动分类"><i class="bi bi-bookmark-plus-fill me-1"></i> 保存为本地案例</button>`
+                        : ``
+                    );
+
                 turnTailHtml = `
                     <div class="dsh-turn-tail">
                         <div class="d-flex align-items-center gap-2">
@@ -3697,15 +3743,13 @@
                             <span>·</span>
                             <span>${steps.length} 阶段节点</span>
                             <span>·</span>
-                            <span class="${isSuccess ? 'text-success' : 'text-muted'}"><i class="bi ${isSuccess ? 'bi-shield-check' : 'bi-file-earmark-code'} me-1"></i>${isSuccess ? '测试脚本已固化' : '测试用例已归档'}</span>
+                            ${solidifyTagHtml}
                         </div>
                         <div class="dsh-tail-actions">
                             <button class="dsh-tail-btn" onclick="copySessionGoal('${escapeHtml(sessionData.goal || '')}')" title="复制测试目标">
                                 <i class="bi bi-clipboard me-1"></i> 复制目标
                             </button>
-                            <button class="dsh-tail-btn ms-2" onclick="openEmbeddedCode('${sessionData.case_name || 'test_beike_search_p0.py'}', '自动化用例代码')" title="在右侧工作台查看固化的自动化用例代码">
-                                <i class="bi bi-code-slash me-1"></i> 脚本代码
-                            </button>
+                            ${saveOrViewBtnHtml}
                         </div>
                     </div>
                 `;
@@ -3871,6 +3915,43 @@
         function copySessionGoal(text) {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(text);
+            }
+        }
+
+        async function saveSessionToLocalCase(sessionId) {
+            const btn = document.getElementById(`saveCaseBtn_${sessionId}`);
+            const originalHtml = btn ? btn.innerHTML : "";
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 10px; height: 10px;"></span> 正在智能分析归类...`;
+            }
+            try {
+                const formData = new FormData();
+                const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/save_to_local_case`, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`🎉 用例已成功入库！\n🏷️ 自动分类：【${data.module}】\n🏷️ 用例标题：${data.title}\n📄 脚本文件：${data.filename}`);
+                    await pollCurrentSession();
+                    await loadSolidifiedCasesWorkspace();
+                    if (typeof loadSolidifiedCases === "function") {
+                        await loadSolidifiedCases();
+                    }
+                } else {
+                    alert(data.message || "保存本地用例失败");
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                }
+            } catch (e) {
+                alert("保存本地用例请求异常: " + e);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
             }
         }
 

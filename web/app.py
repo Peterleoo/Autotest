@@ -91,6 +91,32 @@ async def get_devices():
 
     return {"android_devices": devices, "ios_node": ios_node}
 
+@app.get("/api/devices/{device_id}/screenshot")
+async def get_device_screenshot(device_id: str):
+    """获取指定真机设备的实时屏幕截图 (PNG 二进制流)"""
+    adb_bin = app_mgr.adb_bin
+    try:
+        # 1. 尝试直接通过原生 ADB exec-out screencap -p 抓取端侧画面
+        if device_id and device_id not in ["mock-device", "local-simulator", "default"]:
+            res = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap", "-p"], capture_output=True, timeout=6)
+            if res.returncode == 0 and res.stdout and len(res.stdout) > 200:
+                return Response(content=res.stdout, media_type="image/png")
+    except Exception as e:
+        logger.warning(f"获取设备 [{device_id}] 实时屏幕截图失败: {e}")
+
+    # 2. 若直连抓取受阻，查找最近一次自动化执行产出的视觉感知截屏作为兜底
+    try:
+        screenshots_dir = settings.REPORTS_DIR / "screenshots"
+        if screenshots_dir.exists():
+            pngs = sorted(screenshots_dir.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
+            if pngs:
+                with open(pngs[0], "rb") as f:
+                    return Response(content=f.read(), media_type="image/png")
+    except Exception:
+        pass
+
+    return Response(status_code=404, content=b"Device screenshot unavailable", media_type="text/plain")
+
 @app.get("/api/apps")
 async def get_apps():
     """获取已下载的安装包列表与元数据"""
@@ -312,31 +338,45 @@ def save_cases_metadata(data: Dict[str, Any]):
 
 def auto_categorize_case(goal: str, title: str = "", steps: list = None) -> tuple:
     """根据用例目标及执行步骤，智能识别业务模块、用例层级与中文标题"""
-    combined_text = f"{goal} {title} "
-    if steps:
-        for s in steps:
-            if isinstance(s, dict):
-                combined_text += f"{s.get('title', '')} {s.get('desc', '')} "
-    t_lower = combined_text.lower()
-    
-    if any(k in t_lower for k in ["搜索", "筛选", "商圈", "找房", "二手房", "整租", "合租", "租房", "买房", "朝阳", "望京", "租金", "户型", "小区"]):
-        module = "房源搜索"
-        level = "P0" if any(k in t_lower for k in ["搜索", "商圈", "筛选", "租金"]) else "P1"
-    elif any(k in t_lower for k in ["发布", "委托", "售房", "出租", "表单", "录入", "必填", "校验", "拦截", "提交", "售价"]):
-        module = "业务表单"
-        level = "P0" if any(k in t_lower for k in ["必填", "校验", "拦截", "提交"]) else "P1"
-    elif any(k in t_lower for k in ["登录", "注册", "手机号", "验证码", "密码", "协议", "授权", "退出登录", "退出"]):
+    g_lower = f"{goal} {title}".lower()
+
+    # 优先基于用户的核心测试目标进行定性
+    if any(k in g_lower for k in ["登录", "注册", "手机号", "验证码", "密码", "协议", "授权", "退出登录"]):
         module = "用户鉴权"
         level = "P0"
-    elif any(k in t_lower for k in ["导航", "tab", "底栏", "金刚区", "巡检", "遍历", "流转", "返回", "首页", "切换"]):
+    elif any(k in g_lower for k in ["搜索", "筛选", "商圈", "找房", "二手房", "整租", "合租", "租房", "买房", "租金", "户型"]):
+        module = "房源搜索"
+        level = "P0" if any(k in g_lower for k in ["搜索", "商圈", "筛选", "租金"]) else "P1"
+    elif any(k in g_lower for k in ["发布", "委托", "售房", "出租", "表单", "录入", "必填"]):
+        module = "业务表单"
+        level = "P0" if any(k in g_lower for k in ["必填", "拦截", "提交"]) else "P1"
+    elif any(k in g_lower for k in ["导航", "tab", "底栏", "金刚区", "巡检", "遍历", "流转"]):
         module = "核心导航"
         level = "P1"
-    elif any(k in t_lower for k in ["个人中心", "我的", "设置", "缓存", "主题", "深色模式", "偏好", "清理"]):
+    elif any(k in g_lower for k in ["个人中心", "我的", "设置", "缓存", "主题", "深色模式", "偏好", "清理"]):
         module = "系统设置"
         level = "P2"
     else:
-        module = "业务通用"
-        level = "P1"
+        # 次级基于步骤文本综合匹配
+        steps_text = " ".join([f"{s.get('title','')} {s.get('desc','')}" for s in (steps or []) if isinstance(s, dict)]).lower()
+        if any(k in steps_text for k in ["登录", "验证码"]):
+            module = "用户鉴权"
+            level = "P0"
+        elif any(k in steps_text for k in ["搜索", "筛选", "商圈", "找房"]):
+            module = "房源搜索"
+            level = "P0"
+        elif any(k in steps_text for k in ["表单", "发布", "委托", "必填"]):
+            module = "业务表单"
+            level = "P0"
+        elif any(k in steps_text for k in ["导航", "tab", "金刚区"]):
+            module = "核心导航"
+            level = "P1"
+        elif any(k in steps_text for k in ["设置", "缓存", "主题"]):
+            module = "系统设置"
+            level = "P2"
+        else:
+            module = "业务通用"
+            level = "P1"
 
     clean_title = title or goal[:24]
     if len(clean_title) > 28:
@@ -417,8 +457,10 @@ async def save_session_to_local_case(
 
     # 1. 自动智能识别分类与层级
     auto_module, auto_level, clean_title = auto_categorize_case(goal, title, plan_steps)
-    module = custom_module or auto_module
-    final_title = custom_title or clean_title
+    req_module = custom_module.strip() if isinstance(custom_module, str) and custom_module.strip() else None
+    req_title = custom_title.strip() if isinstance(custom_title, str) and custom_title.strip() else None
+    module = req_module or auto_module
+    final_title = req_title or clean_title
 
     # 2. 规范化文件名与前缀
     prefix_map = {
