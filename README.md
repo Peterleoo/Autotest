@@ -1,143 +1,166 @@
-# AI 移动端跨平台自动化测试与脚本固化引擎 (Autotest)
+# 🤖 Autotest AI - 移动端全自动化测试与用例固化工作台
 
-本项目基于 **GitHub 开源生态**（Appium 2.x、Pytest、Requests、Allure）以及 **多模态 AI 智能体技术**（借鉴腾讯 AppAgent 与字节 Midscene.js 的设计精髓），实现**Android（安卓）与 iOS（苹果）应用**的无死板工作流自动化测试。
+[![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/Web-FastAPI%20%2B%20Bootstrap5-009688.svg)](https://fastapi.tiangolo.com/)
+[![ADB Driver](https://img.shields.io/badge/Driver-Native%20ADB%20Speed-success.svg)](https://developer.android.com/tools/adb)
+[![Zero Token Regression](https://img.shields.io/badge/Solidified-Zero%20Token%20Replay-orange.svg)](tests/solidified/)
 
----
-
-## 🌟 核心特色与两阶段设计
-
-1. **前期：AI 自由驱动测试（零门槛，无特定繁重工作流）**
-   - 告别传统硬编码编写大量 Page Object 和繁琐 Locator 的沉重负担。
-   - 用户只需提供一句自然语言意图（例如：*“安装并打开应用，测试输入错误账号密码的交互提示，并验证后端鉴权接口返回”*）。
-   - AI 结合**屏幕截图（多模态视觉）**与**控件树**，自主规划并执行：应用安装 ➔ 点击/输入/滑动 ➔ 接口请求 ➔ 智能断言。
-
-2. **后期：一键测试用例固化（Solidification）**
-   - AI 探索与验证成功后，无侵入式轨迹追踪器会自动记录所有高价值动作。
-   - **一键固化为标准、确定性的 Python (Pytest + Appium + Requests) 原生脚本**，存放于 `tests/solidified/`。
-   - 固化后的用例可直接用于日常回归测试与 CI/CD 流水线，**零 Token 消耗、秒级高速执行、100% 确定性**。
-
-3. **全维度测试覆盖**：
-   - 📦 **应用安装与生命周期**：自动扫描 `apps/` 目录并完成 APK / IPA 安装与权限授予。
-   - 🌐 **接口测试（API Testing）**：统一 Session、Token 传递、数据前后置准备与业务字段校验。
-   - 📱 **功能与业务测试**：端到端业务主链路（登录注册、商品浏览、表单提交等）。
-   - 👆 **交互体验测试**：点击、长按、滑动滚动、软键盘输入、弹窗自动放行、文案可见性断言。
-
-4. **多模型生态支持**：
-   - 支持 **Antigravity / Gemini 授权**接入
-   - 支持 **DeepSeek**（DeepSeek-V3 / DeepSeek-R1）
-   - 支持 **Claude / Anthropic**（系统已就绪）
-   - 支持任意 **OpenAI 兼容协议**（本地 Ollama / vLLM / 通义千问等）
+**Autotest AI** 是一套面向移动端应用（Android / iOS）的**全智能自动化测试与确定性脚本固化工作台**。融合大语言模型（DeepSeek、Gemini / Antigravity、Claude、OpenAI 等）与原生 ADB 极速真机驱动，实现**“自然语言意图驱动 ➔ 多模态真机全自动测试 ➔ 智能自然语言问答式诊断 ➔ 零 Token 确定性 Python 脚本一键固化”**的全链路闭环。
 
 ---
 
-## 📁 目录结构
+## 🌟 核心特性与架构亮点
 
-```
+### 1. 🖥️ 桌面级 Web 交互工作台
+- **现代化极简三栏布局**：
+  - **左侧会话区**：历史测试任务持久化归档，进行中任务带有**实时动态转圈指示灯**，支持单任务检索与删除；
+  - **中央对话流**：基于自然语言的沉浸式测试流，支持**任务规划推理（Thought）折叠展开**与**多阶段节点执行跟踪**；
+  - **右侧工作台（Canvas）**：默认优雅折叠，内嵌**实时终端控制台、步骤时序节点、内嵌式固化脚本查看器与全景评测报告查看器**，无需在浏览器多标签页之间繁琐跳转。
+- **双模工作台无缝切换**：
+  - **AI 测试模式**：自然语言意图驱动、实时设备调度与多轮意图纠偏；
+  - **本地用例看板**：已固化自动化资产集中管理，支持分类检索、一键 AI 复用与本地毫秒级直接回放。
+
+### 2. ⚡ 纯真机原生 ADB 极速引擎（免驱动安装）
+- **真机实测优先**：全面拥抱真实端侧体验，内置纯真机在线检测硬拦截，未连真机禁止盲测，杜绝脱机无效调用；
+- **原生 ADB 极速驱动**：告别重量级 Appium 守护进程与繁琐的辅助 APK 依赖，利用原生 ADB 管道直连真机，彻底免疫系统安装弹窗与权限拦截；
+- **即插即用自动巡检**：多设备矩阵并发支持，精准感知 USB 连线状态与设备离线健康检查。
+
+### 3. 💬 单任务多轮连续对话与纠偏
+- 支持在**同一条测试任务中进行连续自然对话**；
+- 测试推进过程中可随时发送接续指令、纠偏指令或补充测试目标，系统自动在当前上下文内追加步骤流转，**无需频繁新建会话**。
+
+### 4. ✍️ 智能打字机效应与问答式自然结论
+- **像大模型聊天回答一样输出**：摒弃繁重死板的边框卡片，以自然对话口吻直接输出测试结论；
+  - **测试通过**：清晰归纳各阶段耗时、验证通过链路与固化脚本说明；
+  - **测试受阻**：明确标出已通过步骤、当前卡点位置、阻断深度原因与排错建议；
+- **智能打字机效应（Typewriter Effect）**：
+  - 仅在测试任务**首次实时完成产出结论**时，以 16ms 节奏逐字流出并伴随闪烁光标；
+  - 页面刷新（F5）、重新加载或切换查看历史任务时，**自动静默全量呈现，绝不重复打字**；
+- **轻量内嵌直达文字链**：结论末尾提供极简直达链，一键呼出右侧工作台查看脚本源码或失败现场报告。
+
+### 5. 🎯 动态智能用例推荐与应用管理
+- 主界面空状态下动态根据已上传待测安装包（如 `xianghe_zhaofang.apk`）生成智能推荐业务用例网格（P0 核心流程、字段必填校验、全屏画廊轮播等）；
+- 支持 **🔄 换一批** 实时刷新不同业务场景用例，点击卡片即可一键填充并启动测试。
+
+### 6. 💡 全屏聚光灯新手 3 步向导
+- 为新用户提供全屏高亮聚光灯指引：
+  1. **第一步**：选择绑定的物理真机；
+  2. **第二步**：输入自然语言业务测试目标；
+  3. **第三步**：实时查看执行规划、步骤流转与交付物；
+- 完成向导后弹出就绪卡片，可在顶部顶栏随时再次呼出复习。
+
+### 7. 🛡️ 零 Token 确定性脚本固化（Solidification）
+- 测试通过后，动作追踪器将操作时序自动编译固化为纯 Python 原生回归脚本（存放在 `tests/solidified/` 目录下）；
+- 后续可脱离大模型调用，以**零 Token、零延迟、100% 确定性**直接用于 CI/CD 与高频冒烟回归。
+
+---
+
+## 📁 项目目录结构
+
+```text
 f:\Autotest
-├── apps/                   # 存放待测安装包 (.apk / .ipa)
+├── apps/                        # 待测安装包目录 (自动发现 APK / IPA)
 ├── config/
-│   ├── settings.py         # 平台、设备、Appium Server 与接口 Base URL 配置
-│   └── ai_config.py        # 多模型厂商接入配置 (DeepSeek, Claude, Antigravity, OpenAI)
+│   ├── settings.py              # 全局路径、设备超时与端口配置
+│   └── ai_config.py             # 多大模型厂商接入 (DeepSeek / Gemini / Claude / OpenAI)
 ├── core/
-│   ├── app_manager.py      # 应用安装、卸载、更新与设备生命周期管理
-│   ├── driver_factory.py   # Appium 驱动管理工厂 (Android UiAutomator2 / iOS XCUITest)
-│   ├── api_client.py       # 统一接口测试客户端 (会话、请求历史与断言)
-│   └── llm_client.py       # 统一多模型调用与结构化决策层
+│   ├── app_manager.py           # 原生应用生命周期与包管理
+│   ├── task_manager.py          # 任务调度中心、步骤流水线与多会话状态机
+│   └── llm_client.py            # 大模型统一网关与结构化推理
 ├── ai_engine/
-│   ├── screen_parser.py    # 屏幕截屏与控件树紧凑视图解析
-│   ├── action_executor.py  # 原子操作执行器 (Tap, Type, Swipe, API, Assert) 与动作追踪
-│   ├── test_agent.py       # AI 智能探索与测试决策主循环
-│   └── solidifier.py       # 核心：测试动作轨迹一键固化编译引擎
+│   ├── screen_parser.py         # 视觉截屏与 OCR 感知
+│   ├── action_executor.py       # 原子动作执行器 (点击/滑动/输入/断言)
+│   └── solidifier.py            # 动作轨迹一键固化编译引擎
+├── data/
+│   └── sessions/                # 历史测试会话与诊断日志 JSON 存储
 ├── tests/
-│   ├── solidified/         # 存放 AI 跑通后自动固化生成的确定性测试脚本 (如 test_login.py)
-│   └── test_engine.py      # 引擎能力自检测试
-├── .env.example            # 环境变量配置模板
-├── pytest.ini              # Pytest 运行配置
-├── requirements.txt        # Python 依赖清单
-└── run_ai_test.py          # AI 驱动测试与固化入口 CLI
+│   ├── solidified/              # 固化生成的标准自动化测试脚本 (.py)
+│   └── test_engine.py           # 基础驱动自检单元测试
+├── web/
+│   ├── app.py                   # FastAPI 后端服务与 RESTful 接口
+│   ├── static/                  # 静态资源 (CSS / JS / 依赖库)
+│   └── templates/
+│       └── index.html           # 桌面级 Web 交互工作台前端单页
+├── start_web.bat                # Web 端一键启动脚本 (Windows)
+├── requirements.txt             # Python 依赖清单
+└── README.md                    # 项目说明文档
 ```
 
 ---
 
-## 🚀 快速上手与使用指引
+## 🚀 极速上手指引
 
-### 1. 放入待测应用
-将您的测试安装包直接拷贝到 `apps/` 目录下（例如 `apps/my_app.apk`）。
-程序在启动时会自动发现并执行安装与授权。
+### 1. 环境准备
+确保本机已安装：
+- **Python 3.10+**
+- **Android SDK Platform-Tools (ADB)**：确保终端执行 `adb devices` 能够正常输出设备列表。
 
-### 2. 配置模型（任选其一）
-复制 `.env.example` 为 `.env`，根据需要配置对应的 AI Key：
+安装 Python 依赖：
+```bash
+pip install -r requirements.txt
+```
+
+### 2. 准备手机真机设备
+1. 使用 USB 数据线将手机连接至电脑；
+2. 手机开启【开发者选项】并启用【USB 调试】；
+3. 手机屏幕弹出授权弹窗时，勾选【始终允许这台电脑进行调试】并点击确定；
+4. 终端执行 `adb devices`，确认状态为 `device`。
+
+### 3. 配置大模型 API（二选一）
+在根目录下复制 `.env.example` 为 `.env`（或在 Web 界面底栏直接配置）：
 ```env
-# 启用模型类型: deepseek / claude / antigravity / openai
+# 方式 A: 使用 DeepSeek
 AI_PROVIDER=deepseek
-
-# 若使用 DeepSeek:
-DEEPSEEK_API_KEY=your_key
+DEEPSEEK_API_KEY=your_deepseek_api_key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 
-# 若使用 Claude (系统环境变量已默认支持):
-# AI_PROVIDER=claude
-
-# 若使用 Antigravity / Gemini:
+# 方式 B: 使用 Antigravity / Gemini
 # AI_PROVIDER=antigravity
-# ANTIGRAVITY_API_KEY=your_gemini_key
+# ANTIGRAVITY_API_KEY=your_gemini_api_key
 ```
 
-### 3. 跨平台运行配置
-
-#### A. 安卓（Android - Windows 本地运行）
-1. 连接 Android 真机（开启 USB 调试）或启动 Android 模拟器。
-2. 在终端启动 Appium 服务：
-   ```bash
-   appium
-   ```
-3. 检查设备连接：
-   ```bash
-   adb devices
-   ```
-
-#### B. 苹果（iOS - 局域网 macOS 机器支持）
-1. 在局域网内的 Mac 机器上启动 Appium 服务（监听 `0.0.0.0:4723`）：
-   ```bash
-   appium --address 0.0.0.0 --port 4723
-   ```
-2. 在 Windows 的 `.env` 中指定 Mac 的局域网 IP：
-   ```env
-   TARGET_PLATFORM=ios
-   APPIUM_SERVER_URL=http://192.168.1.100:4723
-   IOS_DEVICE_NAME=iPhone 15
-   IOS_BUNDLE_ID=com.example.yourapp
-   ```
+### 4. 一键启动 Web 工作台
+在 Windows 资源管理器中**双击运行 `start_web.bat`**，或在命令行中运行：
+```bash
+python -m uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
+```
+打开浏览器访问：**[http://127.0.0.1:8000](http://127.0.0.1:8000)**。
 
 ---
 
-### 4. 运行 AI 自动化测试与自动固化
+## 💡 核心操作流程
 
-只需执行统一入口 `run_ai_test.py`，并输入自然语言意图：
+### 流程一：发起全新 AI 测试
+1. 进入主界面，在底栏胶囊工具栏中勾选您的**物理真机**；
+2. 在输入框中输入自然语言测试意图，例如：
+   > *“打开应用，在首页搜索框输入‘望京’，进入搜索结果页并断言房源列表展示成功。”*
+   *(或直接点击中央推荐卡片快速填充)*；
+3. 按 **Enter** 发送，AI 自动进行规划推理（Thought），并在设备上执行端侧转场与视觉断言；
+4. 测试完毕后，系统以自然语言回答形式通过**打字机流式输出业务结论**，并在末尾提供固化源码与评测报告查看链接。
 
-```bash
-# 示例 1: 登录与注册测试并固化为 test_login_register.py
-python run_ai_test.py -g "打开应用，测试账号密码登录流程，若有用户协议先点击同意，并调用登录鉴权接口验证" -n "login_register"
+### 流程二：单任务连续对话纠偏
+1. 若测试中途遇到业务逻辑分支需要调整，直接在当前会话的输入框中输入纠偏指令：
+   > *“跳过中间的弹窗引导，直接点击底部的‘合租’频道进行复核。”*
+2. 按 **Enter** 发送，系统在当前会话中实时追加步骤并继续推进，无需重新创建任务。
 
-# 示例 2: 核心业务流程测试
-python run_ai_test.py -g "进入应用首页，搜索商品'手机'，点击第一项加入购物车，并断言页面出现成功提示" -n "business_order_flow"
-```
-
-- AI 将自动接管手机屏幕，完成交互并验证接口。
-- 测试完成后，系统自动在 `tests/solidified/` 目录下生成同名的原生 Python 测试脚本。
+### 流程三：本地固化用例看板与一键回放
+1. 点击顶栏切换至【本地用例】；
+2. 浏览已归档的 P0/P1/P2 用例资产库；
+3. 点击【本地回放】，系统直接调度本地 Python 驱动以**零 Token、毫秒级**执行该确定性脚本，右侧控制台实时输出执行结果。
 
 ---
 
-### 5. 执行固化脚本与查看测试报告（零 AI 消耗）
+## 🛠️ 常见问题排查 (FAQ)
 
-后期进行日常批量回归测试时，直接通过 Pytest 执行固化脚本：
+- **Q1: 界面提示“无法发起测试，未检测到任何物理真机设备”？**
+  - **A**: 系统已全面启用纯真机安全校验。请检查手机 USB 连线，确保在手机端允许了电脑的 USB 调试授权，并在命令行运行 `adb devices` 验证是否显示设备串号。
+- **Q2: 为什么测试完成后刷新页面没有打字机动画？**
+  - **A**: 系统设计了智能状态记忆。打字机效应仅在测试任务实时首次跑通收尾时呈现；刷新页面或加载历史已完成任务时，系统会以静态完整形式秒级呈现，无需再次等待打字过程。
+- **Q3: 如何切换 AI 模型或放行审批策略？**
+  - **A**: 悬浮在输入框底部的配置胶囊中，点击模型名称可切换 DeepSeek / Gemini 等模型，点击审批模式可切换【自动放行】或【人工逐步审核】。
 
-```bash
-# 执行所有固化生成的测试用例
-pytest tests/solidified/ -v -s
+---
 
-# 执行生成 Allure 可视化测试报告
-pytest tests/solidified/ --alluredir=reports/allure_results
-allure serve reports/allure_results
-```
+## 📄 License
+MIT License. 欢迎提 Issue 与 PR 共同完善移动端智能化测试生态！
