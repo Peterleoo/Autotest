@@ -145,6 +145,24 @@ async def download_from_qr(url_or_code: str = Form(...)):
     except Exception as e:
         return {"success": False, "message": str(e)}
 
+@app.post("/api/upload_app")
+async def upload_app_package(file: UploadFile = File(...)):
+    """接收用户上传的 APK / IPA 安装包文件并存入 apps 目录"""
+    try:
+        dest_path = settings.APPS_DIR / file.filename
+        content = await file.read()
+        dest_path.write_bytes(content)
+        info = app_mgr.get_apk_info(dest_path)
+        return {
+            "success": True,
+            "message": f"应用 {file.filename} 上传成功！已完成元数据解析",
+            "filename": file.filename,
+            "label": info.get("label") or dest_path.stem,
+            "package": info.get("package") or settings.ANDROID_APP_PACKAGE
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "message": f"上传失败: {str(e)}"})
+
 ALL_SUGGESTED_CASES = [
     {
         "id": "CASE-01",
@@ -205,9 +223,11 @@ ALL_SUGGESTED_CASES = [
 ]
 
 @app.api_route("/api/ai/suggest_cases", methods=["GET", "POST"])
-async def suggest_cases(app_name: str = Form("象盒找房")):
+async def suggest_cases(request: Request, app_name: Optional[str] = None):
     """AI 测试用例助手：针对当前应用生成完善的多样化测试用例矩阵"""
     import random
+    if not app_name:
+        app_name = request.query_params.get("app_name") or "象盒找房"
     # 随机抽取 4 个不重复的业务用例
     sampled = random.sample(ALL_SUGGESTED_CASES, min(4, len(ALL_SUGGESTED_CASES)))
     return {"app_name": app_name, "cases": sampled}
@@ -577,6 +597,15 @@ async def delete_task_session(session_id: str):
     """删除指定的测试会话记录"""
     ok = task_mgr.delete_session(session_id)
     return {"success": ok}
+
+@app.post("/api/sessions/{session_id}/message")
+async def append_session_message(session_id: str, message: str = Form(...)):
+    """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图"""
+    try:
+        res = task_mgr.append_session_message(session_id, message)
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"success": False, "message": str(e)})
 
 # ==================== 智能测试规划与人机协同执行引擎 ====================
 

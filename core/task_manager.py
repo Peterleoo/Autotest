@@ -148,6 +148,7 @@ class TaskManager:
             "session_id": s["session_id"],
             "title": s["title"],
             "goal": s["goal"],
+            "messages": s.get("messages", [{"role": "user", "content": s.get("goal", ""), "timestamp": s.get("created_at", "")}]),
             "status": s["status"],
             "is_success": is_success,
             "has_fail": has_fail,
@@ -193,15 +194,8 @@ class TaskManager:
         is_auto = (approval_mode == "auto")
         init_status = "RUNNING" if is_auto else "AWAITING_APPROVAL"
 
-        # 自动生成针对测试目标的 AI 深度思考过程
-        thinking_data = {
-            "duration": "1.8s",
-            "bullets": [
-                {"tag": "业务意图解析", "content": f"目标锚定为【{goal}】。通过语义分析识别核心交互链路与界面状态转移。"},
-                {"tag": "跨端定位适配", "content": f"针对分配的设备矩阵，iOS 采用 Predicate 语法定位元素，Android 采用动态 XPath/ID 复合匹配。"},
-                {"tag": "断言与防抖策略", "content": "列表异步加载采用 800ms 防抖等待，首项数据卡片执行模糊文本正则匹配，保障断言幂等性。"}
-            ]
-        }
+        # 🚀 真实调用大模型进行业务意图深度推演与测试步骤动态规划（带毫秒级降级保底）
+        thinking_data, plan_steps = self._generate_ai_plan_and_thinking(goal, is_auto, test_mode)
 
         session = {
             "session_id": session_id,
@@ -215,7 +209,10 @@ class TaskManager:
             "target_devices": device_ids,
             "thinking": thinking_data,
             "clarification": None,
-            "plan_steps": self._decompose_plan_steps(goal, is_auto),
+            "messages": [
+                {"role": "user", "content": goal, "timestamp": datetime.now().strftime("%H:%M:%S")}
+            ],
+            "plan_steps": plan_steps,
             "devices": {},
             "report_url": ""
         }
@@ -267,6 +264,64 @@ class TaskManager:
             self.executor.submit(self._device_worker, session_id, dev_id, session["goal"], session["case_name"], session["test_mode"])
         return True
 
+    def append_session_message(self, session_id: str, message: str) -> Dict[str, Any]:
+        """
+        在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，杜绝频繁新建任务
+        """
+        session = self.sessions.get(session_id)
+        if not session:
+            raise ValueError(f"会话不存在: {session_id}")
+
+        if "messages" not in session or not isinstance(session["messages"], list):
+            session["messages"] = [
+                {"role": "user", "content": session.get("goal", ""), "timestamp": session.get("created_at", "")}
+            ]
+
+        now_str = datetime.now().strftime("%H:%M:%S")
+        session["messages"].append({
+            "role": "user",
+            "content": message,
+            "timestamp": now_str
+        })
+
+        # 为各设备追加用户打断/修正指令日志
+        for dev_id, dev in session.get("devices", {}).items():
+            dev["logs"].append(f"[{now_str}] 💬 [连续对话修正/指令追加]: {message}")
+            dev["action"] = f"响应用户追加指令: {message[:18]}..."
+
+        # 若会话已经处于非 RUNNING 状态（已完成或已中断），重新激活推进
+        if session.get("status") in ["COMPLETED", "FAILED", "AWAITING_APPROVAL"]:
+            session["status"] = "RUNNING"
+            session["is_success"] = None
+            session["error_message"] = None
+            if "plan_steps" not in session or not isinstance(session["plan_steps"], list):
+                session["plan_steps"] = []
+            # 扩展新增一个规划步骤
+            new_step_id = len(session["plan_steps"]) + 1
+            session["plan_steps"].append({
+                "step_id": new_step_id,
+                "title": f"追随指令: {message[:16]}",
+                "desc": f"根据用户多轮追加意图【{message}】执行调整与校验",
+                "status": "RUNNING"
+            })
+            # 重新向目标设备分发执行
+            target_devs = session.get("target_devices", [])
+            if not target_devs and "devices" in session:
+                target_devs = list(session["devices"].keys())
+            for dev_id in target_devs:
+                if dev_id in session.get("devices", {}):
+                    session["devices"][dev_id]["status"] = "QUEUED"
+                self.executor.submit(
+                    self._device_worker,
+                    session_id,
+                    dev_id,
+                    message,
+                    session.get("case_name", "auto_flow"),
+                    session.get("test_mode", "real")
+                )
+
+        return {"success": True, "session_id": session_id, "message_count": len(session["messages"])}
+
     def clarify_session(self, session_id: str, inputs: Dict[str, Any]) -> bool:
         """接收用户在中间区域提交的补充测试参数并继续执行"""
         session = self.sessions.get(session_id)
@@ -307,6 +362,88 @@ class TaskManager:
         except Exception:
             pass
         return f"Android 真机 ({device_id[:8]})"
+
+    def _generate_ai_plan_and_thinking(self, goal: str, is_auto: bool, test_mode: str = "real"):
+        """
+        调用真实大模型（Google Antigravity / Hermes）进行业务意图深度推演与测试用例结构化拆解。
+        若模型调用超时或异常，自动平滑降级至规则解析引擎，确保测试流 100% 不阻塞。
+        """
+        import time
+        from core.llm_client import LLMClient
+
+        init_st = "READY" if is_auto else "PENDING"
+        start_t = time.time()
+
+        system_prompt = (
+            "你是一个资深移动端自动化测试架构专家。请针对用户给出的移动端测试目标，深入推演其业务逻辑与交互链路，"
+            "并规划出合理严密的 4-6 个测试执行步骤。\n"
+            "必须严格输出 JSON 格式，不要包含任何额外非 JSON 字符，结构规范如下：\n"
+            "{\n"
+            '  "thinking": {\n'
+            '    "bullets": [\n'
+            '      {"tag": "业务意图深入剖析", "content": "紧扣目标业务链路，解析核心功能入口与终态校验预期"},\n'
+            '      {"tag": "核心交互路径规划", "content": "推演跨界面状态转移、UI组件定位与关键手势输入操作"},\n'
+            '      {"tag": "端侧风险与断言策略", "content": "推演开屏广告拦截、异步数据加载防抖与关键结果断言规则"}\n'
+            '    ]\n'
+            '  },\n'
+            '  "plan_steps": [\n'
+            '    {"step_id": 1, "title": "步骤简短标题", "desc": "步骤具体动作与预期"}\n'
+            '  ]\n'
+            '}'
+        )
+
+        try:
+            client = LLMClient()
+            ai_res = client.chat_decision(
+                system_prompt=system_prompt,
+                user_prompt=f"测试目标：【{goal}】\n运行模式：{test_mode}"
+            )
+            elapsed = round(time.time() - start_t, 1)
+
+            # 解析 thinking 数据
+            raw_thinking = ai_res.get("thinking") if isinstance(ai_res, dict) else None
+            bullets = []
+            if isinstance(raw_thinking, dict) and isinstance(raw_thinking.get("bullets"), list):
+                for b in raw_thinking["bullets"]:
+                    if isinstance(b, dict) and "tag" in b and "content" in b:
+                        bullets.append({"tag": str(b["tag"]), "content": str(b["content"])})
+
+            # 解析 plan_steps 数据
+            raw_steps = ai_res.get("plan_steps") if isinstance(ai_res, dict) else None
+            parsed_steps = []
+            if isinstance(raw_steps, list) and len(raw_steps) > 0:
+                for idx, s in enumerate(raw_steps, 1):
+                    if isinstance(s, dict):
+                        title = s.get("title") or f"执行阶段 {idx}"
+                        desc = s.get("desc") or s.get("action") or "根据界面反馈执行动作"
+                        parsed_steps.append({
+                            "step_id": idx,
+                            "title": title,
+                            "desc": desc,
+                            "status": init_st
+                        })
+
+            if bullets and parsed_steps:
+                thinking_data = {
+                    "duration": f"{elapsed}s",
+                    "bullets": bullets
+                }
+                logger.info(f"✨ 大模型真实完成意图推演与规划 (耗时 {elapsed}s，共 {len(parsed_steps)} 步骤)")
+                return thinking_data, parsed_steps
+
+        except Exception as e:
+            logger.warning(f"大模型规划推演异常，启动规则引擎兜底: {e}")
+
+        # 降级保底：若 LLM 失败或未返回规范格式，使用本地规则引擎分解
+        fallback_thinking = {
+            "duration": f"{round(time.time() - start_t, 1)}s",
+            "bullets": [
+                {"tag": "业务意图解析", "content": f"目标锚定为【{goal}】。通过语义分析识别核心交互链路与界面状态转移。"},
+                {"tag": "跨端定位适配", "content": f"针对分配的设备矩阵，iOS 采用 Predicate 语法定位元素，Android 采用动态 XPath/ID 复合匹配。"},
+                {"tag": "断言与防抖策略", "content": "列表异步加载采用 800ms 防抖等待，首项数据卡片执行模糊文本正则匹配，保障断言幂等性。"}
+            ]
+        }
+        return fallback_thinking, self._decompose_plan_steps(goal, is_auto)
 
     def _decompose_plan_steps(self, goal: str, is_auto: bool) -> List[Dict[str, Any]]:
         """

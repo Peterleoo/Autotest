@@ -167,6 +167,127 @@
             color: var(--text-main);
         }
 
+        /* 进行中任务单色半环旋转动态标识 (对齐原稿交互动效) */
+        .session-running-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 1.8px solid var(--border-subtle);
+            border-top-color: var(--text-main);
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: sessionSpin 0.75s linear infinite;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+        @keyframes sessionSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 主对话区动态推荐用例组件 */
+        .app-suggest-box {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 14px;
+            width: 100%;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease;
+        }
+        .app-suggest-box:hover {
+            border-color: var(--border-hover);
+        }
+        .suggest-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .suggest-app-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-hover);
+            border-radius: 9999px;
+            padding: 2px 10px;
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--text-main);
+        }
+        .suggest-refresh-btn {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            border-radius: 9999px;
+            padding: 3px 10px;
+            font-size: 11.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .suggest-refresh-btn:hover {
+            background-color: var(--bg-surface-hover);
+            color: var(--text-main);
+            border-color: var(--border-hover);
+        }
+        .suggest-refresh-btn.rotating i {
+            animation: spinOnce 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes spinOnce {
+            100% { transform: rotate(360deg); }
+        }
+        .suggest-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        @media (max-width: 768px) {
+            .suggest-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .suggest-card-item {
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .suggest-card-item:hover {
+            background-color: var(--bg-surface-hover);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+        .suggest-card-title {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .suggest-card-desc {
+            font-size: 11px;
+            color: var(--text-sub);
+            line-height: 1.45;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
         /* 单色微型胶囊 (Monochrome Tags) */
         .mono-tag {
             font-size: 10px;
@@ -204,6 +325,9 @@
         }
         .gpt-header {
             height: 50px;
+            min-height: 50px;
+            max-height: 50px;
+            flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -211,6 +335,7 @@
             background-color: var(--bg-main);
             border-bottom: 1px solid var(--border-subtle);
             z-index: 10;
+            box-sizing: border-box;
         }
 
         /* ChatGPT 桌面端顶部居中分段控制器 (AI测试 vs 本地用例) */
@@ -336,13 +461,14 @@
             max-width: 880px;
             width: 100%;
             margin: 0 auto;
-            padding: 16px 20px 20px 20px;
+            padding: 24px 20px 24px 20px;
             display: flex;
             flex-direction: column;
             gap: 12px;
             height: 100%;
             min-height: 0;
             overflow: hidden;
+            box-sizing: border-box;
         }
         .local-workspace-header {
             flex-shrink: 0;
@@ -439,6 +565,7 @@
         }
         .chat-scroll-area {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -1092,6 +1219,8 @@
             background-color: var(--bg-sidebar);
             border-left: 1px solid var(--border-subtle);
             height: 100vh;
+            min-height: 0;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
@@ -1110,6 +1239,7 @@
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
         }
         .canvas-tabs-nav {
             display: flex;
@@ -1132,6 +1262,41 @@
         .canvas-tab-btn.active {
             color: var(--text-main);
             background-color: var(--bg-surface);
+            font-weight: 600;
+        }
+
+        /* Canvas 内部子分段选单 (Deliverables vs Solidified Cases) */
+        .canvas-subtabs-nav {
+            display: inline-flex;
+            align-items: center;
+            background-color: var(--bg-main);
+            border: 1px solid var(--border-subtle);
+            border-radius: 9999px;
+            padding: 2px;
+            gap: 2px;
+        }
+        .canvas-subtab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-sub);
+            font-size: 11px;
+            font-weight: 500;
+            padding: 3px 9px;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            user-select: none;
+        }
+        .canvas-subtab-btn:hover {
+            color: var(--text-main);
+        }
+        .canvas-subtab-btn.active {
+            color: var(--text-main);
+            background-color: var(--bg-surface);
+            border-color: var(--border-strong);
             font-weight: 600;
         }
 
@@ -1205,12 +1370,6 @@
             <button class="gpt-new-btn" onclick="startNewChat()">
                 <i class="bi bi-plus-lg"></i>
                 <span>新建测试任务</span>
-            </button>
-
-            <!-- 智能用例推荐抽屉入口 -->
-            <button class="gpt-new-btn" style="border-style: dashed;" onclick="openSuggestedCasesModal()">
-                <i class="bi bi-stars"></i>
-                <span>智能用例推荐库</span>
             </button>
         </div>
 
@@ -1346,7 +1505,7 @@
         <div id="sessionEnvAlertBanner" class="env-alert-banner d-none"></div>
 
         <!-- ======================= 模式 A：AI测试视图 (含滚动对话区与底部悬浮输入胶囊) ======================= -->
-        <div id="workspaceAiView" class="d-flex flex-column flex-grow-1 overflow-hidden" style="position: relative;">
+        <div id="workspaceAiView" class="d-flex flex-column flex-grow-1 overflow-hidden" style="position: relative; flex: 1 1 0px; min-height: 0;">
             <!-- 滚动对话区 -->
             <div class="chat-scroll-area" id="chatScrollArea">
                 <div class="chat-content-container">
@@ -1428,26 +1587,30 @@
                             </div>
                         </div>
 
-                        <div class="empty-icon-circle">
-                            <i class="bi bi-cpu"></i>
-                        </div>
-                        <div class="empty-title">今天想执行什么自动化测试？</div>
-                        <div class="prompt-grid" id="emptyPromptGrid">
-                            <div class="prompt-card" onclick="fillPrompt('在首页顶部搜索栏输入【精装两居】，触发搜索并断言房源列表数据返回')">
-                                <div class="prompt-card-title"><span class="mono-tag me-1">功能流转</span> 精装房源搜索断言</div>
-                                <div class="prompt-card-desc">在首页顶部搜索栏输入关键词，断言房源列表及返回有效性</div>
+                        <!-- 动态智能用例推荐组件 (上传应用后动态生成推荐用例 + 🔄 换一批刷新) -->
+                        <div class="app-suggest-box" id="appSuggestBox">
+                            <div class="suggest-header">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-stars" style="color: var(--text-main); font-size: 14px;"></i>
+                                    <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">智能用例推荐</span>
+                                    <div class="suggest-app-badge" id="currentSuggestAppBadge" title="当前生成用例的目标应用">
+                                        <i class="bi bi-box-seam" style="font-size: 11px;"></i>
+                                        <span id="suggestTargetAppLabel">象盒找房 (默认应用)</span>
+                                    </div>
+                                    <button class="btn btn-sm py-0 px-2" style="font-size: 11px; color: var(--text-sub); border: 1px dashed var(--border-subtle); border-radius: 9999px;" onclick="openAppPackagesModal()" title="上传新应用 APK/IPA 或从应用库选择">
+                                        <i class="bi bi-upload me-1"></i>更换/上传应用
+                                    </button>
+                                </div>
+                                <button class="suggest-refresh-btn" id="btnRefreshSuggestCases" onclick="refreshAppSuggestedCases()" title="换一批不同业务场景测试用例">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>换一批</span>
+                                </button>
                             </div>
-                            <div class="prompt-card" onclick="fillPrompt('遍历首页金刚区各入口，并依次切换底部导航栏各一级 Tab')">
-                                <div class="prompt-card-title"><span class="mono-tag me-1">核心遍历</span> 核心导航链路遍历</div>
-                                <div class="prompt-card-desc">自动巡检金刚区入口与底栏四个核心模块页面可用性</div>
-                            </div>
-                            <div class="prompt-card" onclick="fillPrompt('点击发布房源，在必填项输入合法与非法参数，测试字段异常拦截')">
-                                <div class="prompt-card-title"><span class="mono-tag me-1">异常拦截</span> 发布流程与异常拦截</div>
-                                <div class="prompt-card-desc">测试必填校验、电话格式限制及表单提交反馈</div>
-                            </div>
-                            <div class="prompt-card" onclick="fillPrompt('进入任意房源详情页，滑动查看画廊大图并断言在线咨询按钮可用')">
-                                <div class="prompt-card-title"><span class="mono-tag me-1">详情交互</span> 房源详情与画廊交互</div>
-                                <div class="prompt-card-desc">测试多图轮播滑动、IM 在线咨询浮窗及经纪人名片状态</div>
+                            <!-- 动态用例卡片网格 -->
+                            <div class="suggest-grid" id="suggestCasesGrid">
+                                <div class="p-3 text-center text-muted w-100 col-span-2" style="grid-column: 1 / -1; font-size: 12px;">
+                                    <span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span> 正在根据待测应用生成智能推荐用例...
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1470,13 +1633,13 @@
 
                         <!-- 1. 设备选择胶囊 (带在线状态呼吸指示灯) -->
                         <div class="position-relative">
-                            <div class="pill-btn" onclick="togglePopover('devicePopover')" title="选择协同测试设备">
+                            <div class="pill-btn" onclick="togglePopover('devicePopover', event)" title="选择协同测试设备">
                                 <span class="status-indicator-dot dot-online" id="deviceStatusDot"></span>
                                 <i class="bi bi-phone"></i>
                                 <span id="deviceSummaryLabel">1 台设备在线</span>
                                 <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
                             </div>
-                            <div class="gpt-popover" id="devicePopover" style="left: 0; width: 280px;">
+                            <div class="gpt-popover" id="devicePopover" style="left: 0; width: 280px;" onclick="event.stopPropagation()">
                                 <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
                                     <span class="small fw-semibold" style="font-size: 11px;">协同测试设备</span>
                                     <span class="small text-muted" style="font-size: 11px; cursor: pointer;" onclick="toggleAllDevices()">全选/反选</span>
@@ -1500,22 +1663,22 @@
 
                         <!-- 2. AI 模型切换胶囊 (用户明确要求补全) -->
                         <div class="position-relative">
-                            <div class="pill-btn" onclick="togglePopover('modelPopover')">
+                            <div class="pill-btn" onclick="togglePopover('modelPopover', event)" title="切换推理与编排大模型">
                                 <i class="bi bi-cpu"></i>
                                 <span id="activeModelLabel">Hermes (DeepSeek)</span>
                                 <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
                             </div>
-                            <div class="gpt-popover" id="modelPopover" style="left: 80px; width: 190px;">
-                                <div class="popover-item active" onclick="quickSelectModel('hermes', 'Hermes (DeepSeek)')">
+                            <div class="gpt-popover" id="modelPopover" style="left: 0; min-width: 195px;" onclick="event.stopPropagation()">
+                                <div class="popover-item active" id="itemModel_hermes" onclick="quickSelectModel('hermes', 'Hermes (DeepSeek)', this)">
                                     <span>Hermes (DeepSeek)</span>
                                 </div>
-                                <div class="popover-item" onclick="quickSelectModel('antigravity', 'Google Antigravity')">
+                                <div class="popover-item" id="itemModel_antigravity" onclick="quickSelectModel('antigravity', 'Google Antigravity', this)">
                                     <span>Google Antigravity</span>
                                 </div>
-                                <div class="popover-item" onclick="quickSelectModel('deepseek', 'DeepSeek 官方')">
+                                <div class="popover-item" id="itemModel_deepseek" onclick="quickSelectModel('deepseek', 'DeepSeek 官方', this)">
                                     <span>DeepSeek 官方</span>
                                 </div>
-                                <div class="popover-item" onclick="quickSelectModel('openai', 'OpenAI 兼容')">
+                                <div class="popover-item" id="itemModel_openai" onclick="quickSelectModel('openai', 'OpenAI 兼容', this)">
                                     <span>OpenAI 兼容</span>
                                 </div>
                             </div>
@@ -1523,17 +1686,23 @@
 
                         <!-- 3. 审批模式胶囊 -->
                         <div class="position-relative">
-                            <div class="pill-btn" onclick="togglePopover('approvalPopover')">
+                            <div class="pill-btn" onclick="togglePopover('approvalPopover', event)" title="切换自动放行 / 人工逐级审批">
                                 <i class="bi bi-shield-check"></i>
                                 <span id="approvalModeLabel">自动放行</span>
                                 <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
                             </div>
-                            <div class="gpt-popover" id="approvalPopover" style="left: 200px; width: 150px;">
+                            <div class="gpt-popover" id="approvalPopover" style="left: 0; min-width: 165px;" onclick="event.stopPropagation()">
                                 <div class="popover-item active" onclick="setApprovalMode('auto', '自动放行')" id="itemApproveAuto">
-                                    <span>自动放行 (Auto)</span>
+                                    <div class="d-flex align-items-center gap-1.5">
+                                        <i class="bi bi-lightning-charge"></i>
+                                        <span>自动放行 (Auto)</span>
+                                    </div>
                                 </div>
                                 <div class="popover-item" onclick="setApprovalMode('manual', '人工逐步')" id="itemApproveManual">
-                                    <span>人工逐步 (Manual)</span>
+                                    <div class="d-flex align-items-center gap-1.5">
+                                        <i class="bi bi-hand-index-thumb"></i>
+                                        <span>人工逐步 (Manual)</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1559,46 +1728,48 @@
     </div>
 
     <!-- ======================= 模式 B：本地用例视图 (ChatGPT 桌面端风格本地回归测试资产看板) ======================= -->
-    <div id="workspaceLocalView" class="d-flex flex-column flex-grow-1 overflow-hidden d-none">
+    <div id="workspaceLocalView" class="d-flex flex-column flex-grow-1 overflow-hidden d-none" style="flex: 1 1 0px; min-height: 0;">
         <div class="local-workspace-container">
-            <!-- 顶部资产概览与操作栏 -->
-            <div class="d-flex justify-content-between align-items-center pb-2 border-bottom" style="border-color: var(--border-subtle) !important;">
-                <div>
-                    <div class="fw-semibold d-flex align-items-center gap-2" style="font-size: 15px; color: var(--text-main);">
-                        <i class="bi bi-folder-check"></i>
-                        <span>本地自动化回归用例资产</span>
-                        <span class="mono-tag mono-tag-active" id="localCaseTotalCountBadge">16 用例</span>
+            <!-- 顶部资产概览与操作栏 (固定吸顶区) -->
+            <div class="local-workspace-header">
+                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom" style="border-color: var(--border-subtle) !important;">
+                    <div>
+                        <div class="fw-semibold d-flex align-items-center gap-2" style="font-size: 15px; color: var(--text-main);">
+                            <i class="bi bi-folder-check"></i>
+                            <span>本地自动化回归用例资产</span>
+                            <span class="mono-tag mono-tag-active" id="localCaseTotalCountBadge">16 用例</span>
+                        </div>
+                        <div style="font-size: 11.5px; margin-top: 3px; color: #a1a1aa;">
+                            沉淀自高频业务链路，具备确定性执行逻辑；可直接免机/真机回归，亦可一键交由 AI 深度接续探索。
+                        </div>
                     </div>
-                    <div style="font-size: 11.5px; margin-top: 3px; color: #a1a1aa;">
-                        沉淀自高频业务链路，具备确定性执行逻辑；可直接免机/真机回归，亦可一键交由 AI 深度接续探索。
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="icon-btn" onclick="loadSolidifiedCasesWorkspace()" title="刷新用例列表">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="icon-btn" onclick="loadSolidifiedCasesWorkspace()" title="刷新用例列表">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
+
+                <!-- 模块分类与检索过滤条 -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-1 flex-wrap" id="localCategoryTabs">
+                        <span class="local-filter-pill active" onclick="filterLocalCases('ALL', this)">全部</span>
+                        <span class="local-filter-pill" onclick="filterLocalCases('房源搜索', this)">房源搜索</span>
+                        <span class="local-filter-pill" onclick="filterLocalCases('业务表单', this)">业务表单</span>
+                        <span class="local-filter-pill" onclick="filterLocalCases('核心导航', this)">核心导航</span>
+                        <span class="local-filter-pill" onclick="filterLocalCases('系统设置', this)">系统设置</span>
+                        <span class="local-filter-pill" onclick="filterLocalCases('业务通用', this)">业务通用</span>
+                    </div>
+
+                    <div style="width: 230px; position: relative;">
+                        <input type="text" id="localCaseSearchInput" class="form-control form-control-sm" placeholder="搜索用例名、描述、脚本..." style="padding-left: 28px; border-radius: 8px;" oninput="onSearchLocalCases(this.value)">
+                        <i class="bi bi-search position-absolute text-muted" style="left: 9px; top: 7px; font-size: 11px;"></i>
+                    </div>
                 </div>
             </div>
 
-            <!-- 模块分类与检索过滤条 -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <div class="d-flex align-items-center gap-1 flex-wrap" id="localCategoryTabs">
-                    <span class="local-filter-pill active" onclick="filterLocalCases('ALL', this)">全部</span>
-                    <span class="local-filter-pill" onclick="filterLocalCases('房源搜索', this)">房源搜索</span>
-                    <span class="local-filter-pill" onclick="filterLocalCases('业务表单', this)">业务表单</span>
-                    <span class="local-filter-pill" onclick="filterLocalCases('核心导航', this)">核心导航</span>
-                    <span class="local-filter-pill" onclick="filterLocalCases('系统设置', this)">系统设置</span>
-                    <span class="local-filter-pill" onclick="filterLocalCases('业务通用', this)">业务通用</span>
-                </div>
-
-                <div style="width: 230px; position: relative;">
-                    <input type="text" id="localCaseSearchInput" class="form-control form-control-sm" placeholder="搜索用例名、描述、脚本..." style="padding-left: 28px; border-radius: 8px;" oninput="onSearchLocalCases(this.value)">
-                    <i class="bi bi-search position-absolute text-muted" style="left: 9px; top: 7px; font-size: 11px;"></i>
-                </div>
-            </div>
-
-            <!-- 结构化用例列表容器 -->
-            <div id="localCasesWorkspaceList" class="d-flex flex-column gap-2 flex-grow-1" style="min-height: 200px;">
+            <!-- 结构化用例列表独立滚动区 (永不撑高父级) -->
+            <div class="local-workspace-body" id="localCasesWorkspaceList">
                 <div class="small text-muted p-3 text-center">正在加载本地用例资产...</div>
             </div>
         </div>
@@ -1654,29 +1825,31 @@
         </div>
 
         <!-- View 3: 📦 交付物与本地回归脚本 (Deliverables & Local Cases) -->
-        <div class="p-3 flex-grow-1 overflow-y-auto d-none" id="canvasDeliverablesView">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="small fw-semibold text-muted" style="font-size: 11px;">DELIVERABLES 交付物</span>
-                <button class="icon-btn" onclick="loadReports()"><i class="bi bi-arrow-clockwise"></i></button>
-            </div>
-            <div id="deliverablesReportsList" class="d-flex flex-column gap-2 mb-4">
-                <div class="canvas-empty-state py-4">
-                    <div class="canvas-empty-icon" style="width: 36px; height: 36px; font-size: 16px;">
-                        <i class="bi bi-box-seam"></i>
-                    </div>
-                    <div class="canvas-empty-title" style="font-size: 12px;">暂无归档交付物</div>
-                    <div class="canvas-empty-desc" style="font-size: 11px;">
-                        测试执行完成后，AI 将自动在此沉淀 0 Token 标准 Python 回归脚本与在线 HTML 报告。
-                    </div>
+        <div class="d-flex flex-column flex-grow-1 overflow-hidden d-none" id="canvasDeliverablesView" style="min-height: 0;">
+            <!-- 顶部子分段控制器 (已固化用例 / 全景评测报告) - 永久吸顶锁定 -->
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom flex-shrink-0" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
+                <div class="canvas-subtabs-nav">
+                    <button class="canvas-subtab-btn active" id="btnSubTabCases" onclick="switchDeliverablesSubTab('cases')">
+                        <i class="bi bi-file-earmark-code"></i> 本地用例脚本 <span class="mono-tag ms-1" id="subtabCaseCount">17</span>
+                    </button>
+                    <button class="canvas-subtab-btn" id="btnSubTabReports" onclick="switchDeliverablesSubTab('reports')">
+                        <i class="bi bi-file-earmark-bar-graph"></i> 交付报告 <span class="mono-tag ms-1" id="subtabReportCount">20+</span>
+                    </button>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <button class="icon-btn" onclick="refreshCurrentDeliverablesSubTab()" title="刷新数据"><i class="bi bi-arrow-clockwise"></i></button>
                 </div>
             </div>
 
-            <!-- 本地固化回归脚本 (用户要求的本地用例安放处) -->
-            <div class="d-flex justify-content-between align-items-center mb-2 pt-2 border-top" style="border-color: var(--border-subtle) !important;">
-                <span class="small fw-semibold text-muted" style="font-size: 11px;">LOCAL TEST CASES 本地回归用例</span>
-                <button class="icon-btn" onclick="loadSolidifiedCases()"><i class="bi bi-arrow-clockwise"></i></button>
+            <!-- 子视图 A: 本地固化用例列表 (独立内部局部平滑滚动，永不撑高父级) -->
+            <div class="p-3 flex-grow-1 overflow-y-auto" id="subViewCases" style="min-height: 0;">
+                <div id="solidifiedCasesList" class="d-flex flex-column gap-2">正在加载本地脚本...</div>
             </div>
-            <div id="solidifiedCasesList" class="d-flex flex-column gap-2">正在加载本地脚本...</div>
+
+            <!-- 子视图 B: 交付报告列表 (独立内部局部平滑滚动，永不撑高父级) -->
+            <div class="p-3 flex-grow-1 overflow-y-auto d-none" id="subViewReports" style="min-height: 0;">
+                <div id="deliverablesReportsList" class="d-flex flex-column gap-2">正在加载报告...</div>
+            </div>
         </div>
     </aside>
 
@@ -1900,6 +2073,8 @@
                 allSolidifiedCases = data.cases || [];
                 const badge = document.getElementById("localCaseTotalCountBadge");
                 if (badge) badge.innerText = `${allSolidifiedCases.length} 用例`;
+                const wsBadge = document.getElementById("workspaceLocalCasesCount");
+                if (wsBadge) wsBadge.innerText = `${allSolidifiedCases.length} 个已固化脚本`;
                 renderLocalCasesWorkspace();
             } catch (e) {
                 const box = document.getElementById("localCasesWorkspaceList");
@@ -2032,7 +2207,45 @@
             canvas.classList.toggle("collapsed");
         }
 
+        let currentDeliverablesSubTab = "cases";
+
+        function switchDeliverablesSubTab(subTab) {
+            if (subTab !== "cases" && subTab !== "reports") subTab = "cases";
+            currentDeliverablesSubTab = subTab;
+
+            const btnCases = document.getElementById("btnSubTabCases");
+            const btnReports = document.getElementById("btnSubTabReports");
+            const viewCases = document.getElementById("subViewCases");
+            const viewReports = document.getElementById("subViewReports");
+
+            if (btnCases) btnCases.classList.toggle("active", subTab === "cases");
+            if (btnReports) btnReports.classList.toggle("active", subTab === "reports");
+
+            if (viewCases) viewCases.classList.toggle("d-none", subTab !== "cases");
+            if (viewReports) viewReports.classList.toggle("d-none", subTab !== "reports");
+
+            if (subTab === "cases") {
+                loadSolidifiedCases();
+            } else {
+                loadReports();
+            }
+        }
+
+        function refreshCurrentDeliverablesSubTab() {
+            if (currentDeliverablesSubTab === "cases") {
+                loadSolidifiedCases();
+            } else {
+                loadReports();
+            }
+        }
+
         function switchCanvasTab(tab) {
+            let targetSubTab = null;
+            if (tab === "cases" || tab === "reports") {
+                targetSubTab = tab;
+                tab = "deliverables";
+            }
+
             const btnLogs = document.getElementById("btnTabLogs");
             const btnDeliv = document.getElementById("btnTabDeliverables");
 
@@ -2050,6 +2263,11 @@
             if (viewDeliv) viewDeliv.classList.toggle("d-none", tab !== "deliverables");
 
             if (tab === "deliverables") {
+                if (targetSubTab) {
+                    switchDeliverablesSubTab(targetSubTab);
+                } else {
+                    switchDeliverablesSubTab(currentDeliverablesSubTab);
+                }
                 loadReports();
                 loadSolidifiedCases();
             } else if (tab === "logs") {
@@ -2350,8 +2568,12 @@
             textarea.focus();
         }
 
-        function togglePopover(popoverId) {
+        function togglePopover(popoverId, event) {
+            if (event) {
+                event.stopPropagation();
+            }
             const pop = document.getElementById(popoverId);
+            if (!pop) return;
             const isShowing = pop.classList.contains("show");
             closeAllPopovers();
             if (!isShowing) pop.classList.add("show");
@@ -2362,16 +2584,19 @@
         }
 
         document.addEventListener("click", function(e) {
-            if (!e.target.closest(".position-relative")) {
+            if (!e.target.closest(".position-relative") && !e.target.closest(".gpt-popover")) {
                 closeAllPopovers();
             }
         });
 
         function setApprovalMode(mode, label) {
             currentApprovalMode = mode;
-            document.getElementById("approvalModeLabel").innerText = label;
-            document.getElementById("itemApproveAuto").classList.toggle("active", mode === "auto");
-            document.getElementById("itemApproveManual").classList.toggle("active", mode === "manual");
+            const lbl = document.getElementById("approvalModeLabel");
+            if (lbl) lbl.innerText = label;
+            const itemAuto = document.getElementById("itemApproveAuto");
+            const itemManual = document.getElementById("itemApproveManual");
+            if (itemAuto) itemAuto.classList.toggle("active", mode === "auto");
+            if (itemManual) itemManual.classList.toggle("active", mode === "manual");
             closeAllPopovers();
         }
 
@@ -2469,6 +2694,7 @@
             loadDevices();
             loadApps();
             loadSuggestedCases();
+            refreshAppSuggestedCases();
             loadSessions();
             loadReports();
             loadSolidifiedCases();
@@ -2550,9 +2776,9 @@
                 androids.forEach((d) => {
                     availableDevices.push({ id: d.id, model: d.model, platform: "Android" });
                     htmlCheckboxes += `
-                        <div class="form-check m-0 py-1">
+                        <div class="form-check m-0 py-1" onclick="event.stopPropagation()">
                             <input class="form-check-input device-checkbox" type="checkbox" id="dev_${d.id}" value="${d.id}" checked onchange="updateDeviceSummary()">
-                            <label class="form-check-label small" for="dev_${d.id}" style="color: var(--text-main); font-size: 11.5px;">
+                            <label class="form-check-label small" for="dev_${d.id}" style="color: var(--text-main); font-size: 11.5px; cursor: pointer; user-select: none;">
                                 <i class="bi bi-android2 me-1"></i> ${d.model}
                             </label>
                         </div>
@@ -2572,9 +2798,9 @@
                     const ios = data.ios_node;
                     availableDevices.push({ id: ios.id, model: ios.model, platform: "iOS" });
                     htmlCheckboxes += `
-                        <div class="form-check m-0 py-1">
+                        <div class="form-check m-0 py-1" onclick="event.stopPropagation()">
                             <input class="form-check-input device-checkbox" type="checkbox" id="dev_${ios.id}" value="${ios.id}" onchange="updateDeviceSummary()">
-                            <label class="form-check-label small" for="dev_${ios.id}" style="color: var(--text-main); font-size: 11.5px;">
+                            <label class="form-check-label small" for="dev_${ios.id}" style="color: var(--text-main); font-size: 11.5px; cursor: pointer; user-select: none;">
                                 <i class="bi bi-apple me-1"></i> ${ios.model}
                             </label>
                         </div>
@@ -2701,17 +2927,25 @@
                     ? `<span class="mono-tag mono-tag-active">真机</span>` 
                     : `<span class="mono-tag">仿真</span>`;
 
+                const isRunning = (s.status === "RUNNING");
+                const runningSpinnerHtml = isRunning ? `<span class="session-running-spinner ms-1.5" title="测试协同推进中..."></span>` : "";
+
                 let statusTagHtml = "";
                 if (s.is_success === false) {
                     statusTagHtml = `<span class="mono-tag" style="border-color: rgba(239,68,68,0.5); color: #ef4444; font-size: 9.5px;">失败</span>`;
                 } else if (s.is_success === true) {
                     statusTagHtml = `<span class="mono-tag" style="border-color: rgba(16,185,129,0.5); color: #10b981; font-size: 9.5px;">通过</span>`;
+                } else if (isRunning) {
+                    statusTagHtml = `<span class="mono-tag mono-tag-active" style="font-size: 9.5px;">推进中</span>`;
                 }
 
                 html += `
                     <div class="session-card ${isActive}" onclick="switchSession('${s.session_id}')">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="small fw-semibold text-truncate" style="max-width: 175px; font-size: 12.5px;">${s.title}</span>
+                            <div class="d-flex align-items-center text-truncate" style="max-width: 185px;">
+                                <span class="small fw-semibold text-truncate" style="font-size: 12.5px;">${s.title}</span>
+                                ${runningSpinnerHtml}
+                            </div>
                             <span class="session-delete-btn" onclick="event.stopPropagation(); deleteSession('${s.session_id}')" title="删除会话">
                                 <i class="bi bi-x-lg"></i>
                             </span>
@@ -2735,6 +2969,7 @@
             document.getElementById("emptyStateBox").classList.remove("d-none");
             document.getElementById("messagesFlow").innerHTML = "";
             document.getElementById("currentSessionTitleDisplay").innerText = "新测试任务";
+            refreshAppSuggestedCases();
 
             // 1. 新建任务时：展示模式切换分段按钮 (AI测试 / 本地用例)
             const segmented = document.getElementById("mainWorkspaceSegmented");
@@ -2866,26 +3101,24 @@
 
             // ① 思考过程条 (DeepSeek Harness 风格：轻量单行折叠 + 极简展开)
             let thinkingObj = sessionData.thinking;
-            if (!thinkingObj || !thinkingObj.bullets) {
-                thinkingObj = {
-                    duration: "1.8s",
-                    bullets: [
-                        { tag: "业务意图解析", content: `目标锚定为【${sessionData.goal || '自动化测试'}】。通过语义分析识别核心交互链路与界面状态转移。` },
-                        { tag: "跨端定位适配", content: "针对当前分配的设备矩阵，iOS 采用 Predicate 语法定位元素，Android 采用动态 XPath/ID 复合匹配。" },
-                        { tag: "断言与防抖策略", content: "列表异步加载采用 800ms 防抖等待，首项数据卡片执行模糊文本正则匹配，保障断言幂等性。" }
-                    ]
-                };
-            }
             let bulletsHtml = "";
-            thinkingObj.bullets.forEach(b => {
-                bulletsHtml += `
-                    <div class="mb-1">
-                        <strong style="color: var(--text-main); font-weight: 500;">${escapeHtml(b.tag)}：</strong>
-                        <span>${escapeHtml(b.content)}</span>
+            let thinkingDuration = (thinkingObj && thinkingObj.duration) ? thinkingObj.duration : '1.5s';
+            if (thinkingObj && Array.isArray(thinkingObj.bullets) && thinkingObj.bullets.length > 0) {
+                thinkingObj.bullets.forEach(b => {
+                    bulletsHtml += `
+                        <div class="mb-1">
+                            <strong style="color: var(--text-main); font-weight: 500;">${escapeHtml(b.tag || '推演')}：</strong>
+                            <span>${escapeHtml(b.content || '')}</span>
+                        </div>
+                    `;
+                });
+            } else {
+                bulletsHtml = `
+                    <div class="mb-1 text-muted" style="font-size: 12px;">
+                        <span>正在进行深度意图推演与用例策略规划...</span>
                     </div>
                 `;
-            });
-            const thinkingDuration = thinkingObj.duration || '1.8s';
+            }
             const thoughtExpandedClass = dshExpandedState.thought ? "expanded" : "";
             let thinkingHtml = `
                 <div class="dsh-thought-container ${thoughtExpandedClass}" id="dshThoughtBox">
@@ -3095,16 +3328,22 @@
                 `;
             }
 
-            // 彻底去除头像与名称，执行过程自然流式融入对话
-            flow.innerHTML = `
-                <!-- 用户意图直接展示 (无头像、无用户名称) -->
+            // 提取多轮连续对话消息列表，支持在单任务内打断、修正与追加意图
+            const msgs = (sessionData.messages && sessionData.messages.length > 0)
+                ? sessionData.messages
+                : [{ role: "user", content: sessionData.goal, timestamp: sessionData.created_at }];
+
+            let chatTurnsHtml = "";
+            const firstMsgContent = msgs[0] ? msgs[0].content : sessionData.goal;
+            chatTurnsHtml += `
+                <!-- 初始业务测试意图 -->
                 <div class="msg-user-row">
                     <div class="msg-user-bubble">
-                        ${sessionData.goal}
+                        ${escapeHtml(firstMsgContent)}
                     </div>
                 </div>
 
-                <!-- AI 执行流直接展开 (无头像、无名称抬头，自然平铺流) -->
+                <!-- AI 执行流与规划推进 -->
                 <div class="msg-ai-row">
                     ${thinkingHtml}
                     ${executionStreamHtml}
@@ -3113,6 +3352,27 @@
                     ${turnTailHtml}
                 </div>
             `;
+
+            // 渲染后续追加的连续对话纠偏指令
+            if (msgs.length > 1) {
+                for (let i = 1; i < msgs.length; i++) {
+                    const m = msgs[i];
+                    chatTurnsHtml += `
+                        <div class="msg-user-row mt-3">
+                            <div class="msg-user-bubble" style="border-left: 2px solid var(--text-main);">
+                                <div class="small text-muted mb-1 d-flex align-items-center gap-1" style="font-size: 10.5px;">
+                                    <i class="bi bi-chat-dots-fill"></i>
+                                    <span>连续对话修正 / 指令追加</span>
+                                    <span class="ms-auto">${escapeHtml(m.timestamp || '')}</span>
+                                </div>
+                                <div style="line-height: 1.5;">${escapeHtml(m.content)}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            flow.innerHTML = chatTurnsHtml;
             updateConsoleLogs();
         }
 
@@ -3338,7 +3598,7 @@
             }
         }
 
-        // ================= 9. 发送新任务 =================
+        // ================= 9. 发送新任务 / 单任务连续对话 =================
         async function submitNewTask() {
             const input = document.getElementById("taskInputText");
             const goal = input.value.trim();
@@ -3346,13 +3606,32 @@
 
             if (!goal) return;
 
-            const checkedBoxes = document.querySelectorAll(".device-checkbox:checked");
-            const selectedDevIds = Array.from(checkedBoxes).map(c => c.value);
-
             btn.disabled = true;
             btn.innerHTML = `<span class="spinner-border spinner-border-sm" style="width: 13px; height: 13px;"></span>`;
 
             try {
+                // 分支 A: 如果当前已有处于激活状态的会话，执行单任务连续对话（打断/修正/追加意图），不新建会话
+                if (activeSessionId) {
+                    const formData = new FormData();
+                    formData.append("message", goal);
+                    const res = await fetch(`/api/sessions/${activeSessionId}/message`, { method: "POST", body: formData });
+                    const data = await res.json();
+                    if (data.success) {
+                        input.value = "";
+                        onInputTextChange();
+                        // 立即刷新当前会话详情并重载左侧状态
+                        await pollCurrentSession();
+                        loadSessions();
+                    } else {
+                        alert(data.message || "追加测试指令失败");
+                    }
+                    return;
+                }
+
+                // 分支 B: 当前无激活任务时，创建全新的自动化测试会话
+                const checkedBoxes = document.querySelectorAll(".device-checkbox:checked");
+                const selectedDevIds = Array.from(checkedBoxes).map(c => c.value);
+
                 const formData = new FormData();
                 formData.append("goal", goal);
                 formData.append("devices", selectedDevIds.join(","));
@@ -3372,7 +3651,7 @@
                     alert(data.message || "创建任务失败");
                 }
             } catch (e) {
-                alert("发起任务异常: " + e);
+                alert("发起测试指令异常: " + e);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
@@ -3405,13 +3684,28 @@
         }
 
         // ================= 10. 模型切换与配置 =================
-        async function quickSelectModel(provider, name) {
-            const formData = new FormData();
-            formData.append("provider", provider);
-            await fetch("/api/config", { method: "POST", body: formData });
-            document.getElementById("activeModelLabel").innerText = name;
+        async function quickSelectModel(provider, name, el) {
+            const label = document.getElementById("activeModelLabel");
+            if (label) label.innerText = name;
+
+            // 立即更新所有选项的激活高亮状态
+            document.querySelectorAll("#modelPopover .popover-item").forEach(item => item.classList.remove("active"));
+            if (el) {
+                el.classList.add("active");
+            } else {
+                const target = document.getElementById(`itemModel_${provider}`);
+                if (target) target.classList.add("active");
+            }
             closeAllPopovers();
-            loadModelConfig();
+
+            try {
+                const formData = new FormData();
+                formData.append("provider", provider);
+                await fetch("/api/config", { method: "POST", body: formData });
+                loadModelConfig();
+            } catch (e) {
+                console.warn("模型切换持久化失败", e);
+            }
         }
 
         async function loadModelConfig() {
@@ -3428,6 +3722,11 @@
                 if (label && providerNames[data.provider]) {
                     label.innerText = providerNames[data.provider];
                 }
+                // 同步浮层激活勾选状态
+                document.querySelectorAll("#modelPopover .popover-item").forEach(item => item.classList.remove("active"));
+                const target = document.getElementById(`itemModel_${data.provider}`);
+                if (target) target.classList.add("active");
+
                 const pSelect = document.getElementById("modelProviderSelect");
                 if (pSelect) pSelect.value = data.provider;
 
@@ -3480,6 +3779,10 @@
                 const res = await fetch("/api/reports");
                 const data = await res.json();
                 const box = document.getElementById("deliverablesReportsList");
+                const countBadge = document.getElementById("subtabReportCount");
+                if (countBadge && data.reports) {
+                    countBadge.innerText = data.reports.length;
+                }
                 if (data.reports && data.reports.length > 0) {
                     let html = "";
                     data.reports.forEach(r => {
@@ -3517,6 +3820,10 @@
                 const res = await fetch("/api/solidified_cases");
                 const data = await res.json();
                 const box = document.getElementById("solidifiedCasesList");
+                const countBadge = document.getElementById("subtabCaseCount");
+                if (countBadge && data.cases) {
+                    countBadge.innerText = data.cases.length;
+                }
                 if (data.cases && data.cases.length > 0) {
                     let html = "";
                     data.cases.forEach(c => {
@@ -3630,13 +3937,90 @@
 
         async function uploadApp() {
             const fileInput = document.getElementById("appFileInput");
-            if (!fileInput.files || fileInput.files.length === 0) return alert("请选择文件！");
+            if (!fileInput.files || fileInput.files.length === 0) return alert("请选择待测 APK 或 IPA 文件！");
+            const file = fileInput.files[0];
             const formData = new FormData();
-            formData.append("file", fileInput.files[0]);
-            const res = await fetch("/api/upload_app", { method: "POST", body: formData });
-            const data = await res.json();
-            alert(data.message);
-            loadApps();
+            formData.append("file", file);
+
+            try {
+                const res = await fetch("/api/upload_app", { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    alert(data.message || "安装包上传成功！");
+                    loadApps();
+                    // 核心联动：上传应用后在主对话区域中间动态生成推荐用例
+                    const appLabel = data.label || file.name.replace(/\.[^/.]+$/, "");
+                    refreshAppSuggestedCases(`${appLabel} (已就绪)`);
+                    // 关闭模态框
+                    const modalEl = document.getElementById("appPackagesModal");
+                    if (modalEl) {
+                        const mInstance = bootstrap.Modal.getInstance(modalEl);
+                        if (mInstance) mInstance.hide();
+                    }
+                } else {
+                    alert(data.message || "上传失败");
+                }
+            } catch (e) {
+                alert("上传发生异常: " + e);
+            }
+        }
+
+        // ================= 13. 主对话区应用用例智能推荐与动态换一批 =================
+        let currentSuggestedAppName = "象盒找房 (官方演示)";
+        window._suggestedCasesCache = [];
+
+        function pickSuggestedCase(idx) {
+            if (window._suggestedCasesCache && window._suggestedCasesCache[idx]) {
+                const c = window._suggestedCasesCache[idx];
+                fillPrompt(c.goal || c.title);
+            }
+        }
+
+        async function refreshAppSuggestedCases(appName) {
+            if (appName) {
+                currentSuggestedAppName = appName;
+            }
+            const labelEl = document.getElementById("suggestTargetAppLabel");
+            if (labelEl) labelEl.innerText = currentSuggestedAppName;
+
+            const grid = document.getElementById("suggestCasesGrid");
+            const btn = document.getElementById("btnRefreshSuggestCases");
+            if (btn) btn.classList.add("rotating");
+
+            try {
+                const res = await fetch(`/api/ai/suggest_cases?app_name=${encodeURIComponent(currentSuggestedAppName)}`);
+                const data = await res.json();
+                const cases = data.cases || [];
+                window._suggestedCasesCache = cases;
+
+                if (cases.length === 0) {
+                    if (grid) grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无可推荐用例，可直接在下方输入框描述意图</div>`;
+                    return;
+                }
+
+                let html = "";
+                cases.forEach((c, idx) => {
+                    const levelClass = c.level === 'P0' ? 'mono-tag-active' : '';
+                    html += `
+                        <div class="suggest-card-item" onclick="pickSuggestedCase(${idx})">
+                            <div class="suggest-card-title">
+                                <span class="mono-tag ${levelClass}" style="font-size: 9px;">${c.level || 'P1'}</span>
+                                <span class="text-truncate" style="font-size: 12px;">${escapeHtml(c.title)}</span>
+                            </div>
+                            <div class="suggest-card-desc" title="${escapeHtml(c.goal)}">
+                                ${escapeHtml(c.goal)}
+                            </div>
+                        </div>
+                    `;
+                });
+                if (grid) grid.innerHTML = html;
+            } catch (e) {
+                if (grid) grid.innerHTML = `<div class="p-2 text-danger small" style="grid-column: 1 / -1;">推荐用例加载失败，请重试</div>`;
+            } finally {
+                setTimeout(() => {
+                    if (btn) btn.classList.remove("rotating");
+                }, 500);
+            }
         }
     </script>
 </body>
