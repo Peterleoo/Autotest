@@ -336,12 +336,28 @@
             max-width: 880px;
             width: 100%;
             margin: 0 auto;
-            padding: 20px 20px 30px 20px;
+            padding: 16px 20px 20px 20px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 12px;
             height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .local-workspace-header {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .local-workspace-body {
+            flex: 1;
+            min-height: 0;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 4px;
         }
         .local-filter-pill {
             background: rgba(255, 255, 255, 0.03);
@@ -503,32 +519,37 @@
         .onboarding-guide-card {
             background-color: var(--bg-surface);
             border: 1px solid var(--border-hover);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
             border-radius: 12px;
-            padding: 12px 14px;
-            max-width: 680px;
+            padding: 16px 18px;
+            max-width: 760px;
             width: 100%;
-            margin: 0 auto 20px auto;
+            margin: 0 auto 24px auto;
             text-align: left;
             animation: fadeIn 0.25s ease;
         }
         .onboarding-step-box {
             background-color: var(--bg-main);
             border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            padding: 10px 12px;
+            border-radius: 10px;
+            padding: 14px;
             height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
             transition: all 0.15s ease;
         }
         .onboarding-step-box:hover {
-            border-color: var(--border-hover);
+            border-color: var(--border-strong);
+            transform: translateY(-1px);
         }
         .onboarding-step-num {
-            width: 18px;
-            height: 18px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
-            background-color: var(--border-strong);
-            color: #ffffff;
-            font-size: 10px;
+            background-color: var(--text-main);
+            color: var(--bg-main);
+            font-size: 11px;
             font-weight: 700;
             display: inline-flex;
             align-items: center;
@@ -1310,7 +1331,11 @@
                 </button>
             </div>
 
-            <div class="d-flex align-items-center gap-1">
+            <div class="d-flex align-items-center gap-1.5">
+                <button class="btn btn-sm d-flex align-items-center gap-1.5 py-1 px-2.5 rounded-pill" id="btnTopOnboarding" onclick="restoreOnboardingGuide()" style="background-color: var(--bg-surface); border: 1px solid var(--border-hover); font-size: 11.5px; color: var(--text-main); font-weight: 500;" title="打开首次使用新手 3 步向导">
+                    <i class="bi bi-lightbulb-fill text-warning" style="font-size: 12px;"></i>
+                    <span>新手向导</span>
+                </button>
                 <button class="icon-btn" onclick="toggleCanvas()" title="展开/收起右侧工作台 (Canvas)">
                     <i class="bi bi-layout-sidebar-reverse"></i>
                 </button>
@@ -1328,49 +1353,76 @@
 
                     <!-- 新任务空状态：中央智能测试用例推荐网格与 3 步新手向导 -->
                     <div class="empty-state-box" id="emptyStateBox">
-                        <!-- 首次使用 3 步极简向导卡片（支持收起与 localStorage 记忆） -->
-                        <div class="onboarding-guide-card" id="onboardingGuideCard" style="display: none;">
-                            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                        <!-- 首次使用 3 步极简向导卡片（带状态动态检测与快捷绑定按钮） -->
+                        <div class="onboarding-guide-card" id="onboardingGuideCard">
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom" style="border-color: var(--border-subtle) !important;">
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="mono-tag mono-tag-active" style="font-size: 10px;">快速上手向导</span>
-                                    <span class="small fw-semibold" style="font-size: 12px; color: var(--text-main);">AutoTest 极简自动化 3 步操作链路</span>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 11px; font-weight: 600;">首次使用指引</span>
+                                    <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">3 步快速跑通真机自动化测试</span>
                                 </div>
-                                <button class="icon-btn" style="width: 22px; height: 22px; font-size: 11px;" onclick="dismissOnboardingGuide()" title="收起引导（可在侧栏重新呼出）">
-                                    <i class="bi bi-x-lg"></i>
+                                <button class="btn btn-sm py-0.5 px-2 text-muted" style="font-size: 11px; border-radius: 9999px;" onclick="dismissOnboardingGuide()" title="收起指引（可随时在右上角【新手向导】重新打开）">
+                                    <span>已掌握 / 暂且收起</span> <i class="bi bi-x-lg ms-1"></i>
                                 </button>
                             </div>
                             <div class="row g-2 text-start">
+                                <!-- Step 1: 绑定设备 -->
                                 <div class="col-md-4">
                                     <div class="onboarding-step-box">
-                                        <div class="d-flex align-items-center gap-2 mb-1">
-                                            <span class="onboarding-step-num">1</span>
-                                            <span class="small fw-semibold" style="font-size: 12px;">设备就绪与模式</span>
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center mb-1.5">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="onboarding-step-num">1</span>
+                                                    <span class="fw-semibold" style="font-size: 12.5px; color: var(--text-main);">绑定测试设备</span>
+                                                </div>
+                                                <span id="onboardingDevStatus" class="badge bg-secondary-subtle text-secondary" style="font-size: 9.5px;">检测中...</span>
+                                            </div>
+                                            <div class="small text-muted mb-3" style="font-size: 11px; line-height: 1.5;">
+                                                连接 USB 手机并开启开发者调试；无真机时也可一键开启【本地轻量仿真】。
+                                            </div>
                                         </div>
-                                        <div class="small text-muted" style="font-size: 11px; line-height: 1.45;">
-                                            自动发现 USB 物理真机；无手机时支持切换【本地仿真】，零硬件门槛秒级验证。
-                                        </div>
+                                        <button class="btn btn-sm btn-outline-primary w-100 py-1" id="onboardingDevBtn" style="font-size: 11.5px; font-weight: 500; border-radius: 6px;" onclick="openDeviceNodesModal()">
+                                            <i class="bi bi-phone me-1"></i> 去绑定 / 管理设备 ➔
+                                        </button>
                                     </div>
                                 </div>
+                                <!-- Step 2: 确认模型 -->
                                 <div class="col-md-4">
                                     <div class="onboarding-step-box">
-                                        <div class="d-flex align-items-center gap-2 mb-1">
-                                            <span class="onboarding-step-num">2</span>
-                                            <span class="small fw-semibold" style="font-size: 12px;">输入业务测试目标</span>
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center mb-1.5">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="onboarding-step-num">2</span>
+                                                    <span class="fw-semibold" style="font-size: 12.5px; color: var(--text-main);">确认模型驱动</span>
+                                                </div>
+                                                <span id="onboardingModelStatus" class="badge bg-secondary-subtle text-secondary" style="font-size: 9.5px;">检测中...</span>
+                                            </div>
+                                            <div class="small text-muted mb-3" style="font-size: 11px; line-height: 1.5;">
+                                                基于官方 OAuth 订阅直连或企业专属网关，毫秒级视觉推理界面元素与断言。
+                                            </div>
                                         </div>
-                                        <div class="small text-muted" style="font-size: 11px; line-height: 1.45;">
-                                            点击下方场景用例或自然语言输入意图，AI 自研判复杂度并自动规划多阶段节点。
-                                        </div>
+                                        <button class="btn btn-sm btn-outline-secondary w-100 py-1" id="onboardingModelBtn" style="font-size: 11.5px; font-weight: 500; border-radius: 6px;" onclick="openAntigravityModal()">
+                                            <i class="bi bi-cpu me-1"></i> 查看授权 / 切换 ➔
+                                        </button>
                                     </div>
                                 </div>
+                                <!-- Step 3: 输入意图 -->
                                 <div class="col-md-4">
                                     <div class="onboarding-step-box">
-                                        <div class="d-flex align-items-center gap-2 mb-1">
-                                            <span class="onboarding-step-num">3</span>
-                                            <span class="small fw-semibold" style="font-size: 12px;">人机协同与脚本固化</span>
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center mb-1.5">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="onboarding-step-num">3</span>
+                                                    <span class="fw-semibold" style="font-size: 12.5px; color: var(--text-main);">输入业务目标</span>
+                                                </div>
+                                                <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size: 9.5px;">就绪待命</span>
+                                            </div>
+                                            <div class="small text-muted mb-3" style="font-size: 11px; line-height: 1.5;">
+                                                在下方对话框用自然语言描述待测业务意图，支持自动探针推演与时序固化。
+                                            </div>
                                         </div>
-                                        <div class="small text-muted" style="font-size: 11px; line-height: 1.45;">
-                                            遇验证码自动暂停支持敲回车唤醒；测试完成沉淀 0 Token 确定性 Python 脚本。
-                                        </div>
+                                        <button class="btn btn-sm btn-light w-100 py-1" style="font-size: 11.5px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-hover);" onclick="fillPromptAndFocus('打开应用，若有隐私政策点击同意，进入登录界面输入账号和手机验证码登录，测试登录跳转并断言鉴权接口返回 200')">
+                                            <i class="bi bi-magic me-1"></i> 一键填入登录流程 ➔
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -2338,6 +2390,14 @@
             updateDeviceSummary();
         }
 
+        function fillPromptAndFocus(text) {
+            fillPrompt(text);
+            const textarea = document.getElementById("taskInputText");
+            if (textarea) {
+                textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+
         // 首次使用 3 步向导控制
         function dismissOnboardingGuide() {
             const guide = document.getElementById("onboardingGuideCard");
@@ -2346,12 +2406,51 @@
         }
 
         function restoreOnboardingGuide() {
+            const emptyBox = document.getElementById("emptyStateBox");
+            if (emptyBox && emptyBox.classList.contains("d-none")) {
+                if (typeof startNewSession === "function") {
+                    startNewSession();
+                } else {
+                    emptyBox.classList.remove("d-none");
+                }
+            }
             const guide = document.getElementById("onboardingGuideCard");
             if (guide) {
                 guide.style.display = "block";
                 guide.scrollIntoView({ behavior: "smooth", block: "center" });
             }
             localStorage.removeItem("autotest_onboarding_dismissed");
+        }
+
+        function updateOnboardingDeviceStatus() {
+            const badge = document.getElementById("onboardingDevStatus");
+            const btn = document.getElementById("onboardingDevBtn");
+            if (!badge) return;
+            if (currentTestMode === "local") {
+                badge.innerHTML = `<span class="status-indicator-dot dot-sim me-1"></span>免机本地仿真`;
+                badge.className = "badge bg-info-subtle text-info border border-info-subtle";
+                if (btn) btn.innerHTML = `<i class="bi bi-laptop me-1"></i>已就绪 (本地仿真模式)`;
+            } else if (availableDevices && availableDevices.length > 0) {
+                const d = availableDevices[0];
+                badge.innerHTML = `<span class="status-indicator-dot dot-online me-1"></span>已就绪: ${escapeHtml(d.model || d.name || '真机在线')}`;
+                badge.className = "badge bg-success-subtle text-success border border-success-subtle";
+                if (btn) btn.innerHTML = `<i class="bi bi-gear me-1"></i>管理真机 (${availableDevices.length}台在线)`;
+            } else {
+                badge.innerHTML = `<span class="status-indicator-dot dot-offline me-1"></span>未发现真机`;
+                badge.className = "badge bg-warning-subtle text-warning border border-warning-subtle";
+                if (btn) btn.innerHTML = `<i class="bi bi-plug me-1"></i>去连接/绑定设备 ➔`;
+            }
+        }
+
+        function updateOnboardingModelStatus(configData) {
+            const badge = document.getElementById("onboardingModelStatus");
+            const btn = document.getElementById("onboardingModelBtn");
+            if (!badge || !configData) return;
+            const prov = configData.provider === "antigravity" ? "Google 官方授权" : (configData.provider === "hermes" ? "Hermes 网关" : configData.provider);
+            const model = configData.current_model || "gemini-2.5-flash";
+            badge.innerHTML = `<span class="status-indicator-dot dot-online me-1"></span>已就绪: ${escapeHtml(model)}`;
+            badge.className = "badge bg-success-subtle text-success border border-success-subtle";
+            if (btn) btn.innerHTML = `<i class="bi bi-cpu me-1"></i>${escapeHtml(prov)} (${escapeHtml(model)})`;
         }
 
         // ================= 3. 初始加载与鉴权 =================
@@ -2519,6 +2618,7 @@
                     dot.className = "status-indicator-dot dot-offline";
                 }
             }
+            updateOnboardingDeviceStatus();
         }
 
         function toggleAllDevices() {
@@ -3332,6 +3432,7 @@
                 if (pSelect) pSelect.value = data.provider;
 
                 renderModelOptions(data.provider, data.current_model);
+                updateOnboardingModelStatus(data);
             } catch (e) {}
         }
 
