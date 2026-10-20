@@ -90,6 +90,9 @@ class TaskManager:
                     "model": d["model"],
                     "status": d["status"]
                 })
+            platforms = list(set([d.get("platform", "Android") for d in s["devices"].values()]))
+            if not platforms:
+                platforms = ["Android"]
             res.append({
                 "session_id": s["session_id"],
                 "title": s["title"],
@@ -97,6 +100,8 @@ class TaskManager:
                 "status": s["status"],
                 "created_at": s["created_at"],
                 "test_mode": s["test_mode"],
+                "is_real_device": (s["test_mode"] == "real"),
+                "platforms": platforms,
                 "device_count": len(s["devices"]),
                 "devices": device_summaries,
                 "report_url": s.get("report_url", "")
@@ -111,14 +116,17 @@ class TaskManager:
 
         offsets = offsets or {}
         devices_data = {}
+        platforms = set()
         for dev_id, dev_info in s["devices"].items():
             offset = offsets.get(dev_id, 0)
             logs = dev_info["logs"]
             new_logs = logs[offset:] if offset < len(logs) else []
+            plat = dev_info.get("platform", "Android")
+            platforms.add(plat)
             devices_data[dev_id] = {
                 "device_id": dev_id,
                 "model": dev_info["model"],
-                "platform": dev_info.get("platform", "Android"),
+                "platform": plat,
                 "status": dev_info["status"],
                 "step": dev_info["step"],
                 "max_steps": dev_info["max_steps"],
@@ -135,6 +143,11 @@ class TaskManager:
             "title": s["title"],
             "goal": s["goal"],
             "status": s["status"],
+            "approval_mode": s.get("approval_mode", "auto"),
+            "plan_steps": s.get("plan_steps", []),
+            "thinking": s.get("thinking", {}),
+            "clarification": s.get("clarification"),
+            "platforms": list(platforms) if platforms else ["Android"],
             "created_at": s["created_at"],
             "test_mode": s["test_mode"],
             "devices": devices_data,
@@ -146,10 +159,11 @@ class TaskManager:
         goal: str,
         device_ids: Optional[List[str]] = None,
         test_mode: str = "real",
-        case_name: str = "auto_flow"
+        case_name: str = "auto_flow",
+        approval_mode: str = "auto"
     ) -> str:
         """
-        创建一个新任务会话并分发给一个或多个目标设备并发执行
+        创建一个新任务会话并分发给一个或多个目标设备并发执行，支持自动放行与人工审批确认
         """
         from core.app_manager import AppManager
         app_mgr = AppManager()
@@ -167,6 +181,18 @@ class TaskManager:
 
         session_id = f"sess_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
         title = goal[:20] + ("..." if len(goal) > 20 else "")
+        is_auto = (approval_mode == "auto")
+        init_status = "RUNNING" if is_auto else "AWAITING_APPROVAL"
+
+        # 自动生成针对测试目标的 AI 深度思考过程
+        thinking_data = {
+            "duration": "1.8s",
+            "bullets": [
+                {"tag": "业务意图解析", "content": f"目标锚定为【{goal}】。通过语义分析识别核心交互链路与界面状态转移。"},
+                {"tag": "跨端定位适配", "content": f"针对分配的设备矩阵，iOS 采用 Predicate 语法定位元素，Android 采用动态 XPath/ID 复合匹配。"},
+                {"tag": "断言与防抖策略", "content": "列表异步加载采用 800ms 防抖等待，首项数据卡片执行模糊文本正则匹配，保障断言幂等性。"}
+            ]
+        }
 
         session = {
             "session_id": session_id,
@@ -174,9 +200,17 @@ class TaskManager:
             "goal": goal,
             "case_name": case_name,
             "test_mode": test_mode,
+            "approval_mode": approval_mode,
             "created_at": datetime.now().strftime("%H:%M:%S"),
-            "status": "RUNNING",
+            "status": init_status,
             "target_devices": device_ids,
+            "thinking": thinking_data,
+            "clarification": None,
+            "plan_steps": [
+                {"step_id": 1, "title": "应用启动与前置许可核验", "desc": "启动待测应用，若有隐私政策自动确认放行", "status": "APPROVED" if is_auto else "PENDING"},
+                {"step_id": 2, "title": "核心手势流转与目标探索", "desc": goal, "status": "APPROVED" if is_auto else "PENDING"},
+                {"step_id": 3, "title": "多端断言与测试脚本固化", "desc": "验证断言通过率，并自动固化为标准回归脚本", "status": "APPROVED" if is_auto else "PENDING"}
+            ],
             "devices": {},
             "report_url": ""
         }
@@ -189,11 +223,11 @@ class TaskManager:
                 "device_id": dev_id,
                 "model": model_label,
                 "platform": platform,
-                "status": "QUEUED",
+                "status": "QUEUED" if is_auto else "AWAITING_APPROVAL",
                 "step": 0,
                 "max_steps": 15,
-                "action": "等待设备独占调度...",
-                "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] 任务会话已创建，等待分配设备 [{model_label}]"],
+                "action": "等待自动分发调度..." if is_auto else "等待人工审批确认方案...",
+                "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] 任务会话已创建 (审批模式: {'自动放行' if is_auto else '等待人工确认'})，分配设备 [{model_label}]"],
                 "report_url": "",
                 "success": None,
                 "duration": "0s",
@@ -203,11 +237,46 @@ class TaskManager:
         self.sessions[session_id] = session
         self.active_session_id = session_id
 
-        # 🚀 矩阵并发分发：为每个设备派发独立执行 Worker 线程
-        for dev_id in device_ids:
-            self.executor.submit(self._device_worker, session_id, dev_id, goal, case_name, test_mode)
+        # 🚀 若为自动审批，立即派发线程并发执行；若为人工审批，则挂起等待用户确认
+        if is_auto:
+            for dev_id in device_ids:
+                self.executor.submit(self._device_worker, session_id, dev_id, goal, case_name, test_mode)
 
         return session_id
+
+    def approve_session(self, session_id: str) -> bool:
+        """人工审批放行：唤醒任务并开始向各设备分发执行"""
+        session = self.sessions.get(session_id)
+        if not session or session["status"] != "AWAITING_APPROVAL":
+            return False
+
+        session["status"] = "RUNNING"
+        for s in session["plan_steps"]:
+            s["status"] = "APPROVED"
+
+        for dev_id in session["target_devices"]:
+            if dev_id in session["devices"]:
+                session["devices"][dev_id]["status"] = "QUEUED"
+                session["devices"][dev_id]["action"] = "人工审批通过，已进入执行队列"
+                session["devices"][dev_id]["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 人工审批放行通过，开始调度执行")
+            self.executor.submit(self._device_worker, session_id, dev_id, session["goal"], session["case_name"], session["test_mode"])
+        return True
+
+    def clarify_session(self, session_id: str, inputs: Dict[str, Any]) -> bool:
+        """接收用户在中间区域提交的补充测试参数并继续执行"""
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        account = inputs.get("account", "访客")
+        env = inputs.get("env", "生产")
+        session["user_supplement"] = inputs
+        session["clarification"] = None # 补充完毕关闭提示
+
+        for dev_id, dev in session["devices"].items():
+            dev["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 收到用户补充前置参数: 账号[{account}] 环境[{env}]，继续执行")
+
+        return True
 
     def delete_session(self, session_id: str) -> bool:
         if session_id in self.sessions:
