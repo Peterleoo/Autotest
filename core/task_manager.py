@@ -197,6 +197,8 @@ class TaskManager:
             "platforms": list(platforms) if platforms else ["Android"],
             "created_at": s["created_at"],
             "test_mode": s["test_mode"],
+            "provider": s.get("provider", "hermes"),
+            "model": s.get("model", "deepseek-flash"),
             "devices": devices_data,
             "report_url": s.get("report_url", "")
         }
@@ -207,7 +209,9 @@ class TaskManager:
         device_ids: Optional[List[str]] = None,
         test_mode: str = "real",
         case_name: str = "auto_flow",
-        approval_mode: str = "auto"
+        approval_mode: str = "auto",
+        provider: Optional[str] = None,
+        model: Optional[str] = None
     ) -> str:
         """
         创建一个新任务会话并分发给一个或多个目标设备并发执行，支持自动放行与人工审批确认
@@ -232,7 +236,7 @@ class TaskManager:
         init_status = "RUNNING" if is_auto else "AWAITING_APPROVAL"
 
         # 🚀 真实调用大模型进行业务意图深度推演与测试步骤动态规划（带毫秒级降级保底）
-        thinking_data, plan_steps = self._generate_ai_plan_and_thinking(goal, is_auto, test_mode)
+        thinking_data, plan_steps = self._generate_ai_plan_and_thinking(goal, is_auto, test_mode, provider=provider, model=model)
 
         session = {
             "session_id": session_id,
@@ -241,6 +245,8 @@ class TaskManager:
             "case_name": case_name,
             "test_mode": test_mode,
             "approval_mode": approval_mode,
+            "provider": provider,
+            "model": model,
             "created_at": datetime.now().strftime("%H:%M:%S"),
             "status": init_status,
             "target_devices": device_ids,
@@ -305,13 +311,18 @@ class TaskManager:
             self.executor.submit(self._device_worker, session_id, dev_id, session["goal"], session["case_name"], session["test_mode"])
         return True
 
-    def append_session_message(self, session_id: str, message: str) -> Dict[str, Any]:
+    def append_session_message(self, session_id: str, message: str, provider: Optional[str] = None, model: Optional[str] = None) -> Dict[str, Any]:
         """
-        在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，杜绝频繁新建任务
+        在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，杜绝频繁新建任务，支持动态模型切换
         """
         session = self.sessions.get(session_id)
         if not session:
             raise ValueError(f"会话不存在: {session_id}")
+
+        if provider:
+            session["provider"] = provider
+        if model:
+            session["model"] = model
 
         if "messages" not in session or not isinstance(session["messages"], list):
             session["messages"] = [
@@ -411,9 +422,9 @@ class TaskManager:
             pass
         return f"Android 真机 ({device_id[:8]})"
 
-    def _generate_ai_plan_and_thinking(self, goal: str, is_auto: bool, test_mode: str = "real"):
+    def _generate_ai_plan_and_thinking(self, goal: str, is_auto: bool, test_mode: str = "real", provider: Optional[str] = None, model: Optional[str] = None):
         """
-        调用真实大模型（Google Antigravity / Hermes）进行业务意图深度推演与测试用例结构化拆解。
+        调用真实大模型（Google Antigravity / Hermes / DeepSeek）进行业务意图深度推演与测试用例结构化拆解。
         若模型调用超时或异常，自动平滑降级至规则解析引擎，确保测试流 100% 不阻塞。
         """
         import time
@@ -441,7 +452,7 @@ class TaskManager:
         )
 
         try:
-            client = LLMClient()
+            client = LLMClient(provider=provider, model=model)
             ai_res = client.chat_decision(
                 system_prompt=system_prompt,
                 user_prompt=f"测试目标：【{goal}】\n运行模式：{test_mode}"

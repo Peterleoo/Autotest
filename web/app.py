@@ -763,9 +763,11 @@ async def create_task_session(
     devices: str = Form("auto"),
     test_mode: str = Form("real"),
     case_name: str = Form("auto_flow"),
-    approval_mode: str = Form("auto")
+    approval_mode: str = Form("auto"),
+    provider: Optional[str] = Form(None),
+    model: Optional[str] = Form(None)
 ):
-    """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批"""
+    """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型"""
     device_ids = []
     if devices and devices != "auto":
         device_ids = [d.strip() for d in devices.split(",") if d.strip()]
@@ -774,7 +776,9 @@ async def create_task_session(
         device_ids=device_ids,
         test_mode=test_mode,
         case_name=case_name,
-        approval_mode=approval_mode
+        approval_mode=approval_mode,
+        provider=provider,
+        model=model
     )
     return {"success": True, "session_id": session_id, "message": "测试会话已创建"}
 
@@ -814,10 +818,15 @@ async def delete_task_session(session_id: str):
     return {"success": ok}
 
 @app.post("/api/sessions/{session_id}/message")
-async def append_session_message(session_id: str, message: str = Form(...)):
-    """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图"""
+async def append_session_message(
+    session_id: str,
+    message: str = Form(...),
+    provider: Optional[str] = Form(None),
+    model: Optional[str] = Form(None)
+):
+    """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，支持动态切换模型"""
     try:
-        res = task_mgr.append_session_message(session_id, message)
+        res = task_mgr.append_session_message(session_id, message, provider=provider, model=model)
         return res
     except Exception as e:
         return JSONResponse(status_code=400, content={"success": False, "message": str(e)})

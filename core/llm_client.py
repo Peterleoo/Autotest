@@ -11,12 +11,13 @@ class LLMClient:
     """
     统一多模型客户端：支持 Antigravity / DeepSeek / Claude / OpenAI 等
     """
-    def __init__(self, provider: Optional[str] = None):
+    def __init__(self, provider: Optional[str] = None, model: Optional[str] = None):
         self.provider = (provider or ai_config.PROVIDER).lower()
+        self.override_model = model
         self._init_client()
 
     def _init_client(self):
-        logger.info(f"正在初始化 AI 模型驱动: {self.provider}")
+        logger.info(f"正在初始化 AI 模型驱动: {self.provider} (指定模型: {self.override_model})")
         if self.provider == "hermes":
             try:
                 from anthropic import Anthropic
@@ -24,7 +25,7 @@ class LLMClient:
                     api_key=ai_config.HERMES_API_KEY,
                     base_url=ai_config.HERMES_BASE_URL
                 )
-                self.model_name = ai_config.HERMES_MODEL
+                self.model_name = self.override_model or ai_config.HERMES_MODEL
                 logger.info(f"Hermes 网关初始化成功: {self.model_name} @ {ai_config.HERMES_BASE_URL}")
             except Exception as e:
                 logger.error(f"初始化 Hermes 客户端失败: {e}")
@@ -37,7 +38,7 @@ class LLMClient:
                     api_key=ai_config.ANTHROPIC_API_KEY,
                     base_url=ai_config.ANTHROPIC_BASE_URL
                 )
-                self.model_name = ai_config.ANTHROPIC_MODEL
+                self.model_name = self.override_model or ai_config.ANTHROPIC_MODEL
             except Exception as e:
                 logger.error(f"初始化 Claude 客户端失败: {e}")
                 self.client = None
@@ -50,7 +51,7 @@ class LLMClient:
                     base_url=ai_config.DEEPSEEK_BASE_URL,
                     timeout=ai_config.TIMEOUT
                 )
-                self.model_name = ai_config.DEEPSEEK_MODEL
+                self.model_name = self.override_model or ai_config.DEEPSEEK_MODEL
             except Exception as e:
                 logger.error(f"初始化 DeepSeek 客户端失败: {e}")
                 self.client = None
@@ -65,7 +66,7 @@ class LLMClient:
                     timeout=ai_config.TIMEOUT,
                     max_retries=1
                 )
-                self.model_name = ai_config.ANTIGRAVITY_MODEL
+                self.model_name = self.override_model or ai_config.ANTIGRAVITY_MODEL
             except Exception as e:
                 logger.error(f"初始化 Antigravity 客户端失败: {e}")
                 self.client = None
@@ -79,7 +80,7 @@ class LLMClient:
                     timeout=ai_config.TIMEOUT,
                     max_retries=1
                 )
-                self.model_name = ai_config.OPENAI_MODEL
+                self.model_name = self.override_model or ai_config.OPENAI_MODEL
             except Exception as e:
                 logger.error(f"初始化 OpenAI 客户端失败: {e}")
                 self.client = None

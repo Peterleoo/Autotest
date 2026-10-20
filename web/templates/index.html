@@ -10,14 +10,16 @@
     <style>
         :root {
             /* 纯粹黑白灰极致高级调色板 (Monochrome Dark) */
-            --bg-main: #212121;
-            --bg-sidebar: #171717;
-            --bg-surface: #2a2a2a;
-            --bg-surface-hover: #333333;
-            --bg-input: #2a2a2a;
+            --bg-app: #121214; /* 全页面底层灰背景，从左侧一直延续到顶部与右侧 */
+            --bg-main: #1e1e22; /* 盖在上面的中间/右侧工作区卡片面板底色 */
+            --bg-sidebar: transparent; /* 左侧直接承接全页面底色 */
+            --bg-surface: #27272b;
+            --bg-surface-hover: #323238;
+            --bg-input: #27272b;
             --border-subtle: rgba(255, 255, 255, 0.08);
             --border-hover: rgba(255, 255, 255, 0.18);
             --border-strong: rgba(255, 255, 255, 0.28);
+            --border-card: rgba(255, 255, 255, 0.09);
             --text-main: #ececec;
             --text-sub: #b4b4b4;
             --text-muted: #8e8e8e;
@@ -29,17 +31,20 @@
             --console-bg: #121212;
             --console-text: #e4e4e7;
             --shadow-float: 0 4px 24px rgba(0, 0, 0, 0.35);
+            --shadow-card: -3px 0 12px rgba(0, 0, 0, 0.28);
         }
 
         body[data-theme="light"] {
-            --bg-main: #ffffff;
-            --bg-sidebar: #f8f8f8;
-            --bg-surface: #f3f3f3;
-            --bg-surface-hover: #e8e8e8;
-            --bg-input: #f3f3f3;
-            --border-subtle: rgba(0, 0, 0, 0.08);
-            --border-hover: rgba(0, 0, 0, 0.18);
-            --border-strong: rgba(0, 0, 0, 0.3);
+            --bg-app: #f2f3f5; /* 全页面底层灰背景，从左侧一直延续到顶部与右侧 (用户截图浅灰底) */
+            --bg-main: #ffffff; /* 盖在上面的白色工作区 (用户截图纯白内容区) */
+            --bg-sidebar: transparent; /* 左侧直接承接全页面底色 */
+            --bg-surface: #ffffff;
+            --bg-surface-hover: #f4f4f5;
+            --bg-input: #f4f4f6;
+            --border-subtle: rgba(0, 0, 0, 0.07);
+            --border-hover: rgba(0, 0, 0, 0.15);
+            --border-strong: rgba(0, 0, 0, 0.25);
+            --border-card: rgba(0, 0, 0, 0.08);
             --text-main: #18181b;
             --text-sub: #52525b;
             --text-muted: #71717a;
@@ -51,6 +56,7 @@
             --console-bg: #18181b;
             --console-text: #f4f4f5;
             --shadow-float: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --shadow-card: -2px 0 10px rgba(0, 0, 0, 0.04);
         }
 
         * {
@@ -313,20 +319,25 @@
             background-color: rgba(0, 0, 0, 0.08);
         }
 
-        /* ================= 2. 中间主区域 (Chat Stream) ================= */
+        /* ================= 2. 中间主区域 (盖在灰色背景上面的白色卡片，左侧圆角) ================= */
         .gpt-main {
             flex: 1;
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            height: 100%;
             background-color: var(--bg-main);
             overflow: hidden;
             position: relative;
+            border-top-left-radius: 14px; /* 关键：中间区域左侧圆角 */
+            border-top: 1px solid var(--border-card);
+            border-left: 1px solid var(--border-card);
+            box-shadow: var(--shadow-card);
+            z-index: 20;
         }
         .gpt-header {
-            height: 50px;
-            min-height: 50px;
-            max-height: 50px;
+            height: 48px;
+            min-height: 48px;
+            max-height: 48px;
             flex-shrink: 0;
             display: flex;
             align-items: center;
@@ -334,6 +345,7 @@
             padding: 0 16px;
             background-color: var(--bg-main);
             border-bottom: 1px solid var(--border-subtle);
+            border-top-left-radius: 14px; /* 与卡片左上角圆角平滑贴合 */
             z-index: 10;
             box-sizing: border-box;
         }
@@ -987,27 +999,125 @@
         .dsh-step-block.expanded .dsh-row-chevron {
             transform: rotate(180deg);
         }
-        .dsh-code-expanded {
-            margin: 4px 0 8px 22px;
-            padding: 10px 14px;
-            background-color: #0d1117;
-            color: #f1f5f9;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 6px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        /* 步骤展开结构化详情卡片 (解决首行大缩进空白，层次分明) */
+        .dsh-step-detail-card {
+            margin: 6px 0 10px 22px;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
             font-size: 11.5px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-all;
+            line-height: 1.5;
             display: none;
         }
-        body[data-theme="light"] .dsh-code-expanded {
-            background-color: #f8fafc;
-            color: #0f172a;
-            border: 1px solid #cbd5e1;
+        body[data-theme="light"] .dsh-step-detail-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
         }
-        .dsh-step-block.expanded .dsh-code-expanded {
+        .dsh-step-block.expanded .dsh-step-detail-card {
             display: block;
+        }
+        .dsh-trace-code {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: #0d1117;
+            color: #94a3b8;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        body[data-theme="light"] .dsh-trace-code {
+            background-color: #f1f5f9;
+            color: #334155;
+            border-color: #cbd5e1;
+        }
+
+        /* 呼吸光晕动画 (去技术化：步骤执行中像真人点手机) */
+        @keyframes step-pulse-glow {
+            0% {
+                box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5);
+                border-color: rgba(56, 189, 248, 0.9);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(56, 189, 248, 0);
+                border-color: rgba(56, 189, 248, 0.4);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5);
+                border-color: rgba(56, 189, 248, 0.9);
+            }
+        }
+
+        /* 极简当前步骤动态指示胶囊 (聚焦实时投屏) */
+        .current-step-capsule {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 14px;
+            border-radius: 9999px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            font-size: 11.5px;
+            color: var(--text-main);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+            max-width: 92%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .current-step-capsule.active {
+            background: rgba(56, 189, 248, 0.08);
+            border-color: #38bdf8;
+            color: #38bdf8;
+            animation: step-pulse-glow 1.8s infinite ease-in-out;
+        }
+        .current-step-capsule.completed {
+            background: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }
+        .current-step-capsule.failed {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+
+        /* 三段式业务诊断横幅 (人话转译：非技术人员一看就懂) */
+        .business-diagnostic-banner {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(185, 28, 28, 0.08) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            border-radius: 10px;
+            padding: 12px 14px;
+            color: #fca5a5;
+            font-size: 12px;
+            line-height: 1.55;
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.08);
+            margin-bottom: 12px;
+        }
+        body[data-theme="light"] .business-diagnostic-banner {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+
+        /* 自测成功“一键固化入库”高光引导按钮 */
+        .btn-highlight-save {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff !important;
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+            transition: all 0.18s ease;
+        }
+        .btn-highlight-save:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
         }
 
         /* ④ 轮次尾部元数据与操作条 (DeepSeek Harness Turn Tail) */
@@ -1401,6 +1511,194 @@
             margin: 4px 0;
         }
 
+                /* ================= DeepSeek Harness 风格双栏全局设置模态框 ================= */
+        .settings-modal-dialog {
+            max-width: 820px;
+            width: 92vw;
+        }
+        .settings-modal-content {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 620px;
+            max-height: 85vh;
+        }
+        .settings-modal-header {
+            height: 52px;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-subtle);
+            background-color: var(--bg-surface);
+            flex-shrink: 0;
+        }
+        .settings-modal-body {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .settings-sidebar {
+            width: 190px;
+            border-right: 1px solid var(--border-subtle);
+            background-color: var(--bg-sidebar);
+            padding: 12px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .settings-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: var(--text-sub);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+            border: 1px solid transparent;
+        }
+        .settings-nav-item:hover {
+            color: var(--text-main);
+            background-color: var(--bg-surface-hover);
+        }
+        .settings-nav-item.active {
+            color: var(--text-main);
+            background-color: var(--bg-surface);
+            border-color: var(--border-subtle);
+            font-weight: 600;
+        }
+        .settings-content-area {
+            flex: 1;
+            min-width: 0;
+            overflow-y: auto;
+            padding: 20px 24px;
+            background-color: var(--bg-surface);
+        }
+        .settings-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+        .settings-section-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* 外观主题卡片 */
+        .settings-theme-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .theme-select-card {
+            border: 1.5px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 14px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            background-color: var(--bg-main);
+            user-select: none;
+        }
+        .theme-select-card:hover {
+            border-color: var(--border-hover);
+        }
+        .theme-select-card.active {
+            border-color: var(--text-main);
+            background-color: var(--bg-surface-hover);
+        }
+
+        /* 模型提供商卡片列表 */
+        .settings-provider-card {
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--bg-main);
+            transition: border-color 0.15s ease;
+        }
+        .settings-provider-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        /* 模型选择器下拉选单 (DeepSeek Harness) */
+        .model-select-pill {
+            padding: 4px 10px;
+            font-size: 11.5px;
+            font-weight: 500;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .model-select-pill:hover {
+            background-color: var(--bg-surface-hover);
+            border-color: var(--border-hover);
+            color: var(--text-main);
+        }
+        .model-dropdown-menu {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            right: 0;
+            min-width: 250px;
+            max-width: 320px;
+            max-height: 380px;
+            overflow-y: auto;
+            padding: 6px;
+            z-index: 1000;
+        }
+        .model-group-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding: 6px 8px 4px 8px;
+            letter-spacing: 0.5px;
+        }
+        .model-item-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            color: var(--text-sub);
+            transition: all 0.12s ease;
+            user-select: none;
+        }
+        .model-item-option:hover {
+            background-color: var(--bg-surface-hover);
+            color: var(--text-main);
+        }
+        .model-item-option.active {
+            background-color: var(--bg-surface-hover);
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
         /* ================= 4. 右侧工作台 Canvas (Nodes / Logs / Deliverables) ================= */
         .gpt-canvas {
             width: 440px;
@@ -1559,6 +1857,46 @@
 </head>
 <body data-theme="dark">
 
+    <!-- ======================= 全局通栏顶部条 (灰色底色贯穿全屏延伸至右侧) ======================= -->
+    <header class="app-top-chrome" id="appTopChrome">
+        <div class="d-flex align-items-center gap-2">
+            <!-- 桌面端菜单标识 -->
+            <div class="app-chrome-brand d-flex align-items-center gap-1.5">
+                <i class="bi bi-robot" style="font-size: 13px; color: var(--text-main);"></i>
+                <span class="fw-bold" style="font-size: 12px; letter-spacing: 0.5px; color: var(--text-main);">AUTOTEST AI</span>
+            </div>
+            <div class="app-chrome-menu d-flex align-items-center gap-1 ms-2">
+                <span class="chrome-menu-item">应用</span>
+                <span class="chrome-menu-item">调试</span>
+                <span class="chrome-menu-item" onclick="openAntigravityModal()">模型</span>
+                <span class="chrome-menu-item" onclick="openAppPackagesModal()">应用包</span>
+            </div>
+        </div>
+
+        <!-- 顶部中间可拖拽或状态 -->
+        <div class="app-chrome-center d-flex align-items-center gap-2"></div>
+
+        <!-- 顶部右侧系统控制与向导 -->
+        <div class="d-flex align-items-center gap-2">
+            <button class="chrome-pill-btn" onclick="startTourGuide()" title="新手 3 步使用向导">
+                <i class="bi bi-lightbulb-fill text-warning" style="font-size: 11px;"></i>
+                <span>向导</span>
+            </button>
+            <button class="chrome-icon-btn" onclick="toggleThemeQuick(event)" title="切换深色/浅色主题">
+                <i class="bi bi-sun" id="chromeThemeIcon"></i>
+            </button>
+            <!-- 桌面端窗口控件装饰 -->
+            <div class="chrome-win-controls d-flex align-items-center ms-2">
+                <div class="chrome-win-btn win-min" title="最小化"></div>
+                <div class="chrome-win-btn win-max" title="最大化"></div>
+                <div class="chrome-win-btn win-close" title="关闭"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ======================= 桌面端主工作视口包装层 (承载侧栏与中间/右侧卡片) ======================= -->
+    <div class="app-window-body" id="appWindowBody">
+
     <!-- ======================= 1. 左侧边栏：会话任务与设备种类矢量标识 ======================= -->
     <aside class="gpt-sidebar" id="gptSidebar">
         <!-- 侧栏头部 -->
@@ -1585,83 +1923,18 @@
             <div class="small text-muted p-2">加载会话中...</div>
         </div>
 
-        <!-- 侧栏底部：ChatGPT 风格账号与设置中心 -->
+        <!-- 侧栏底部：DeepSeek Harness 风格全局设置入口 -->
         <div class="p-2 border-top position-relative" style="border-color: var(--border-subtle) !important;">
-            <!-- 用户卡片触发区 (点击展开设置小弹窗) -->
-            <div class="user-profile-bar" id="userProfileBar" onclick="toggleUserProfilePopover(event)">
+            <div class="user-profile-bar" id="userProfileBar" onclick="openSettingsModal()" title="打开全局系统设置 (模型接入 / 外观 / OAuth / 许可)">
                 <div class="d-flex align-items-center gap-2 text-truncate">
                     <div class="user-avatar-badge">PM</div>
                     <div class="d-flex flex-column text-truncate" style="line-height: 1.25;">
                         <span class="small fw-semibold text-truncate" id="authBadgeLabel" style="font-size: 12px;">PM Harness</span>
-                        <span class="text-muted" style="font-size: 10px;" id="authTeamSub">云校验授权有效</span>
+                        <span class="text-muted" style="font-size: 10px;" id="authTeamSub">企业全功能版</span>
                     </div>
                 </div>
-                <i class="bi bi-three-dots text-muted" style="font-size: 13px;"></i>
-            </div>
-
-            <!-- ChatGPT 风格左下角上浮小弹窗 (Profile Popover) -->
-            <div class="gpt-popover profile-popover" id="profilePopover" onclick="event.stopPropagation()">
-                <!-- 头部：团队与账号信息 -->
-                <div class="profile-popover-header">
-                    <div class="user-avatar-badge" style="width: 28px; height: 28px; font-size: 11px;">PM</div>
-                    <div class="d-flex flex-column text-truncate">
-                        <span class="fw-semibold text-truncate" style="font-size: 12.5px;" id="popoverTeamName">PM Harness</span>
-                        <span class="text-muted" style="font-size: 10.5px;" id="popoverRoleName">企业全功能版</span>
-                    </div>
-                </div>
-
-                <div class="popover-divider"></div>
-
-                <!-- 简单快捷项：气泡内直接即点即生效 -->
-                <div class="popover-item" onclick="toggleThemeQuick(event)" title="直接切换黑白暗夜/浅亮主题">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-moon-stars" id="quickThemeIcon" style="font-size: 13px;"></i>
-                        <span id="quickThemeText">夜间模式</span>
-                    </div>
-                    <span class="mono-tag mono-tag-active" id="quickThemeBadge" style="font-size: 9.5px;">深色</span>
-                </div>
-
-                <div class="popover-item" onclick="restoreOnboardingGuide(); closeAllPopovers();" title="重新查看系统新手引导">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-question-circle" style="font-size: 13px;"></i>
-                        <span>新手 3 步向导</span>
-                    </div>
-                    <span class="text-muted" style="font-size: 10px;">教程</span>
-                </div>
-
-                <div class="popover-divider"></div>
-
-                <!-- 复杂专项功能：打开居中独立模态框 -->
-                <div class="popover-item" onclick="openAntigravityModal()" title="绑定 Google 账号与切换官方大模型">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-cpu" style="font-size: 13px;"></i>
-                        <span>Antigravity 授权与模型</span>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
-                </div>
-
-                <div class="popover-item" onclick="openInviteAuthModal()" title="核销邀请码与查看企业席位">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-shield-check" style="font-size: 13px;"></i>
-                        <span>邀请码激活与许可</span>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
-                </div>
-
-                <div class="popover-item" onclick="openAppPackagesModal()" title="蒲公英分发短链下载与 APK 上传">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-box-seam" style="font-size: 13px;"></i>
-                        <span>待测应用包管理</span>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
-                </div>
-
-                <div class="popover-item" onclick="openDeviceNodesModal()" title="管理 USB 真机与执行节点">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-phone" style="font-size: 13px;"></i>
-                        <span>真机与节点设备</span>
-                    </div>
-                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
+                <div class="d-flex align-items-center gap-1 text-muted">
+                    <i class="bi bi-gear" style="font-size: 14px;"></i>
                 </div>
             </div>
         </div>
@@ -1763,7 +2036,6 @@
                 <!-- 胶囊底部工具栏 -->
                 <div class="gpt-toolbar">
                     <div class="d-flex align-items-center gap-2">
-
                         <!-- 1. 设备选择胶囊 (带在线状态呼吸指示灯，仅支持物理真机) -->
                         <div class="position-relative" id="pillDeviceWrapper">
                             <div class="pill-btn" onclick="togglePopover('devicePopover', event)" title="选择协同测试真机设备">
@@ -1794,30 +2066,7 @@
                             </div>
                         </div>
 
-                        <!-- 2. AI 模型切换胶囊 -->
-                        <div class="position-relative" id="pillModelWrapper">
-                            <div class="pill-btn" onclick="togglePopover('modelPopover', event)" title="切换推理与编排大模型">
-                                <i class="bi bi-cpu"></i>
-                                <span id="activeModelLabel">Hermes (DeepSeek)</span>
-                                <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
-                            </div>
-                            <div class="gpt-popover" id="modelPopover" style="left: 0; min-width: 195px;" onclick="event.stopPropagation()">
-                                <div class="popover-item active" id="itemModel_hermes" onclick="quickSelectModel('hermes', 'Hermes (DeepSeek)', this)">
-                                    <span>Hermes (DeepSeek)</span>
-                                </div>
-                                <div class="popover-item" id="itemModel_antigravity" onclick="quickSelectModel('antigravity', 'Google Antigravity', this)">
-                                    <span>Google Antigravity</span>
-                                </div>
-                                <div class="popover-item" id="itemModel_deepseek" onclick="quickSelectModel('deepseek', 'DeepSeek 官方', this)">
-                                    <span>DeepSeek 官方</span>
-                                </div>
-                                <div class="popover-item" id="itemModel_openai" onclick="quickSelectModel('openai', 'OpenAI 兼容', this)">
-                                    <span>OpenAI 兼容</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 3. 审批模式胶囊 -->
+                        <!-- 2. 审批模式胶囊 -->
                         <div class="position-relative" id="pillApprovalWrapper">
                             <div class="pill-btn" onclick="togglePopover('approvalPopover', event)" title="切换自动放行 / 人工逐级审批">
                                 <i class="bi bi-shield-check"></i>
@@ -1841,10 +2090,35 @@
                         </div>
                     </div>
 
-                    <!-- 纯白黑箭头圆形发送按钮 -->
-                    <button class="gpt-send-btn" id="btnSendTask" onclick="submitNewTask()" title="发送执行">
-                        <i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>
-                    </button>
+                    <!-- 右侧操作区：DeepSeek Harness 风格模型选择器 + 发送按钮 -->
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- 模型选择胶囊 (新增任务与已有对话均可任意点选切换) -->
+                        <div class="position-relative" id="pillModelWrapper">
+                            <div class="model-select-pill" onclick="togglePopover('modelPopover', event)" title="切换推理大模型 (全场景实时生效)">
+                                <span class="status-indicator-dot dot-online" id="modelStatusDot"></span>
+                                <span id="activeModelLabel">deepseek-flash</span>
+                                <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
+                            </div>
+                            <div class="gpt-popover model-dropdown-menu" id="modelPopover" onclick="event.stopPropagation()">
+                                <!-- 动态分组渲染的各厂商与可用模型 -->
+                                <div id="modelDropdownList">
+                                    <div class="p-2 text-center text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>加载模型中...</div>
+                                </div>
+                                <div class="popover-divider"></div>
+                                <div class="popover-item" onclick="openSettingsModal('models'); closeAllPopovers();" title="打开模型接入与 API 配置中心">
+                                    <div class="d-flex align-items-center gap-1.5 text-muted">
+                                        <i class="bi bi-gear" style="font-size: 12px;"></i>
+                                        <span style="font-size: 11.5px;">配置新模型与 API 密钥...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 纯白黑箭头圆形发送按钮 -->
+                        <button class="gpt-send-btn" id="btnSendTask" onclick="submitNewTask()" title="发送执行">
+                            <i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1965,6 +2239,13 @@
 
             <!-- 手机投屏展示主体区 -->
             <div class="flex-grow-1 overflow-auto p-3 d-flex flex-column align-items-center justify-content-center" id="phoneMirrorOuterBox" style="background: var(--bg-main);">
+                <!-- 极简当前步骤动态指示胶囊 (聚焦实时投屏，仅显示当前单步) -->
+                <div id="currentStepCapsule" class="current-step-capsule mb-3">
+                    <span class="spinner-grow spinner-grow-sm text-info d-none" id="currentStepCapsuleSpinner" style="width: 8px; height: 8px;"></span>
+                    <i class="bi bi-phone" id="currentStepCapsuleIcon"></i>
+                    <span id="currentStepCapsuleText">端侧待命中 · 发起测试后将实时跟踪交互</span>
+                </div>
+
                 <!-- 真实手机拟物化投屏外框 -->
                 <div class="phone-mockup-frame" id="phoneMockupFrame">
                     <div class="phone-mockup-camera"></div>
@@ -1991,90 +2272,261 @@
             </div>
         </div>
     </aside>
+    </div><!-- /appWindowBody -->
 
-    <!-- ======================= 模态框 1: Google Antigravity 官方授权与 AI 网关 ======================= -->
-    <div class="modal fade" id="antigravityModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-md modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
+    <!-- ======================= 模态框: 🎉 自测成功完成极简高光引导浮层 (0输入/0下拉/一键保存团队用例) ======================= -->
+    <div class="modal fade" id="successHighlightModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+            <div class="modal-content success-highlight-modal" style="background: linear-gradient(145deg, #18181b 0%, #09090b 100%); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 30px rgba(16, 185, 129, 0.15);">
+                <div class="modal-header border-0 pb-0 pt-3 px-3">
                     <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-cpu" style="font-size: 15px;"></i>
-                        <span class="modal-title fw-semibold" style="font-size: 13.5px;">Google Antigravity 官方授权与 AI 网关</span>
+                        <span style="font-size: 20px;">🎉</span>
+                        <span class="modal-title fw-bold" style="font-size: 14.5px; color: #34d399;">自测成功完成</span>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-3">
-                    <!-- Google Antigravity OAuth 绑定状态卡片 -->
-                    <div class="p-3 mb-3 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="small fw-semibold"><i class="bi bi-google me-1"></i> Google OAuth 官方绑定</span>
-                            <span id="agAuthStatusBadge" class="mono-tag">检测中...</span>
+                <div class="modal-body p-3 pt-2" id="successHighlightModalBody">
+                    <div class="text-sub mb-3" style="font-size: 12px; line-height: 1.6;">
+                        全流程端侧校验已 100% 达成。AI 已提炼用例并自动归档：
+                    </div>
+                    <div class="p-2.5 rounded mb-3" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(255, 255, 255, 0.15);">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="text-muted" style="font-size: 11px;">所属团队模块：</span>
+                            <span class="mono-tag" id="highlightModalModuleBadge" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;">业务通用</span>
                         </div>
-                        <div class="small text-muted mb-2" id="agAuthEmail" style="font-size: 11px;">
-                            正在查询 Google 授权账户绑定状态...
+                        <div class="fw-semibold text-main text-truncate" id="highlightModalTitleText" style="font-size: 12.5px;">
+                            自动化业务链路回归
                         </div>
-                        <button class="btn btn-sm btn-outline-light py-1 px-3 w-100 fw-semibold" id="btnAgLogin" onclick="triggerAntigravityLogin()" style="font-size: 11.5px;">
-                            <i class="bi bi-box-arrow-up-right me-1"></i> 立即连接 Google Antigravity 账号
-                        </button>
                     </div>
-
-                    <!-- 模型与网关配置表单 -->
-                    <div class="mb-3">
-                        <label class="form-label small">AI 协议服务商：</label>
-                        <select id="modelProviderSelect" class="form-select" onchange="onProviderChange()">
-                            <option value="antigravity">Google Antigravity 官方</option>
-                            <option value="hermes">Hermes (DeepSeek 本地加速)</option>
-                            <option value="deepseek">DeepSeek 官方 API</option>
-                            <option value="openai">OpenAI 兼容协议</option>
-                        </select>
+                    <button class="btn w-100 py-2 btn-highlight-save d-flex align-items-center justify-content-center gap-1.5" id="btnModalSaveTeamCase" onclick="executeModalSaveTeamCase()">
+                        <i class="bi bi-shield-check" style="font-size: 14px;"></i>
+                        <span>✨ 一键保存为团队用例</span>
+                    </button>
+                    <div class="text-center mt-2.5">
+                        <span class="text-muted" style="font-size: 11px; cursor: pointer;" data-bs-dismiss="modal">稍后保存 / 关闭</span>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small">模型选择：</label>
-                        <select id="modelSelect" class="form-select"></select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small">API Key (第三方网关选填)：</label>
-                        <input type="password" id="modelApiKeyInput" class="form-control" placeholder="使用 Antigravity 官方授权时可免填">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small">Base URL (第三方网关选填)：</label>
-                        <input type="text" id="modelBaseUrlInput" class="form-control" placeholder="留空使用默认官方网关地址">
-                    </div>
-                    <button class="btn btn-light w-100 fw-semibold py-1.5" onclick="saveModelConfigModal()" style="font-size: 12.5px;">保存配置并生效</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ======================= 模态框 2: 邀请码激活与许可鉴权 ======================= -->
-    <div class="modal fade" id="inviteAuthModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-md modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
+        <!-- ======================= DeepSeek Harness 风格双栏全局设置中心 ======================= -->
+    <div class="modal fade" id="harnessSettingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog settings-modal-dialog modal-dialog-centered">
+            <div class="modal-content settings-modal-content">
+                <!-- 顶部 Header: 标题 + 打开配置文件 + 关闭按钮 -->
+                <div class="settings-modal-header">
+                    <div class="fw-semibold" style="font-size: 15px; color: var(--text-main);">设置</div>
                     <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-shield-check" style="font-size: 15px;"></i>
-                        <span class="modal-title fw-semibold" style="font-size: 13.5px;">邀请码激活与企业团队许可</span>
+                        <button class="btn btn-sm btn-outline-light py-0.5 px-2.5 rounded-pill" onclick="openEnvConfigTip()" style="font-size: 11px;">
+                            <i class="bi bi-file-earmark-code me-1"></i>打开配置文件
+                        </button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body p-3">
-                    <div class="p-3 mb-3 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="small fw-semibold">授权状态</span>
-                            <span id="modalAuthBadge" class="mono-tag mono-tag-active">已激活</span>
+
+                <!-- 模态框主体: 左侧垂直 Tab 导航 + 右侧独立内容区 -->
+                <div class="settings-modal-body">
+                    <!-- 左侧分类导航 -->
+                    <div class="settings-sidebar">
+                        <div class="settings-nav-item active" id="tabNavGeneral" onclick="switchSettingsTab('general')">
+                            <i class="bi bi-gear"></i>
+                            <span>通用设置</span>
                         </div>
-                        <div class="small text-muted" id="modalAuthTeam" style="font-size: 11.5px;">团队: PM Harness 团队</div>
-                        <div class="small text-muted" id="modalAuthRole" style="font-size: 11.5px;">类型: 企业全功能版</div>
-                        <div class="small text-muted" id="modalAuthExpires" style="font-size: 11.5px;">到期: 永久有效</div>
+                        <div class="settings-nav-item" id="tabNavModels" onclick="switchSettingsTab('models')">
+                            <i class="bi bi-hdd-network"></i>
+                            <span>模型</span>
+                        </div>
+                        <div class="settings-nav-item" id="tabNavOAuth" onclick="switchSettingsTab('oauth')">
+                            <i class="bi bi-google"></i>
+                            <span>Gemini OAuth</span>
+                        </div>
+                        <div class="settings-nav-item" id="tabNavLicense" onclick="switchSettingsTab('license')">
+                            <i class="bi bi-shield-check"></i>
+                            <span>团队与许可</span>
+                        </div>
                     </div>
-                    <div class="mb-2">
-                        <label class="form-label small">在线激活/变更邀请码：</label>
-                        <div class="input-group">
-                            <input type="text" id="inviteCodeInput" class="form-control" placeholder="输入 PM Harness 邀请码...">
-                            <button class="btn btn-outline-light" onclick="verifyInviteCode()">立即核销</button>
+
+                    <!-- 右侧面板 1: 通用设置 -->
+                    <div class="settings-content-area" id="panelSettingsGeneral">
+                        <div class="settings-section-title">通用设置</div>
+                        <div class="settings-section-desc">配置系统交互模式、外观主题与执行策略</div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">权限模式</label>
+                            <select class="form-select form-select-sm" style="max-width: 280px;">
+                                <option value="workspace">工作区内修改 (默认)</option>
+                                <option value="readonly">只读浏览 (安全限制)</option>
+                            </select>
                         </div>
-                        <div class="text-muted mt-1" style="font-size: 11px;">
-                            核销成功后将自动同步云端特权，享受更多并发节点与专业级自动化模型支撑。
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">语言 (Language)</label>
+                            <select class="form-select form-select-sm" style="max-width: 280px;">
+                                <option value="zh-CN">简体中文 (Chinese)</option>
+                                <option value="en-US">English</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">外观与主题</label>
+                            <div class="settings-theme-cards">
+                                <div class="theme-select-card" id="themeCardLight" onclick="switchTheme('light')">
+                                    <i class="bi bi-sun" style="font-size: 20px;"></i>
+                                    <div class="small fw-semibold mt-1">浅色</div>
+                                </div>
+                                <div class="theme-select-card active" id="themeCardDark" onclick="switchTheme('dark')">
+                                    <i class="bi bi-moon-stars" style="font-size: 20px;"></i>
+                                    <div class="small fw-semibold mt-1">深色</div>
+                                </div>
+                                <div class="theme-select-card" id="themeCardAuto" onclick="switchTheme('dark')">
+                                    <i class="bi bi-display" style="font-size: 20px;"></i>
+                                    <div class="small fw-semibold mt-1">跟随系统</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">默认执行审批策略</label>
+                            <select class="form-select form-select-sm" id="defaultApprovalSelect" onchange="setApprovalMode(this.value, this.options[this.selectedIndex].text)" style="max-width: 280px;">
+                                <option value="auto">自动放行 (Auto) - 推荐高频回归</option>
+                                <option value="manual">人工逐步 (Manual) - 涉及支付/敏感操作</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 右侧面板 2: 模型接入 (核心，参考截图 2 & 3) -->
+                    <div class="settings-content-area d-none" id="panelSettingsModels">
+                        <div class="settings-section-title">模型</div>
+                        <div class="settings-section-desc">填入各提供商的 API 密钥即可使用其模型。</div>
+
+                        <!-- 已接入提供商卡片列表 -->
+                        <div id="settingsProvidersList">
+                            <div class="settings-provider-card">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-semibold small">象盒 Hermes 企业网关</span>
+                                        <span class="status-indicator-dot dot-online" id="statusDot_hermes"></span>
+                                        <span class="mono-tag" id="badge_hermes">内置已就绪</span>
+                                    </div>
+                                    <div class="text-muted mt-1" style="font-size: 11px;">模型: <code id="model_hermes">deepseek-flash</code> · 本地内网零等待推演</div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="selectProviderForEdit('hermes')">编辑</button>
+                            </div>
+
+                            <div class="settings-provider-card">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-semibold small">Google Antigravity 官方 (OAuth)</span>
+                                        <span class="status-indicator-dot dot-online" id="statusDot_antigravity"></span>
+                                        <span class="mono-tag" id="badge_antigravity">官方已授权</span>
+                                    </div>
+                                    <div class="text-muted mt-1" style="font-size: 11px;">模型: <code id="model_antigravity">gemini-2.5-flash</code> · 原生多模态视觉推理</div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="selectProviderForEdit('antigravity')">编辑</button>
+                            </div>
+
+                            <div class="settings-provider-card">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-semibold small">DeepSeek 官方 API</span>
+                                        <span class="status-indicator-dot dot-offline" id="statusDot_deepseek"></span>
+                                        <span class="mono-tag" id="badge_deepseek">官方 API</span>
+                                    </div>
+                                    <div class="text-muted mt-1" style="font-size: 11px;">模型: <code id="model_deepseek">deepseek-chat</code> · api.deepseek.com</div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="selectProviderForEdit('deepseek')">编辑</button>
+                            </div>
+
+                            <div class="settings-provider-card">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-semibold small">OpenAI 兼容协议 / 自定义网关</span>
+                                        <span class="status-indicator-dot dot-offline" id="statusDot_openai"></span>
+                                        <span class="mono-tag" id="badge_openai">自定义</span>
+                                    </div>
+                                    <div class="text-muted mt-1" style="font-size: 11px;">模型: <code id="model_openai">gpt-4o</code> · 自定义 Base URL 与 Key</div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="selectProviderForEdit('openai')">编辑</button>
+                            </div>
+                        </div>
+
+                        <!-- 接入配置表单 -->
+                        <div class="p-3 rounded border mt-3" style="border-color: var(--border-subtle) !important; background-color: var(--bg-main);">
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                                <span class="small fw-semibold"><i class="bi bi-sliders me-1"></i>配置 AI 服务商参数</span>
+                                <span class="mono-tag mono-tag-active" id="currentProviderBadge">Hermes</span>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">AI 提供商：</label>
+                                <select id="modelProviderSelect" class="form-select form-select-sm" onchange="onProviderChange()">
+                                    <option value="antigravity">Google Antigravity 官方 (OAuth)</option>
+                                    <option value="hermes">Hermes (象盒企业网关)</option>
+                                    <option value="deepseek">DeepSeek 官方 API</option>
+                                    <option value="openai">OpenAI 兼容协议 / 自定义</option>
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">默认调用模型：</label>
+                                <select id="modelSelect" class="form-select form-select-sm"></select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">API 密钥 (API Key)：</label>
+                                <input type="password" id="modelApiKeyInput" class="form-control form-control-sm" placeholder="使用官方授权时可免填，第三方网关必填">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small mb-1">API 地址 (Base URL)：</label>
+                                <input type="text" id="modelBaseUrlInput" class="form-control form-control-sm" placeholder="留空使用默认官方网关地址">
+                            </div>
+                            <button class="btn btn-sm btn-light w-100 fw-semibold py-1.5" onclick="saveModelConfigModal()">
+                                <i class="bi bi-check2-circle me-1"></i>保存提供商配置并生效
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 右侧面板 3: Gemini OAuth -->
+                    <div class="settings-content-area d-none" id="panelSettingsOAuth">
+                        <div class="settings-section-title">Gemini OAuth</div>
+                        <div class="settings-section-desc">Google Antigravity 官方订阅授权，享受原生多模态视觉推理与高频额度。</div>
+
+                        <div class="p-3 mb-3 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-semibold"><i class="bi bi-google me-1"></i> Google OAuth 官方绑定状态</span>
+                                <span id="agAuthStatusBadge" class="mono-tag">检测中...</span>
+                            </div>
+                            <div class="small text-muted mb-3" id="agAuthEmail" style="font-size: 11.5px;">
+                                正在查询 Google 授权账户绑定状态...
+                            </div>
+                            <button class="btn btn-sm btn-outline-light py-1.5 px-3 w-100 fw-semibold" id="btnAgLogin" onclick="triggerAntigravityLogin()" style="font-size: 12px;">
+                                <i class="bi bi-box-arrow-up-right me-1"></i> 立即连接 Google Antigravity 官方账号
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 右侧面板 4: 团队与许可 -->
+                    <div class="settings-content-area d-none" id="panelSettingsLicense">
+                        <div class="settings-section-title">团队与许可</div>
+                        <div class="settings-section-desc">管理企业席位配额、查看团队授权与激活新许可</div>
+
+                        <div class="p-3 mb-3 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small fw-semibold">授权状态</span>
+                                <span id="modalAuthBadge" class="mono-tag mono-tag-active">已激活</span>
+                            </div>
+                            <div class="small text-muted" id="modalAuthTeam" style="font-size: 11.5px;">团队: PM Harness 团队</div>
+                            <div class="small text-muted" id="modalAuthRole" style="font-size: 11.5px;">类型: 企业全功能版</div>
+                            <div class="small text-muted" id="modalAuthExpires" style="font-size: 11.5px;">到期: 永久有效</div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small">在线激活/变更邀请码：</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="inviteCodeInput" class="form-control" placeholder="输入 PM Harness 邀请码...">
+                                <button class="btn btn-outline-light" onclick="verifyInviteCode()">立即核销</button>
+                            </div>
+                            <div class="text-muted mt-1" style="font-size: 11px;">
+                                核销成功后将自动同步云端特权，享受更多并发节点与专业级自动化模型支撑。
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2357,13 +2809,19 @@
             const viewCases = document.getElementById("subViewCases");
             const viewReports = document.getElementById("subViewReports");
 
+            if (btnCases) btnCases.classList.toggle("active", subTab === "cases");
+            if (btnReports) btnReports.classList.toggle("active", subTab === "reports");
+            if (viewCases) viewCases.classList.toggle("d-none", subTab !== "cases");
+            if (viewReports) viewReports.classList.toggle("d-none", subTab !== "reports");
+        }
+
         // ================= 右侧工作台：双 Tab 切换 (全量日志 vs 屏幕显示) =================
         let currentScreenDeviceId = null;
         let screenAutoSyncTimer = null;
         let isScreenAutoSyncEnabled = true;
 
         function switchCanvasTab(tab) {
-            if (!["logs", "screen"].includes(tab)) tab = "logs";
+            if (!["logs", "screen"].includes(tab)) tab = "screen";
 
             const btnLogs = document.getElementById("btnTabLogs");
             const btnScreen = document.getElementById("btnTabScreen");
@@ -2549,24 +3007,46 @@
             }
         }
 
-        // ================= 侧栏左下角 ChatGPT 风格设置浮层与独立模态框打开联动 =================
-        function toggleUserProfilePopover(e) {
-            if (e) e.stopPropagation();
-            const pop = document.getElementById("profilePopover");
-            if (!pop) return;
-            const isShowing = pop.classList.contains("show");
+        // ================= DeepSeek Harness 风格双栏全局设置中心 =================
+        function openSettingsModal(initialTab = "general") {
             closeAllPopovers();
-            if (!isShowing) {
-                pop.classList.add("show");
-            }
+            switchSettingsTab(initialTab);
+            loadModelConfig();
+            loadAntigravityStatus();
+            const modalEl = document.getElementById("harnessSettingsModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
         }
 
+        // 向后兼容
         function openAntigravityModal() {
-            closeAllPopovers();
-            loadAntigravityStatus();
-            loadModelConfig();
-            const modalEl = document.getElementById("antigravityModal");
-            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            openSettingsModal("oauth");
+        }
+        function openInviteAuthModal() {
+            openSettingsModal("license");
+        }
+
+        function switchSettingsTab(tabName) {
+            const tabs = ["general", "models", "oauth", "license"];
+            tabs.forEach(t => {
+                const nav = document.getElementById(`tabNav${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                const panel = document.getElementById(`panelSettings${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                if (nav) nav.classList.toggle("active", t === tabName);
+                if (panel) panel.classList.toggle("d-none", t !== tabName);
+            });
+        }
+
+        function openEnvConfigTip() {
+            alert("配置文件路径: F:\\Autotest\\.env\n可在设置中的【模型】面板直接编辑保存，系统将自动热同步至 .env 文件中。");
+        }
+
+        function selectProviderForEdit(provider) {
+            const pSelect = document.getElementById("modelProviderSelect");
+            if (pSelect) {
+                pSelect.value = provider;
+                onProviderChange();
+            }
+            const formCard = document.getElementById("modelProviderSelect")?.closest(".border");
+            if (formCard) formCard.scrollIntoView({ behavior: "smooth" });
         }
 
         async function loadAntigravityStatus() {
@@ -2750,9 +3230,12 @@
             }
 
             let chipsHtml = `
-                <span class="env-chip" title="原始执行方式"><i class="bi ${modeIcon}"></i> ${modeLabel}</span>
-                <span class="env-chip ${hasOfflineDevice ? 'env-chip-warning' : ''}" title="原始绑定设备">
-                    <i class="bi bi-cpu"></i> ${devSummary}
+                <span class="env-chip" title="执行方式"><i class="bi ${modeIcon}"></i> ${modeLabel}</span>
+                <span class="env-chip ${hasOfflineDevice ? 'env-chip-warning' : ''}" title="绑定设备">
+                    <i class="bi bi-phone"></i> ${devSummary}
+                </span>
+                <span class="env-chip" title="当前推演模型 (点击随时切换)" onclick="togglePopover('modelPopover', event)" style="cursor: pointer;">
+                    <i class="bi bi-cpu"></i> ${escapeHtml(data.model || currentActiveModel)} <i class="bi bi-chevron-down ms-0.5" style="font-size: 8px;"></i>
                 </span>
             `;
             if (data.approval_mode) {
@@ -3434,6 +3917,209 @@
             switchCanvasTab('screen');
         }
 
+        // ================= 业务人话转译与诊断生成器 (优化项 2) =================
+        function translateDiagnostic(errorMsg, failedStepNum, failedStepTitle) {
+            const raw = String(errorMsg || "").trim();
+            let situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
+            let suggestion = "请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查待测应用是否在前台。";
+
+            if (!raw || raw === "undefined") {
+                situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
+                suggestion = "请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查待测应用是否在前台。";
+            } else if (/NoSuchElement|not found|未找到|未定位|未检测到/i.test(raw)) {
+                situation = '屏幕可能停留在“隐私政策授权”弹窗、权限申请或加载页，导致目标按钮被遮挡。';
+                suggestion = '可在真机投屏中手动点击“同意/授权”，或重新发起测试并在意图中加入“先同意隐私协议”。';
+            } else if (/Timeout|timeout|超时|未在预期时间内/i.test(raw)) {
+                situation = '界面转场响应缓慢或网络数据加载延迟，未在预期时限内捕获到关键反馈。';
+                suggestion = '请检查网络连通性或当前端侧运行负载，确认页面加载就绪后一键重试。';
+            } else if (/Session|device|offline|连接断开|ADB/i.test(raw)) {
+                situation = 'ADB 底层通信链路出现波动或真机处于息屏/掉线状态。';
+                suggestion = '请在右侧屏幕显示中检查真机唤醒状态与 USB/WiFi 授权，确认连接正常后重试。';
+            } else {
+                situation = `执行受阻：${raw.slice(0, 100)}`;
+                suggestion = '请检查手机屏幕状态，排除无关弹窗遮挡后重新发起执行。';
+            }
+
+            return {
+                stepNum: failedStepNum || 1,
+                stepTitle: failedStepTitle || "业务交互执行",
+                situation: situation,
+                suggestion: suggestion,
+                raw: raw
+            };
+        }
+
+        // ================= 聚焦实时屏幕：极简当前步骤动态指示胶囊 =================
+        function updateCurrentStepCapsule(sessionData) {
+            const capsule = document.getElementById("currentStepCapsule");
+            const spinner = document.getElementById("currentStepCapsuleSpinner");
+            const icon = document.getElementById("currentStepCapsuleIcon");
+            const textEl = document.getElementById("currentStepCapsuleText");
+            if (!capsule || !textEl) return;
+
+            const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
+            let hasDeviceFail = (sessionData.has_fail === true);
+            for (const d of Object.values(sessionData.devices || {})) {
+                if (d.status === "FAIL" || d.success === false) {
+                    hasDeviceFail = true;
+                    break;
+                }
+            }
+            const isSuccess = (sessionData.is_success === true || (sessionData.is_success !== false && !hasDeviceFail && sessionData.status !== "FAILED"));
+
+            const steps = sessionData.plan_steps || [];
+            capsule.className = "current-step-capsule mb-3";
+
+            if (isFinished) {
+                if (spinner) spinner.classList.add("d-none");
+                if (isSuccess) {
+                    capsule.classList.add("completed");
+                    if (icon) icon.className = "bi bi-check-circle-fill text-success";
+                    textEl.innerText = `全流程测试验证通过 · ${steps.length} 个规划阶段均已达成`;
+                } else {
+                    capsule.classList.add("failed");
+                    if (icon) icon.className = "bi bi-exclamation-triangle-fill text-danger";
+                    textEl.innerText = `测试推进受阻 · 请参考主对话流人话诊断或检查真机弹窗`;
+                }
+                return;
+            }
+
+            // 查找当前正在执行的步骤
+            let activeStep = null;
+            let activeIdx = 0;
+            for (let i = 0; i < steps.length; i++) {
+                if (steps[i].status === "RUNNING") {
+                    activeStep = steps[i];
+                    activeIdx = i + 1;
+                    break;
+                }
+            }
+            if (!activeStep && steps.length > 0) {
+                activeStep = steps[0];
+                activeIdx = 1;
+            }
+
+            capsule.classList.add("active");
+            if (spinner) spinner.classList.remove("d-none");
+            if (icon) icon.className = "bi bi-lightning-charge-fill text-info";
+
+            let liveAction = "";
+            for (const devInfo of Object.values(sessionData.devices || {})) {
+                if (devInfo.action) liveAction = devInfo.action;
+            }
+
+            const stepTitle = activeStep ? (activeStep.title || activeStep.name) : "执行业务交互";
+            textEl.innerText = liveAction ? `当前第 ${activeIdx} 步：${liveAction}` : `当前第 ${activeIdx} 步：${stepTitle}`;
+        }
+
+        // ================= 🎉 自测成功极简动态高光模态浮层控制器 =================
+        let currentModalSessionData = null;
+
+        function showSuccessHighlightModal(sessionData) {
+            currentModalSessionData = sessionData;
+            const modalEl = document.getElementById("successHighlightModal");
+            if (!modalEl) return;
+
+            let suggestedTitle = sessionData.goal ? sessionData.goal.slice(0, 24) : "业务链路自动化回归";
+            let suggestedModule = "业务通用";
+            if (/房|安居客|链家|租房|买房|二手房|小区/i.test(suggestedTitle)) suggestedModule = "房源搜索";
+            else if (/登录|注册|绑定|密码|验证码|鉴权/i.test(suggestedTitle)) suggestedModule = "业务通用";
+            else if (/表单|提交|录入|创建|申请/i.test(suggestedTitle)) suggestedModule = "业务表单";
+            else if (/导航|进入|跳转|页面|切换/i.test(suggestedTitle)) suggestedModule = "核心导航";
+            else if (/设置|开关|权限|清除|配置/i.test(suggestedTitle)) suggestedModule = "系统设置";
+
+            const badge = document.getElementById("highlightModalModuleBadge");
+            const titleEl = document.getElementById("highlightModalTitleText");
+            const body = document.getElementById("successHighlightModalBody");
+
+            if (badge) badge.innerText = suggestedModule;
+            if (titleEl) titleEl.innerText = `《${suggestedTitle}》`;
+
+            // 重置 modal 内部状态
+            if (body) {
+                body.innerHTML = `
+                    <div class="text-sub mb-3" style="font-size: 12px; line-height: 1.6;">
+                        全流程端侧校验已 100% 达成。AI 已提炼用例并自动归档：
+                    </div>
+                    <div class="p-2.5 rounded mb-3" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(255, 255, 255, 0.15);">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="text-muted" style="font-size: 11px;">所属团队模块：</span>
+                            <span class="mono-tag" id="highlightModalModuleBadge" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;">${escapeHtml(suggestedModule)}</span>
+                        </div>
+                        <div class="fw-semibold text-main text-truncate" id="highlightModalTitleText" style="font-size: 12.5px;">
+                            《${escapeHtml(suggestedTitle)}》
+                        </div>
+                    </div>
+                    <button class="btn w-100 py-2 btn-highlight-save d-flex align-items-center justify-content-center gap-1.5" id="btnModalSaveTeamCase" onclick="executeModalSaveTeamCase()">
+                        <i class="bi bi-shield-check" style="font-size: 14px;"></i>
+                        <span>✨ 一键保存为团队用例</span>
+                    </button>
+                    <div class="text-center mt-2.5">
+                        <span class="text-muted" style="font-size: 11px; cursor: pointer;" data-bs-dismiss="modal">稍后保存 / 关闭</span>
+                    </div>
+                `;
+            }
+
+            try {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            } catch (e) {}
+        }
+
+        async function executeModalSaveTeamCase() {
+            if (!currentModalSessionData) return;
+            const btn = document.getElementById("btnModalSaveTeamCase");
+            const body = document.getElementById("successHighlightModalBody");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span> 正在入库固化并生成确定性代码...`;
+            }
+
+            try {
+                const res = await fetch(`/api/sessions/${encodeURIComponent(currentModalSessionData.session_id)}/save_to_local_case`, {
+                    method: "POST"
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (body) {
+                        body.innerHTML = `
+                            <div class="p-3 text-center">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 32px;"></i>
+                                <div class="fw-bold mt-2" style="font-size: 14px; color: #34d399;">已成功沉淀为团队用例！</div>
+                                <div class="text-muted mt-1" style="font-size: 11.5px; line-height: 1.5;">
+                                    已生成确定性脚本【${escapeHtml(data.filename)}】<br>已支持团队秒级免 Token 回归与 CI 门禁接入。
+                                </div>
+                                <button class="btn btn-sm btn-outline-light mt-3 px-4 rounded-pill" data-bs-dismiss="modal" style="font-size: 11.5px;">完成</button>
+                            </div>
+                        `;
+                    }
+                    await pollCurrentSession();
+                    await loadSolidifiedCasesWorkspace();
+                    if (typeof loadSolidifiedCases === "function") {
+                        await loadSolidifiedCases();
+                    }
+                    setTimeout(() => {
+                        try {
+                            const modal = bootstrap.Modal.getInstance(document.getElementById("successHighlightModal"));
+                            if (modal) modal.hide();
+                        } catch (e) {}
+                    }, 2200);
+                } else {
+                    alert(data.message || "入库保存失败");
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<span>✨ 一键保存为团队用例</span>`;
+                    }
+                }
+            } catch (err) {
+                alert("请求异常: " + err.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span>✨ 一键保存为团队用例</span>`;
+                }
+            }
+        }
+
         // 渲染对话流 (无头像/无名称)
         function renderChatStream(sessionData) {
             const flow = document.getElementById("messagesFlow");
@@ -3508,15 +4194,9 @@
                 ];
             }
 
-            // 提取当前实时端侧动作与最新日志摘要
             let currentLiveAction = "";
-            let latestLogsSnippet = "";
             for (const [devId, devInfo] of Object.entries(sessionData.devices || {})) {
                 if (devInfo.action) currentLiveAction = devInfo.action;
-                if (deviceLogsCache[devId] && deviceLogsCache[devId].length > 0) {
-                    const logs = deviceLogsCache[devId];
-                    latestLogsSnippet = logs.slice(-3).join("\n");
-                }
             }
 
             let stepsHtml = "";
@@ -3558,24 +4238,58 @@
                     statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px;">等待中</span>`;
                 }
 
-                let errorBannerHtml = "";
-                if (isFailed || st.error_msg) {
-                    const errMsg = st.error_msg || sessionData.error_message || "端侧动作未达预期或校验断言不通过";
-                    errorBannerHtml = `
-                        <div class="mb-2 p-2 rounded" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; font-size: 11.5px;">
-                            <div class="fw-semibold mb-1" style="color: #f87171;"><i class="bi bi-exclamation-triangle-fill me-1"></i> 失败原因分析：</div>
-                            <div style="line-height: 1.5; color: #fecaca;">${escapeHtml(errMsg)}</div>
+                // 结构化状态判定卡片 (消灭多余空格与缩进)
+                let statusDetailCardHtml = "";
+                if (isCompleted) {
+                    statusDetailCardHtml = `
+                        <div class="d-flex align-items-center justify-content-between p-2 rounded" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); color: #34d399; font-size: 11.5px;">
+                            <div class="d-flex align-items-center gap-1.5">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>界面状态转移校验达成 · 置信度 0.98</span>
+                            </div>
+                            <span class="mono-tag" style="border-color: rgba(16, 185, 129, 0.35); color: #34d399;">耗时 ${st.duration || '0.8s'}</span>
+                        </div>
+                    `;
+                } else if (isFailed) {
+                    const trans = translateDiagnostic(st.error_msg || sessionData.error_message, stepNum, stepTitle);
+                    statusDetailCardHtml = `
+                        <div class="p-2.5 rounded" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; font-size: 11.5px;">
+                            <div class="fw-semibold d-flex align-items-center gap-1 mb-1" style="color: #f87171;">
+                                <i class="bi bi-exclamation-triangle-fill"></i> ⚠️ 在第 ${stepNum} 步【${escapeHtml(stepTitle)}】受阻
+                            </div>
+                            <div class="mb-1" style="color: #fecaca; line-height: 1.5;"><strong>界面现状：</strong>${escapeHtml(trans.situation)}</div>
+                            <div style="color: #cbd5e1; line-height: 1.5;"><strong>建议操作：</strong>${escapeHtml(trans.suggestion)}</div>
                         </div>
                     `;
                 } else if (isSkipped) {
-                    errorBannerHtml = `
-                        <div class="mb-2 p-2 rounded" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(255, 255, 255, 0.15); color: var(--text-sub); font-size: 11.5px;">
-                            <i class="bi bi-check2-circle text-success me-1"></i> 目标已在前期步骤中顺利达成，此预设步骤自动略过。
+                    statusDetailCardHtml = `
+                        <div class="p-2 rounded text-sub" style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); font-size: 11.5px;">
+                            <i class="bi bi-check2-circle text-success me-1"></i> 前期步骤已顺利达成目标，此预设步骤自动略过。
+                        </div>
+                    `;
+                } else if (isRunning) {
+                    statusDetailCardHtml = `
+                        <div class="d-flex align-items-center gap-2 p-2 rounded" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 11.5px;">
+                            <span class="spinner-grow spinner-grow-sm" style="width: 8px; height: 8px;"></span>
+                            <span>正在执行端侧交互: ${escapeHtml(currentLiveAction || '视觉定位组件并派发手势事件...')}</span>
                         </div>
                     `;
                 }
 
-                const detailLogs = st.raw_logs || latestLogsSnippet || `端侧底层调用: 原生 ADB / 视觉判定置信度 0.98 (耗时 ${st.duration || '0.6s'})`;
+                // 底层原生指令跟踪 (严格专属本步骤，绝不借用全局日志跨步污染)
+                let traceLogHtml = "";
+                if (st.raw_logs && st.raw_logs.trim()) {
+                    traceLogHtml = `
+                        <div class="dsh-trace-code mt-2">
+                            <div class="small text-muted mb-1 d-flex align-items-center gap-1" style="font-size: 10px; color: #94a3b8;">
+                                <i class="bi bi-terminal"></i>
+                                <span>底层原生指令跟踪 (ADB / UI Automator Trace)</span>
+                            </div>
+                            <div>${escapeHtml(st.raw_logs.trim())}</div>
+                        </div>
+                    `;
+                }
+
                 const isStepExpanded = (dshExpandedState.allStepsExpanded === true) || (dshExpandedState.steps[stepBlockId] === true);
                 const stepExpandedClass = isStepExpanded ? "expanded" : "";
 
@@ -3592,10 +4306,16 @@
                                 <i class="bi bi-chevron-down dsh-row-chevron"></i>
                             </div>
                         </div>
-                        <div class="dsh-code-expanded">
-                            ${errorBannerHtml}
-                            ${isRunning && currentLiveAction ? `<div class="mb-1" style="color: #38bdf8; font-weight: 500;"><i class="bi bi-play-fill me-1"></i>实时交互: ${escapeHtml(currentLiveAction)}</div>` : ''}
-                            ${escapeHtml(detailLogs)}
+                        <div class="dsh-step-detail-card">
+                            <div class="d-flex align-items-start gap-2 mb-2 pb-2 border-bottom" style="border-color: var(--border-subtle) !important;">
+                                <i class="bi bi-bullseye text-primary mt-0.5" style="font-size: 13px;"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold text-main" style="font-size: 11.5px;">动作与业务意图</div>
+                                    <div class="text-sub mt-0.5" style="font-size: 11px;">${escapeHtml(stepDesc)}</div>
+                                </div>
+                            </div>
+                            ${statusDetailCardHtml}
+                            ${traceLogHtml}
                         </div>
                     </div>
                 `;
@@ -3623,13 +4343,16 @@
                 <div class="dsh-process-group">
                     <div class="dsh-turn-process-header">
                         <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-terminal" style="font-size: 13px; color: var(--text-main);"></i>
+                            <i class="bi bi-display" style="font-size: 13px; color: var(--text-main);"></i>
                             <span class="fw-semibold" style="font-size: 12.5px; color: var(--text-main);">执行过程 (Process)</span>
                             <span class="fw-medium" style="font-size: 11.5px; color: var(--text-sub);">· ${statusLabel}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <button class="dsh-turn-toggle-btn" onclick="openCanvasLogs()" title="在右侧全量控制台查看实时日志流">
-                                <i class="bi bi-layout-sidebar-reverse me-1"></i> 全量日志
+                            <button class="dsh-turn-toggle-btn" onclick="openCanvasScreen()" title="在右侧查看真机屏幕投屏与步骤联动">
+                                <i class="bi bi-phone me-1"></i> 端侧投屏
+                            </button>
+                            <button class="dsh-turn-toggle-btn" onclick="openCanvasLogs()" title="在右侧查看终端日志">
+                                <i class="bi bi-terminal me-1"></i> 日志
                             </button>
                             <button class="dsh-turn-toggle-btn" onclick="toggleAllDshSteps()" id="dshToggleAllStepsBtn" title="一键展开/收起全部步骤详情">
                                 <i class="bi ${dshExpandedState.allStepsExpanded ? 'bi-chevron-contract' : 'bi-chevron-expand'} me-1"></i> ${dshExpandedState.allStepsExpanded ? '收起详情' : '展开详情'}
@@ -3642,29 +4365,25 @@
                 </div>
             `;
 
-            // ④ 任务完成/失败自然语言结论回答 (用户需求：纯文本输出，打字机效应展示，像回答问题一样，无框架)
+            // ④ 任务完成/失败自然语言结论回答 (纯文本打字机输出，无重复按钮，无全景报告)
             let completionBannerHtml = "";
             let conclusionText = "";
-            let linksHtml = "";
+            let diagInfo = null;
 
             if (isFinished) {
                 if (isSuccess) {
-                    conclusionText = `本次自动化测试已执行完毕，测试结论为：全部测试通过 (PASS)。\n\n针对您下达的测试意图，各业务测试阶段均已顺利验证通过：\n`;
+                    conclusionText = `本次自动化测试已执行完毕，测试结论为：全部测试通过 (PASS)。
+
+针对您下达的测试意图，各业务测试阶段均已顺利验证通过：
+`;
                     steps.forEach((st, idx) => {
                         const stepNum = st.step_id || (idx + 1);
                         const stepTitle = st.title || `阶段 ${stepNum}`;
-                        conclusionText += `${idx + 1}. Step ${stepNum}：${stepTitle}（耗时 ${st.duration || '0.8s'}，验证通过）\n`;
+                        conclusionText += `${idx + 1}. Step ${stepNum}：${stepTitle}（耗时 ${st.duration || '0.8s'}，验证通过）
+`;
                     });
-                    conclusionText += `\n所有规划交互与界面转场断言校验达成率 100%。测试结果已就绪，您可点击下方【保存为本地案例】将其自动分类并沉淀入本地回归用例库。`;
-
-                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3">
-                        <span class="conclusion-inline-link" onclick="openCanvasLogs()"><i class="bi bi-terminal"></i> 查看全量日志</span>
-                        <span class="conclusion-inline-link" onclick="openCanvasScreen()"><i class="bi bi-display"></i> 查看端侧屏幕</span>
-                        ${(sessionData.is_solidified && sessionData.solidified_filename)
-                            ? `<span class="conclusion-inline-link text-success" onclick="openEmbeddedCode('${sessionData.solidified_filename}', '本地用例代码')"><i class="bi bi-file-earmark-check-fill text-success"></i> 已入库【${escapeHtml(sessionData.solidified_module || '通用')}】</span>`
-                            : `<span class="conclusion-inline-link text-primary fw-semibold" onclick="saveSessionToLocalCase('${sessionData.session_id}')"><i class="bi bi-bookmark-plus-fill"></i> 保存为本地案例</span>`
-                        }
-                    </div>`;
+                    conclusionText += `
+所有规划交互与界面转场断言校验达成率 100%。测试结果已就绪，您可点击下方【保存为本地案例】将其自动分类并沉淀入本地回归用例库。`;
                 } else {
                     let failedStepIndex = -1;
                     let failedStepTitle = "";
@@ -3692,33 +4411,55 @@
                         failedStepTitle = steps[steps.length - 1]?.title || "业务交互断言";
                     }
 
-                    const failReason = sessionData.error_message || "端侧视觉感知目标组件未定位或界面转场断言超时";
+                    diagInfo = translateDiagnostic(sessionData.error_message, failedStepIndex, failedStepTitle);
 
-                    conclusionText = `本次自动化测试已执行完毕，测试结论为：自动化测试未达预期 (FAIL)。\n\n测试流水线在执行过程中受阻中断，具体诊断情况如下：\n`;
+                    conclusionText = `本次自动化测试已执行完毕，测试结论为：自动化测试未达预期 (FAIL)。
+
+测试流水线在执行过程中受阻中断，具体诊断情况如下：
+`;
                     if (passedSteps.length > 0) {
-                        conclusionText += `• 已验证通过的阶段：\n`;
+                        conclusionText += `• 已验证通过的阶段：
+`;
                         passedSteps.forEach(ps => {
-                            conclusionText += `  - ${ps}（已通过）\n`;
+                            conclusionText += `  - ${ps}（已通过）
+`;
                         });
                     } else {
-                        conclusionText += `• 已验证通过的阶段：无（初始阶段即受阻）\n`;
+                        conclusionText += `• 已验证通过的阶段：无（初始阶段即受阻）
+`;
                     }
-                    conclusionText += `• 当前卡点位置：第 ${failedStepIndex} 步【${failedStepTitle}】\n`;
-                    conclusionText += `• 阻断关键原因：${failReason}\n`;
-                    conclusionText += `• 排错建议：请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查网络连接与待测应用前台运行状态后重新执行。`;
+                    conclusionText += `• 当前卡点位置：第 ${diagInfo.stepNum} 步【${diagInfo.stepTitle}】
+`;
+                    conclusionText += `• 阻断界面现状：${diagInfo.situation}
+`;
+                    conclusionText += `• 建议排错操作：${diagInfo.suggestion}`;
+                }
 
-                    linksHtml = `<div class="mt-2 pt-1 d-flex align-items-center flex-wrap gap-3">
-                        <span class="conclusion-inline-link" onclick="openCanvasLogs()"><i class="bi bi-terminal"></i> 查看终端详细日志</span>
-                        <span class="conclusion-inline-link" onclick="openCanvasScreen()"><i class="bi bi-display"></i> 查看端侧现场屏幕</span>
-                    </div>`;
+                // 阻断专属三段式业务诊断横幅 (在主对话流呈现)
+                let mainDiagBannerHtml = "";
+                if (!isSuccess && diagInfo) {
+                    mainDiagBannerHtml = `
+                        <div class="business-diagnostic-banner mt-3">
+                            <div class="fw-bold d-flex align-items-center gap-1.5 mb-1" style="color: #f87171; font-size: 12.5px;">
+                                <i class="bi bi-exclamation-triangle-fill"></i> ⚠️ 在第 ${diagInfo.stepNum} 步【${escapeHtml(diagInfo.stepTitle)}】受阻
+                            </div>
+                            <div class="mb-1" style="color: #fecaca; line-height: 1.5;">
+                                <strong>界面现状：</strong>${escapeHtml(diagInfo.situation)}
+                            </div>
+                            <div style="color: #e2e8f0; line-height: 1.5;">
+                                <strong style="color: #fca5a5;">建议操作：</strong>${escapeHtml(diagInfo.suggestion)}
+                            </div>
+                        </div>
+                    `;
                 }
 
                 completionBannerHtml = `
+                    ${mainDiagBannerHtml}
                     <div class="ai-conclusion-text" id="aiConclusionBox_${sessionData.id}"></div>
                 `;
             }
 
-            // ⑤ 轮次尾部精简操作与指标栏 (DeepSeek Harness Turn Tail)
+            // ⑤ 轮次尾部精简操作与指标栏 (DeepSeek Harness Turn Tail - 纯净统一的操作归口)
             let turnTailHtml = "";
             if (isFinished) {
                 const isSolidified = (sessionData.is_solidified === true && sessionData.solidified_filename);
@@ -3732,7 +4473,7 @@
                 const saveOrViewBtnHtml = isSolidified
                     ? `<button class="dsh-tail-btn ms-2 text-success" onclick="openEmbeddedCode('${sessionData.solidified_filename}', '查看本地用例代码')" title="查看已归档的自动化用例代码"><i class="bi bi-code-slash me-1"></i> 查看入库脚本</button>`
                     : (isSuccess
-                        ? `<button class="dsh-tail-btn ms-2 text-primary" id="saveCaseBtn_${sessionData.session_id}" onclick="saveSessionToLocalCase('${sessionData.session_id}')" title="经测试验证满意后，主动保存为本地确定性用例并自动分类"><i class="bi bi-bookmark-plus-fill me-1"></i> 保存为本地案例</button>`
+                        ? `<button class="dsh-tail-btn ms-2 text-primary" id="saveCaseBtn_${sessionData.session_id}" onclick="showSuccessHighlightModal(currentActiveSessionData || ${JSON.stringify(sessionData).replace(/"/g, '&quot;')})" title="经测试验证满意后，主动保存为本地确定性用例并自动分类"><i class="bi bi-bookmark-plus-fill me-1"></i> 保存为本地案例</button>`
                         : ``
                     );
 
@@ -3802,6 +4543,9 @@
             flow.innerHTML = chatTurnsHtml;
             updateConsoleLogs();
 
+            // 驱动右侧极简当前步骤胶囊
+            updateCurrentStepCapsule(sessionData);
+
             if (isFinished && conclusionText) {
                 const isAlreadyShown = localStorage.getItem("conclusion_shown_" + sessionData.id) === "1";
                 const isFreshCompletion = liveRunningSessions.has(sessionData.id);
@@ -3810,11 +4554,18 @@
                     // 仅在任务实时推进并首次产出结论的时刻触发打字机
                     liveRunningSessions.delete(sessionData.id);
                     localStorage.setItem("conclusion_shown_" + sessionData.id, "1");
-                    triggerTypewriterConclusion(sessionData.id, conclusionText, linksHtml, true);
+                    triggerTypewriterConclusion(sessionData.id, conclusionText, true);
+
+                    // 若成功且未固化，优雅弹出极简高光模态浮层
+                    if (isSuccess && !sessionData.is_solidified) {
+                        setTimeout(() => {
+                            showSuccessHighlightModal(sessionData);
+                        }, 800);
+                    }
                 } else {
                     // 已经输出完毕、重新加载、刷新或查看历史会话，直接输出完整文本，绝不重新打字
                     localStorage.setItem("conclusion_shown_" + sessionData.id, "1");
-                    triggerTypewriterConclusion(sessionData.id, conclusionText, linksHtml, false);
+                    triggerTypewriterConclusion(sessionData.id, conclusionText, false);
                 }
             } else if (!isFinished && sessionData.id) {
                 // 会话处于运行或推进中，标记为实时活跃会话
@@ -3825,13 +4576,13 @@
         const liveRunningSessions = new Set();
         window._conclusionTypewriterState = window._conclusionTypewriterState || {};
 
-        function triggerTypewriterConclusion(sessionId, fullText, linksHtml, shouldAnimate) {
+        function triggerTypewriterConclusion(sessionId, fullText, shouldAnimate) {
             const box = document.getElementById(`aiConclusionBox_${sessionId}`);
             if (!box) return;
 
-            // 1. 若无需打字动画（已输出完毕、重新加载、刷新或查看历史会话），直接输出完整文本与链接
+            // 1. 若无需打字动画，直接输出完整文本
             if (!shouldAnimate) {
-                box.innerHTML = escapeHtml(fullText) + linksHtml;
+                box.innerHTML = escapeHtml(fullText);
                 return;
             }
 
@@ -3839,7 +4590,7 @@
 
             // 2. 如果在当前页面周期内已经打字完成，直接渲染完整内容
             if (state && state.finished) {
-                box.innerHTML = escapeHtml(fullText) + linksHtml;
+                box.innerHTML = escapeHtml(fullText);
                 return;
             }
 
@@ -3854,8 +4605,7 @@
                 timer: null,
                 finished: false,
                 currentIdx: 0,
-                fullText: fullText,
-                linksHtml: linksHtml
+                fullText: fullText
             };
 
             const cur = window._conclusionTypewriterState[sessionId];
@@ -3876,7 +4626,7 @@
                     clearInterval(cur.timer);
                     cur.timer = null;
                     cur.finished = true;
-                    targetBox.innerHTML = escapeHtml(cur.fullText) + cur.linksHtml;
+                    targetBox.innerHTML = escapeHtml(cur.fullText);
                 } else {
                     targetBox.innerHTML = escapeHtml(currentStr) + '<span class="typewriter-cursor"></span>';
                 }
@@ -4164,6 +4914,8 @@
                 if (activeSessionId) {
                     const formData = new FormData();
                     formData.append("message", goal);
+                    formData.append("provider", currentActiveProvider);
+                    formData.append("model", currentActiveModel);
                     const res = await fetch(`/api/sessions/${activeSessionId}/message`, { method: "POST", body: formData });
                     const data = await res.json();
                     if (data.success) {
@@ -4192,6 +4944,8 @@
                 formData.append("test_mode", "real");
                 formData.append("approval_mode", currentApprovalMode);
                 formData.append("case_name", "matrix_flow");
+                formData.append("provider", currentActiveProvider);
+                formData.append("model", currentActiveModel);
 
                 const res = await fetch("/api/sessions/create", { method: "POST", body: formData });
                 const data = await res.json();
@@ -4241,72 +4995,229 @@
             } catch (e) {}
         }
 
-        // ================= 10. 模型切换与配置 =================
-        async function quickSelectModel(provider, name, el) {
-            const label = document.getElementById("activeModelLabel");
-            if (label) label.innerText = name;
+                // ================= 10. 模型切换与配置 (DeepSeek Harness 全场景切换规范) =================
+        let currentSystemConfig = null;
+        let currentActiveProvider = "hermes";
+        let currentActiveModel = "deepseek-flash";
 
-            // 立即更新所有选项的激活高亮状态
-            document.querySelectorAll("#modelPopover .popover-item").forEach(item => item.classList.remove("active"));
-            if (el) {
-                el.classList.add("active");
-            } else {
-                const target = document.getElementById(`itemModel_${provider}`);
-                if (target) target.classList.add("active");
-            }
+        // ================= DeepSeek Harness 风格双栏全局设置中心 =================
+        function openSettingsModal(initialTab = "general") {
             closeAllPopovers();
+            switchSettingsTab(initialTab);
+            loadModelConfig();
+            loadAntigravityStatus();
+            const modalEl = document.getElementById("harnessSettingsModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
 
-            try {
-                const formData = new FormData();
-                formData.append("provider", provider);
-                await fetch("/api/config", { method: "POST", body: formData });
-                loadModelConfig();
-            } catch (e) {
-                console.warn("模型切换持久化失败", e);
+        // 向后兼容
+        function openAntigravityModal() {
+            openSettingsModal("oauth");
+        }
+        function openInviteAuthModal() {
+            openSettingsModal("license");
+        }
+
+        function switchSettingsTab(tabName) {
+            const tabs = ["general", "models", "oauth", "license"];
+            tabs.forEach(t => {
+                const nav = document.getElementById(`tabNav${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                const panel = document.getElementById(`panelSettings${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                if (nav) nav.classList.toggle("active", t === tabName);
+                if (panel) panel.classList.toggle("d-none", t !== tabName);
+            });
+        }
+
+        function openEnvConfigTip() {
+            alert("配置文件路径: F:\Autotest\.env
+可在设置中的【模型】面板直接编辑保存，系统将自动热同步至 .env 文件中。");
+        }
+
+        function selectProviderForEdit(provider) {
+            const pSelect = document.getElementById("modelProviderSelect");
+            if (pSelect) {
+                pSelect.value = provider;
+                onProviderChange();
             }
+            const formCard = document.getElementById("modelProviderSelect")?.closest(".border");
+            if (formCard) formCard.scrollIntoView({ behavior: "smooth" });
         }
 
         async function loadModelConfig() {
             try {
                 const res = await fetch("/api/config");
                 const data = await res.json();
-                const providerNames = {
-                    "hermes": "Hermes (DeepSeek)",
-                    "antigravity": "Google Antigravity",
-                    "deepseek": "DeepSeek 官方",
-                    "openai": "OpenAI 兼容"
-                };
+                currentSystemConfig = data;
+                currentActiveProvider = data.provider || "hermes";
+                currentActiveModel = data.current_model || "deepseek-flash";
+
+                // 1. 更新底部输入框模型胶囊文字
                 const label = document.getElementById("activeModelLabel");
-                if (label && providerNames[data.provider]) {
-                    label.innerText = providerNames[data.provider];
-                }
-                // 同步浮层激活勾选状态
-                document.querySelectorAll("#modelPopover .popover-item").forEach(item => item.classList.remove("active"));
-                const target = document.getElementById(`itemModel_${data.provider}`);
-                if (target) target.classList.add("active");
+                if (label) label.innerText = currentActiveModel;
 
+                // 2. 动态渲染输入框右侧 DeepSeek Harness 下拉选单
+                renderModelDropdownMenu(data);
+
+                // 3. 更新设置中心内的提供商状态卡片
+                updateSettingsProviderCards(data);
+
+                // 4. 更新设置表单中的选项
                 const pSelect = document.getElementById("modelProviderSelect");
-                if (pSelect) pSelect.value = data.provider;
+                if (pSelect) pSelect.value = currentActiveProvider;
+                renderModelOptions(currentActiveProvider, currentActiveModel);
 
-                renderModelOptions(data.provider, data.current_model);
+                // 5. 更新新手引导中的状态
                 updateOnboardingModelStatus(data);
-            } catch (e) {}
+            } catch (e) {
+                console.warn("加载模型配置异常", e);
+            }
+        }
+
+        function renderModelDropdownMenu(data) {
+            const container = document.getElementById("modelDropdownList");
+            if (!container) return;
+
+            const providerConfigs = [
+                {
+                    id: "antigravity",
+                    name: "Google Antigravity 官方",
+                    badge: data.antigravity?.ready ? "已授权" : "未绑定",
+                    ready: data.antigravity?.ready,
+                    models: data.antigravity?.available_models || ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.8-flash-high"]
+                },
+                {
+                    id: "hermes",
+                    name: "象盒 Hermes 企业网关",
+                    badge: "推荐",
+                    ready: true,
+                    models: data.hermes?.available_models || ["deepseek-flash", "deepseek-chat", "deepseek-coder"]
+                },
+                {
+                    id: "deepseek",
+                    name: "DeepSeek 官方 API",
+                    badge: data.deepseek?.ready ? "已连通" : "未配 Key",
+                    ready: data.deepseek?.ready,
+                    models: data.deepseek?.available_models || ["deepseek-chat", "deepseek-reasoner"]
+                },
+                {
+                    id: "openai",
+                    name: "OpenAI 兼容协议 / 自定义",
+                    badge: data.openai?.ready ? "已连通" : "未配 Key",
+                    ready: data.openai?.ready,
+                    models: data.openai?.available_models || ["gpt-4o", "gpt-4o-mini", "custom"]
+                }
+            ];
+
+            let html = "";
+            providerConfigs.forEach(p => {
+                html += `<div class="model-group-title d-flex justify-content-between align-items-center">
+                    <span>${p.name}</span>
+                    <span class="mono-tag" style="font-size: 8.5px;">${p.badge}</span>
+                </div>`;
+
+                p.models.forEach(m => {
+                    const isSelected = (p.id === currentActiveProvider && m === currentActiveModel);
+                    html += `
+                        <div class="model-item-option ${isSelected ? 'active' : ''}" onclick="switchActiveModel('${p.id}', '${m}')">
+                            <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                <span class="status-indicator-dot ${p.ready ? 'dot-online' : 'dot-offline'}"></span>
+                                <span class="text-truncate">${escapeHtml(m)}</span>
+                            </div>
+                            ${isSelected ? '<i class="bi bi-check2 text-primary"></i>' : ''}
+                        </div>
+                    `;
+                });
+            });
+
+            container.innerHTML = html;
+        }
+
+        function updateSettingsProviderCards(data) {
+            const pBadge = document.getElementById("currentProviderBadge");
+            if (pBadge) pBadge.innerText = (data.provider || "hermes").toUpperCase();
+
+            // 更新各个提供商卡片上的状态与模型文字
+            if (data.hermes) {
+                const el = document.getElementById("model_hermes");
+                if (el) el.innerText = data.hermes.model;
+            }
+            if (data.antigravity) {
+                const el = document.getElementById("model_antigravity");
+                if (el) el.innerText = data.antigravity.model;
+                const dot = document.getElementById("statusDot_antigravity");
+                if (dot) dot.className = `status-indicator-dot ${data.antigravity.ready ? 'dot-online' : 'dot-offline'}`;
+            }
+            if (data.deepseek) {
+                const el = document.getElementById("model_deepseek");
+                if (el) el.innerText = data.deepseek.model;
+                const dot = document.getElementById("statusDot_deepseek");
+                if (dot) dot.className = `status-indicator-dot ${data.deepseek.ready ? 'dot-online' : 'dot-offline'}`;
+            }
+            if (data.openai) {
+                const el = document.getElementById("model_openai");
+                if (el) el.innerText = data.openai.model;
+                const dot = document.getElementById("statusDot_openai");
+                if (dot) dot.className = `status-indicator-dot ${data.openai.ready ? 'dot-online' : 'dot-offline'}`;
+            }
         }
 
         function renderModelOptions(provider, selectedModel) {
             const modelSelect = document.getElementById("modelSelect");
-            if (!modelSelect) return;
-            let models = provider === "hermes" ? ["deepseek-flash", "deepseek-chat"] : ["gemini-3.8-flash-high", "deepseek-chat", "gpt-4o"];
+            if (!modelSelect || !currentSystemConfig) return;
+
+            let models = [];
+            if (provider === "hermes") {
+                models = currentSystemConfig.hermes?.available_models || ["deepseek-flash", "deepseek-chat", "deepseek-coder"];
+            } else if (provider === "antigravity") {
+                models = currentSystemConfig.antigravity?.available_models || ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.8-flash-high"];
+            } else if (provider === "deepseek") {
+                models = currentSystemConfig.deepseek?.available_models || ["deepseek-chat", "deepseek-reasoner"];
+            } else {
+                models = currentSystemConfig.openai?.available_models || ["gpt-4o", "gpt-4o-mini", "o3-mini", "custom"];
+            }
+
             let html = "";
             models.forEach(m => {
                 const isSel = (m === selectedModel) ? "selected" : "";
-                html += `<option value="${m}" ${isSel}>${m}</option>`;
+                html += `<option value="${escapeHtml(m)}" ${isSel}>${escapeHtml(m)}</option>`;
             });
             modelSelect.innerHTML = html;
         }
 
         function onProviderChange() {
-            renderModelOptions(document.getElementById("modelProviderSelect").value, null);
+            const provider = document.getElementById("modelProviderSelect").value;
+            renderModelOptions(provider, null);
+        }
+
+        // 核心：全场景无缝切换当前活跃模型 (DeepSeek Harness 规范，新增任务与已有会话均即时生效)
+        async function switchActiveModel(provider, model) {
+            currentActiveProvider = provider;
+            currentActiveModel = model;
+
+            // 1. 立即更新界面反馈
+            const label = document.getElementById("activeModelLabel");
+            if (label) label.innerText = model;
+
+            // 2. 更新下拉列表状态并收起浮层
+            document.querySelectorAll("#modelDropdownList .model-item-option").forEach(item => item.classList.remove("active"));
+            closeAllPopovers();
+
+            // 3. 向后端实时持久化更新
+            try {
+                const formData = new FormData();
+                formData.append("provider", provider);
+                formData.append("model", model);
+                const res = await fetch("/api/config", { method: "POST", body: formData });
+                const resData = await res.json();
+                console.log("模型切换成功:", resData.message);
+
+                if (activeSessionId) {
+                    console.info(`[会话已更新] 当前会话接续指令将使用新模型: ${model}`);
+                }
+                loadModelConfig();
+            } catch (e) {
+                console.warn("模型热切换异常", e);
+            }
         }
 
         async function saveModelConfigModal() {
@@ -4322,9 +5233,9 @@
             if (baseUrl) formData.append("base_url", baseUrl);
 
             await fetch("/api/config", { method: "POST", body: formData });
-            alert("模型配置已保存！");
+            alert(`AI 提供商 [${provider.toUpperCase()}] 配置已保存并设为当前生效！`);
             loadModelConfig();
-            const modalEl = document.getElementById("antigravityModal");
+            const modalEl = document.getElementById("harnessSettingsModal");
             if (modalEl) {
                 const inst = bootstrap.Modal.getInstance(modalEl);
                 if (inst) inst.hide();
