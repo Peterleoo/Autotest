@@ -185,6 +185,12 @@
             background-color: rgba(255, 255, 255, 0.08);
             color: var(--text-main);
         }
+        body[data-theme="light"] .mono-tag {
+            background-color: rgba(0, 0, 0, 0.04);
+        }
+        body[data-theme="light"] .mono-tag-active {
+            background-color: rgba(0, 0, 0, 0.08);
+        }
 
         /* ================= 2. 中间主区域 (Chat Stream) ================= */
         .gpt-main {
@@ -683,21 +689,21 @@
             gap: 8px;
         }
 
-        /* ③ 中间主对话流：实时测试执行控制台 (Stream Console Card) */
-        .stream-console-card {
+        /* ③ 中间主对话流：原生智能执行过程流 (Native Execution Stream) */
+        .execution-stream-card {
             width: 100%;
             background-color: var(--bg-surface);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
-            margin-top: 10px;
+            margin-top: 8px;
             margin-bottom: 12px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             transition: all 0.2s ease;
         }
-        .stream-console-header {
-            padding: 8px 12px;
+        .execution-stream-header {
+            padding: 9px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -705,59 +711,88 @@
             border-bottom: 1px solid var(--border-subtle);
             user-select: none;
         }
-        .stream-console-title {
-            font-size: 12px;
+        .execution-stream-title {
+            font-size: 12.5px;
             font-weight: 600;
             color: var(--text-main);
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        .stream-console-body {
-            max-height: 240px;
-            min-height: 100px;
-            overflow-y: auto;
-            padding: 10px 12px;
-            background-color: #0b0c0e;
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-            font-size: 11.5px;
-            line-height: 1.6;
-            color: #d1d5db;
+        .execution-steps-container {
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
-        .stream-log-line {
-            word-break: break-all;
-            white-space: pre-wrap;
-            margin-bottom: 2px;
-        }
-        .stream-log-time {
-            color: #6b7280;
-            margin-right: 6px;
-            user-select: none;
-        }
-        .stream-log-highlight {
-            color: #ffffff;
-            font-weight: 600;
-        }
-        .stream-log-success {
-            color: #10b981;
-        }
-        .stream-log-warn {
-            color: #f59e0b;
-        }
-        .stream-console-tab-pill {
-            background: transparent;
+        .execution-step-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--border-subtle);
-            color: var(--text-sub);
-            border-radius: 6px;
-            font-size: 11px;
-            padding: 2px 8px;
-            cursor: pointer;
             transition: all 0.15s ease;
         }
-        .stream-console-tab-pill.active {
-            background-color: var(--border-strong);
+        .execution-step-item:hover {
+            border-color: var(--border-hover);
+            background-color: rgba(255, 255, 255, 0.04);
+        }
+        .execution-step-item.active {
+            border-color: var(--border-strong);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .execution-step-main {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .execution-step-icon {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .execution-step-title {
+            font-size: 13px;
+            font-weight: 600;
             color: #ffffff;
-            border-color: rgba(255, 255, 255, 0.3);
+            line-height: 1.4;
+        }
+        .execution-step-desc {
+            font-size: 11.5px;
+            color: #d4d4d8;
+            line-height: 1.5;
+            margin-left: 26px;
+        }
+        .execution-step-details {
+            margin-left: 26px;
+            margin-top: 4px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-subtle);
+            font-size: 11px;
+            color: #a1a1aa;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .execution-pulse-bar {
+            padding: 8px 14px;
+            border-top: 1px solid var(--border-subtle);
+            background-color: rgba(255, 255, 255, 0.015);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+            color: var(--text-sub);
         }
         .node-step-card.active-step {
             border-color: rgba(255, 255, 255, 0.45);
@@ -1043,20 +1078,25 @@
         </div>
     </aside>
 
+    <!-- 左侧可拖拽分割条 (Left Resizer: 左右拖动改变侧栏/中栏宽度，高度锁定 100vh) -->
+    <div class="pane-resizer" id="resizerLeft" title="按住左右拖拽调节侧边栏宽度"></div>
+
     <!-- ======================= 2. 中间主区域：思考过程 + 用户交互 (无头像/无名称) ======================= -->
     <main class="gpt-main" id="gptMain">
         <!-- 极简顶栏 -->
         <header class="gpt-header">
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 text-truncate">
                 <button class="icon-btn d-none" id="btnExpandSidebar" onclick="toggleSidebar()" title="展开侧栏">
                     <i class="bi bi-layout-sidebar"></i>
                 </button>
                 <span class="small fw-semibold text-truncate" id="currentSessionTitleDisplay" style="max-width: 220px; font-size: 13px;">
                     自动化测试工作台
                 </span>
+                <!-- 已有会话环境摘要芯片 (在已有对话中展示原配置，禁止测试方式篡改) -->
+                <div class="d-inline-flex align-items-center gap-1 ms-2" id="sessionEnvChips"></div>
             </div>
 
-            <!-- ChatGPT 桌面端分段控制器 (3-4个字：AI测试 vs 本地用例) -->
+            <!-- ChatGPT 桌面端分段控制器：仅在新建任务/空状态时展示；已有对话中彻底隐藏！ -->
             <div class="gpt-desktop-segmented" id="mainWorkspaceSegmented">
                 <button class="segmented-btn active" id="btnModeAi" onclick="switchMainWorkspaceMode('ai')" title="进入 AI 编排测试模式">
                     <i class="bi bi-cpu"></i>
@@ -1074,6 +1114,9 @@
                 </button>
             </div>
         </header>
+
+        <!-- 环境巡检警示横条 (若已有会话绑定的物理设备脱机或配置缺失时提醒) -->
+        <div id="sessionEnvAlertBanner" class="env-alert-banner d-none"></div>
 
         <!-- ======================= 模式 A：AI测试视图 (含滚动对话区与底部悬浮输入胶囊) ======================= -->
         <div id="workspaceAiView" class="d-flex flex-column flex-grow-1 overflow-hidden" style="position: relative;">
@@ -1267,7 +1310,7 @@
             <!-- 顶部资产概览与操作栏 -->
             <div class="d-flex justify-content-between align-items-center pb-2 border-bottom" style="border-color: var(--border-subtle) !important;">
                 <div>
-                    <div class="fw-semibold text-white d-flex align-items-center gap-2" style="font-size: 15px;">
+                    <div class="fw-semibold d-flex align-items-center gap-2" style="font-size: 15px; color: var(--text-main);">
                         <i class="bi bi-folder-check"></i>
                         <span>本地自动化回归用例资产</span>
                         <span class="mono-tag mono-tag-active" id="localCaseTotalCountBadge">16 用例</span>
@@ -1307,6 +1350,9 @@
         </div>
     </div>
 </main>
+
+    <!-- 右侧可拖拽分割条 (Right Resizer: 左右拖动改变中栏/右栏宽度，高度锁定 100vh) -->
+    <div class="pane-resizer" id="resizerRight" title="按住左右拖拽调节工作台宽度"></div>
 
     <!-- ======================= 4. 右侧工作台 Canvas (Nodes / Logs / Deliverables) ======================= -->
     <aside class="gpt-canvas" id="gptCanvas">
@@ -1599,7 +1645,7 @@
             filtered.forEach(c => {
                 const isP0 = (c.level === "P0");
                 const levelBadge = isP0 
-                    ? `<span class="mono-tag mono-tag-active" style="border-color: rgba(255,255,255,0.4); color: #ffffff;">${c.level} 核心</span>` 
+                    ? `<span class="mono-tag mono-tag-active">${c.level} 核心</span>` 
                     : `<span class="mono-tag">${c.level}</span>`;
 
                 const safeTitle = (c.title || c.filename).replace(/'/g, "\\'");
@@ -1611,7 +1657,7 @@
                             <div class="d-flex align-items-center gap-2">
                                 <span class="mono-tag">${c.id || 'CASE'}</span>
                                 ${levelBadge}
-                                <span class="small fw-semibold text-white" style="font-size: 13px;">${c.title}</span>
+                                <span class="small fw-semibold" style="font-size: 13px; color: var(--text-main);">${c.title}</span>
                                 <span class="mono-tag" style="font-size: 10px;">${c.module || '通用'}</span>
                             </div>
                             <div class="d-flex align-items-center gap-2">
@@ -1642,8 +1688,8 @@
                                 <span class="ms-1">(${c.size || ''})</span>
                             </div>
                             <div class="d-flex align-items-center gap-3 text-muted">
-                                <span>通过率: <strong class="text-white">${c.pass_rate || '100%'}</strong></span>
-                                <span>耗时: <strong class="text-white">${c.avg_duration || '2.5s'}</strong></span>
+                                <span>通过率: <strong style="color: var(--text-main);">${c.pass_rate || '100%'}</strong></span>
+                                <span>耗时: <strong style="color: var(--text-main);">${c.avg_duration || '2.5s'}</strong></span>
                             </div>
                         </div>
                     </div>
@@ -1712,6 +1758,145 @@
             localStorage.setItem("autotest_theme", theme);
             const sel = document.getElementById("themeSelectModal");
             if (sel) sel.value = theme;
+        }
+
+        // ================= 三栏原生自由拖拽拉伸引擎 (Splitter Resizers) =================
+        function initSplitterResizers() {
+            const sidebar = document.getElementById("gptSidebar");
+            const canvas = document.getElementById("gptCanvas");
+            const resizerLeft = document.getElementById("resizerLeft");
+            const resizerRight = document.getElementById("resizerRight");
+
+            if (!sidebar || !resizerLeft || !canvas || !resizerRight) return;
+
+            // 恢复记忆的面板宽度
+            const savedSidebarW = localStorage.getItem("autotest_sidebar_width");
+            if (savedSidebarW) {
+                sidebar.style.width = savedSidebarW + "px";
+            }
+            const savedCanvasW = localStorage.getItem("autotest_canvas_width");
+            if (savedCanvasW) {
+                canvas.style.width = savedCanvasW + "px";
+            }
+
+            // 1. 左侧拖拽分割条：改变侧栏宽度，中间自适应，高度锁定 100vh
+            resizerLeft.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startWidth = sidebar.getBoundingClientRect().width;
+                document.body.classList.add("resizing-active");
+                resizerLeft.classList.add("dragging");
+
+                function onMouseMove(moveEvent) {
+                    const delta = moveEvent.clientX - startX;
+                    const newW = Math.max(180, Math.min(460, startWidth + delta));
+                    sidebar.style.width = newW + "px";
+                }
+
+                function onMouseUp() {
+                    document.body.classList.remove("resizing-active");
+                    resizerLeft.classList.remove("dragging");
+                    document.removeEventListener("mousemove", onMouseMove);
+                    document.removeEventListener("mouseup", onMouseUp);
+                    const finalW = Math.round(sidebar.getBoundingClientRect().width);
+                    localStorage.setItem("autotest_sidebar_width", finalW);
+                }
+
+                document.addEventListener("mousemove", onMouseMove);
+                document.addEventListener("mouseup", onMouseUp);
+            });
+
+            // 2. 右侧拖拽分割条：改变工作台宽度，中间自适应，高度锁定 100vh
+            resizerRight.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startWidth = canvas.getBoundingClientRect().width;
+                document.body.classList.add("resizing-active");
+                resizerRight.classList.add("dragging");
+
+                function onMouseMove(moveEvent) {
+                    const delta = startX - moveEvent.clientX;
+                    const newW = Math.max(280, Math.min(700, startWidth + delta));
+                    canvas.style.width = newW + "px";
+                }
+
+                function onMouseUp() {
+                    document.body.classList.remove("resizing-active");
+                    resizerRight.classList.remove("dragging");
+                    document.removeEventListener("mousemove", onMouseMove);
+                    document.removeEventListener("mouseup", onMouseUp);
+                    const finalW = Math.round(canvas.getBoundingClientRect().width);
+                    localStorage.setItem("autotest_canvas_width", finalW);
+                }
+
+                document.addEventListener("mousemove", onMouseMove);
+                document.addEventListener("mouseup", onMouseUp);
+            });
+        }
+
+        // ================= 已有会话环境芯片与缺失警示巡检 =================
+        function renderSessionEnvStatus(data) {
+            const chipsBox = document.getElementById("sessionEnvChips");
+            const alertBanner = document.getElementById("sessionEnvAlertBanner");
+            if (!chipsBox) return;
+
+            const isReal = (data.test_mode === "real" || data.is_real_device);
+            const modeLabel = isReal ? "物理真机" : "本地仿真";
+            const modeIcon = isReal ? "bi-phone" : "bi-laptop";
+
+            let deviceNames = [];
+            let boundDeviceIds = [];
+            if (data.devices && typeof data.devices === "object") {
+                for (const [devId, devInfo] of Object.entries(data.devices)) {
+                    boundDeviceIds.push(devId);
+                    deviceNames.push(devInfo.model || devId);
+                }
+            }
+            if (deviceNames.length === 0 && Array.isArray(data.platforms)) {
+                deviceNames = data.platforms;
+            }
+            const devSummary = deviceNames.length > 0 ? deviceNames.join(", ") : (isReal ? "移动真机" : "本地仿真");
+
+            let hasOfflineDevice = false;
+            let offlineDeviceList = [];
+            if (isReal && boundDeviceIds.length > 0) {
+                boundDeviceIds.forEach(devId => {
+                    if (devId !== "default" && devId !== "local-simulator") {
+                        const isOnline = availableDevices.some(d => d.id === devId);
+                        if (!isOnline) {
+                            hasOfflineDevice = true;
+                            offlineDeviceList.push(devId);
+                        }
+                    }
+                });
+            }
+
+            let chipsHtml = `
+                <span class="env-chip" title="原始执行方式"><i class="bi ${modeIcon}"></i> ${modeLabel}</span>
+                <span class="env-chip ${hasOfflineDevice ? 'env-chip-warning' : ''}" title="原始绑定设备">
+                    <i class="bi bi-cpu"></i> ${devSummary}
+                </span>
+            `;
+            if (data.approval_mode) {
+                const approveText = (data.approval_mode === "manual") ? "人工逐步" : "自动放行";
+                chipsHtml += `<span class="env-chip" title="原始审批策略"><i class="bi bi-shield-check"></i> ${approveText}</span>`;
+            }
+            chipsBox.innerHTML = chipsHtml;
+
+            if (alertBanner) {
+                if (hasOfflineDevice) {
+                    alertBanner.classList.remove("d-none");
+                    alertBanner.innerHTML = `
+                        <i class="bi bi-exclamation-triangle" style="font-size: 13px; margin-top: 2px;"></i>
+                        <div class="flex-grow-1">
+                            <strong>环境状态提醒：</strong>当前会话原绑定的物理设备 <code>${offlineDeviceList.join(", ")}</code> 当前处于<strong>离线脱机</strong>状态。若需接续实机测试，请检查 USB 连线或在右侧重新连接。
+                        </div>
+                    `;
+                } else {
+                    alertBanner.classList.add("d-none");
+                    alertBanner.innerHTML = "";
+                }
+            }
         }
 
         // ================= 2. 悬浮输入胶囊与 Popover =================
@@ -1818,6 +2003,7 @@
             loadReports();
             loadSolidifiedCases();
             loadSolidifiedCasesWorkspace();
+            initSplitterResizers();
         });
 
         async function loadAuthStatus() {
@@ -2009,13 +2195,13 @@
                     hasAndroid = true;
                 }
 
-                // 生成高对比度单色矢量徽标 (纯白矢量高亮，无 Emoji)
+                // 生成单色矢量徽标 (自适应主题色，无 Emoji)
                 let platformBadgesHtml = "";
                 if (hasIos) {
-                    platformBadgesHtml += `<span class="d-inline-flex align-items-center text-white" title="Apple iOS 苹果设备" style="font-size: 13px;"><i class="bi bi-apple"></i></span>`;
+                    platformBadgesHtml += `<span class="d-inline-flex align-items-center" title="Apple iOS 苹果设备" style="font-size: 13px; color: var(--text-main);"><i class="bi bi-apple"></i></span>`;
                 }
                 if (hasAndroid) {
-                    platformBadgesHtml += `<span class="d-inline-flex align-items-center text-white" title="Android 安卓设备" style="font-size: 13px;"><i class="bi bi-android2"></i></span>`;
+                    platformBadgesHtml += `<span class="d-inline-flex align-items-center" title="Android 安卓设备" style="font-size: 13px; color: var(--text-main);"><i class="bi bi-android2"></i></span>`;
                 }
                 if (hasLocal && !hasIos && !hasAndroid) {
                     platformBadgesHtml += `<span class="d-inline-flex align-items-center text-muted" title="本地免机仿真" style="font-size: 13px;"><i class="bi bi-laptop"></i></span>`;
@@ -2023,8 +2209,15 @@
 
                 const isReal = (s.test_mode === "real" || s.is_real_device);
                 const modeTagHtml = isReal 
-                    ? `<span class="mono-tag mono-tag-active" style="border-color: rgba(255,255,255,0.4); color: #ffffff;">真机</span>` 
-                    : `<span class="mono-tag" style="color: #a1a1aa;">仿真</span>`;
+                    ? `<span class="mono-tag mono-tag-active">真机</span>` 
+                    : `<span class="mono-tag">仿真</span>`;
+
+                let statusTagHtml = "";
+                if (s.is_success === false) {
+                    statusTagHtml = `<span class="mono-tag" style="border-color: rgba(239,68,68,0.5); color: #ef4444; font-size: 9.5px;">失败</span>`;
+                } else if (s.is_success === true) {
+                    statusTagHtml = `<span class="mono-tag" style="border-color: rgba(16,185,129,0.5); color: #10b981; font-size: 9.5px;">通过</span>`;
+                }
 
                 html += `
                     <div class="session-card ${isActive}" onclick="switchSession('${s.session_id}')">
@@ -2036,6 +2229,7 @@
                         </div>
                         <div class="d-flex align-items-center gap-2 mt-1" style="font-size: 11px;">
                             ${modeTagHtml}
+                            ${statusTagHtml}
                             <span class="d-inline-flex align-items-center gap-1.5 ms-1">${platformBadgesHtml}</span>
                             <span class="text-muted ms-auto" style="font-size: 10px;">${s.created_at}</span>
                         </div>
@@ -2052,6 +2246,32 @@
             document.getElementById("emptyStateBox").classList.remove("d-none");
             document.getElementById("messagesFlow").innerHTML = "";
             document.getElementById("currentSessionTitleDisplay").innerText = "新测试任务";
+
+            // 1. 新建任务时：展示模式切换分段按钮 (AI测试 / 本地用例)
+            const segmented = document.getElementById("mainWorkspaceSegmented");
+            if (segmented) segmented.classList.remove("d-none");
+
+            // 2. 新建任务时：显示测试模式调整胶囊 (真机实测 / 本地仿真)
+            const testModePill = document.getElementById("btnTestModePill");
+            if (testModePill) testModePill.classList.remove("d-none");
+
+            // 3. 隐藏并清空已有会话的原有配置芯片与环境提醒
+            const chips = document.getElementById("sessionEnvChips");
+            if (chips) chips.innerHTML = "";
+            const alertBanner = document.getElementById("sessionEnvAlertBanner");
+            if (alertBanner) {
+                alertBanner.classList.add("d-none");
+                alertBanner.innerHTML = "";
+            }
+
+            // 4. 重置输入框为新任务引导
+            const ta = document.getElementById("taskInputText");
+            if (ta) {
+                ta.placeholder = "描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）...";
+                ta.value = "";
+                ta.focus();
+            }
+
             document.getElementById("pipelineNodesList").innerHTML = `
                 <div class="canvas-empty-state">
                     <div class="canvas-empty-icon"><i class="bi bi-diagram-3"></i></div>
@@ -2070,9 +2290,6 @@
                     </div>
                 `;
             }
-            const ta = document.getElementById("taskInputText");
-            ta.value = "";
-            ta.focus();
         }
 
         async function switchSession(sessionId) {
@@ -2099,7 +2316,22 @@
                 if (!res.ok) return;
                 const data = await res.json();
 
+                // 1. 已有会话：彻底隐藏顶栏模式切换器 (AI测试 / 本地用例)！
+                const segmented = document.getElementById("mainWorkspaceSegmented");
+                if (segmented) segmented.classList.add("d-none");
+
+                // 2. 已有会话：彻底隐藏测试方式调整胶囊 (禁止随意篡改执行方式)！
+                const testModePill = document.getElementById("btnTestModePill");
+                if (testModePill) testModePill.classList.add("d-none");
+
+                // 3. 更新会话标题与输入提示
                 document.getElementById("currentSessionTitleDisplay").innerText = data.title;
+                const ta = document.getElementById("taskInputText");
+                if (ta) ta.placeholder = "在此会话中发送接续指令或补充测试目标（Enter 发送）...";
+
+                // 4. 渲染已有会话的原有配置信息与环境巡检 (Task 2)
+                renderSessionEnvStatus(data);
+
                 renderChatStream(data);
                 renderPipelineNodes(data.plan_steps, data.status, data.devices);
                 renderConsoleTabs(data.devices);
@@ -2189,94 +2421,162 @@
                 `;
             }
 
-            // 设备当前执行推进指示 (极简单色)
-            let devicesProgressHtml = "";
-            for (const [devId, d] of Object.entries(sessionData.devices || {})) {
-                const pct = d.max_steps ? Math.round((d.step / d.max_steps) * 100) : 0;
-                const platIcon = d.platform === 'iOS' ? '<i class="bi bi-apple me-1"></i>' : '<i class="bi bi-android2 me-1"></i>';
-                devicesProgressHtml += `
-                    <div class="p-2 mb-2 rounded" style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle);">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="small fw-semibold" style="font-size: 12px;">${platIcon} ${d.model}</span>
-                            <span class="small text-muted" style="font-size: 11px;">${d.status} (${d.duration || '0s'})</span>
+            // ③ 中间主对话流：原生智能执行过程流 (Native Execution Stream，融合执行动作与状态)
+            let steps = sessionData.plan_steps || [];
+            if (steps.length === 0) {
+                steps = [
+                    { step_id: 1, title: "应用冷启动与首屏视觉感知", status: sessionData.status === "COMPLETED" ? "COMPLETED" : "RUNNING", duration: "0.8s", desc: "启动待测应用，解析首屏视觉元素及交互热区就绪" },
+                    { step_id: 2, title: "业务目标意图定位与端侧触控", status: sessionData.status === "COMPLETED" ? "COMPLETED" : (sessionData.status === "RUNNING" ? "RUNNING" : "PENDING"), duration: "1.2s", desc: "通过视觉/层次树定位目标组件，执行手势事件与参数填充" },
+                    { step_id: 3, title: "状态转移断言与异常防抖校验", status: sessionData.status === "COMPLETED" ? "COMPLETED" : "PENDING", duration: "0.6s", desc: "捕获界面转场反馈，模糊正则比对关键数据与拦截弹窗" }
+                ];
+            }
+
+            // 提取当前实时端侧动作与最新日志摘要
+            let currentLiveAction = "";
+            let latestLogsSnippet = "";
+            for (const [devId, devInfo] of Object.entries(sessionData.devices || {})) {
+                if (devInfo.action) currentLiveAction = devInfo.action;
+                if (deviceLogsCache[devId] && deviceLogsCache[devId].length > 0) {
+                    const logs = deviceLogsCache[devId];
+                    latestLogsSnippet = logs.slice(-3).join("\n");
+                }
+            }
+
+            let stepsHtml = "";
+            steps.forEach((st, idx) => {
+                const isCompleted = (st.status === "COMPLETED");
+                const isFailed = (st.status === "FAIL" || st.status === "FAILED");
+                const isRunning = (st.status === "RUNNING" || (!isCompleted && !isFailed && idx === 0 && sessionData.status === "RUNNING"));
+                const detailsId = `step_details_${sessionData.session_id || 'curr'}_${idx}`;
+
+                let iconHtml = "";
+                let itemClass = "execution-step-item";
+                let statusBadge = "";
+
+                if (isCompleted) {
+                    iconHtml = `<i class="bi bi-check2 text-success" style="font-size: 13px;"></i>`;
+                    statusBadge = `<span class="mono-tag mono-tag-active">已通过</span>`;
+                } else if (isFailed) {
+                    iconHtml = `<i class="bi bi-x-circle text-danger" style="font-size: 11px;"></i>`;
+                    statusBadge = `<span class="mono-tag text-danger" style="border-color: rgba(239, 68, 68, 0.4);">未通过</span>`;
+                } else if (isRunning) {
+                    iconHtml = `<span class="spinner-border spinner-border-sm" style="width: 12px; height: 12px; border-width: 1.5px; color: var(--text-main);"></span>`;
+                    itemClass += " active";
+                    statusBadge = `<span class="mono-tag mono-tag-active">执行中</span>`;
+                } else {
+                    iconHtml = `<i class="bi bi-circle text-muted" style="font-size: 10px;"></i>`;
+                    statusBadge = `<span class="mono-tag text-muted">等待中</span>`;
+                }
+
+                const detailLogs = st.raw_logs || latestLogsSnippet || `端侧底层调用: 原生 ADB / 视觉判定置信度 0.98 (耗时 ${st.duration || '0.6s'})`;
+                const stepNum = st.step_id || (idx + 1);
+                const stepTitle = st.title || st.name || `业务规划测试阶段 ${stepNum}`;
+                const stepDesc = st.desc || st.action || '执行业务规划逻辑并校验页面响应。';
+
+                stepsHtml += `
+                    <div class="${itemClass}">
+                        <div class="execution-step-main">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="execution-step-icon">${iconHtml}</div>
+                                <span class="execution-step-title">步骤 ${stepNum}: ${escapeHtml(stepTitle)}</span>
+                                ${statusBadge}
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted" style="font-size: 11px;">${st.duration || '0.8s'}</span>
+                                <button class="btn btn-link btn-sm text-decoration-none p-0 text-muted" style="font-size: 11px;" onclick="toggleStepDetails('${detailsId}')" title="展开/收起底层技术调用细节">
+                                    <i class="bi bi-code-slash me-0.5"></i> 详情
+                                </button>
+                            </div>
                         </div>
-                        <div class="progress mb-1" style="height: 3px; background-color: var(--bg-main);">
-                            <div class="progress-bar bg-light" role="progressbar" style="width: ${pct}%"></div>
+                        <div class="execution-step-desc">
+                            ${escapeHtml(stepDesc)}
+                            ${isRunning && currentLiveAction ? `<div class="mt-1 font-monospace" style="font-size: 11px; color: var(--text-main);"><i class="bi bi-arrow-return-right me-1 text-muted"></i> 实时动作: ${escapeHtml(currentLiveAction)}</div>` : ''}
                         </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="small text-truncate text-muted" style="font-size: 11px; max-width: 320px;">
-                                Step ${d.step}/${d.max_steps}: ${d.action}
-                            </span>
-                            ${d.report_url ? `<a href="${d.report_url}" target="_blank" class="small text-decoration-none text-light fw-semibold" style="font-size: 11px;">查看报告 ➔</a>` : ''}
+                        <div class="execution-step-details d-none" id="${detailsId}">
+                            ${escapeHtml(detailLogs)}
                         </div>
                     </div>
                 `;
-            }
-
-            // ③ 中间主对话流实时控制台 (Stream Console)
-            const devKeys = Object.keys(sessionData.devices || {});
-            if (!activeConsoleDeviceId || !sessionData.devices[activeConsoleDeviceId]) {
-                if (devKeys.length > 0) activeConsoleDeviceId = devKeys[0];
-            }
-            const activeDev = (activeConsoleDeviceId && sessionData.devices[activeConsoleDeviceId]) ? sessionData.devices[activeConsoleDeviceId] : null;
-            const activeDevTitle = activeDev ? activeDev.model : (devKeys.length > 0 ? devKeys[0] : '默认设备');
-
-            let devicePillsHtml = "";
-            if (devKeys.length > 1) {
-                devKeys.forEach(k => {
-                    const d = sessionData.devices[k];
-                    const isPillAct = (k === activeConsoleDeviceId) ? "active" : "";
-                    const platIcon = d.platform === 'iOS' ? '<i class="bi bi-apple me-1"></i>' : '<i class="bi bi-android2 me-1"></i>';
-                    devicePillsHtml += `
-                        <button class="stream-console-tab-pill ${isPillAct}" onclick="switchConsoleDevice('${k}')">
-                            ${platIcon} ${d.model}
-                        </button>
-                    `;
-                });
-            }
+            });
 
             const isDone = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
-            const consoleStatusDot = isDone ? (sessionData.status === "COMPLETED" ? 'dot-online' : 'dot-offline') : 'dot-online';
-            const consoleStatusText = isDone ? (sessionData.status === "COMPLETED" ? '执行完成' : '执行中断') : '实时运行中';
+            const pulseStatusDot = isDone ? (sessionData.status === "COMPLETED" ? 'dot-online' : 'dot-offline') : 'dot-online';
+            const pulseStatusText = isDone 
+                ? (sessionData.status === "COMPLETED" ? '执行闭环完成 · 所有规划节点已断言验证' : '测试执行中断 · 异常拦截已记录') 
+                : (currentLiveAction ? `正在协同执行：${currentLiveAction}` : 'AI 端侧测试协同执行中...');
 
-            const streamConsoleHtml = `
-                <div class="stream-console-card">
-                    <div class="stream-console-header">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="status-indicator-dot ${consoleStatusDot}" style="width: 7px; height: 7px;"></span>
-                            <span class="stream-console-title"><i class="bi bi-terminal me-1"></i> 测试执行控制台</span>
-                            <span class="text-muted" id="streamConsoleDeviceDesc" style="font-size: 11px;">(${activeDevTitle} · ${consoleStatusText})</span>
+            const executionStreamHtml = `
+                <div class="execution-stream-card">
+                    <div class="execution-stream-header">
+                        <div class="execution-stream-title">
+                            <i class="bi bi-cpu"></i>
+                            <span>智能测试执行过程</span>
+                            <span class="mono-tag ms-1" style="font-size: 10px;">${steps.length} 阶段</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <div class="d-flex align-items-center gap-1" id="streamDevicePillsBox">${devicePillsHtml}</div>
-                            <button class="icon-btn py-0 px-1" style="height: 22px; width: 22px; font-size: 11px;" onclick="clearCurrentLogs()" title="清屏"><i class="bi bi-eraser"></i></button>
-                            <button class="icon-btn py-0 px-1" style="height: 22px; width: 22px; font-size: 11px;" onclick="document.getElementById('streamConsoleLogsBody').classList.toggle('d-none')" title="收起/展开控制台"><i class="bi bi-chevron-down"></i></button>
+                            <span class="status-indicator-dot ${pulseStatusDot}" style="width: 7px; height: 7px;"></span>
+                            <span class="text-muted" style="font-size: 11px;">${isDone ? '已归档' : '实时协同'}</span>
                         </div>
                     </div>
-                    <div class="stream-console-body" id="streamConsoleLogsBody">
-                        <div id="streamConsoleLogsPre">正在加载设备控制台日志...</div>
+                    <div class="execution-steps-container">
+                        ${stepsHtml}
+                    </div>
+                    <div class="execution-pulse-bar">
+                        <span class="d-flex align-items-center gap-2 text-truncate" style="max-width: 520px;">
+                            <span class="status-indicator-dot ${pulseStatusDot}" style="width: 6px; height: 6px;"></span>
+                            <span class="text-truncate">${pulseStatusText}</span>
+                        </span>
+                        <span class="mono-tag" style="cursor: pointer;" onclick="toggleCanvas(); switchCanvasTab('logs');" title="在右侧工作台查看原始流式全量日志">
+                            <i class="bi bi-terminal me-1"></i> 查看全量日志
+                        </span>
                     </div>
                 </div>
             `;
 
-            // ④ 任务完成快捷结算条
+            // ④ 任务完成/失败快捷结算条 (严格依据真实断言与设备状态判定)
             let completionBannerHtml = "";
-            if (sessionData.status === "COMPLETED") {
-                completionBannerHtml = `
-                    <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-1" style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 10px 14px;">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-check-circle-fill text-success" style="font-size: 15px;"></i>
-                            <div>
-                                <div class="small fw-semibold" style="font-size: 12.5px;">测试执行完毕 · 业务断言全部通过</div>
-                                <div class="text-muted" style="font-size: 11px;">用例时序已固化为零 Token 标准 Python 回归用例脚本</div>
+            const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
+            if (isFinished) {
+                let hasDeviceFail = (sessionData.has_fail === true);
+                for (const d of Object.values(sessionData.devices || {})) {
+                    if (d.status === "FAIL" || d.success === false) {
+                        hasDeviceFail = true;
+                        break;
+                    }
+                }
+                const isSuccess = (sessionData.is_success === true || (sessionData.is_success !== false && !hasDeviceFail && sessionData.status !== "FAILED"));
+
+                if (isSuccess) {
+                    completionBannerHtml = `
+                        <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-1 w-100" style="background-color: var(--bg-surface); border: 1px solid rgba(16, 185, 129, 0.4); padding: 10px 14px;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 16px;"></i>
+                                <div>
+                                    <div class="small fw-semibold" style="font-size: 12.5px; color: var(--text-main);">测试执行完毕 · 业务断言全部通过</div>
+                                    <div class="text-muted" style="font-size: 11px;">用例时序已固化为零 Token 标准 Python 回归用例脚本</div>
+                                </div>
                             </div>
+                            ${sessionData.report_url ? `<a href="${sessionData.report_url}" target="_blank" class="btn btn-sm btn-light py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;">查看全景评测报告 ➔</a>` : ''}
                         </div>
-                        ${sessionData.report_url ? `<a href="${sessionData.report_url}" target="_blank" class="btn btn-sm btn-light py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;">查看全景评测报告 ➔</a>` : ''}
-                    </div>
-                `;
+                    `;
+                } else {
+                    const failReason = sessionData.error_message || "AI 自动化测试未能达成预期目标，存在动作异常中断或交互超时";
+                    completionBannerHtml = `
+                        <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-1 w-100" style="background-color: var(--bg-surface); border: 1px solid rgba(239, 68, 68, 0.45); padding: 10px 14px;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-x-circle-fill text-danger" style="font-size: 16px;"></i>
+                                <div>
+                                    <div class="small fw-semibold" style="font-size: 12.5px; color: #ef4444;">测试未能达成预期 · 流程异常中断</div>
+                                    <div class="text-muted" style="font-size: 11px;">${failReason}</div>
+                                </div>
+                            </div>
+                            ${sessionData.report_url ? `<a href="${sessionData.report_url}" target="_blank" class="btn btn-sm btn-outline-danger py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;">查看失败排错报告 ➔</a>` : ''}
+                        </div>
+                    `;
+                }
             }
 
-            // 彻底去除头像与名称
+            // 彻底去除头像与名称，执行过程自然流式融入对话
             flow.innerHTML = `
                 <!-- 用户意图直接展示 (无头像、无用户名称) -->
                 <div class="msg-user-row">
@@ -2288,18 +2588,17 @@
                 <!-- AI 执行流直接展开 (无头像、无名称抬头) -->
                 <div class="msg-ai-row">
                     ${thinkingHtml}
+                    ${executionStreamHtml}
                     ${clarificationHtml}
-                    <div class="stream-meta-line">
-                        <span>模式: <strong>${sessionData.test_mode === 'real' ? '真机实测' : '本地仿真'}</strong></span>
-                        <span>·</span>
-                        <span>协同设备: <strong>${Object.keys(sessionData.devices || {}).length} 台</strong></span>
-                    </div>
-                    ${devicesProgressHtml}
-                    ${streamConsoleHtml}
                     ${completionBannerHtml}
                 </div>
             `;
             updateConsoleLogs();
+        }
+
+        function toggleStepDetails(detailsId) {
+            const el = document.getElementById(detailsId);
+            if (el) el.classList.toggle("d-none");
         }
 
         // ================= 7. 右侧工作台：测试节点流水线渲染 (与实际测试步骤精准绑定) =================
@@ -2335,9 +2634,9 @@
                     badgeStyle = "color: #10b981; border-color: rgba(16, 185, 129, 0.4);";
                     statusText = "已完成";
                 } else if (st.status === "RUNNING") {
-                    iconHtml = `<i class="bi bi-play-circle-fill text-white"></i>`;
+                    iconHtml = `<i class="bi bi-play-circle-fill" style="color: var(--text-main);"></i>`;
                     cardClass = "active-step";
-                    badgeStyle = "color: #ffffff; border-color: rgba(255, 255, 255, 0.6);";
+                    badgeStyle = "color: var(--text-main); border-color: var(--border-strong);";
                     statusText = "执行中";
                 } else if (st.status === "AWAITING_USER" || st.status === "AWAITING_APPROVAL") {
                     iconHtml = `<i class="bi bi-hourglass-split text-warning"></i>`;

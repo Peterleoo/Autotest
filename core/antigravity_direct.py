@@ -148,35 +148,51 @@ class AntigravityDirectClient:
             "request": request_payload
         }
 
-        try:
-            logger.info(f"正在通过 Google Antigravity 官方授权调用 [{self.model_name}]...")
-            resp = self.session.post(url, headers=headers, json=body, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                cands = data.get("response", {}).get("candidates", [])
-                if cands:
-                    parts = cands[0].get("content", {}).get("parts", [])
-                    raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
-                    logger.info("Google Antigravity 官方响应成功！")
-                    return self._parse_json(raw_text)
-                raise RuntimeError(f"Google 响应未包含候选内容: {data}")
-            elif resp.status_code == 401:
-                # 强制重新刷新 token 并重试一次
-                self.config_data["tokens"]["expiresAt"] = 0
-                token = self.ensure_access_token()
-                headers["Authorization"] = f"Bearer {token}"
-                resp2 = self.session.post(url, headers=headers, json=body, timeout=30)
-                if resp2.status_code == 200:
-                    cands = resp2.json().get("response", {}).get("candidates", [])
-                    parts = cands[0].get("content", {}).get("parts", [])
-                    raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
-                    return self._parse_json(raw_text)
-                raise RuntimeError(f"Google 鉴权失败 ({resp2.status_code}): {resp2.text[:200]}")
-            else:
-                raise RuntimeError(f"Google 端点返回错误码 ({resp.status_code}): {resp.text[:300]}")
-        except Exception as e:
-            logger.error(f"Antigravity 官方直连请求异常: {e}")
-            raise e
+        max_retries = 3
+        last_err = None
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    logger.info(f"正在通过 Google Antigravity 官方授权调用 [{self.model_name}] (第 {attempt+1}/{max_retries} 次重试)...")
+                else:
+                    logger.info(f"正在通过 Google Antigravity 官方授权调用 [{self.model_name}]...")
+
+                resp = self.session.post(url, headers=headers, json=body, timeout=35)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    cands = data.get("response", {}).get("candidates", [])
+                    if cands:
+                        parts = cands[0].get("content", {}).get("parts", [])
+                        raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
+                        logger.info("Google Antigravity 官方响应成功！")
+                        return self._parse_json(raw_text)
+                    raise RuntimeError(f"Google 响应未包含候选内容: {data}")
+                elif resp.status_code == 401:
+                    # 强制重新刷新 token 并重试一次
+                    self.config_data["tokens"]["expiresAt"] = 0
+                    token = self.ensure_access_token()
+                    headers["Authorization"] = f"Bearer {token}"
+                    resp2 = self.session.post(url, headers=headers, json=body, timeout=35)
+                    if resp2.status_code == 200:
+                        cands = resp2.json().get("response", {}).get("candidates", [])
+                        parts = cands[0].get("content", {}).get("parts", [])
+                        raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
+                        return self._parse_json(raw_text)
+                    raise RuntimeError(f"Google 鉴权失败 ({resp2.status_code}): {resp2.text[:200]}")
+                else:
+                    raise RuntimeError(f"Google 端点返回错误码 ({resp.status_code}): {resp.text[:300]}")
+            except Exception as e:
+                last_err = e
+                if attempt < max_retries - 1:
+                    wait_sec = 1.0 * (attempt + 1)
+                    logger.warning(f"Antigravity 官方直连网络抖动 ({e})，正在等待 {wait_sec}s 自动重试 ({attempt+1}/{max_retries})...")
+                    time.sleep(wait_sec)
+                    # 重建 Session 防止连接池脏状态
+                    self.session = requests.Session()
+                    self.session.proxies.update(self.proxy)
+                else:
+                    logger.error(f"Antigravity 官方直连多次重试后仍然异常: {e}")
+                    raise e
 
     def _parse_json(self, raw_text: str) -> Dict[str, Any]:
         raw_text = raw_text.strip()

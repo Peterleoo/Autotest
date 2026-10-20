@@ -236,34 +236,35 @@ class ActionExecutor:
         raise ValueError("未找到可输入的文本框")
 
     def _swipe(self, direction: str):
-        """通用滑动手势"""
+        """通用滑动手势（采用平滑温和微步长，杜绝大跨度甩动与视口越界死锁）"""
         if hasattr(self.driver, "execute_adb"):
-            logger.info(f"原生 ADB 执行滑动手势: {direction}")
+            logger.info(f"原生 ADB 执行平滑微步滑动手势: {direction}")
             if direction == "up":
-                self.driver.execute_adb(["shell", "input", "swipe", "540", "1600", "540", "600", "300"])
+                # 从屏幕中下部温和平缓滑至中上部 (跨度 400px，时长 600ms，无猛甩惯性)
+                self.driver.execute_adb(["shell", "input", "swipe", "540", "1350", "540", "950", "600"])
             elif direction == "down":
-                self.driver.execute_adb(["shell", "input", "swipe", "540", "600", "540", "1600", "300"])
+                self.driver.execute_adb(["shell", "input", "swipe", "540", "950", "540", "1350", "600"])
             elif direction == "left":
-                self.driver.execute_adb(["shell", "input", "swipe", "900", "1000", "200", "1000", "300"])
+                self.driver.execute_adb(["shell", "input", "swipe", "800", "1000", "300", "1000", "600"])
             elif direction == "right":
-                self.driver.execute_adb(["shell", "input", "swipe", "200", "1000", "900", "1000", "300"])
+                self.driver.execute_adb(["shell", "input", "swipe", "300", "1000", "800", "1000", "600"])
             return
 
         size = self.driver.get_window_size()
         width = size["width"]
         height = size["height"]
 
-        if direction == "up": # 向上滑，屏幕内容往上滚
-            start_x, start_y = width // 2, int(height * 0.8)
-            end_x, end_y = width // 2, int(height * 0.2)
+        if direction == "up": # 向上滑，屏幕内容往上滚，跨度取 20% 高度
+            start_x, start_y = width // 2, int(height * 0.65)
+            end_x, end_y = width // 2, int(height * 0.45)
         elif direction == "down":
-            start_x, start_y = width // 2, int(height * 0.2)
-            end_x, end_y = width // 2, int(height * 0.8)
+            start_x, start_y = width // 2, int(height * 0.45)
+            end_x, end_y = width // 2, int(height * 0.65)
         elif direction == "left":
-            start_x, start_y = int(width * 0.8), height // 2
-            end_x, end_y = int(width * 0.2), height // 2
+            start_x, start_y = int(width * 0.7), height // 2
+            end_x, end_y = int(width * 0.3), height // 2
         else: # right
-            start_x, start_y = int(width * 0.2), height // 2
-            end_x, end_y = int(width * 0.8), height // 2
+            start_x, start_y = int(width * 0.3), height // 2
+            end_x, end_y = int(width * 0.7), height // 2
 
         self.driver.swipe(start_x, start_y, end_x, end_y, duration=600)

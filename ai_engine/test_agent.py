@@ -29,9 +29,10 @@ SYSTEM_PROMPT = """
     - 紧扣用户的【测试目标】！不要点击与目标无关的广告或偏门入口。
     - 针对登录流程：若有协议勾选先点击协议勾选 -> 点击手机号输入框输入测试号码 -> 点击获取验证码/用密码登录 -> 验证跳转。
     - 针对搜索流程：若当前不在首页（例如误入“委托服务”或“我的”页面），第一步必须先按返回键 {"action": "press_key", "key": "back"} 或点击底部【首页】Tab 回到主页；然后在主页顶部点击搜索框（带有“搜索”或“请输入小区名”）进入搜索页面；在搜索页面，可直接点击下方的【热门搜索】条目（如‘钰龙天下’、‘华润凤凰城’、‘星城国际’）或搜索联想条目，即可一键直达房源搜索结果列表；在房源列表中执行下拉滑动或文本断言（如包含‘万’、‘室’、‘m²’等房源信息），达成目标后果断调用 finish 完成测试！
+    - 针对表单录入与必填校验：长表单页面的“免费发布/立即提交”按钮往往固定在屏幕最底部的悬浮操作条（Sticky Bottom Bar）中。严禁在上下滑动中盲目震荡！若表单项已就绪，优先点击页面底部的提交/发布按钮触发必填校验；达成必填校验拦截后，果断调用 finish 完成测试！
     - 针对委托服务区：严禁在未要求测试委托服务时点击委托房源或委托卡片！
 3. 【坐标精准感知】：元素列表中附带了视觉 OCR 探测出的屏幕精确物理坐标 [x, y]，你可以直接基于编号或坐标点击。
-4. 【禁止无意义刷步】：不要原地重复断言相同的文字；达成业务目标后应果断调用 finish 完成测试。
+4. 【禁止无意义刷步与盲目滑动】：严禁原地重复上下滑动；达成业务目标后应果断调用 finish 完成测试。
 5. 输出格式必须是纯 JSON，不要包含任何 markdown 代码块包裹或解释文本。
 
 JSON 输出格式样例：
@@ -132,6 +133,18 @@ class AITestAgent:
                 # 重新获取一次
                 screen_info = ScreenParser.get_screen_summary(self.driver)
 
+            # 检测是否陷入上下滑动震荡循环 (Anti-Oscillation Guard)
+            recent_swipes = [h.get("action") for h in self.executor.action_history[-3:] if h.get("action") == "swipe"]
+            oscillation_warning = ""
+            if len(recent_swipes) >= 2:
+                oscillation_warning = """
+⚠️【系统防震荡自愈警示】：
+检测到你在最近几步内连续多次执行滑动手势，可能已滑过头或陷入了上下震荡死锁！
+1. 请仔细核查当前屏幕最下方的元素列表中是否已有提交/发布/确定按钮；
+2. 若已识别出提交类按钮，请立即执行 tap 点击！严禁再次盲目执行 swipe；
+3. 若元素列表中未提取出文字，长表单的提交按钮通常固定在屏幕正下方悬浮操作条，可直接点击底部 [540, 2150] 附近区域触发提交校验！
+"""
+
             # 2. 构造 Prompt
             user_prompt = f"""
 【用户测试总目标】
@@ -139,7 +152,7 @@ class AITestAgent:
 
 【当前已执行的操作历史】
 {json.dumps([{'action': h.get('action'), 'reason': h.get('reason'), 'error': h.get('error')} for h in self.executor.action_history[-4:]], ensure_ascii=False)}
-
+{oscillation_warning}
 【当前屏幕可交互元素列表】
 {screen_info['element_summary_text']}
 

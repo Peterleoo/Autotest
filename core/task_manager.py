@@ -98,6 +98,7 @@ class TaskManager:
                 "title": s["title"],
                 "goal": s["goal"],
                 "status": s["status"],
+                "is_success": s.get("is_success"),
                 "created_at": s["created_at"],
                 "test_mode": s["test_mode"],
                 "is_real_device": (s["test_mode"] == "real"),
@@ -117,12 +118,15 @@ class TaskManager:
         offsets = offsets or {}
         devices_data = {}
         platforms = set()
+        has_fail = False
         for dev_id, dev_info in s["devices"].items():
             offset = offsets.get(dev_id, 0)
             logs = dev_info["logs"]
             new_logs = logs[offset:] if offset < len(logs) else []
             plat = dev_info.get("platform", "Android")
             platforms.add(plat)
+            if dev_info["status"] == "FAIL" or dev_info.get("success") is False:
+                has_fail = True
             devices_data[dev_id] = {
                 "device_id": dev_id,
                 "model": dev_info["model"],
@@ -138,11 +142,16 @@ class TaskManager:
                 "success": dev_info.get("success")
             }
 
+        is_success = s.get("is_success", not has_fail if s["status"] in ["COMPLETED", "FINISHED"] else None)
+
         return {
             "session_id": s["session_id"],
             "title": s["title"],
             "goal": s["goal"],
             "status": s["status"],
+            "is_success": is_success,
+            "has_fail": has_fail,
+            "error_message": s.get("error_message", "流程异常中断，未能达成测试目标" if has_fail else ""),
             "approval_mode": s.get("approval_mode", "auto"),
             "plan_steps": s.get("plan_steps", []),
             "thinking": s.get("thinking", {}),
@@ -410,7 +419,11 @@ class TaskManager:
             all_done = all(d["status"] in ["PASS", "FAIL", "COMPLETED"] for d in session["devices"].values())
             if all_done:
                 session["status"] = "COMPLETED"
-                self._complete_all_steps(session, is_success=all(d.get("success", False) for d in session["devices"].values()))
+                has_fail = any(d["status"] == "FAIL" or d.get("success") is False for d in session["devices"].values())
+                session["is_success"] = not has_fail
+                if has_fail:
+                    session["error_message"] = "存在执行失败的设备或动作异常中断"
+                self._complete_all_steps(session, is_success=not has_fail)
                 for d in session["devices"].values():
                     if d.get("report_url"):
                         session["report_url"] = d["report_url"]
@@ -475,6 +488,10 @@ class TaskManager:
         is_success = (proc.returncode == 0)
         dev_state["success"] = is_success
         dev_state["status"] = "PASS" if is_success else "FAIL"
+
+        if not is_success:
+            session["is_success"] = False
+            session["error_message"] = "AI 自动化测试未能达成预期目标，存在失败动作"
 
         self._complete_all_steps(session, is_success=is_success)
 
