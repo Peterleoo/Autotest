@@ -1224,20 +1224,44 @@
             to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
         }
 
-        /* ================= 业务结构化结论卡片 ================= */
-        .result-conclusion-card {
-            border-radius: 12px;
-            padding: 14px 16px;
+        /* ================= 业务纯文本打字机结论输出 ================= */
+        .ai-conclusion-text {
+            font-size: 13px;
+            line-height: 1.75;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            word-break: break-word;
             margin-top: 12px;
-            width: 100%;
+            padding: 6px 0;
+            font-family: inherit;
         }
-        .success-conclusion {
-            background-color: var(--bg-surface);
-            border: 1px solid rgba(16, 185, 129, 0.45);
+        .typewriter-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.1em;
+            background-color: var(--text-main);
+            vertical-align: -2px;
+            margin-left: 2px;
+            animation: blinkCursor 0.8s infinite;
         }
-        .fail-conclusion {
-            background-color: var(--bg-surface);
-            border: 1px solid rgba(239, 68, 68, 0.45);
+        @keyframes blinkCursor {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .conclusion-inline-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--text-sub);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+            margin-right: 12px;
+            transition: color 0.15s ease;
+        }
+        .conclusion-inline-link:hover {
+            color: var(--text-main);
         }
 
         /* 引导遮罩内部样式 */
@@ -3589,62 +3613,37 @@
                 </div>
             `;
 
-            // ④ 任务完成/失败结构化业务结论面板 (用户需求：测试通过输出全部完成说明；测试不通过明确哪些通过、卡在哪里及原因)
+            // ④ 任务完成/失败自然语言结论回答 (用户需求：纯文本输出，打字机效应展示，像回答问题一样，无框架)
             let completionBannerHtml = "";
+            let conclusionText = "";
+            let linksHtml = "";
+
             if (isFinished) {
                 if (isSuccess) {
-                    let passedStepsSummaryHtml = "";
+                    conclusionText = `本次自动化测试已执行完毕，测试结论为：全部测试通过 (PASS)。\n\n针对您下达的测试意图，各业务测试阶段均已顺利验证通过：\n`;
                     steps.forEach((st, idx) => {
                         const stepNum = st.step_id || (idx + 1);
                         const stepTitle = st.title || `阶段 ${stepNum}`;
-                        passedStepsSummaryHtml += `
-                            <div class="d-flex align-items-center justify-content-between py-1 border-bottom" style="border-color: rgba(255,255,255,0.05) !important;">
-                                <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 80%;">
-                                    <i class="bi bi-check-circle-fill text-success" style="font-size: 12px;"></i>
-                                    <span style="color: var(--text-main); font-weight: 500;">Step ${stepNum}: ${escapeHtml(stepTitle)}</span>
-                                </div>
-                                <span class="text-muted font-monospace" style="font-size: 10.5px;">通过 (${st.duration || '0.8s'})</span>
-                            </div>
-                        `;
+                        conclusionText += `${idx + 1}. Step ${stepNum}：${stepTitle}（耗时 ${st.duration || '0.8s'}，验证通过）\n`;
                     });
+                    conclusionText += `\n所有规划交互与界面转场断言校验达成率 100%。业务操作时序已成功固化为本地零 Token 自动化回归脚本，后续可随时调用批量回归。`;
 
-                    completionBannerHtml = `
-                        <div class="result-conclusion-card success-conclusion mt-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="bi bi-check-circle-fill text-success" style="font-size: 18px;"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 13.5px; color: #10b981;">测试结论：全链路自动化测试通过 (PASS)</div>
-                                        <div class="text-muted" style="font-size: 11px;">所有规划阶段均顺利闭环，端侧界面转场与断言校验 100% 达成。</div>
-                                    </div>
-                                </div>
-                                <span class="mono-tag mono-tag-active" style="color: #10b981; border-color: rgba(16,185,129,0.5);">通过率 100%</span>
-                            </div>
-
-                            <div class="p-2 mb-2 rounded" style="background: rgba(255, 255, 255, 0.03); font-size: 11.5px;">
-                                <div class="small text-muted mb-1 fw-semibold"><i class="bi bi-card-checklist me-1"></i>已验证通过的业务测试阶段：</div>
-                                ${passedStepsSummaryHtml}
-                            </div>
-
-                            <div class="d-flex justify-content-between align-items-center pt-2 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
-                                <div class="small text-muted" style="font-size: 11px;">
-                                    <i class="bi bi-shield-check text-success me-1"></i>测试时序已成功固化为本地零 Token 自动化回归脚本
-                                </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <button class="btn btn-sm btn-outline-light py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;" onclick="openEmbeddedCode('${sessionData.case_name || 'test_beike_search_p0.py'}', '固化脚本源码')">
-                                        <i class="bi bi-code-slash me-1"></i>在右侧查看脚本
-                                    </button>
-                                    ${sessionData.report_url ? `<button class="btn btn-sm btn-light py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;" onclick="openEmbeddedReport('${sessionData.report_url}', '全景评测报告')"><i class="bi bi-file-earmark-bar-graph me-1"></i>在右侧查看报告</button>` : ''}
-                                </div>
-                            </div>
+                    linksHtml = `
+                        <div class="mt-2 pt-1 d-flex align-items-center flex-wrap">
+                            <span class="conclusion-inline-link" onclick="openEmbeddedCode('${sessionData.case_name || 'test_beike_search_p0.py'}', '固化脚本源码')">
+                                <i class="bi bi-code-slash"></i> 查看固化脚本源码
+                            </span>
+                            ${sessionData.report_url ? `
+                            <span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '全景评测报告')">
+                                <i class="bi bi-file-earmark-bar-graph"></i> 查看全景评测报告
+                            </span>` : ''}
                         </div>
                     `;
                 } else {
-                    // 测试未通过：详细结构化诊断（哪些通过，卡在第几步，阻断关键原因分析与排错建议）
                     let failedStepIndex = -1;
                     let failedStepTitle = "";
-                    let stepDiagnosisHtml = "";
                     let foundFail = false;
+                    const passedSteps = [];
 
                     steps.forEach((st, idx) => {
                         const stepNum = st.step_id || (idx + 1);
@@ -3657,33 +3656,9 @@
                             failedStepIndex = stepNum;
                             failedStepTitle = stepTitle;
                         }
-
-                        let statusBadge = "";
-                        let itemClass = "";
                         if (isStepPassed) {
-                            statusBadge = `<span class="mono-tag" style="color: #10b981; border-color: rgba(16,185,129,0.35); font-size: 9.5px;"><i class="bi bi-check2 me-1"></i>已通过</span>`;
-                        } else if (isStepFail || (!foundFail && idx === steps.length - 1)) {
-                            if (!foundFail) {
-                                failedStepIndex = stepNum;
-                                failedStepTitle = stepTitle;
-                                foundFail = true;
-                            }
-                            statusBadge = `<span class="mono-tag mono-tag-active" style="color: #ef4444; border-color: rgba(239,68,68,0.5); font-size: 9.5px;"><i class="bi bi-exclamation-octagon me-1"></i>卡在此处</span>`;
-                            itemClass = "fw-semibold";
-                        } else {
-                            statusBadge = `<span class="mono-tag text-muted" style="font-size: 9.5px;">未执行</span>`;
+                            passedSteps.push(`Step ${stepNum}：${stepTitle}`);
                         }
-
-                        stepDiagnosisHtml += `
-                            <div class="d-flex align-items-center justify-content-between py-1 border-bottom ${itemClass}" style="border-color: rgba(255,255,255,0.05) !important;">
-                                <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 75%;">
-                                    <span style="font-size: 11.5px; color: ${isStepFail ? '#ef4444' : (isStepPassed ? 'var(--text-main)' : 'var(--text-muted)')};">
-                                        Step ${stepNum}: ${escapeHtml(stepTitle)}
-                                    </span>
-                                </div>
-                                ${statusBadge}
-                            </div>
-                        `;
                     });
 
                     if (failedStepIndex === -1) {
@@ -3693,48 +3668,35 @@
 
                     const failReason = sessionData.error_message || "端侧视觉感知目标组件未定位或界面转场断言超时";
 
-                    completionBannerHtml = `
-                        <div class="result-conclusion-card fail-conclusion mt-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="bi bi-x-circle-fill text-danger" style="font-size: 18px;"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 13.5px; color: #ef4444;">测试结论：自动化测试未达预期 (FAIL)</div>
-                                        <div class="text-muted" style="font-size: 11px;">执行流水线已中断，详细受阻步骤与原因诊断如下：</div>
-                                    </div>
-                                </div>
-                                <span class="mono-tag" style="color: #ef4444; border-color: rgba(239,68,68,0.5);">流程中断</span>
-                            </div>
+                    conclusionText = `本次自动化测试已执行完毕，测试结论为：自动化测试未达预期 (FAIL)。\n\n测试流水线在执行过程中受阻中断，具体诊断情况如下：\n`;
+                    if (passedSteps.length > 0) {
+                        conclusionText += `• 已验证通过的阶段：\n`;
+                        passedSteps.forEach(ps => {
+                            conclusionText += `  - ${ps}（已通过）\n`;
+                        });
+                    } else {
+                        conclusionText += `• 已验证通过的阶段：无（初始阶段即受阻）\n`;
+                    }
+                    conclusionText += `• 当前卡点位置：第 ${failedStepIndex} 步【${failedStepTitle}】\n`;
+                    conclusionText += `• 阻断关键原因：${failReason}\n`;
+                    conclusionText += `• 排错建议：请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查网络连接与待测应用前台运行状态后重新执行。`;
 
-                            <!-- 步骤流水线状态跟踪 -->
-                            <div class="p-2 mb-2 rounded" style="background: rgba(255, 255, 255, 0.03); font-size: 11.5px;">
-                                <div class="small text-muted mb-1 fw-semibold"><i class="bi bi-diagram-3 me-1"></i>步骤执行流水线状态诊断：</div>
-                                ${stepDiagnosisHtml}
-                            </div>
-
-                            <!-- 阻断关键原因分析 -->
-                            <div class="p-2.5 mb-2 rounded" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); font-size: 12px; color: #fca5a5;">
-                                <div class="fw-semibold mb-1" style="color: #f87171;"><i class="bi bi-exclamation-triangle-fill me-1"></i>中断阻断原因深度分析：</div>
-                                <div style="line-height: 1.5; color: #fecaca;">
-                                    <strong>受阻位置：</strong>第 ${failedStepIndex} 步【${escapeHtml(failedStepTitle)}】<br>
-                                    <strong>关键原因：</strong>${escapeHtml(failReason)}
-                                </div>
-                            </div>
-
-                            <!-- 排错建议 -->
-                            <div class="small text-muted mb-3" style="font-size: 11px; line-height: 1.5;">
-                                <i class="bi bi-info-circle me-1"></i><strong>排错建议：</strong>请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查网络连接与待测包前台运行状态后重新执行。
-                            </div>
-
-                            <div class="d-flex justify-content-end align-items-center gap-2 pt-2 border-top" style="border-color: rgba(255,255,255,0.08) !important;">
-                                <button class="btn btn-sm btn-outline-light py-1 px-3" style="font-size: 11.5px; border-radius: 9999px;" onclick="openCanvasLogs()">
-                                    <i class="bi bi-terminal me-1"></i>在右侧查看终端日志
-                                </button>
-                                ${sessionData.report_url ? `<button class="btn btn-sm btn-outline-danger py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;" onclick="openEmbeddedReport('${sessionData.report_url}', '失败现场排错报告')"><i class="bi bi-file-earmark-bar-graph me-1"></i>在右侧查看报告</button>` : ''}
-                            </div>
+                    linksHtml = `
+                        <div class="mt-2 pt-1 d-flex align-items-center flex-wrap">
+                            <span class="conclusion-inline-link" onclick="openCanvasLogs()">
+                                <i class="bi bi-terminal"></i> 查看终端详细日志
+                            </span>
+                            ${sessionData.report_url ? `
+                            <span class="conclusion-inline-link" onclick="openEmbeddedReport('${sessionData.report_url}', '失败现场排错报告')">
+                                <i class="bi bi-file-earmark-bar-graph"></i> 查看现场排错报告
+                            </span>` : ''}
                         </div>
                     `;
                 }
+
+                completionBannerHtml = `
+                    <div class="ai-conclusion-text" id="aiConclusionBox_${sessionData.id}"></div>
+                `;
             }
 
             // ⑤ 轮次尾部精简操作与指标栏 (DeepSeek Harness Turn Tail)
@@ -3807,6 +3769,64 @@
 
             flow.innerHTML = chatTurnsHtml;
             updateConsoleLogs();
+
+            if (isFinished && conclusionText) {
+                triggerTypewriterConclusion(sessionData.id, conclusionText, linksHtml);
+            }
+        }
+
+        window._conclusionTypewriterState = window._conclusionTypewriterState || {};
+
+        function triggerTypewriterConclusion(sessionId, fullText, linksHtml) {
+            const box = document.getElementById(`aiConclusionBox_${sessionId}`);
+            if (!box) return;
+
+            const state = window._conclusionTypewriterState[sessionId];
+
+            // 1. 如果该会话已经播放完毕，直接完整输出纯文本与末尾链接，不重复播放打字动画
+            if (state && state.finished) {
+                box.innerHTML = escapeHtml(fullText) + linksHtml;
+                return;
+            }
+
+            // 2. 如果正在播放中，DOM 重建时更新展示内容，继续由同一计时器驱动
+            if (state && state.timer) {
+                box.innerHTML = escapeHtml(state.fullText.slice(0, state.currentIdx)) + '<span class="typewriter-cursor"></span>';
+                return;
+            }
+
+            // 3. 首次启动打字机效果（回答式流式逐字输出）
+            window._conclusionTypewriterState[sessionId] = {
+                timer: null,
+                finished: false,
+                currentIdx: 0,
+                fullText: fullText,
+                linksHtml: linksHtml
+            };
+
+            const cur = window._conclusionTypewriterState[sessionId];
+            const speed = 16; // 每 16ms 输出一个字
+
+            cur.timer = setInterval(() => {
+                const targetBox = document.getElementById(`aiConclusionBox_${sessionId}`);
+                if (!targetBox) {
+                    clearInterval(cur.timer);
+                    cur.timer = null;
+                    return;
+                }
+
+                cur.currentIdx++;
+                const currentStr = cur.fullText.slice(0, cur.currentIdx);
+
+                if (cur.currentIdx >= cur.fullText.length) {
+                    clearInterval(cur.timer);
+                    cur.timer = null;
+                    cur.finished = true;
+                    targetBox.innerHTML = escapeHtml(cur.fullText) + cur.linksHtml;
+                } else {
+                    targetBox.innerHTML = escapeHtml(currentStr) + '<span class="typewriter-cursor"></span>';
+                }
+            }, speed);
         }
 
         function toggleDshThought() {
