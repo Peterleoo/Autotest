@@ -3759,31 +3759,53 @@
             updateConsoleLogs();
 
             if (isFinished && conclusionText) {
-                triggerTypewriterConclusion(sessionData.id, conclusionText, linksHtml);
+                const isAlreadyShown = localStorage.getItem("conclusion_shown_" + sessionData.id) === "1";
+                const isFreshCompletion = liveRunningSessions.has(sessionData.id);
+
+                if (!isAlreadyShown && isFreshCompletion) {
+                    // 仅在任务实时推进并首次产出结论的时刻触发打字机
+                    liveRunningSessions.delete(sessionData.id);
+                    localStorage.setItem("conclusion_shown_" + sessionData.id, "1");
+                    triggerTypewriterConclusion(sessionData.id, conclusionText, linksHtml, true);
+                } else {
+                    // 已经输出完毕、重新加载、刷新或查看历史会话，直接输出完整文本，绝不重新打字
+                    localStorage.setItem("conclusion_shown_" + sessionData.id, "1");
+                    triggerTypewriterConclusion(sessionData.id, conclusionText, linksHtml, false);
+                }
+            } else if (!isFinished && sessionData.id) {
+                // 会话处于运行或推进中，标记为实时活跃会话
+                liveRunningSessions.add(sessionData.id);
             }
         }
 
+        const liveRunningSessions = new Set();
         window._conclusionTypewriterState = window._conclusionTypewriterState || {};
 
-        function triggerTypewriterConclusion(sessionId, fullText, linksHtml) {
+        function triggerTypewriterConclusion(sessionId, fullText, linksHtml, shouldAnimate) {
             const box = document.getElementById(`aiConclusionBox_${sessionId}`);
             if (!box) return;
 
+            // 1. 若无需打字动画（已输出完毕、重新加载、刷新或查看历史会话），直接输出完整文本与链接
+            if (!shouldAnimate) {
+                box.innerHTML = escapeHtml(fullText) + linksHtml;
+                return;
+            }
+
             const state = window._conclusionTypewriterState[sessionId];
 
-            // 1. 如果该会话已经播放完毕，直接完整输出纯文本与末尾链接，不重复播放打字动画
+            // 2. 如果在当前页面周期内已经打字完成，直接渲染完整内容
             if (state && state.finished) {
                 box.innerHTML = escapeHtml(fullText) + linksHtml;
                 return;
             }
 
-            // 2. 如果正在播放中，DOM 重建时更新展示内容，继续由同一计时器驱动
+            // 3. 如果正在打字中（轮询导致 DOM 重绘），恢复已打出文字，由原定时器继续推进
             if (state && state.timer) {
                 box.innerHTML = escapeHtml(state.fullText.slice(0, state.currentIdx)) + '<span class="typewriter-cursor"></span>';
                 return;
             }
 
-            // 3. 首次启动打字机效果（回答式流式逐字输出）
+            // 4. 首次实时输出结论：启动打字机逐字输出
             window._conclusionTypewriterState[sessionId] = {
                 timer: null,
                 finished: false,
@@ -3793,7 +3815,7 @@
             };
 
             const cur = window._conclusionTypewriterState[sessionId];
-            const speed = 16; // 每 16ms 输出一个字
+            const speed = 16; // 每 16ms 吐出一个字符
 
             cur.timer = setInterval(() => {
                 const targetBox = document.getElementById(`aiConclusionBox_${sessionId}`);
@@ -4066,6 +4088,10 @@
                     if (data.success) {
                         input.value = "";
                         onInputTextChange();
+                        // 标记该会话重新进入实时执行，清除旧结论状态
+                        liveRunningSessions.add(activeSessionId);
+                        localStorage.removeItem("conclusion_shown_" + activeSessionId);
+                        delete window._conclusionTypewriterState[activeSessionId];
                         // 立即刷新当前会话详情并重载左侧状态
                         await pollCurrentSession();
                         loadSessions();
@@ -4092,6 +4118,10 @@
                 if (data.success && data.session_id) {
                     input.value = "";
                     onInputTextChange();
+                    // 标记新会话进入实时执行，首次完成时触发打字机
+                    liveRunningSessions.add(data.session_id);
+                    localStorage.removeItem("conclusion_shown_" + data.session_id);
+                    delete window._conclusionTypewriterState[data.session_id];
                     await loadSessions();
                     switchSession(data.session_id);
                 } else {

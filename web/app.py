@@ -232,66 +232,125 @@ async def suggest_cases(request: Request, app_name: Optional[str] = None):
     sampled = random.sample(ALL_SUGGESTED_CASES, min(4, len(ALL_SUGGESTED_CASES)))
     return {"app_name": app_name, "cases": sampled}
 
+METADATA_FILE = settings.SOLIDIFIED_DIR / "cases_metadata.json"
+
+DEFAULT_PRESET_METADATA = {
+    "test_beike_search_p0.py": {
+        "id": "CASE-01",
+        "title": "二手房区域商圈级联筛选断言",
+        "module": "房源搜索",
+        "level": "P0",
+        "desc": "定位首页二手房频道，级联选择朝阳-望京商圈，断言返回房源列表首项卡片包含望京商圈标签并记录响应耗时。",
+        "precondition": "待测 App 已安装启动，无需登录态。",
+        "pass_rate": "100%",
+        "avg_duration": "2.4s"
+    },
+    "test_publish_validate_p0.py": {
+        "id": "CASE-02",
+        "title": "发布房源字段必填校验与异常拦截",
+        "module": "业务表单",
+        "level": "P0",
+        "desc": "进入房源发布流程，在售价、户型及联系方式字段输入非法及空值参数，断言前端表单校验浮窗拦截与提交阻断。",
+        "precondition": "需要具备发布权限的基础访客或经纪人态。",
+        "pass_rate": "100%",
+        "avg_duration": "3.1s"
+    },
+    "test_nav_tabs_p1.py": {
+        "id": "CASE-03",
+        "title": "首页金刚区与底栏核心模块遍历巡检",
+        "module": "核心导航",
+        "level": "P1",
+        "desc": "依次点击首页主要金刚区业务入口，并切换底部导航栏各一级 Tab，断言各级页面视图渲染完整无白屏死锁。",
+        "precondition": "应用冷启动完成并跳过引导广告。",
+        "pass_rate": "100%",
+        "avg_duration": "4.2s"
+    },
+    "test_detail_gallery_p1.py": {
+        "id": "CASE-04",
+        "title": "房源详情画廊大图滑动与IM咨询唤起",
+        "module": "房源搜索",
+        "level": "P1",
+        "desc": "进入精选房源详情，软手势轮播画廊多图，点击在线微聊咨询，断言即时聊天浮窗正常呼出并渲染输入框。",
+        "precondition": "首页有展示推荐房源卡片。",
+        "pass_rate": "98%",
+        "avg_duration": "2.8s"
+    },
+    "test_user_profile_p2.py": {
+        "id": "CASE-05",
+        "title": "个人中心偏好设置与缓存清理验证",
+        "module": "系统设置",
+        "level": "P2",
+        "desc": "切换至'我的'个人中心，进入通用设置页执行缓存清理，并切换深色模式开关，断言界面即时响应生效。",
+        "precondition": "已进入'我的'个人中心页面。",
+        "pass_rate": "100%",
+        "avg_duration": "1.9s"
+    }
+}
+
+def load_cases_metadata() -> Dict[str, Any]:
+    settings.SOLIDIFIED_DIR.mkdir(parents=True, exist_ok=True)
+    if METADATA_FILE.exists():
+        try:
+            with open(METADATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    merged = dict(DEFAULT_PRESET_METADATA)
+                    merged.update(data)
+                    return merged
+        except Exception as e:
+            logger.warning(f"读取用例元数据失败: {e}")
+    save_cases_metadata(DEFAULT_PRESET_METADATA)
+    return dict(DEFAULT_PRESET_METADATA)
+
+def save_cases_metadata(data: Dict[str, Any]):
+    settings.SOLIDIFIED_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"保存用例元数据失败: {e}")
+
+def auto_categorize_case(goal: str, title: str = "", steps: list = None) -> tuple:
+    """根据用例目标及执行步骤，智能识别业务模块、用例层级与中文标题"""
+    combined_text = f"{goal} {title} "
+    if steps:
+        for s in steps:
+            if isinstance(s, dict):
+                combined_text += f"{s.get('title', '')} {s.get('desc', '')} "
+    t_lower = combined_text.lower()
+    
+    if any(k in t_lower for k in ["搜索", "筛选", "商圈", "找房", "二手房", "整租", "合租", "租房", "买房", "朝阳", "望京", "租金", "户型", "小区"]):
+        module = "房源搜索"
+        level = "P0" if any(k in t_lower for k in ["搜索", "商圈", "筛选", "租金"]) else "P1"
+    elif any(k in t_lower for k in ["发布", "委托", "售房", "出租", "表单", "录入", "必填", "校验", "拦截", "提交", "售价"]):
+        module = "业务表单"
+        level = "P0" if any(k in t_lower for k in ["必填", "校验", "拦截", "提交"]) else "P1"
+    elif any(k in t_lower for k in ["登录", "注册", "手机号", "验证码", "密码", "协议", "授权", "退出登录", "退出"]):
+        module = "用户鉴权"
+        level = "P0"
+    elif any(k in t_lower for k in ["导航", "tab", "底栏", "金刚区", "巡检", "遍历", "流转", "返回", "首页", "切换"]):
+        module = "核心导航"
+        level = "P1"
+    elif any(k in t_lower for k in ["个人中心", "我的", "设置", "缓存", "主题", "深色模式", "偏好", "清理"]):
+        module = "系统设置"
+        level = "P2"
+    else:
+        module = "业务通用"
+        level = "P1"
+
+    clean_title = title or goal[:24]
+    if len(clean_title) > 28:
+        clean_title = clean_title[:28] + "..."
+    return module, level, clean_title
+
 @app.get("/api/solidified_cases")
 async def get_solidified_cases():
     """获取所有已固化的测试用例资产（带业务分类与详细说明）"""
     cases = []
-    preset_metadata = {
-        "test_beike_search_p0.py": {
-            "id": "CASE-01",
-            "title": "二手房区域商圈级联筛选断言",
-            "module": "房源搜索",
-            "level": "P0",
-            "desc": "定位首页二手房频道，级联选择朝阳-望京商圈，断言返回房源列表首项卡片包含望京商圈标签并记录响应耗时。",
-            "precondition": "待测 App 已安装启动，无需登录态。",
-            "pass_rate": "100%",
-            "avg_duration": "2.4s"
-        },
-        "test_publish_validate_p0.py": {
-            "id": "CASE-02",
-            "title": "发布房源字段必填校验与异常拦截",
-            "module": "业务表单",
-            "level": "P0",
-            "desc": "进入房源发布流程，在售价、户型及联系方式字段输入非法及空值参数，断言前端表单校验浮窗拦截与提交阻断。",
-            "precondition": "需要具备发布权限的基础访客或经纪人态。",
-            "pass_rate": "100%",
-            "avg_duration": "3.1s"
-        },
-        "test_nav_tabs_p1.py": {
-            "id": "CASE-03",
-            "title": "首页金刚区与底栏核心模块遍历巡检",
-            "module": "核心导航",
-            "level": "P1",
-            "desc": "依次点击首页主要金刚区业务入口，并切换底部导航栏各一级 Tab，断言各级页面视图渲染完整无白屏死锁。",
-            "precondition": "应用冷启动完成并跳过引导广告。",
-            "pass_rate": "100%",
-            "avg_duration": "4.2s"
-        },
-        "test_detail_gallery_p1.py": {
-            "id": "CASE-04",
-            "title": "房源详情画廊大图滑动与IM咨询唤起",
-            "module": "房源搜索",
-            "level": "P1",
-            "desc": "进入精选房源详情，软手势轮播画廊多图，点击在线微聊咨询，断言即时聊天浮窗正常呼出并渲染输入框。",
-            "precondition": "首页有展示推荐房源卡片。",
-            "pass_rate": "98%",
-            "avg_duration": "2.8s"
-        },
-        "test_user_profile_p2.py": {
-            "id": "CASE-05",
-            "title": "个人中心偏好设置与缓存清理验证",
-            "module": "系统设置",
-            "level": "P2",
-            "desc": "切换至'我的'个人中心，进入通用设置页执行缓存清理，并切换深色模式开关，断言界面即时响应生效。",
-            "precondition": "已进入'我的'个人中心页面。",
-            "pass_rate": "100%",
-            "avg_duration": "1.9s"
-        }
-    }
+    metadata = load_cases_metadata()
 
-    # 扫描真实磁盘文件并自动写入预设样本脚本
-    settings.SOLIDIFIED_DIR.mkdir(parents=True, exist_ok=True)
-    for fname, meta in preset_metadata.items():
+    # 确保预设样本脚本存在
+    for fname, meta in DEFAULT_PRESET_METADATA.items():
         target_f = settings.SOLIDIFIED_DIR / fname
         if not target_f.exists():
             try:
@@ -299,17 +358,23 @@ async def get_solidified_cases():
             except Exception:
                 pass
 
-    for f in settings.SOLIDIFIED_DIR.glob("*.py"):
-        meta = preset_metadata.get(f.name, {
-            "id": f"CASE-{len(cases)+1:02d}",
-            "title": f.stem.replace("test_", "").replace("_", " "),
-            "module": "业务通用",
-            "level": "P1",
-            "desc": f"针对 {f.stem} 的自动化标准回归测试脚本。",
-            "precondition": "待测 App 启动就绪。",
-            "pass_rate": "100%",
-            "avg_duration": "2.5s"
-        })
+    for f in sorted(settings.SOLIDIFIED_DIR.glob("*.py"), key=lambda x: x.stat().st_mtime, reverse=True):
+        if f.name in metadata:
+            meta = metadata[f.name]
+        else:
+            mod, lvl, tit = auto_categorize_case(f.stem, f.stem)
+            meta = {
+                "id": f"CASE-{len(cases)+1:02d}",
+                "title": tit.replace("test_", "").replace("_", " "),
+                "module": mod,
+                "level": lvl,
+                "desc": f"针对 {f.stem} 的自动化标准回归测试脚本。",
+                "precondition": "待测 App 启动就绪。",
+                "pass_rate": "100%",
+                "avg_duration": "2.5s"
+            }
+            metadata[f.name] = meta
+
         cases.append({
             "filename": f.name,
             "path": str(f),
@@ -319,6 +384,110 @@ async def get_solidified_cases():
         })
 
     return {"cases": cases}
+
+@app.post("/api/sessions/{session_id}/save_to_local_case")
+async def save_session_to_local_case(
+    session_id: str,
+    custom_title: Optional[str] = Form(None),
+    custom_module: Optional[str] = Form(None)
+):
+    """
+    用户主动将满意测试会话固化保存为本地用例，并基于业务意图自动识别归类
+    """
+    session = task_mgr.sessions.get(session_id)
+    if not session:
+        return {"success": False, "message": f"未找到对应测试会话: {session_id}"}
+
+    # 若已固化，直接返回既有信息
+    if session.get("is_solidified") and session.get("solidified_filename"):
+        fn = session["solidified_filename"]
+        target = settings.SOLIDIFIED_DIR / fn
+        if target.exists():
+            return {
+                "success": True,
+                "already_saved": True,
+                "filename": fn,
+                "module": session.get("solidified_module", "业务通用"),
+                "message": f"该用例已存在于本地用例库【{session.get('solidified_module', '业务通用')}】中"
+            }
+
+    goal = session.get("goal", "")
+    title = session.get("title", "")
+    plan_steps = session.get("plan_steps", [])
+
+    # 1. 自动智能识别分类与层级
+    auto_module, auto_level, clean_title = auto_categorize_case(goal, title, plan_steps)
+    module = custom_module or auto_module
+    final_title = custom_title or clean_title
+
+    # 2. 规范化文件名与前缀
+    prefix_map = {
+        "房源搜索": "search",
+        "业务表单": "form",
+        "核心导航": "nav",
+        "用户鉴权": "auth",
+        "系统设置": "settings",
+        "业务通用": "general"
+    }
+    prefix = prefix_map.get(module, "case")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    case_name = f"{prefix}_{ts}"
+
+    # 3. 构造 Pytest 动作轨迹代码并固化落盘
+    action_trace = []
+    for idx, s in enumerate(plan_steps, 1):
+        action_trace.append({
+            "action": "wait" if idx == 1 else "assert_text",
+            "reason": f"步骤 {idx}: {s.get('title', '')} - {s.get('desc', '')}",
+            "expected": s.get("title", ""),
+            "seconds": 1
+        })
+    if not action_trace:
+        action_trace = [
+            {"action": "wait", "reason": "应用冷启动与上下文感知", "seconds": 2},
+            {"action": "assert_text", "reason": "业务目标校验", "expected": goal[:10]}
+        ]
+
+    solid_file = Solidifier.solidify_test_case(
+        case_name=case_name,
+        goal=goal,
+        action_history=action_trace
+    )
+
+    # 4. 更新持久化用例元数据
+    metadata = load_cases_metadata()
+    case_id = f"CASE-{len(metadata)+1:02d}"
+    metadata[solid_file.name] = {
+        "id": case_id,
+        "title": final_title,
+        "module": module,
+        "level": auto_level,
+        "desc": f"针对【{goal[:45]}】的自动化回归测试用例，包含 {len(plan_steps)} 个校验步骤。",
+        "precondition": "待测 App 启动就绪。",
+        "pass_rate": "100%",
+        "avg_duration": session.get("duration", "2.8s"),
+        "session_id": session_id,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    save_cases_metadata(metadata)
+
+    # 5. 更新会话状态并持久化
+    session["is_solidified"] = True
+    session["solidified_filename"] = solid_file.name
+    session["solidified_module"] = module
+    session["solidified_case_id"] = case_id
+    task_mgr._save_session(session_id)
+
+    logger.info(f"💾 用户主动将测试会话 [{session_id}] 固化保存为本地用例: {solid_file.name} (自动归类: {module})")
+    return {
+        "success": True,
+        "filename": solid_file.name,
+        "module": module,
+        "title": final_title,
+        "level": auto_level,
+        "case_id": case_id,
+        "message": f"用例已成功保存并自动归类至【{module}】"
+    }
 
 @app.get("/api/config")
 async def get_config():
