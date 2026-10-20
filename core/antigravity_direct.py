@@ -27,15 +27,42 @@ class AntigravityDirectClient:
     4. 原生支持 Gemini 3.8 / 3.7 / 2.5 多模态视觉（图片理解）与推理决策。
     """
     def __init__(self, model_name: Optional[str] = None):
-        self.model_name = model_name or os.getenv("ANTIGRAVITY_MODEL", "gemini-3.8-flash-medium")
-        self.proxy = {
-            "http": os.getenv("HTTP_PROXY", "http://127.0.0.1:7897"),
-            "https": os.getenv("HTTPS_PROXY", "http://127.0.0.1:7897")
-        }
+        self.model_name = model_name or os.getenv("ANTIGRAVITY_MODEL", "gemini-2.5-flash")
+        self.proxy = self._detect_proxy()
         self.session = requests.Session()
         self.session.proxies.update(self.proxy)
         self.config_data = self._load_token_data()
         self.token = self.ensure_access_token()
+
+    def _create_session(self) -> requests.Session:
+        """创建无死连接污染的独立 Session，设置零连接池复用与代理"""
+        s = requests.Session()
+        s.proxies.update(self.proxy)
+        s.headers.update({"Connection": "close"})
+        return s
+
+    @staticmethod
+    def _detect_proxy() -> Dict[str, str]:
+        """智能自适应探测可用代理端口，杜绝写死 7897 导致的断连"""
+        # 1. 优先使用系统/用户显式配置的环境变量
+        env_http = os.getenv("HTTP_PROXY") or os.getenv("http_proxy")
+        env_https = os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")
+        if env_http:
+            return {"http": env_http, "https": env_https or env_http}
+
+        # 2. 依次轻量探测常见科学上网端口
+        import socket
+        candidate_ports = [7897, 7890, 10809, 10808]
+        for port in candidate_ports:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.15):
+                    proxy_url = f"http://127.0.0.1:{port}"
+                    return {"http": proxy_url, "https": proxy_url}
+            except Exception:
+                continue
+
+        # 默认回退 7897
+        return {"http": "http://127.0.0.1:7897", "https": "http://127.0.0.1:7897"}
 
     def _load_token_data(self) -> Dict[str, Any]:
         for p in TOKEN_FILES:
@@ -114,7 +141,8 @@ class AntigravityDirectClient:
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
-            "User-Agent": "antigravity/hub/2.24.0 darwin/arm64"
+            "User-Agent": "antigravity/hub/2.24.0 darwin/arm64",
+            "Connection": "close"  # 禁用 Keep-Alive，防止代理死连接复用导致的 TCP RST 10054
         }
 
         # 构造 user parts
@@ -151,13 +179,14 @@ class AntigravityDirectClient:
         max_retries = 3
         last_err = None
         for attempt in range(max_retries):
+            session = self._create_session()
             try:
                 if attempt > 0:
                     logger.info(f"正在通过 Google Antigravity 官方授权调用 [{self.model_name}] (第 {attempt+1}/{max_retries} 次重试)...")
                 else:
                     logger.info(f"正在通过 Google Antigravity 官方授权调用 [{self.model_name}]...")
 
-                resp = self.session.post(url, headers=headers, json=body, timeout=35)
+                resp = session.post(url, headers=headers, json=body, timeout=25)
                 if resp.status_code == 200:
                     data = resp.json()
                     cands = data.get("response", {}).get("candidates", [])
@@ -172,27 +201,34 @@ class AntigravityDirectClient:
                     self.config_data["tokens"]["expiresAt"] = 0
                     token = self.ensure_access_token()
                     headers["Authorization"] = f"Bearer {token}"
-                    resp2 = self.session.post(url, headers=headers, json=body, timeout=35)
+                    resp2 = session.post(url, headers=headers, json=body, timeout=25)
                     if resp2.status_code == 200:
                         cands = resp2.json().get("response", {}).get("candidates", [])
                         parts = cands[0].get("content", {}).get("parts", [])
                         raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
                         return self._parse_json(raw_text)
                     raise RuntimeError(f"Google 鉴权失败 ({resp2.status_code}): {resp2.text[:200]}")
+                elif resp.status_code in [429, 503, 404] and body["model"] != "gemini-2.5-flash":
+                    logger.warning(f"当前模型 [{body['model']}] 返回 {resp.status_code}，自动热切换至高可用模型 gemini-2.5-flash...")
+                    body["model"] = "gemini-2.5-flash"
+                    continue
                 else:
                     raise RuntimeError(f"Google 端点返回错误码 ({resp.status_code}): {resp.text[:300]}")
             except Exception as e:
                 last_err = e
+                # 若遇到超时且当前不是 2.5-flash，切换为 2.5-flash
+                if ("timed out" in str(e).lower() or "readtimeout" in str(e).lower()) and body["model"] != "gemini-2.5-flash":
+                    logger.warning(f"模型 [{body['model']}] 响应超时，自动切换至高可用模型 gemini-2.5-flash 重试...")
+                    body["model"] = "gemini-2.5-flash"
                 if attempt < max_retries - 1:
                     wait_sec = 1.0 * (attempt + 1)
                     logger.warning(f"Antigravity 官方直连网络抖动 ({e})，正在等待 {wait_sec}s 自动重试 ({attempt+1}/{max_retries})...")
                     time.sleep(wait_sec)
-                    # 重建 Session 防止连接池脏状态
-                    self.session = requests.Session()
-                    self.session.proxies.update(self.proxy)
                 else:
                     logger.error(f"Antigravity 官方直连多次重试后仍然异常: {e}")
                     raise e
+            finally:
+                session.close()
 
     def _parse_json(self, raw_text: str) -> Dict[str, Any]:
         raw_text = raw_text.strip()

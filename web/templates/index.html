@@ -618,36 +618,47 @@
             align-items: flex-start;
         }
 
-        /* ① 思考测试过程 (Thinking Stream 单色折叠) */
-        .thinking-card {
+        /* ① 思考过程条 (DeepSeek Harness 风格：轻量单行折叠 + 极简展开) */
+        .dsh-thought-container {
             width: 100%;
-            background-color: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            margin-bottom: 12px;
-            overflow: hidden;
+            margin-bottom: 6px;
         }
-        .thinking-header {
-            padding: 8px 12px;
-            display: flex;
+        .dsh-thought-row {
+            display: inline-flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 7px;
+            padding: 4px 8px;
+            border-radius: 6px;
             cursor: pointer;
             user-select: none;
             font-size: 12px;
-            color: var(--text-sub);
+            color: var(--text-muted);
+            transition: all 0.15s ease;
         }
-        .thinking-header:hover {
+        .dsh-thought-row:hover {
             color: var(--text-main);
-            background-color: rgba(255, 255, 255, 0.02);
+            background-color: rgba(255, 255, 255, 0.04);
         }
-        .thinking-content {
-            padding: 10px 14px;
-            font-size: 12.5px;
+        .dsh-thought-chevron {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+            opacity: 0.7;
+        }
+        .dsh-thought-container.expanded .dsh-thought-chevron {
+            transform: rotate(180deg);
+        }
+        .dsh-thought-body {
+            padding: 6px 14px 8px 16px;
+            margin-left: 10px;
+            border-left: 1.5px solid var(--border-subtle);
+            font-size: 12px;
+            line-height: 1.65;
             color: var(--text-sub);
-            line-height: 1.7;
-            border-top: 1px solid var(--border-subtle);
-            background-color: rgba(0, 0, 0, 0.12);
+            margin-bottom: 8px;
+            display: none;
+        }
+        .dsh-thought-container.expanded .dsh-thought-body {
+            display: block;
         }
 
         /* ② 用户补充信息/交互表单 (Clarification Card) */
@@ -689,110 +700,192 @@
             gap: 8px;
         }
 
-        /* ③ 中间主对话流：原生智能执行过程流 (Native Execution Stream) */
-        .execution-stream-card {
+        /* ③ 执行过程流 (DeepSeek Harness 风格：平铺紧凑 DisclosureRow，零大卡片外框) */
+        .dsh-process-group {
             width: 100%;
-            background-color: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            margin-top: 8px;
-            margin-bottom: 12px;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
-            transition: all 0.2s ease;
+            gap: 2px;
+            margin: 6px 0 10px 0;
+            position: relative;
         }
-        .execution-stream-header {
-            padding: 9px 14px;
+        .dsh-turn-process-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background-color: rgba(255, 255, 255, 0.02);
-            border-bottom: 1px solid var(--border-subtle);
+            padding: 4px 6px;
+            margin-bottom: 4px;
+            font-size: 11.5px;
+            color: var(--text-main);
+            border-radius: 6px;
             user-select: none;
         }
-        .execution-stream-title {
-            font-size: 12.5px;
-            font-weight: 600;
+        .dsh-turn-toggle-btn {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            padding: 3px 9px;
+            font-size: 11px;
             color: var(--text-main);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            font-weight: 500;
+        }
+        .dsh-turn-toggle-btn:hover {
+            color: var(--text-main);
+            border-color: var(--border-hover);
+            background-color: var(--bg-surface-hover);
+        }
+        .dsh-steps-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .dsh-step-block {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .dsh-disclosure-row {
             display: flex;
             align-items: center;
-            gap: 6px;
-        }
-        .execution-steps-container {
-            padding: 10px 14px;
-            display: flex;
-            flex-direction: column;
+            height: 28px;
+            min-height: 28px;
+            padding: 0 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            user-select: none;
             gap: 8px;
+            font-size: 12.5px;
+            color: var(--text-main);
+            transition: background-color 0.12s ease, color 0.12s ease;
+            position: relative;
         }
-        .execution-step-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            background-color: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-subtle);
-            transition: all 0.15s ease;
+        .dsh-disclosure-row:hover {
+            background-color: var(--bg-surface-hover);
+            color: var(--text-main);
         }
-        .execution-step-item:hover {
-            border-color: var(--border-hover);
-            background-color: rgba(255, 255, 255, 0.04);
+        .dsh-disclosure-row.active {
+            background-color: var(--bg-surface);
+            color: var(--text-main);
+            font-weight: 600;
         }
-        .execution-step-item.active {
-            border-color: var(--border-strong);
-            background-color: rgba(255, 255, 255, 0.05);
-        }
-        .execution-step-main {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 8px;
-        }
-        .execution-step-icon {
-            width: 18px;
-            height: 18px;
-            display: flex;
+        .dsh-state-dot {
+            width: 14px;
+            height: 14px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 13px;
             flex-shrink: 0;
-            margin-top: 1px;
+            font-size: 12px;
         }
-        .execution-step-title {
-            font-size: 13px;
+        .dsh-row-title {
             font-weight: 600;
-            color: #ffffff;
-            line-height: 1.4;
+            color: var(--text-main);
+            flex-shrink: 0;
+            font-size: 12px;
         }
-        .execution-step-desc {
-            font-size: 11.5px;
-            color: #d4d4d8;
-            line-height: 1.5;
-            margin-left: 26px;
+        .dsh-row-sep {
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background-color: var(--text-sub);
+            flex-shrink: 0;
+            opacity: 0.6;
         }
-        .execution-step-details {
-            margin-left: 26px;
-            margin-top: 4px;
-            padding: 6px 10px;
-            border-radius: 6px;
-            background-color: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border-subtle);
+        .dsh-row-summary {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            color: var(--text-sub);
+        }
+        .dsh-disclosure-row:hover .dsh-row-summary {
+            color: var(--text-main);
+        }
+        .dsh-row-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .dsh-row-duration {
             font-size: 11px;
-            color: #a1a1aa;
+            color: var(--text-sub);
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 500;
+        }
+        .dsh-row-chevron {
+            font-size: 10px;
+            color: var(--text-sub);
+            transition: transform 0.18s ease;
+            opacity: 0.8;
+        }
+        .dsh-disclosure-row:hover .dsh-row-chevron {
+            opacity: 1;
+            color: var(--text-main);
+        }
+        .dsh-step-block.expanded .dsh-row-chevron {
+            transform: rotate(180deg);
+        }
+        .dsh-code-expanded {
+            margin: 4px 0 8px 22px;
+            padding: 10px 14px;
+            background-color: #0d1117;
+            color: #f1f5f9;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11.5px;
+            line-height: 1.6;
             white-space: pre-wrap;
             word-break: break-all;
+            display: none;
         }
-        .execution-pulse-bar {
-            padding: 8px 14px;
-            border-top: 1px solid var(--border-subtle);
-            background-color: rgba(255, 255, 255, 0.015);
+        body[data-theme="light"] .dsh-code-expanded {
+            background-color: #f8fafc;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
+        }
+        .dsh-step-block.expanded .dsh-code-expanded {
+            display: block;
+        }
+
+        /* ④ 轮次尾部元数据与操作条 (DeepSeek Harness Turn Tail) */
+        .dsh-turn-tail {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 11.5px;
-            color: var(--text-sub);
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-subtle);
+            font-size: 11px;
+            color: var(--text-muted);
+            user-select: none;
+        }
+        .dsh-tail-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .dsh-tail-btn {
+            background: none;
+            border: none;
+            padding: 0;
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.15s ease;
+        }
+        .dsh-tail-btn:hover {
+            color: var(--text-main);
         }
         .node-step-card.active-step {
             border-color: rgba(255, 255, 255, 0.45);
@@ -922,6 +1015,54 @@
         .popover-item:hover, .popover-item.active {
             background-color: var(--bg-surface-hover);
             color: var(--text-main);
+        }
+
+        /* 个人与设置气泡选单 (ChatGPT 风格 Profile Popover) */
+        .user-profile-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            user-select: none;
+            width: 100%;
+        }
+        .user-profile-bar:hover {
+            background-color: var(--bg-surface-hover);
+        }
+        .user-avatar-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: 1px solid var(--border-strong);
+            background-color: var(--bg-surface);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-main);
+            flex-shrink: 0;
+        }
+        .profile-popover {
+            bottom: calc(100% + 8px);
+            left: 8px;
+            width: 236px;
+            padding: 6px;
+            box-shadow: var(--shadow-float);
+        }
+        .profile-popover-header {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 6px 8px 8px 8px;
+        }
+        .popover-divider {
+            height: 1px;
+            background-color: var(--border-subtle);
+            margin: 4px 0;
         }
 
         /* ================= 4. 右侧工作台 Canvas (Nodes / Logs / Deliverables) ================= */
@@ -1057,23 +1198,84 @@
             <div class="small text-muted p-2">加载会话中...</div>
         </div>
 
-        <!-- 侧栏底部：授权团队与设置中心 -->
-        <div class="p-2 border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important;">
-            <div class="d-flex align-items-center gap-2 text-truncate" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#controlCenterModal">
-                <div style="width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold;">
-                    PM
+        <!-- 侧栏底部：ChatGPT 风格账号与设置中心 -->
+        <div class="p-2 border-top position-relative" style="border-color: var(--border-subtle) !important;">
+            <!-- 用户卡片触发区 (点击展开设置小弹窗) -->
+            <div class="user-profile-bar" id="userProfileBar" onclick="toggleUserProfilePopover(event)">
+                <div class="d-flex align-items-center gap-2 text-truncate">
+                    <div class="user-avatar-badge">PM</div>
+                    <div class="d-flex flex-column text-truncate" style="line-height: 1.25;">
+                        <span class="small fw-semibold text-truncate" id="authBadgeLabel" style="font-size: 12px;">PM Harness</span>
+                        <span class="text-muted" style="font-size: 10px;" id="authTeamSub">云校验授权有效</span>
+                    </div>
                 </div>
-                <div class="d-flex flex-column text-truncate">
-                    <span class="small fw-semibold text-truncate" id="authBadgeLabel" style="font-size: 11.5px;">PM Harness</span>
-                    <span class="text-muted" style="font-size: 10px;" id="authTeamSub">云校验授权有效</span>
+                <i class="bi bi-three-dots text-muted" style="font-size: 13px;"></i>
+            </div>
+
+            <!-- ChatGPT 风格左下角上浮小弹窗 (Profile Popover) -->
+            <div class="gpt-popover profile-popover" id="profilePopover" onclick="event.stopPropagation()">
+                <!-- 头部：团队与账号信息 -->
+                <div class="profile-popover-header">
+                    <div class="user-avatar-badge" style="width: 28px; height: 28px; font-size: 11px;">PM</div>
+                    <div class="d-flex flex-column text-truncate">
+                        <span class="fw-semibold text-truncate" style="font-size: 12.5px;" id="popoverTeamName">PM Harness</span>
+                        <span class="text-muted" style="font-size: 10.5px;" id="popoverRoleName">企业全功能版</span>
+                    </div>
                 </div>
-            <div class="d-flex align-items-center gap-1">
-                <button class="icon-btn" onclick="restoreOnboardingGuide()" title="快速上手 3 步向导">
-                    <i class="bi bi-question-circle"></i>
-                </button>
-                <button class="icon-btn" data-bs-toggle="modal" data-bs-target="#controlCenterModal" title="系统设置">
-                    <i class="bi bi-gear"></i>
-                </button>
+
+                <div class="popover-divider"></div>
+
+                <!-- 简单快捷项：气泡内直接即点即生效 -->
+                <div class="popover-item" onclick="toggleThemeQuick(event)" title="直接切换黑白暗夜/浅亮主题">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-moon-stars" id="quickThemeIcon" style="font-size: 13px;"></i>
+                        <span id="quickThemeText">夜间模式</span>
+                    </div>
+                    <span class="mono-tag mono-tag-active" id="quickThemeBadge" style="font-size: 9.5px;">深色</span>
+                </div>
+
+                <div class="popover-item" onclick="restoreOnboardingGuide(); closeAllPopovers();" title="重新查看系统新手引导">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-question-circle" style="font-size: 13px;"></i>
+                        <span>新手 3 步向导</span>
+                    </div>
+                    <span class="text-muted" style="font-size: 10px;">教程</span>
+                </div>
+
+                <div class="popover-divider"></div>
+
+                <!-- 复杂专项功能：打开居中独立模态框 -->
+                <div class="popover-item" onclick="openAntigravityModal()" title="绑定 Google 账号与切换官方大模型">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-cpu" style="font-size: 13px;"></i>
+                        <span>Antigravity 授权与模型</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
+                </div>
+
+                <div class="popover-item" onclick="openInviteAuthModal()" title="核销邀请码与查看企业席位">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-shield-check" style="font-size: 13px;"></i>
+                        <span>邀请码激活与许可</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
+                </div>
+
+                <div class="popover-item" onclick="openAppPackagesModal()" title="蒲公英分发短链下载与 APK 上传">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-box-seam" style="font-size: 13px;"></i>
+                        <span>待测应用包管理</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
+                </div>
+
+                <div class="popover-item" onclick="openDeviceNodesModal()" title="管理 USB 真机与执行节点">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-phone" style="font-size: 13px;"></i>
+                        <span>真机与节点设备</span>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted" style="font-size: 10px;"></i>
+                </div>
             </div>
         </div>
     </aside>
@@ -1354,13 +1556,13 @@
     <!-- 右侧可拖拽分割条 (Right Resizer: 左右拖动改变中栏/右栏宽度，高度锁定 100vh) -->
     <div class="pane-resizer" id="resizerRight" title="按住左右拖拽调节工作台宽度"></div>
 
-    <!-- ======================= 4. 右侧工作台 Canvas (Nodes / Logs / Deliverables) ======================= -->
+    <!-- ======================= 4. 右侧工作台 Canvas (Logs / Deliverables) ======================= -->
     <aside class="gpt-canvas" id="gptCanvas">
-        <!-- 头部导航双 Tab (测试节点流水线与交付产物) -->
+        <!-- 头部导航双 Tab (全量日志与交付产物) -->
         <div class="canvas-header">
             <div class="canvas-tabs-nav">
-                <button class="canvas-tab-btn active" id="btnTabNodes" onclick="switchCanvasTab('nodes')">
-                    <i class="bi bi-diagram-3"></i> 测试节点
+                <button class="canvas-tab-btn active" id="btnTabLogs" onclick="switchCanvasTab('logs')">
+                    <i class="bi bi-terminal"></i> 全量日志
                 </button>
                 <button class="canvas-tab-btn" id="btnTabDeliverables" onclick="switchCanvasTab('deliverables')">
                     <i class="bi bi-box-seam"></i> 交付物与脚本
@@ -1371,23 +1573,32 @@
             </button>
         </div>
 
-        <!-- View 1: 📋 测试节点 (Pipeline Nodes) -->
-        <div class="p-3 flex-grow-1 overflow-y-auto" id="canvasNodesView">
+        <!-- View 1: 💻 全量测试日志 (Terminal Logs - 经典黑色背景控制台) -->
+        <div class="d-flex flex-column flex-grow-1 overflow-hidden" id="canvasLogsView" style="background-color: var(--console-bg);">
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
+                <div class="d-flex align-items-center gap-2" id="consoleDeviceTabs">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px; font-weight: 500;">
+                        <span class="spinner-grow spinner-grow-sm me-1" style="width: 6px; height: 6px;"></span>实时监听中
+                    </span>
+                    <span class="small fw-semibold" id="consoleDeviceName" style="font-size: 11px; color: var(--text-sub);">控制台终端就绪</span>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <button class="icon-btn" onclick="clearCurrentLogs()" title="清空日志"><i class="bi bi-eraser"></i></button>
+                    <button class="icon-btn" onclick="scrollConsoleToBottom()" title="滚动至底部"><i class="bi bi-arrow-down"></i></button>
+                </div>
+            </div>
+            <div class="terminal-screen flex-grow-1" id="runLogs" style="background-color: #0d1117; color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11.5px; line-height: 1.6; padding: 14px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">[System] 自动化测试引擎已就绪。
+[System] 正在实时捕获端侧截屏感知、视觉 OCR 指纹复用与 AI 意图决策日志...
+[System] 提示：在中间输入框输入测试目标后，按 Enter 即可启动。</div>
+        </div>
+
+        <!-- View 2 (备用兼容): 📋 测试节点 (Pipeline Nodes) -->
+        <div class="p-3 flex-grow-1 overflow-y-auto d-none" id="canvasNodesView">
             <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
                 <span class="small fw-semibold text-muted" style="font-size: 11px;">PIPELINE EXECUTION NODES</span>
                 <span class="mono-tag" id="nodesSummaryBadge">0 节点</span>
             </div>
-            <div id="pipelineNodesList" class="d-flex flex-column gap-1">
-                <div class="canvas-empty-state">
-                    <div class="canvas-empty-icon">
-                        <i class="bi bi-diagram-3"></i>
-                    </div>
-                    <div class="canvas-empty-title">全链路测试节点看板</div>
-                    <div class="canvas-empty-desc">
-                        在左侧输入测试目标后，AI 将自动拆解执行链路，并在此实时呈现节点流转进度与完成打勾状态。
-                    </div>
-                </div>
-            </div>
+            <div id="pipelineNodesList" class="d-flex flex-column gap-1"></div>
         </div>
 
         <!-- View 3: 📦 交付物与本地回归脚本 (Deliverables & Local Cases) -->
@@ -1417,121 +1628,158 @@
         </div>
     </aside>
 
-    <!-- ======================= 5. 系统设置中心模态框 (纯黑白极简) ======================= -->
-    <div class="modal fade" id="controlCenterModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+    <!-- ======================= 模态框 1: Google Antigravity 官方授权与 AI 网关 ======================= -->
+    <div class="modal fade" id="antigravityModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <span class="modal-title fw-semibold" style="font-size: 14px;">系统设置与授权许可</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-cpu" style="font-size: 15px;"></i>
+                        <span class="modal-title fw-semibold" style="font-size: 13.5px;">Google Antigravity 官方授权与 AI 网关</span>
+                    </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-3">
-                    <ul class="nav nav-tabs mb-3" id="settingsTab" role="tablist">
-                        <li class="nav-item">
-                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-auth" type="button">邀请码鉴权</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-theme" type="button">颜色模式</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-devs" type="button">设备管理</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-apps" type="button">应用包管理</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-models" type="button">AI 网关高级</button>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content">
-                        <!-- 邀请码与许可 -->
-                        <div class="tab-pane fade show active" id="tab-auth" role="tabpanel">
-                            <div class="p-3 mb-3 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="small fw-semibold">授权状态</span>
-                                    <span id="modalAuthBadge" class="mono-tag mono-tag-active">已激活</span>
-                                </div>
-                                <div class="small text-muted" id="modalAuthTeam">团队: PM Harness 团队</div>
-                                <div class="small text-muted" id="modalAuthRole">类型: 企业全功能版</div>
-                                <div class="small text-muted" id="modalAuthExpires">到期: 永久有效</div>
-                            </div>
-                            <div class="mb-2">
-                                <label class="form-label small">在线激活邀请码：</label>
-                                <div class="input-group">
-                                    <input type="text" id="inviteCodeInput" class="form-control" placeholder="输入 PM Harness 邀请码...">
-                                    <button class="btn btn-outline-light" onclick="verifyInviteCode()">立即核销</button>
-                                </div>
-                            </div>
+                    <!-- Google Antigravity OAuth 绑定状态卡片 -->
+                    <div class="p-3 mb-3 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-semibold"><i class="bi bi-google me-1"></i> Google OAuth 官方绑定</span>
+                            <span id="agAuthStatusBadge" class="mono-tag">检测中...</span>
                         </div>
-
-                        <!-- 颜色模式 -->
-                        <div class="tab-pane fade" id="tab-theme" role="tabpanel">
-                            <label class="form-label small">主题色阶：</label>
-                            <select id="themeSelectModal" class="form-select" onchange="switchTheme(this.value)">
-                                <option value="dark" selected>黑白暗夜 (Monochrome Dark)</option>
-                                <option value="light">极简浅亮 (Monochrome Light)</option>
-                            </select>
+                        <div class="small text-muted mb-2" id="agAuthEmail" style="font-size: 11px;">
+                            正在查询 Google 授权账户绑定状态...
                         </div>
+                        <button class="btn btn-sm btn-outline-light py-1 px-3 w-100 fw-semibold" id="btnAgLogin" onclick="triggerAntigravityLogin()" style="font-size: 11.5px;">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> 立即连接 Google Antigravity 账号
+                        </button>
+                    </div>
 
-                        <!-- 设备管理 -->
-                        <div class="tab-pane fade" id="tab-devs" role="tabpanel">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-muted">在线真机与节点列表</span>
-                                <button class="btn btn-sm btn-outline-secondary py-0" onclick="loadDevices()">刷新</button>
-                            </div>
-                            <div id="devicesList">正在加载设备...</div>
+                    <!-- 模型与网关配置表单 -->
+                    <div class="mb-3">
+                        <label class="form-label small">AI 协议服务商：</label>
+                        <select id="modelProviderSelect" class="form-select" onchange="onProviderChange()">
+                            <option value="antigravity">Google Antigravity 官方</option>
+                            <option value="hermes">Hermes (DeepSeek 本地加速)</option>
+                            <option value="deepseek">DeepSeek 官方 API</option>
+                            <option value="openai">OpenAI 兼容协议</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">模型选择：</label>
+                        <select id="modelSelect" class="form-select"></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">API Key (第三方网关选填)：</label>
+                        <input type="password" id="modelApiKeyInput" class="form-control" placeholder="使用 Antigravity 官方授权时可免填">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Base URL (第三方网关选填)：</label>
+                        <input type="text" id="modelBaseUrlInput" class="form-control" placeholder="留空使用默认官方网关地址">
+                    </div>
+                    <button class="btn btn-light w-100 fw-semibold py-1.5" onclick="saveModelConfigModal()" style="font-size: 12.5px;">保存配置并生效</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 模态框 2: 邀请码激活与许可鉴权 ======================= -->
+    <div class="modal fade" id="inviteAuthModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-shield-check" style="font-size: 15px;"></i>
+                        <span class="modal-title fw-semibold" style="font-size: 13.5px;">邀请码激活与企业团队许可</span>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="p-3 mb-3 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-semibold">授权状态</span>
+                            <span id="modalAuthBadge" class="mono-tag mono-tag-active">已激活</span>
                         </div>
-
-                        <!-- 应用库 -->
-                        <div class="tab-pane fade" id="tab-apps" role="tabpanel">
-                            <div class="mb-3">
-                                <label class="form-label small">通过分发短链直接下载：</label>
-                                <div class="input-group">
-                                    <input type="text" id="qrInput" class="form-control" placeholder="输入蒲公英短链如 pgyer.com/xxxx">
-                                    <button class="btn btn-outline-secondary" onclick="downloadFromQR()">下载</button>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small">本地 APK/IPA 上传：</label>
-                                <div class="input-group">
-                                    <input type="file" id="appFileInput" class="form-control">
-                                    <button class="btn btn-outline-secondary" onclick="uploadApp()">上传</button>
-                                </div>
-                            </div>
-                            <div id="appsList">正在加载应用库...</div>
+                        <div class="small text-muted" id="modalAuthTeam" style="font-size: 11.5px;">团队: PM Harness 团队</div>
+                        <div class="small text-muted" id="modalAuthRole" style="font-size: 11.5px;">类型: 企业全功能版</div>
+                        <div class="small text-muted" id="modalAuthExpires" style="font-size: 11.5px;">到期: 永久有效</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">在线激活/变更邀请码：</label>
+                        <div class="input-group">
+                            <input type="text" id="inviteCodeInput" class="form-control" placeholder="输入 PM Harness 邀请码...">
+                            <button class="btn btn-outline-light" onclick="verifyInviteCode()">立即核销</button>
                         </div>
-
-                        <!-- AI 网关 -->
-                        <div class="tab-pane fade" id="tab-models" role="tabpanel">
-                            <div class="mb-3">
-                                <label class="form-label small">提供商：</label>
-                                <select id="modelProviderSelect" class="form-select" onchange="onProviderChange()">
-                                    <option value="hermes">Hermes (DeepSeek 本地加速)</option>
-                                    <option value="antigravity">Google Antigravity 官方</option>
-                                    <option value="deepseek">DeepSeek 官方 API</option>
-                                    <option value="openai">OpenAI 兼容协议</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small">模型选择：</label>
-                                <select id="modelSelect" class="form-select"></select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small">API Key：</label>
-                                <input type="password" id="modelApiKeyInput" class="form-control">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label small">Base URL：</label>
-                                <input type="text" id="modelBaseUrlInput" class="form-control">
-                            </div>
-                            <button class="btn btn-light w-100 fw-semibold" onclick="saveModelConfigModal()">保存模型配置</button>
+                        <div class="text-muted mt-1" style="font-size: 11px;">
+                            核销成功后将自动同步云端特权，享受更多并发节点与专业级自动化模型支撑。
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- ======================= 模态框 3: 待测应用包管理 (APK/IPA) ======================= -->
+    <div class="modal fade" id="appPackagesModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-box-seam" style="font-size: 15px;"></i>
+                        <span class="modal-title fw-semibold" style="font-size: 13.5px;">待测应用包管理 (APK / IPA)</span>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">通过分发短链直接下载：</label>
+                            <div class="input-group">
+                                <input type="text" id="qrInput" class="form-control" placeholder="输入蒲公英短链如 pgyer.com/xxxx">
+                                <button class="btn btn-outline-secondary" onclick="downloadFromQR()">解析下载</button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">本地安装包文件上传：</label>
+                            <div class="input-group">
+                                <input type="file" id="appFileInput" class="form-control" accept=".apk,.ipa">
+                                <button class="btn btn-outline-secondary" onclick="uploadApp()">上传入库</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                        <span class="small fw-semibold text-muted" style="font-size: 11.5px;">已归档待测应用列表</span>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 11px;" onclick="loadApps()"><i class="bi bi-arrow-clockwise me-1"></i>刷新</button>
+                    </div>
+                    <div id="appsList" style="max-height: 320px; overflow-y: auto;">正在加载应用库...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================= 模态框 4: 真机与节点设备管理 ======================= -->
+    <div class="modal fade" id="deviceNodesModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-phone" style="font-size: 15px;"></i>
+                        <span class="modal-title fw-semibold" style="font-size: 13.5px;">真机与测试节点管理</span>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small text-muted" style="font-size: 11.5px;">实时探测在线物理手机与免机仿真节点</span>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 11px;" onclick="loadDevices()"><i class="bi bi-arrow-clockwise me-1"></i>刷新</button>
+                    </div>
+                    <div id="devicesList" style="max-height: 340px; overflow-y: auto;">正在加载设备...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 兼容隐藏元素 -->
+    <select id="themeSelectModal" class="d-none"></select>
 
     <!-- ======================= 6. 智能用例推荐库模态框 (轻量抽屉) ======================= -->
     <div class="modal fade" id="suggestedCasesModal" tabindex="-1" aria-hidden="true">
@@ -1733,24 +1981,33 @@
         }
 
         function switchCanvasTab(tab) {
-            const btnNodes = document.getElementById("btnTabNodes");
+            const btnLogs = document.getElementById("btnTabLogs");
             const btnDeliv = document.getElementById("btnTabDeliverables");
 
+            const viewLogs = document.getElementById("canvasLogsView");
             const viewNodes = document.getElementById("canvasNodesView");
             const viewDeliv = document.getElementById("canvasDeliverablesView");
 
-            if (tab !== "deliverables") tab = "nodes";
+            if (!["logs", "deliverables", "nodes"].includes(tab)) tab = "logs";
 
-            if (btnNodes) btnNodes.classList.toggle("active", tab === "nodes");
+            if (btnLogs) btnLogs.classList.toggle("active", tab === "logs");
             if (btnDeliv) btnDeliv.classList.toggle("active", tab === "deliverables");
 
+            if (viewLogs) viewLogs.classList.toggle("d-none", tab !== "logs");
             if (viewNodes) viewNodes.classList.toggle("d-none", tab !== "nodes");
             if (viewDeliv) viewDeliv.classList.toggle("d-none", tab !== "deliverables");
 
             if (tab === "deliverables") {
                 loadReports();
                 loadSolidifiedCases();
+            } else if (tab === "logs") {
+                updateConsoleLogs();
             }
+        }
+
+        function scrollConsoleToBottom() {
+            const runLogs = document.getElementById("runLogs");
+            if (runLogs) runLogs.scrollTop = runLogs.scrollHeight;
         }
 
         function switchTheme(theme) {
@@ -1758,6 +2015,120 @@
             localStorage.setItem("autotest_theme", theme);
             const sel = document.getElementById("themeSelectModal");
             if (sel) sel.value = theme;
+            updateThemeToggleUI(theme);
+        }
+
+        function toggleThemeQuick(e) {
+            if (e) e.stopPropagation();
+            const currentTheme = document.body.getAttribute("data-theme") || "dark";
+            const nextTheme = (currentTheme === "dark") ? "light" : "dark";
+            switchTheme(nextTheme);
+        }
+
+        function updateThemeToggleUI(theme) {
+            const icon = document.getElementById("quickThemeIcon");
+            const text = document.getElementById("quickThemeText");
+            const badge = document.getElementById("quickThemeBadge");
+            if (!icon || !text || !badge) return;
+            if (theme === "dark") {
+                icon.className = "bi bi-moon-stars";
+                text.innerText = "夜间模式";
+                badge.innerText = "深色";
+                badge.className = "mono-tag mono-tag-active";
+            } else {
+                icon.className = "bi bi-sun";
+                text.innerText = "明亮模式";
+                badge.innerText = "浅色";
+                badge.className = "mono-tag";
+            }
+        }
+
+        // ================= 侧栏左下角 ChatGPT 风格设置浮层与独立模态框打开联动 =================
+        function toggleUserProfilePopover(e) {
+            if (e) e.stopPropagation();
+            const pop = document.getElementById("profilePopover");
+            if (!pop) return;
+            const isShowing = pop.classList.contains("show");
+            closeAllPopovers();
+            if (!isShowing) {
+                pop.classList.add("show");
+            }
+        }
+
+        function openAntigravityModal() {
+            closeAllPopovers();
+            loadAntigravityStatus();
+            loadModelConfig();
+            const modalEl = document.getElementById("antigravityModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        async function loadAntigravityStatus() {
+            try {
+                const res = await fetch("/api/antigravity/status");
+                const data = await res.json();
+                const statusBadge = document.getElementById("agAuthStatusBadge");
+                const emailEl = document.getElementById("agAuthEmail");
+                const btnLogin = document.getElementById("btnAgLogin");
+                if (data.is_logged_in) {
+                    if (statusBadge) {
+                        statusBadge.className = "mono-tag mono-tag-active";
+                        statusBadge.innerText = "已授权绑定";
+                    }
+                    if (emailEl) emailEl.innerHTML = `<span style="color: var(--text-main); font-weight: 500;"><i class="bi bi-check-circle me-1"></i> 已登录账号:</span> ${data.email || 'Google 账号'}`;
+                    if (btnLogin) {
+                        btnLogin.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> 重新授权 / 切换 Google 账号`;
+                        btnLogin.className = "btn btn-sm btn-outline-secondary py-1 px-3 w-100";
+                    }
+                } else {
+                    if (statusBadge) {
+                        statusBadge.className = "mono-tag";
+                        statusBadge.innerText = "未授权";
+                    }
+                    if (emailEl) emailEl.innerText = "尚未连接 Google 官方账号，点击下方按钮完成 OAuth 授权即可启用官方大模型。";
+                    if (btnLogin) {
+                        btnLogin.innerHTML = `<i class="bi bi-box-arrow-up-right me-1"></i> 立即连接 Google Antigravity 账号`;
+                        btnLogin.className = "btn btn-sm btn-light py-1 px-3 w-100 fw-semibold";
+                    }
+                }
+            } catch (e) {}
+        }
+
+        async function triggerAntigravityLogin() {
+            try {
+                const res = await fetch("/api/antigravity/login", { method: "POST" });
+                const data = await res.json();
+                if (data.success && data.auth_url) {
+                    window.open(data.auth_url, "_blank");
+                    alert(data.message || "已在系统默认浏览器中打开 Google 登录授权页，请完成授权。");
+                    setTimeout(loadAntigravityStatus, 4000);
+                } else {
+                    alert(data.message || "发起 Google 登录失败");
+                }
+            } catch (e) {
+                alert("调用 Antigravity 授权异常: " + e.message);
+            }
+        }
+
+        function openInviteAuthModal() {
+            closeAllPopovers();
+            loadAuthStatus();
+            const modalEl = document.getElementById("inviteAuthModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function openAppPackagesModal() {
+            closeAllPopovers();
+            loadApps();
+            const modalEl = document.getElementById("appPackagesModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function openDeviceNodesModal() {
+            closeAllPopovers();
+            loadDevices();
+            const modalEl = document.getElementById("deviceNodesModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
         }
 
         // ================= 三栏原生自由拖拽拉伸引擎 (Splitter Resizers) =================
@@ -2014,11 +2385,29 @@
                 const teamEl = document.getElementById("modalAuthTeam");
                 const roleEl = document.getElementById("modalAuthRole");
                 const expEl = document.getElementById("modalAuthExpires");
+                const badge = document.getElementById("modalAuthBadge");
+                const teamSub = document.getElementById("authTeamSub");
+                const popTeam = document.getElementById("popoverTeamName");
+                const popRole = document.getElementById("popoverRoleName");
 
                 if (data.is_activated) {
                     if (label) label.innerText = data.team_name || "PM Harness";
+                    if (popTeam) popTeam.innerText = data.team_name || "PM Harness";
+                    if (teamSub) teamSub.innerText = data.role || "企业全功能版";
+                    if (popRole) popRole.innerText = (data.role || "企业全功能版") + " · 永久授权";
+                    if (badge) {
+                        badge.innerText = "已激活";
+                        badge.className = "mono-tag mono-tag-active";
+                    }
                 } else {
                     if (label) label.innerText = "未激活 / 待授权";
+                    if (popTeam) popTeam.innerText = "未激活团队";
+                    if (teamSub) teamSub.innerText = "待输入邀请码";
+                    if (popRole) popRole.innerText = "体验模式 · 待激活";
+                    if (badge) {
+                        badge.innerText = "未激活";
+                        badge.className = "mono-tag";
+                    }
                 }
                 if (teamEl) teamEl.innerText = "团队: " + (data.team_name || "未激活");
                 if (roleEl) roleEl.innerText = "类型: " + (data.role || "社区版");
@@ -2352,6 +2741,21 @@
             } catch (e) {}
         }
 
+        // 全局交互状态持久化记忆（避免轮询重绘 DOM 时折叠状态丢失）
+        const dshExpandedState = {
+            thought: false,
+            steps: {},
+            allStepsExpanded: false
+        };
+
+        function openCanvasLogs() {
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && canvas.classList.contains("collapsed")) {
+                canvas.classList.remove("collapsed");
+            }
+            switchCanvasTab('logs');
+        }
+
         // 渲染对话流 (无头像/无名称)
         function renderChatStream(sessionData) {
             const flow = document.getElementById("messagesFlow");
@@ -2360,7 +2764,7 @@
 
             if (emptyBox) emptyBox.classList.add("d-none");
 
-            // ① 思考测试过程 (Thinking Stream 单色折叠)
+            // ① 思考过程条 (DeepSeek Harness 风格：轻量单行折叠 + 极简展开)
             let thinkingObj = sessionData.thinking;
             if (!thinkingObj || !thinkingObj.bullets) {
                 thinkingObj = {
@@ -2376,24 +2780,21 @@
             thinkingObj.bullets.forEach(b => {
                 bulletsHtml += `
                     <div class="mb-1">
-                        <strong style="color: var(--text-main);">${b.tag}：</strong>
-                        <span>${b.content}</span>
+                        <strong style="color: var(--text-main); font-weight: 500;">${escapeHtml(b.tag)}：</strong>
+                        <span>${escapeHtml(b.content)}</span>
                     </div>
                 `;
             });
+            const thinkingDuration = thinkingObj.duration || '1.8s';
+            const thoughtExpandedClass = dshExpandedState.thought ? "expanded" : "";
             let thinkingHtml = `
-                <div class="thinking-card">
-                    <div class="thinking-header" onclick="document.getElementById('thinkingContentBox').classList.toggle('d-none')">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-lightbulb"></i>
-                            <span>思考测试过程 (耗时 ${thinkingObj.duration || '1.8s'})</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-1 text-muted">
-                            <span>展开/折叠</span>
-                            <i class="bi bi-chevron-down" style="font-size: 10px;"></i>
-                        </div>
+                <div class="dsh-thought-container ${thoughtExpandedClass}" id="dshThoughtBox">
+                    <div class="dsh-thought-row" onclick="toggleDshThought()">
+                        <i class="bi bi-lightbulb" style="font-size: 13px; color: var(--text-main);"></i>
+                        <span style="font-weight: 500; color: var(--text-sub);">Thought for ${thinkingDuration} · 业务意图与策略推演</span>
+                        <i class="bi bi-chevron-down dsh-thought-chevron"></i>
                     </div>
-                    <div class="thinking-content" id="thinkingContentBox">
+                    <div class="dsh-thought-body" id="dshThoughtBody">
                         ${bulletsHtml}
                     </div>
                 </div>
@@ -2421,7 +2822,7 @@
                 `;
             }
 
-            // ③ 中间主对话流：原生智能执行过程流 (Native Execution Stream，融合执行动作与状态)
+            // ③ 中间主对话流：DeepSeek Harness 风格执行流 (平铺单行 DisclosureRow，零大卡片外壳)
             let steps = sessionData.plan_steps || [];
             if (steps.length === 0) {
                 steps = [
@@ -2447,113 +2848,107 @@
                 const isCompleted = (st.status === "COMPLETED");
                 const isFailed = (st.status === "FAIL" || st.status === "FAILED");
                 const isRunning = (st.status === "RUNNING" || (!isCompleted && !isFailed && idx === 0 && sessionData.status === "RUNNING"));
-                const detailsId = `step_details_${sessionData.session_id || 'curr'}_${idx}`;
+                const stepNum = st.step_id || (idx + 1);
+                const stepTitle = st.title || st.name || `业务规划阶段 ${stepNum}`;
+                const stepDesc = st.desc || st.action || '执行业务规划逻辑并校验页面响应。';
+                const stepBlockId = `dsh_step_${sessionData.session_id || 'curr'}_${idx}`;
 
-                let iconHtml = "";
-                let itemClass = "execution-step-item";
-                let statusBadge = "";
+                let stateDotHtml = "";
+                let rowClass = "dsh-disclosure-row";
+                let statusTagHtml = "";
 
                 if (isCompleted) {
-                    iconHtml = `<i class="bi bi-check2 text-success" style="font-size: 13px;"></i>`;
-                    statusBadge = `<span class="mono-tag mono-tag-active">已通过</span>`;
+                    stateDotHtml = `<i class="bi bi-check2 text-success" style="font-size: 13px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag" style="font-size: 9px; color: #10b981; border-color: rgba(16,185,129,0.35);">通过</span>`;
                 } else if (isFailed) {
-                    iconHtml = `<i class="bi bi-x-circle text-danger" style="font-size: 11px;"></i>`;
-                    statusBadge = `<span class="mono-tag text-danger" style="border-color: rgba(239, 68, 68, 0.4);">未通过</span>`;
+                    stateDotHtml = `<i class="bi bi-x-circle text-danger" style="font-size: 12px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-danger" style="font-size: 9px; border-color: rgba(239, 68, 68, 0.4);">失败</span>`;
                 } else if (isRunning) {
-                    iconHtml = `<span class="spinner-border spinner-border-sm" style="width: 12px; height: 12px; border-width: 1.5px; color: var(--text-main);"></span>`;
-                    itemClass += " active";
-                    statusBadge = `<span class="mono-tag mono-tag-active">执行中</span>`;
+                    stateDotHtml = `<span class="spinner-border spinner-border-sm" style="width: 11px; height: 11px; border-width: 1.5px; color: var(--text-main);"></span>`;
+                    statusTagHtml = `<span class="mono-tag mono-tag-active" style="font-size: 9px;">执行中</span>`;
+                    rowClass += " active";
                 } else {
-                    iconHtml = `<i class="bi bi-circle text-muted" style="font-size: 10px;"></i>`;
-                    statusBadge = `<span class="mono-tag text-muted">等待中</span>`;
+                    stateDotHtml = `<i class="bi bi-circle text-muted" style="font-size: 8px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px;">等待中</span>`;
                 }
 
                 const detailLogs = st.raw_logs || latestLogsSnippet || `端侧底层调用: 原生 ADB / 视觉判定置信度 0.98 (耗时 ${st.duration || '0.6s'})`;
-                const stepNum = st.step_id || (idx + 1);
-                const stepTitle = st.title || st.name || `业务规划测试阶段 ${stepNum}`;
-                const stepDesc = st.desc || st.action || '执行业务规划逻辑并校验页面响应。';
+                const isStepExpanded = (dshExpandedState.allStepsExpanded === true) || (dshExpandedState.steps[stepBlockId] === true);
+                const stepExpandedClass = isStepExpanded ? "expanded" : "";
 
                 stepsHtml += `
-                    <div class="${itemClass}">
-                        <div class="execution-step-main">
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="execution-step-icon">${iconHtml}</div>
-                                <span class="execution-step-title">步骤 ${stepNum}: ${escapeHtml(stepTitle)}</span>
-                                ${statusBadge}
-                            </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="text-muted" style="font-size: 11px;">${st.duration || '0.8s'}</span>
-                                <button class="btn btn-link btn-sm text-decoration-none p-0 text-muted" style="font-size: 11px;" onclick="toggleStepDetails('${detailsId}')" title="展开/收起底层技术调用细节">
-                                    <i class="bi bi-code-slash me-0.5"></i> 详情
-                                </button>
+                    <div class="dsh-step-block ${stepExpandedClass}" id="${stepBlockId}">
+                        <div class="${rowClass}" onclick="toggleDshStep('${stepBlockId}')">
+                            <div class="dsh-state-dot">${stateDotHtml}</div>
+                            <span class="dsh-row-title">Step ${stepNum}: ${escapeHtml(stepTitle)}</span>
+                            <span class="dsh-row-sep"></span>
+                            <span class="dsh-row-summary" title="${escapeHtml(stepDesc)}">${escapeHtml(stepDesc)}</span>
+                            <div class="dsh-row-meta">
+                                ${statusTagHtml}
+                                <span class="dsh-row-duration">${st.duration || '0.8s'}</span>
+                                <i class="bi bi-chevron-down dsh-row-chevron"></i>
                             </div>
                         </div>
-                        <div class="execution-step-desc">
-                            ${escapeHtml(stepDesc)}
-                            ${isRunning && currentLiveAction ? `<div class="mt-1 font-monospace" style="font-size: 11px; color: var(--text-main);"><i class="bi bi-arrow-return-right me-1 text-muted"></i> 实时动作: ${escapeHtml(currentLiveAction)}</div>` : ''}
-                        </div>
-                        <div class="execution-step-details d-none" id="${detailsId}">
+                        <div class="dsh-code-expanded">
+                            ${isRunning && currentLiveAction ? `<div class="mb-1" style="color: #38bdf8; font-weight: 500;"><i class="bi bi-play-fill me-1"></i>实时交互: ${escapeHtml(currentLiveAction)}</div>` : ''}
                             ${escapeHtml(detailLogs)}
                         </div>
                     </div>
                 `;
             });
 
-            const isDone = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
-            const pulseStatusDot = isDone ? (sessionData.status === "COMPLETED" ? 'dot-online' : 'dot-offline') : 'dot-online';
-            const pulseStatusText = isDone 
-                ? (sessionData.status === "COMPLETED" ? '执行闭环完成 · 所有规划节点已断言验证' : '测试执行中断 · 异常拦截已记录') 
-                : (currentLiveAction ? `正在协同执行：${currentLiveAction}` : 'AI 端侧测试协同执行中...');
+            // ④ 判定全流程完成与成功状态
+            const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
+            let hasDeviceFail = (sessionData.has_fail === true);
+            for (const d of Object.values(sessionData.devices || {})) {
+                if (d.status === "FAIL" || d.success === false) {
+                    hasDeviceFail = true;
+                    break;
+                }
+            }
+            const isSuccess = (sessionData.is_success === true || (sessionData.is_success !== false && !hasDeviceFail && sessionData.status !== "FAILED"));
+
+            let statusLabel = "";
+            if (isFinished) {
+                statusLabel = isSuccess ? `已完成 · ${steps.length} 阶段通过验证` : `未达预期 · ${steps.length} 阶段已记录`;
+            } else {
+                statusLabel = currentLiveAction ? `协同执行: ${currentLiveAction}` : '测试任务执行推进中...';
+            }
 
             const executionStreamHtml = `
-                <div class="execution-stream-card">
-                    <div class="execution-stream-header">
-                        <div class="execution-stream-title">
-                            <i class="bi bi-cpu"></i>
-                            <span>智能测试执行过程</span>
-                            <span class="mono-tag ms-1" style="font-size: 10px;">${steps.length} 阶段</span>
+                <div class="dsh-process-group">
+                    <div class="dsh-turn-process-header">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-terminal" style="font-size: 13px; color: var(--text-main);"></i>
+                            <span class="fw-semibold" style="font-size: 12.5px; color: var(--text-main);">执行过程 (Process)</span>
+                            <span class="fw-medium" style="font-size: 11.5px; color: var(--text-sub);">· ${statusLabel}</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <span class="status-indicator-dot ${pulseStatusDot}" style="width: 7px; height: 7px;"></span>
-                            <span class="text-muted" style="font-size: 11px;">${isDone ? '已归档' : '实时协同'}</span>
+                            <button class="dsh-turn-toggle-btn" onclick="openCanvasLogs()" title="在右侧全量控制台查看实时日志流">
+                                <i class="bi bi-layout-sidebar-reverse me-1"></i> 全量日志
+                            </button>
+                            <button class="dsh-turn-toggle-btn" onclick="toggleAllDshSteps()" id="dshToggleAllStepsBtn" title="一键展开/收起全部步骤详情">
+                                <i class="bi ${dshExpandedState.allStepsExpanded ? 'bi-chevron-contract' : 'bi-chevron-expand'} me-1"></i> ${dshExpandedState.allStepsExpanded ? '收起详情' : '展开详情'}
+                            </button>
                         </div>
                     </div>
-                    <div class="execution-steps-container">
+                    <div class="dsh-steps-container" id="dshStepsContainer">
                         ${stepsHtml}
-                    </div>
-                    <div class="execution-pulse-bar">
-                        <span class="d-flex align-items-center gap-2 text-truncate" style="max-width: 520px;">
-                            <span class="status-indicator-dot ${pulseStatusDot}" style="width: 6px; height: 6px;"></span>
-                            <span class="text-truncate">${pulseStatusText}</span>
-                        </span>
-                        <span class="mono-tag" style="cursor: pointer;" onclick="toggleCanvas(); switchCanvasTab('logs');" title="在右侧工作台查看原始流式全量日志">
-                            <i class="bi bi-terminal me-1"></i> 查看全量日志
-                        </span>
                     </div>
                 </div>
             `;
 
             // ④ 任务完成/失败快捷结算条 (严格依据真实断言与设备状态判定)
             let completionBannerHtml = "";
-            const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
             if (isFinished) {
-                let hasDeviceFail = (sessionData.has_fail === true);
-                for (const d of Object.values(sessionData.devices || {})) {
-                    if (d.status === "FAIL" || d.success === false) {
-                        hasDeviceFail = true;
-                        break;
-                    }
-                }
-                const isSuccess = (sessionData.is_success === true || (sessionData.is_success !== false && !hasDeviceFail && sessionData.status !== "FAILED"));
-
                 if (isSuccess) {
                     completionBannerHtml = `
-                        <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-1 w-100" style="background-color: var(--bg-surface); border: 1px solid rgba(16, 185, 129, 0.4); padding: 10px 14px;">
+                        <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-2 w-100" style="background-color: var(--bg-surface); border: 1px solid rgba(16, 185, 129, 0.4); padding: 10px 14px;">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi bi-check-circle-fill text-success" style="font-size: 16px;"></i>
                                 <div>
                                     <div class="small fw-semibold" style="font-size: 12.5px; color: var(--text-main);">测试执行完毕 · 业务断言全部通过</div>
-                                    <div class="text-muted" style="font-size: 11px;">用例时序已固化为零 Token 标准 Python 回归用例脚本</div>
+                                    <div style="font-size: 11px; color: var(--text-sub);">用例时序已固化为零 Token 标准 Python 回归用例脚本</div>
                                 </div>
                             </div>
                             ${sessionData.report_url ? `<a href="${sessionData.report_url}" target="_blank" class="btn btn-sm btn-light py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;">查看全景评测报告 ➔</a>` : ''}
@@ -2562,18 +2957,42 @@
                 } else {
                     const failReason = sessionData.error_message || "AI 自动化测试未能达成预期目标，存在动作异常中断或交互超时";
                     completionBannerHtml = `
-                        <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-1 w-100" style="background-color: var(--bg-surface); border: 1px solid rgba(239, 68, 68, 0.45); padding: 10px 14px;">
+                        <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-2 w-100" style="background-color: var(--bg-surface); border: 1px solid rgba(239, 68, 68, 0.45); padding: 10px 14px;">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi bi-x-circle-fill text-danger" style="font-size: 16px;"></i>
                                 <div>
                                     <div class="small fw-semibold" style="font-size: 12.5px; color: #ef4444;">测试未能达成预期 · 流程异常中断</div>
-                                    <div class="text-muted" style="font-size: 11px;">${failReason}</div>
+                                    <div style="font-size: 11px; color: var(--text-sub);">${failReason}</div>
                                 </div>
                             </div>
                             ${sessionData.report_url ? `<a href="${sessionData.report_url}" target="_blank" class="btn btn-sm btn-outline-danger py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;">查看失败排错报告 ➔</a>` : ''}
                         </div>
                     `;
                 }
+            }
+
+            // ⑤ 轮次尾部精简操作与指标栏 (DeepSeek Harness Turn Tail)
+            let turnTailHtml = "";
+            if (isFinished) {
+                turnTailHtml = `
+                    <div class="dsh-turn-tail">
+                        <div class="d-flex align-items-center gap-2">
+                            <span><i class="bi bi-clock me-1"></i>耗时 ${sessionData.duration || '3.6s'}</span>
+                            <span>·</span>
+                            <span>${steps.length} 阶段节点</span>
+                            <span>·</span>
+                            <span class="${isSuccess ? 'text-success' : 'text-muted'}"><i class="bi ${isSuccess ? 'bi-shield-check' : 'bi-file-earmark-code'} me-1"></i>${isSuccess ? '测试脚本已固化' : '测试用例已归档'}</span>
+                        </div>
+                        <div class="dsh-tail-actions">
+                            <button class="dsh-tail-btn" onclick="copySessionGoal('${escapeHtml(sessionData.goal || '')}')" title="复制测试目标">
+                                <i class="bi bi-clipboard me-1"></i> 复制目标
+                            </button>
+                            <button class="dsh-tail-btn ms-2" onclick="toggleCanvas(); switchCanvasTab('cases');" title="在右侧查看固化的自动化用例代码">
+                                <i class="bi bi-code-slash me-1"></i> 脚本代码
+                            </button>
+                        </div>
+                    </div>
+                `;
             }
 
             // 彻底去除头像与名称，执行过程自然流式融入对话
@@ -2585,15 +3004,51 @@
                     </div>
                 </div>
 
-                <!-- AI 执行流直接展开 (无头像、无名称抬头) -->
+                <!-- AI 执行流直接展开 (无头像、无名称抬头，自然平铺流) -->
                 <div class="msg-ai-row">
                     ${thinkingHtml}
                     ${executionStreamHtml}
                     ${clarificationHtml}
                     ${completionBannerHtml}
+                    ${turnTailHtml}
                 </div>
             `;
             updateConsoleLogs();
+        }
+
+        function toggleDshThought() {
+            dshExpandedState.thought = !dshExpandedState.thought;
+            const box = document.getElementById("dshThoughtBox");
+            if (box) box.classList.toggle("expanded", dshExpandedState.thought);
+        }
+
+        function toggleDshStep(stepBlockId) {
+            const isExp = !(dshExpandedState.steps[stepBlockId] || false);
+            dshExpandedState.steps[stepBlockId] = isExp;
+            const el = document.getElementById(stepBlockId);
+            if (el) el.classList.toggle("expanded", isExp);
+        }
+
+        function toggleAllDshSteps() {
+            dshExpandedState.allStepsExpanded = !dshExpandedState.allStepsExpanded;
+            const isExp = dshExpandedState.allStepsExpanded;
+            const blocks = document.querySelectorAll(".dsh-step-block");
+            blocks.forEach(b => {
+                b.classList.toggle("expanded", isExp);
+                if (b.id) dshExpandedState.steps[b.id] = isExp;
+            });
+            const btn = document.getElementById("dshToggleAllStepsBtn");
+            if (btn) {
+                btn.innerHTML = isExp 
+                    ? '<i class="bi bi-chevron-contract me-1"></i> 收起详情' 
+                    : '<i class="bi bi-chevron-expand me-1"></i> 展开详情';
+            }
+        }
+
+        function copySessionGoal(text) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text);
+            }
         }
 
         function toggleStepDetails(detailsId) {
@@ -2721,19 +3176,37 @@
         function updateConsoleLogs() {
             const streamPre = document.getElementById("streamConsoleLogsPre");
             const runLogs = document.getElementById("runLogs");
+            const devNameEl = document.getElementById("consoleDeviceName");
 
             if (!activeConsoleDeviceId || !deviceLogsCache[activeConsoleDeviceId]) {
                 const readyText = "[Ready] 正在连接设备控制台...";
                 if (streamPre) streamPre.innerText = readyText;
-                if (runLogs) runLogs.innerText = readyText;
+                if (runLogs) runLogs.innerHTML = `<span style="color: #64748b;">${readyText}</span>`;
+                if (devNameEl) devNameEl.innerText = "控制台终端就绪";
                 return;
             }
 
             const lines = deviceLogsCache[activeConsoleDeviceId];
-            const textContent = lines.join("\n") || "[Ready] 暂无日志输出。";
+            if (devNameEl) {
+                devNameEl.innerText = `${activeConsoleDeviceId} · 实时日志 (${lines.length} 行)`;
+            }
 
             if (runLogs) {
-                runLogs.innerText = textContent;
+                let formattedHtml = "";
+                lines.forEach(l => {
+                    let color = "#cbd5e1";
+                    if (l.includes("✅") || l.includes("🎉") || l.includes("断言通过") || l.includes("成功") || l.includes("SUCCESS")) {
+                        color = "#4ade80";
+                    } else if (l.includes("❌") || l.includes("FAIL") || l.includes("异常") || l.includes("ERROR") || l.includes("失败")) {
+                        color = "#f87171";
+                    } else if (l.includes("[Step ") || l.includes("OCR") || l.includes("AI 决策") || l.includes("--- [Step")) {
+                        color = "#38bdf8";
+                    } else if (l.includes("[WARNING]") || l.includes("重试")) {
+                        color = "#fbbf24";
+                    }
+                    formattedHtml += `<div style="color: ${color}; line-height: 1.6; margin-bottom: 1px;">${escapeHtml(l)}</div>`;
+                });
+                runLogs.innerHTML = formattedHtml || `<span style="color: #64748b;">[Ready] 暂无日志输出。</span>`;
                 runLogs.scrollTop = runLogs.scrollHeight;
             }
 
@@ -2893,6 +3366,11 @@
             await fetch("/api/config", { method: "POST", body: formData });
             alert("模型配置已保存！");
             loadModelConfig();
+            const modalEl = document.getElementById("antigravityModal");
+            if (modalEl) {
+                const inst = bootstrap.Modal.getInstance(modalEl);
+                if (inst) inst.hide();
+            }
         }
 
         // ================= 11. 交付物与本地用例管理 =================

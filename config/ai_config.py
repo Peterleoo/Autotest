@@ -34,7 +34,7 @@ class AIConfig:
 
     @property
     def ANTIGRAVITY_MODEL(self) -> str:
-        return os.getenv("ANTIGRAVITY_MODEL", "gemini-3.8-flash-high")
+        return os.getenv("ANTIGRAVITY_MODEL", "gemini-2.5-flash")
 
     @property
     def ANTIGRAVITY_PROXY(self) -> str:
