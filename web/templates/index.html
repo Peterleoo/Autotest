@@ -243,6 +243,88 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
         }
 
+        /* 自由拖拽拉伸分割条 (Pane Splitter Resizers) */
+        .pane-resizer {
+            width: 5px;
+            cursor: col-resize;
+            background-color: transparent;
+            position: relative;
+            z-index: 60;
+            flex-shrink: 0;
+            transition: background-color 0.15s ease;
+            user-select: none;
+        }
+        .pane-resizer:hover, .pane-resizer.dragging {
+            background-color: rgba(255, 255, 255, 0.22);
+        }
+        .pane-resizer::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3px;
+            height: 28px;
+            border-radius: 9999px;
+            background-color: rgba(255, 255, 255, 0.3);
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+        .pane-resizer:hover::after, .pane-resizer.dragging::after {
+            opacity: 1;
+        }
+        body.resizing-active {
+            cursor: col-resize !important;
+            user-select: none !important;
+        }
+        body.resizing-active iframe, body.resizing-active textarea {
+            pointer-events: none !important;
+        }
+
+        /* 已有会话环境芯片与缺失警示 (Environment Health & Chips) */
+        .session-env-bar {
+            background-color: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+            color: var(--text-sub);
+            flex-shrink: 0;
+        }
+        .env-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            background-color: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            border-radius: 5px;
+            font-size: 11px;
+            color: var(--text-main);
+        }
+        .env-chip-warning {
+            border-color: rgba(255, 255, 255, 0.4);
+            background-color: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            font-weight: 500;
+        }
+        .env-alert-banner {
+            background-color: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            padding: 9px 13px;
+            margin: 10px 16px 0 16px;
+            font-size: 11.5px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            color: #ffffff;
+            line-height: 1.5;
+            flex-shrink: 0;
+        }
+
         /* 本地测试用例资产工作台 (Local Cases Workspace) */
         .local-workspace-container {
             max-width: 880px;
@@ -599,6 +681,91 @@
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        /* ③ 中间主对话流：实时测试执行控制台 (Stream Console Card) */
+        .stream-console-card {
+            width: 100%;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            margin-top: 10px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s ease;
+        }
+        .stream-console-header {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-subtle);
+            user-select: none;
+        }
+        .stream-console-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .stream-console-body {
+            max-height: 240px;
+            min-height: 100px;
+            overflow-y: auto;
+            padding: 10px 12px;
+            background-color: #0b0c0e;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+            font-size: 11.5px;
+            line-height: 1.6;
+            color: #d1d5db;
+        }
+        .stream-log-line {
+            word-break: break-all;
+            white-space: pre-wrap;
+            margin-bottom: 2px;
+        }
+        .stream-log-time {
+            color: #6b7280;
+            margin-right: 6px;
+            user-select: none;
+        }
+        .stream-log-highlight {
+            color: #ffffff;
+            font-weight: 600;
+        }
+        .stream-log-success {
+            color: #10b981;
+        }
+        .stream-log-warn {
+            color: #f59e0b;
+        }
+        .stream-console-tab-pill {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-sub);
+            border-radius: 6px;
+            font-size: 11px;
+            padding: 2px 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .stream-console-tab-pill.active {
+            background-color: var(--border-strong);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        .node-step-card.active-step {
+            border-color: rgba(255, 255, 255, 0.45);
+            background-color: var(--bg-surface);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.04);
+        }
+        .node-step-card.completed-step {
+            border-color: rgba(16, 185, 129, 0.25);
         }
 
         /* ================= 3. 底部 ChatGPT 悬浮大胶囊 (集成模型切换) ================= */
@@ -1143,14 +1310,11 @@
 
     <!-- ======================= 4. 右侧工作台 Canvas (Nodes / Logs / Deliverables) ======================= -->
     <aside class="gpt-canvas" id="gptCanvas">
-        <!-- 头部导航三 Tab -->
+        <!-- 头部导航双 Tab (测试节点流水线与交付产物) -->
         <div class="canvas-header">
             <div class="canvas-tabs-nav">
                 <button class="canvas-tab-btn active" id="btnTabNodes" onclick="switchCanvasTab('nodes')">
                     <i class="bi bi-diagram-3"></i> 测试节点
-                </button>
-                <button class="canvas-tab-btn" id="btnTabLogs" onclick="switchCanvasTab('logs')">
-                    <i class="bi bi-terminal"></i> 测试日志
                 </button>
                 <button class="canvas-tab-btn" id="btnTabDeliverables" onclick="switchCanvasTab('deliverables')">
                     <i class="bi bi-box-seam"></i> 交付物与脚本
@@ -1178,19 +1342,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- View 2: 💻 测试日志 (Terminal Logs) -->
-        <div class="d-flex flex-column flex-grow-1 overflow-hidden d-none" id="canvasLogsView">
-            <div class="d-flex justify-content-between align-items-center px-3 py-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                <div class="d-flex align-items-center gap-1" id="consoleDeviceTabs">
-                    <span class="small text-muted" style="font-size: 11px;">日志终端就绪</span>
-                </div>
-                <button class="icon-btn" onclick="clearCurrentLogs()" title="清屏"><i class="bi bi-eraser"></i></button>
-            </div>
-            <div class="terminal-screen" id="runLogs">[System] 终端已就绪。
-[System] 正在监听端侧截屏感知、视觉 OCR 指纹复用与 AI 意图决策日志...
-[System] 提示：在中间输入框输入测试目标后，按 Enter 即可启动。</div>
         </div>
 
         <!-- View 3: 📦 交付物与本地回归脚本 (Deliverables & Local Cases) -->
@@ -1537,20 +1688,18 @@
 
         function switchCanvasTab(tab) {
             const btnNodes = document.getElementById("btnTabNodes");
-            const btnLogs = document.getElementById("btnTabLogs");
             const btnDeliv = document.getElementById("btnTabDeliverables");
 
             const viewNodes = document.getElementById("canvasNodesView");
-            const viewLogs = document.getElementById("canvasLogsView");
             const viewDeliv = document.getElementById("canvasDeliverablesView");
 
-            btnNodes.classList.toggle("active", tab === "nodes");
-            btnLogs.classList.toggle("active", tab === "logs");
-            btnDeliv.classList.toggle("active", tab === "deliverables");
+            if (tab !== "deliverables") tab = "nodes";
 
-            viewNodes.classList.toggle("d-none", tab !== "nodes");
-            viewLogs.classList.toggle("d-none", tab !== "logs");
-            viewDeliv.classList.toggle("d-none", tab !== "deliverables");
+            if (btnNodes) btnNodes.classList.toggle("active", tab === "nodes");
+            if (btnDeliv) btnDeliv.classList.toggle("active", tab === "deliverables");
+
+            if (viewNodes) viewNodes.classList.toggle("d-none", tab !== "nodes");
+            if (viewDeliv) viewDeliv.classList.toggle("d-none", tab !== "deliverables");
 
             if (tab === "deliverables") {
                 loadReports();
@@ -2064,6 +2213,69 @@
                 `;
             }
 
+            // ③ 中间主对话流实时控制台 (Stream Console)
+            const devKeys = Object.keys(sessionData.devices || {});
+            if (!activeConsoleDeviceId || !sessionData.devices[activeConsoleDeviceId]) {
+                if (devKeys.length > 0) activeConsoleDeviceId = devKeys[0];
+            }
+            const activeDev = (activeConsoleDeviceId && sessionData.devices[activeConsoleDeviceId]) ? sessionData.devices[activeConsoleDeviceId] : null;
+            const activeDevTitle = activeDev ? activeDev.model : (devKeys.length > 0 ? devKeys[0] : '默认设备');
+
+            let devicePillsHtml = "";
+            if (devKeys.length > 1) {
+                devKeys.forEach(k => {
+                    const d = sessionData.devices[k];
+                    const isPillAct = (k === activeConsoleDeviceId) ? "active" : "";
+                    const platIcon = d.platform === 'iOS' ? '<i class="bi bi-apple me-1"></i>' : '<i class="bi bi-android2 me-1"></i>';
+                    devicePillsHtml += `
+                        <button class="stream-console-tab-pill ${isPillAct}" onclick="switchConsoleDevice('${k}')">
+                            ${platIcon} ${d.model}
+                        </button>
+                    `;
+                });
+            }
+
+            const isDone = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
+            const consoleStatusDot = isDone ? (sessionData.status === "COMPLETED" ? 'dot-online' : 'dot-offline') : 'dot-online';
+            const consoleStatusText = isDone ? (sessionData.status === "COMPLETED" ? '执行完成' : '执行中断') : '实时运行中';
+
+            const streamConsoleHtml = `
+                <div class="stream-console-card">
+                    <div class="stream-console-header">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="status-indicator-dot ${consoleStatusDot}" style="width: 7px; height: 7px;"></span>
+                            <span class="stream-console-title"><i class="bi bi-terminal me-1"></i> 测试执行控制台</span>
+                            <span class="text-muted" id="streamConsoleDeviceDesc" style="font-size: 11px;">(${activeDevTitle} · ${consoleStatusText})</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-1" id="streamDevicePillsBox">${devicePillsHtml}</div>
+                            <button class="icon-btn py-0 px-1" style="height: 22px; width: 22px; font-size: 11px;" onclick="clearCurrentLogs()" title="清屏"><i class="bi bi-eraser"></i></button>
+                            <button class="icon-btn py-0 px-1" style="height: 22px; width: 22px; font-size: 11px;" onclick="document.getElementById('streamConsoleLogsBody').classList.toggle('d-none')" title="收起/展开控制台"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="stream-console-body" id="streamConsoleLogsBody">
+                        <div id="streamConsoleLogsPre">正在加载设备控制台日志...</div>
+                    </div>
+                </div>
+            `;
+
+            // ④ 任务完成快捷结算条
+            let completionBannerHtml = "";
+            if (sessionData.status === "COMPLETED") {
+                completionBannerHtml = `
+                    <div class="p-2.5 rounded d-flex justify-content-between align-items-center mt-1" style="background-color: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 10px 14px;">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 15px;"></i>
+                            <div>
+                                <div class="small fw-semibold" style="font-size: 12.5px;">测试执行完毕 · 业务断言全部通过</div>
+                                <div class="text-muted" style="font-size: 11px;">用例时序已固化为零 Token 标准 Python 回归用例脚本</div>
+                            </div>
+                        </div>
+                        ${sessionData.report_url ? `<a href="${sessionData.report_url}" target="_blank" class="btn btn-sm btn-light py-1 px-3 fw-semibold" style="font-size: 11.5px; border-radius: 9999px;">查看全景评测报告 ➔</a>` : ''}
+                    </div>
+                `;
+            }
+
             // 彻底去除头像与名称
             flow.innerHTML = `
                 <!-- 用户意图直接展示 (无头像、无用户名称) -->
@@ -2083,11 +2295,14 @@
                         <span>协同设备: <strong>${Object.keys(sessionData.devices || {}).length} 台</strong></span>
                     </div>
                     ${devicesProgressHtml}
+                    ${streamConsoleHtml}
+                    ${completionBannerHtml}
                 </div>
             `;
+            updateConsoleLogs();
         }
 
-        // ================= 7. 右侧工作台：测试节点流水线渲染 =================
+        // ================= 7. 右侧工作台：测试节点流水线渲染 (与实际测试步骤精准绑定) =================
         function renderPipelineNodes(steps, sessionStatus, devices) {
             const list = document.getElementById("pipelineNodesList");
             const badge = document.getElementById("nodesSummaryBadge");
@@ -2110,25 +2325,41 @@
             let html = "";
             planSteps.forEach(st => {
                 let iconHtml = `<i class="bi bi-circle text-muted"></i>`;
-                let isStepActive = false;
+                let cardClass = "";
+                let badgeStyle = "color: var(--text-muted);";
+                let statusText = st.status || "READY";
 
-                if (sessionStatus === "COMPLETED") {
-                    iconHtml = `<i class="bi bi-check-circle-fill text-light"></i>`;
-                } else if (sessionStatus === "RUNNING") {
-                    iconHtml = `<i class="bi bi-play-circle-fill text-light"></i>`;
-                    isStepActive = true;
-                } else if (sessionStatus === "AWAITING_APPROVAL") {
-                    iconHtml = `<i class="bi bi-hourglass text-muted"></i>`;
+                if (st.status === "COMPLETED") {
+                    iconHtml = `<i class="bi bi-check-circle-fill text-success"></i>`;
+                    cardClass = "completed-step";
+                    badgeStyle = "color: #10b981; border-color: rgba(16, 185, 129, 0.4);";
+                    statusText = "已完成";
+                } else if (st.status === "RUNNING") {
+                    iconHtml = `<i class="bi bi-play-circle-fill text-white"></i>`;
+                    cardClass = "active-step";
+                    badgeStyle = "color: #ffffff; border-color: rgba(255, 255, 255, 0.6);";
+                    statusText = "执行中";
+                } else if (st.status === "AWAITING_USER" || st.status === "AWAITING_APPROVAL") {
+                    iconHtml = `<i class="bi bi-hourglass-split text-warning"></i>`;
+                    badgeStyle = "color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);";
+                    statusText = "待协同";
+                } else if (st.status === "FAIL") {
+                    iconHtml = `<i class="bi bi-x-circle-fill text-danger"></i>`;
+                    cardClass = "failed-step";
+                    badgeStyle = "color: #ef4444; border-color: rgba(239, 68, 68, 0.4);";
+                    statusText = "失败";
+                } else {
+                    statusText = "等待中";
                 }
 
                 html += `
-                    <div class="node-step-card ${isStepActive ? 'active-step' : ''}">
+                    <div class="node-step-card ${cardClass}">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <div class="d-flex align-items-center gap-2">
                                 ${iconHtml}
                                 <span class="fw-semibold small" style="font-size: 12.5px;">Step ${st.step_id}: ${st.title}</span>
                             </div>
-                            <span class="mono-tag" style="font-size: 9px;">${st.status || 'READY'}</span>
+                            <span class="mono-tag" style="font-size: 9px; ${badgeStyle}">${statusText}</span>
                         </div>
                         <div class="text-muted" style="font-size: 11px; margin-left: 20px;">
                             ${st.desc}
@@ -2140,10 +2371,18 @@
         }
 
         // ================= 8. 控制台与日志 =================
-        function renderConsoleTabs(devices) {
-            const tabBox = document.getElementById("consoleDeviceTabs");
-            if (!tabBox) return;
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
 
+        function renderConsoleTabs(devices) {
+            // 中间流和设备切换联动
+            const pillsBox = document.getElementById("streamDevicePillsBox");
             const devKeys = Object.keys(devices || {});
             if (devKeys.length === 0) return;
 
@@ -2151,25 +2390,27 @@
                 activeConsoleDeviceId = devKeys[0];
             }
 
-            let html = "";
-            devKeys.forEach(k => {
-                const d = devices[k];
-                const isAct = (k === activeConsoleDeviceId) ? "active" : "";
-                const platIcon = d.platform === 'iOS' ? '<i class="bi bi-apple me-1"></i>' : '<i class="bi bi-android2 me-1"></i>';
-                html += `
-                    <button class="canvas-tab-btn ${isAct}" onclick="switchConsoleDevice('${k}')">
-                        ${platIcon} ${d.model}
-                    </button>
-                `;
-            });
-            tabBox.innerHTML = html;
+            if (pillsBox && devKeys.length > 1) {
+                let html = "";
+                devKeys.forEach(k => {
+                    const d = devices[k];
+                    const isAct = (k === activeConsoleDeviceId) ? "active" : "";
+                    const platIcon = d.platform === 'iOS' ? '<i class="bi bi-apple me-1"></i>' : '<i class="bi bi-android2 me-1"></i>';
+                    html += `
+                        <button class="stream-console-tab-pill ${isAct}" onclick="switchConsoleDevice('${k}')">
+                            ${platIcon} ${d.model}
+                        </button>
+                    `;
+                });
+                pillsBox.innerHTML = html;
+            }
         }
 
         function switchConsoleDevice(devId) {
             activeConsoleDeviceId = devId;
-            const btns = document.querySelectorAll("#consoleDeviceTabs button");
+            const btns = document.querySelectorAll(".stream-console-tab-pill");
             btns.forEach(b => {
-                if (b.getAttribute("onclick").includes(devId)) {
+                if (b.getAttribute("onclick") && b.getAttribute("onclick").includes(devId)) {
                     b.classList.add("active");
                 } else {
                     b.classList.remove("active");
@@ -2179,17 +2420,43 @@
         }
 
         function updateConsoleLogs() {
-            const logBox = document.getElementById("runLogs");
-            if (!logBox) return;
+            const streamPre = document.getElementById("streamConsoleLogsPre");
+            const runLogs = document.getElementById("runLogs");
 
             if (!activeConsoleDeviceId || !deviceLogsCache[activeConsoleDeviceId]) {
-                logBox.innerText = "[Ready] 正在连接设备控制台...";
+                const readyText = "[Ready] 正在连接设备控制台...";
+                if (streamPre) streamPre.innerText = readyText;
+                if (runLogs) runLogs.innerText = readyText;
                 return;
             }
 
             const lines = deviceLogsCache[activeConsoleDeviceId];
-            logBox.innerText = lines.join("\n") || "[Ready] 暂无日志输出。";
-            logBox.scrollTop = logBox.scrollHeight;
+            const textContent = lines.join("\n") || "[Ready] 暂无日志输出。";
+
+            if (runLogs) {
+                runLogs.innerText = textContent;
+                runLogs.scrollTop = runLogs.scrollHeight;
+            }
+
+            if (streamPre) {
+                let formattedHtml = "";
+                lines.forEach(l => {
+                    let lineClass = "stream-log-line";
+                    if (l.includes("✅") || l.includes("🎉") || l.includes("断言通过") || l.includes("成功")) {
+                        lineClass += " stream-log-success";
+                    } else if (l.includes("❌") || l.includes("FAIL") || l.includes("异常")) {
+                        lineClass += " stream-log-warn";
+                    } else if (l.includes("[Step ") || l.includes("OCR") || l.includes("AI 决策")) {
+                        lineClass += " stream-log-highlight";
+                    }
+                    formattedHtml += `<div class="${lineClass}">${escapeHtml(l)}</div>`;
+                });
+                streamPre.innerHTML = formattedHtml || `<span class="text-muted">[Ready] 暂无日志输出。</span>`;
+                const container = document.getElementById("streamConsoleLogsBody");
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }
         }
 
         function clearCurrentLogs() {
