@@ -1,0 +1,100 @@
+{
+  "test_beike_search_p0.py": {
+    "id": "CASE-01",
+    "title": "二手房区域商圈级联筛选断言",
+    "module": "房源搜索",
+    "level": "P0",
+    "desc": "定位首页二手房频道，级联选择朝阳-望京商圈，断言返回房源列表首项卡片包含望京商圈标签并记录响应耗时。",
+    "precondition": "待测 App 已安装启动，无需登录态。",
+    "pass_rate": "100%",
+    "avg_duration": "2.4s"
+  },
+  "test_publish_validate_p0.py": {
+    "id": "CASE-02",
+    "title": "发布房源字段必填校验与异常拦截",
+    "module": "业务表单",
+    "level": "P0",
+    "desc": "进入房源发布流程，在售价、户型及联系方式字段输入非法及空值参数，断言前端表单校验浮窗拦截与提交阻断。",
+    "precondition": "需要具备发布权限的基础访客或经纪人态。",
+    "pass_rate": "100%",
+    "avg_duration": "3.1s"
+  },
+  "test_nav_tabs_p1.py": {
+    "id": "CASE-03",
+    "title": "首页金刚区与底栏核心模块遍历巡检",
+    "module": "核心导航",
+    "level": "P1",
+    "desc": "依次点击首页主要金刚区业务入口，并切换底部导航栏各一级 Tab，断言各级页面视图渲染完整无白屏死锁。",
+    "precondition": "应用冷启动完成并跳过引导广告。",
+    "pass_rate": "100%",
+    "avg_duration": "4.2s"
+  },
+  "test_detail_gallery_p1.py": {
+    "id": "CASE-04",
+    "title": "房源详情画廊大图滑动与IM咨询唤起",
+    "module": "房源搜索",
+    "level": "P1",
+    "desc": "进入精选房源详情，软手势轮播画廊多图，点击在线微聊咨询，断言即时聊天浮窗正常呼出并渲染输入框。",
+    "precondition": "首页有展示推荐房源卡片。",
+    "pass_rate": "98%",
+    "avg_duration": "2.8s"
+  },
+  "test_user_profile_p2.py": {
+    "id": "CASE-05",
+    "title": "个人中心偏好设置与缓存清理验证",
+    "module": "系统设置",
+    "level": "P2",
+    "desc": "切换至'我的'个人中心，进入通用设置页执行缓存清理，并切换深色模式开关，断言界面即时响应生效。",
+    "precondition": "已进入'我的'个人中心页面。",
+    "pass_rate": "100%",
+    "avg_duration": "1.9s"
+  },
+  "test_form_20261020_150435.py": {
+    "id": "CASE-06",
+    "title": "搜索望京两居室，筛选租金5000-800...",
+    "module": "业务表单",
+    "level": "P0",
+    "desc": "针对【搜索望京两居室，筛选租金5000-8000并断言第一条房源信息】的自动化回归测试用例，包含 5 个校验步骤。",
+    "precondition": "待测 App 启动就绪。",
+    "pass_rate": "100%",
+    "avg_duration": "2.8s",
+    "session_id": "sess_1020_150429_821e",
+    "created_at": "2026-10-20 15:04:35"
+  },
+  "test_search_20261020_150659.py": {
+    "id": "CASE-07",
+    "title": "搜索望京两居室，筛选租金5000-800...",
+    "module": "房源搜索",
+    "level": "P0",
+    "desc": "针对【搜索望京两居室，筛选租金5000-8000并断言第一条房源信息】的自动化回归测试用例，包含 5 个校验步骤。",
+    "precondition": "待测 App 启动就绪。",
+    "pass_rate": "100%",
+    "avg_duration": "2.8s",
+    "session_id": "sess_1020_150652_ba9d",
+    "created_at": "2026-10-20 15:06:59"
+  },
+  "test_search_20261020_152007.py": {
+    "id": "CASE-08",
+    "title": "搜索望京两居室，筛选租金5000-800...",
+    "module": "房源搜索",
+    "level": "P0",
+    "desc": "针对【搜索望京两居室，筛选租金5000-8000并断言第一条房源信息】的自动化回归测试用例，包含 5 个校验步骤。",
+    "precondition": "待测 App 启动就绪。",
+    "pass_rate": "100%",
+    "avg_duration": "2.8s",
+    "session_id": "sess_1020_151853_6979",
+    "created_at": "2026-10-20 15:20:07"
+  },
+  "test_general_20261020_161034.py": {
+    "id": "CASE-09",
+    "title": "搜索望京两居室，筛选租金5000-8000并断言",
+    "module": "业务通用",
+    "level": "P0",
+    "desc": "针对【搜索望京两居室，筛选租金5000-8000并断言第一条房源信息】的自动化回归测试用例，包含 5 个校验步骤。",
+    "precondition": "待测 App 启动就绪。",
+    "pass_rate": "100%",
+    "avg_duration": "2.8s",
+    "session_id": "sess_1020_150652_ba9d",
+    "created_at": "2026-10-20 16:10:34"
+  }
+}

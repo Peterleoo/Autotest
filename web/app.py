@@ -43,7 +43,11 @@ auth_mgr = AuthManager()
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    response = templates.TemplateResponse("index.html", {"request": request})
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/api/devices")
 async def get_devices():
@@ -69,12 +73,22 @@ async def get_devices():
                 ver_res = subprocess.run([adb_bin, "-s", dev_id, "shell", "getprop", "ro.build.version.release"], capture_output=True, text=True)
                 if ver_res.stdout.strip():
                     version = ver_res.stdout.strip()
+
+                # 🚀 联动设备画像与自学习知识库
+                from core.device_knowledge_manager import device_knowledge_mgr
+                dev_fp = device_knowledge_mgr.get_device_fingerprint(dev_id)
+                input_healthy, input_tip = device_knowledge_mgr.probe_input_permission(dev_id)
                 
                 devices.append({
                     "id": dev_id,
-                    "model": model,
+                    "model": f"{dev_fp.get('brand')} {dev_fp.get('model')}" if dev_fp.get("brand") != "Android" else model,
+                    "brand": dev_fp.get("brand", "Android"),
+                    "raw_model": dev_fp.get("model", model),
+                    "rom": dev_fp.get("rom", ""),
                     "platform": "Android",
                     "version": version,
+                    "input_healthy": input_healthy,
+                    "input_tip": input_tip or "",
                     "status": "在线 (Online)"
                 })
     except Exception as e:
@@ -117,6 +131,82 @@ async def get_device_screenshot(device_id: str):
 
     return Response(status_code=404, content=b"Device screenshot unavailable", media_type="text/plain")
 
+@app.get("/api/system/preflight")
+async def system_preflight():
+    """对话流前置链路全景巡检：检测 AI 接入状态、待测应用包、在线物理真机"""
+    provider = (ai_config.PROVIDER or "deepseek").lower()
+    ai_ready = False
+    ai_msg = ""
+    
+    if provider == "hermes":
+        ai_ready = bool(ai_config.HERMES_API_KEY)
+        ai_msg = "Hermes 网关已连接" if ai_ready else "Hermes 未配置 API Key"
+    elif provider == "antigravity":
+        try:
+            from core.antigravity_oauth import AntigravityOAuth
+            ai_ready = AntigravityOAuth().is_logged_in() or bool(ai_config.ANTIGRAVITY_API_KEY)
+        except Exception:
+            ai_ready = bool(ai_config.ANTIGRAVITY_API_KEY)
+        ai_msg = "Google Antigravity 已就绪" if ai_ready else "Antigravity 未登录或未配置 API Key"
+    elif provider == "deepseek":
+        ai_ready = bool(ai_config.DEEPSEEK_API_KEY)
+        ai_msg = "DeepSeek 驱动已就绪" if ai_ready else "DeepSeek 未配置 API Key"
+    elif provider in ["openai", "claude"]:
+        key = ai_config.OPENAI_API_KEY if provider == "openai" else ai_config.ANTHROPIC_API_KEY
+        ai_ready = bool(key)
+        ai_msg = f"{provider.upper()} 已就绪" if ai_ready else f"{provider.upper()} 未配置 API Key"
+    else:
+        ai_ready = bool(ai_config.DEEPSEEK_API_KEY or ai_config.ANTIGRAVITY_API_KEY)
+        ai_msg = "AI 模型已接入" if ai_ready else "未检测到有效 AI 提供商配置"
+
+    model_info = ai_config.get_current_model_info()
+
+    # 2. 检查待测应用包
+    apks = list(settings.APPS_DIR.glob("*.apk"))
+    app_ready = len(apks) > 0
+    current_app_name = apks[0].name if app_ready else ""
+    app_msg = f"已就绪: {current_app_name}" if app_ready else "未检测到待测应用包 (apps/ 目录为空)"
+
+    # 3. 检查物理真机
+    devices = app_mgr.get_connected_devices()
+    device_ready = len(devices) > 0
+    device_msg = f"已连接 {len(devices)} 台真机" if device_ready else "未检测到物理真机设备 (请开启 USB 调试)"
+
+    missing = []
+    if not ai_ready:
+        missing.append("ai")
+    if not app_ready:
+        missing.append("app")
+    if not device_ready:
+        missing.append("device")
+
+    return {
+        "success": True,
+        "ready": len(missing) == 0,
+        "missing": missing,
+        "checks": {
+            "ai": {
+                "ready": ai_ready,
+                "provider": provider,
+                "model": model_info.get("model", ""),
+                "display_name": model_info.get("name", provider),
+                "message": ai_msg
+            },
+            "app": {
+                "ready": app_ready,
+                "count": len(apks),
+                "current_app": current_app_name,
+                "message": app_msg
+            },
+            "device": {
+                "ready": device_ready,
+                "count": len(devices),
+                "devices": devices,
+                "message": device_msg
+            }
+        }
+    }
+
 @app.get("/api/apps")
 async def get_apps():
     """获取已下载的安装包列表与元数据"""
@@ -135,24 +225,71 @@ async def get_apps():
         })
     return {"apps": apks}
 
+@app.get("/api/apps/check_installed")
+async def check_app_installed(package: str, device_id: Optional[str] = None):
+    """检测指定包名的应用是否已安装在目标真机设备上"""
+    if not package:
+        return {"installed": False, "message": "包名不能为空"}
+    installed = app_mgr.is_app_installed(package, device_id=device_id)
+    return {"installed": installed, "package": package, "device_id": device_id}
+
+@app.delete("/api/apps/{filename}")
+async def delete_app_package(filename: str):
+    """从应用库中移除指定 APK 安装包"""
+    apk_path = settings.APPS_DIR / filename
+    if apk_path.exists():
+        try:
+            apk_path.unlink()
+            return {"success": True, "message": f"已成功移除应用包: {filename}"}
+        except Exception as e:
+            return JSONResponse(status_code=500, content={"success": False, "message": str(e)})
+    return JSONResponse(status_code=404, content={"success": False, "message": "文件不存在"})
+
 @app.post("/api/install")
 async def install_app_to_device(device_id: Optional[str] = Form(None), filename: str = Form(...)):
-    """安装指定 APK 到设备"""
+    """安装指定 APK 到设备，支持针对小米 MIUI / 国内厂商安全限制的自适应降级与通道兜底"""
     apk_path = settings.APPS_DIR / filename
     if not apk_path.exists():
         return JSONResponse(status_code=404, content={"message": "安装包不存在"})
 
     adb_bin = app_mgr.adb_bin
-    cmd = [adb_bin]
-    if device_id:
-        cmd.extend(["-s", device_id])
-    cmd.extend(["install", "-r", "-g", str(apk_path)])
+    target_dev = device_id if (device_id and device_id not in ["mock-device", "local-simulator", "default"]) else None
+    base_cmd = [adb_bin]
+    if target_dev:
+        base_cmd.extend(["-s", target_dev])
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        # Step 1: 尝试标准 install -r -g 安装
+        cmd_with_g = base_cmd + ["install", "-r", "-g", str(apk_path)]
+        res = subprocess.run(cmd_with_g, capture_output=True, text=True, timeout=120)
         if "Success" in res.stdout:
-            return {"success": True, "message": f"成功安装 {filename} 到设备 {device_id or '默认设备'}"}
-        return {"success": False, "message": f"安装失败: {res.stdout} {res.stderr}"}
+            return {"success": True, "message": f"成功安装 {filename} 到设备 {target_dev or '默认真机'}"}
+
+        # Step 2: 若触发权限安全异常 (常见于小米 MIUI)，自适应降级为不带 -g 的纯覆盖安装
+        err_msg = (res.stdout + " " + res.stderr).strip()
+        if "INSTALL_GRANT_RUNTIME_PERMISSIONS" in err_msg or "SecurityException" in err_msg:
+            cmd_no_g = base_cmd + ["install", "-r", str(apk_path)]
+            res2 = subprocess.run(cmd_no_g, capture_output=True, text=True, timeout=120)
+            if "Success" in res2.stdout:
+                return {"success": True, "message": f"成功安装 {filename} 到设备 {target_dev or '默认真机'}"}
+            err_msg = (res2.stdout + " " + res2.stderr).strip()
+
+        # Step 3: 若触发 USER_RESTRICTED (小米手机开发者选项中未开启【USB 安装】)
+        if "INSTALL_FAILED_USER_RESTRICTED" in err_msg or "user_restricted" in err_msg.lower():
+            try:
+                remote_dest = f"/sdcard/Download/{filename}"
+                subprocess.run(base_cmd + ["push", str(apk_path), remote_dest], capture_output=True, timeout=30)
+                subprocess.run(base_cmd + ["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", f"file://{remote_dest}", "-t", "application/vnd.android.package-archive"], capture_output=True, timeout=10)
+                return {
+                    "success": False,
+                    "need_user_action": True,
+                    "reason": "MIUI_USER_RESTRICTED",
+                    "message": "已自动将安装包推送到手机并唤起安装弹窗！\n请在手机屏幕上点击【继续/允许安装】；\n或在手机【开发者选项】开启【USB 安装】与【USB 调试(安全设置)】。"
+                }
+            except Exception as e_push:
+                pass
+
+        return {"success": False, "message": f"安装失败: {err_msg}"}
     except Exception as e:
         return {"success": False, "message": str(e)}
 
@@ -570,6 +707,9 @@ async def get_config():
 async def update_config(
     provider: str = Form(...),
     model: Optional[str] = Form(None),
+    app_filename: Optional[str] = Form(None),
+    app_package: Optional[str] = Form(None),
+    app_label: Optional[str] = Form(None),
     api_key: Optional[str] = Form(None),
     base_url: Optional[str] = Form(None)
 ):
@@ -620,6 +760,111 @@ async def update_config(
     
     current_m = keys_to_set.get(f"{provider.upper()}_MODEL") or model or "default"
     return {"success": True, "message": f"成功切换为 [{provider.upper()}] 模型: {current_m}"}
+
+@app.post("/api/config/fetch_models")
+async def fetch_remote_models(
+    provider: str = Form(...),
+    api_key: Optional[str] = Form(None),
+    base_url: Optional[str] = Form(None)
+):
+    """在线动态向服务商拉取可用模型列表"""
+    if provider == "antigravity":
+        from core.antigravity_oauth import AntigravityOAuth
+        oauth = AntigravityOAuth()
+        state = oauth.get_state()
+        models = state.get("models", ["gemini-3.8-flash-high", "gemini-2.5-flash", "gemini-2.5-pro"])
+        return {"success": True, "models": models, "message": f"成功获取 Google 官方 {len(models)} 个可用多模态模型"}
+    
+    effective_url = base_url
+    if not effective_url:
+        if provider == "deepseek":
+            effective_url = "https://api.deepseek.com"
+        elif provider == "hermes":
+            effective_url = os.environ.get("HERMES_BASE_URL", "http://10.10.20.108:8080/v1")
+        else:
+            effective_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+            
+    effective_key = api_key or os.environ.get(f"{provider.upper()}_API_KEY", "")
+    
+    url = (effective_url or "").rstrip("/")
+    if not url.endswith("/models"):
+        if "/v1" in url:
+            models_endpoint = f"{url}/models"
+        else:
+            models_endpoint = f"{url}/v1/models"
+    else:
+        models_endpoint = url
+
+    try:
+        import urllib.request, json
+        req = urllib.request.Request(models_endpoint)
+        if effective_key:
+            req.add_header("Authorization", f"Bearer {effective_key}")
+        req.add_header("User-Agent", "AutotestAI-Client/2.0")
+        
+        with urllib.request.urlopen(req, timeout=5) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            data_list = res_data.get("data", [])
+            model_ids = []
+            for item in data_list:
+                if isinstance(item, dict) and "id" in item:
+                    model_ids.append(item["id"])
+                elif isinstance(item, str):
+                    model_ids.append(item)
+            
+            if model_ids:
+                return {
+                    "success": True,
+                    "models": model_ids,
+                    "message": f"成功在线探测并拉取到 {len(model_ids)} 个可用模型"
+                }
+    except Exception as e:
+        pass
+        
+    fallback = []
+    if provider == "deepseek":
+        fallback = ["deepseek-chat", "deepseek-reasoner"]
+    elif provider == "hermes":
+        fallback = ["deepseek-flash", "deepseek-chat", "deepseek-coder"]
+    else:
+        fallback = ["gpt-4o", "gpt-4o-mini", "custom"]
+        
+    return {
+        "success": False,
+        "models": fallback,
+        "message": "服务商接口未能即时响应，已加载常用模型列表"
+    }
+
+@app.get("/api/settings/env_status")
+async def get_env_status():
+    """获取本地 ADB 与运行环境状态"""
+    import subprocess, shutil
+    adb_path = shutil.which("adb")
+    adb_version = "未检测到 ADB 命令 (请确认已加入环境变量 PATH)"
+    adb_ready = False
+    
+    if adb_path:
+        try:
+            res = subprocess.run([adb_path, "version"], capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                adb_ready = True
+                first_line = res.stdout.strip().split("\n")[0]
+                adb_version = first_line
+        except Exception:
+            pass
+            
+    return {
+        "adb": {
+            "ready": adb_ready,
+            "version": adb_version,
+            "path": adb_path or "adb"
+        },
+        "paths": {
+            "env_file": str(BASE_DIR / ".env"),
+            "solidified_cases": str(BASE_DIR / "solidified_cases"),
+            "reports": str(BASE_DIR / "reports")
+        }
+    }
 
 @app.get("/api/antigravity/status")
 async def get_antigravity_status():
@@ -765,7 +1010,10 @@ async def create_task_session(
     case_name: str = Form("auto_flow"),
     approval_mode: str = Form("auto"),
     provider: Optional[str] = Form(None),
-    model: Optional[str] = Form(None)
+    model: Optional[str] = Form(None),
+    app_filename: Optional[str] = Form(None),
+    app_package: Optional[str] = Form(None),
+    app_label: Optional[str] = Form(None)
 ):
     """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型"""
     device_ids = []
@@ -778,7 +1026,10 @@ async def create_task_session(
         case_name=case_name,
         approval_mode=approval_mode,
         provider=provider,
-        model=model
+        model=model,
+        app_filename=app_filename,
+        app_package=app_package,
+        app_label=app_label
     )
     return {"success": True, "session_id": session_id, "message": "测试会话已创建"}
 
@@ -811,6 +1062,24 @@ async def get_session_detail(session_id: str, offsets: Optional[str] = None):
         return detail
     return JSONResponse(status_code=404, content={"message": "会话不存在"})
 
+@app.post("/api/sessions/{session_id}/pause")
+async def pause_task_session(session_id: str):
+    """用户主动暂停正在运行中的测试任务"""
+    ok = task_mgr.pause_session(session_id)
+    return {"success": ok, "message": "测试任务已暂停" if ok else "无法暂停（任务非运行状态或已结束）"}
+
+@app.post("/api/sessions/{session_id}/resume")
+async def resume_task_session(session_id: str):
+    """用户主动恢复继续已暂停的测试任务"""
+    ok = task_mgr.resume_session(session_id)
+    return {"success": ok, "message": "测试任务已恢复推进" if ok else "无法恢复（任务非暂停状态）"}
+
+@app.post("/api/sessions/{session_id}/stop")
+async def stop_task_session(session_id: str):
+    """用户主动彻底终止当前正在运行的测试任务"""
+    ok = task_mgr.stop_session(session_id)
+    return {"success": ok, "message": "测试任务已彻底终止" if ok else "终止失败或任务不存在"}
+
 @app.post("/api/sessions/{session_id}/delete")
 async def delete_task_session(session_id: str):
     """删除指定的测试会话记录"""
@@ -822,7 +1091,10 @@ async def append_session_message(
     session_id: str,
     message: str = Form(...),
     provider: Optional[str] = Form(None),
-    model: Optional[str] = Form(None)
+    model: Optional[str] = Form(None),
+    app_filename: Optional[str] = Form(None),
+    app_package: Optional[str] = Form(None),
+    app_label: Optional[str] = Form(None)
 ):
     """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，支持动态切换模型"""
     try:

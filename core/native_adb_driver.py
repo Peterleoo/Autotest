@@ -63,15 +63,67 @@ class NativeADBDriver:
         self._detect_device()
 
     def _detect_device(self):
-        if not self.device_id:
+        try:
             res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, timeout=5)
-            for line in res.stdout.strip().split("\n")[1:]:
-                parts = line.split()
-                if len(parts) >= 2 and parts[1] == "device":
-                    self.device_id = parts[0]
-                    break
-        if not self.device_id:
-            raise ConnectionError("未检测到在线的 Android 真机或模拟器！")
+            lines = res.stdout.strip().split("\n")[1:]
+        except Exception as e:
+            raise ConnectionError(f"无法执行 ADB 获取设备列表: {e}")
+
+        online_devices = []
+        abnormal_devices = {}
+        for line in lines:
+            parts = line.split()
+            if len(parts) >= 2:
+                dev_id, status = parts[0], parts[1]
+                if status == "device":
+                    online_devices.append(dev_id)
+                else:
+                    abnormal_devices[dev_id] = status
+
+        if self.device_id:
+            if self.device_id in online_devices:
+                return
+            status = abnormal_devices.get(self.device_id)
+            if status == "offline":
+                try:
+                    logger.warning(f"设备 [{self.device_id}] 处于 offline 状态，尝试执行 adb reconnect...")
+                    subprocess.run([self.adb_bin, "reconnect", "offline"], capture_output=True, timeout=5)
+                    time.sleep(1)
+                    res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, timeout=5)
+                    for l in res.stdout.strip().split("\n")[1:]:
+                        p = l.split()
+                        if len(p) >= 2 and p[0] == self.device_id and p[1] == "device":
+                            logger.info(f"设备 [{self.device_id}] 自动重连成功！")
+                            return
+                except Exception:
+                    pass
+                raise ConnectionError(f"目标真机 [{self.device_id}] 处于离线状态 (offline)。请重新插拔 USB 数据线或重启手机开发者选项中的【USB 调试】。")
+            elif status == "unauthorized":
+                raise ConnectionError(f"目标真机 [{self.device_id}] 未获得 USB 调试授权 (unauthorized)。请点亮手机屏幕并在弹出授权提示框中勾选【始终允许这台电脑调试】。")
+            else:
+                raise ConnectionError(f"目标真机 [{self.device_id}] 未连接或无法识别 (当前状态: {status or '未找到'})。请检查 USB 连接。")
+        else:
+            if online_devices:
+                self.device_id = online_devices[0]
+            else:
+                if abnormal_devices:
+                    dev_id, st = next(iter(abnormal_devices.items()))
+                    raise ConnectionError(f"检测到设备 [{dev_id}] 但处于异常状态 [{st}]，无法激活驱动。请检查手机 USB 调试连接与授权。")
+                raise ConnectionError("未检测到任何已连接的物理真机！杜绝免机仿真，请使用 USB 数据线连接真机并启用 USB 调试。")
+
+        # 🚀 毫秒级手势注入权限健康探针（有记录直接用，无记录 AI 自动分析）
+        try:
+            from core.device_knowledge_manager import device_knowledge_mgr
+            ok, tip = device_knowledge_mgr.probe_input_permission(self.device_id)
+            if not ok:
+                dev_fp = device_knowledge_mgr.get_device_fingerprint(self.device_id)
+                err_msg = f"真机手势模拟点击权限未就绪：{tip}"
+                logger.error(f"❌ 【{dev_fp.get('brand')} {dev_fp.get('model')}】{err_msg}")
+                raise PermissionError(f"【{dev_fp.get('brand')} {dev_fp.get('model')}】{err_msg}")
+        except PermissionError:
+            raise
+        except Exception as e:
+            logger.warning(f"跳过手势探针校验: {e}")
 
     def execute_adb(self, cmd_args: List[str], timeout: int = 15) -> subprocess.CompletedProcess:
         full_cmd = [self.adb_bin]
@@ -152,8 +204,28 @@ class NativeADBDriver:
     def launch_app(self, package: str, activity: str):
         """直接调起真机目标应用前台，零重装零弹窗"""
         logger.info(f"原生 ADB 秒级调起应用: {package}/{activity}")
-        self.execute_adb(["shell", "am", "start", "-n", f"{package}/{activity}"])
+        res = self.execute_adb(["shell", "am", "start", "-n", f"{package}/{activity}"])
+        output = (res.stdout + " " + res.stderr).strip()
+        if "Error" in output or "does not exist" in output or "not found" in output:
+            logger.error(f"调起应用失败: {output}")
+            raise RuntimeError(f"调起应用失败: {output}")
         time.sleep(1.5)
+
+    def get_window_size(self) -> Dict[str, int]:
+        """获取真机物理屏幕分辨率 (width, height)"""
+        try:
+            res = self.execute_adb(["shell", "wm", "size"])
+            m = re.search(r"(\d+)x(\d+)", res.stdout)
+            if m:
+                return {"width": int(m.group(1)), "height": int(m.group(2))}
+        except Exception:
+            pass
+        return {"width": 1080, "height": 2160}
+
+    def swipe(self, start_x: int, start_y: int, end_x: int, end_y: int, duration: int = 500):
+        """执行原生平滑微步滑动"""
+        self.execute_adb(["shell", "input", "swipe", str(int(start_x)), str(int(start_y)), str(int(end_x)), str(int(end_y)), str(int(duration))])
+        time.sleep(0.5)
 
     def implicitly_wait(self, timeout: int):
         pass

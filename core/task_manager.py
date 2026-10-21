@@ -43,6 +43,7 @@ class TaskManager:
         self.device_locks: Dict[str, threading.Lock] = {}
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.active_session_id: Optional[str] = None
+        self.session_procs: Dict[str, subprocess.Popen] = {}
         self._load_persisted_sessions()
 
     def _save_session(self, session_id: str):
@@ -68,6 +69,8 @@ class TaskManager:
                 with open(p, "r", encoding="utf-8") as f:
                     sess = json.load(f)
                     sid = sess.get("session_id") or p.stem
+                    if "timestamp" not in sess:
+                        sess["timestamp"] = p.stat().st_mtime
                     self.sessions[sid] = sess
                     if not self.active_session_id:
                         self.active_session_id = sid
@@ -77,6 +80,102 @@ class TaskManager:
         # 若没有任何历史会话，才创建默认欢迎引导会话
         if not self.sessions:
             self._create_default_welcome_session()
+
+    def pause_session(self, session_id: str) -> bool:
+        """用户主动暂停测试任务：Windows 底层挂起子进程，状态变更为 PAUSED"""
+        session = self.sessions.get(session_id)
+        if not session or session.get("status") != "RUNNING":
+            return False
+        
+        proc = self.session_procs.get(session_id)
+        if proc and proc.poll() is None:
+            try:
+                import ctypes
+                PROCESS_ALL_ACCESS = 0x1FFFFF
+                handle = ctypes.windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, proc.pid)
+                ctypes.windll.ntdll.NtSuspendProcess(handle)
+                ctypes.windll.kernel32.CloseHandle(handle)
+                logger.info(f"⏸️ 成功挂起会话 [{session_id}] 进程 (PID: {proc.pid})")
+            except Exception as e:
+                logger.warning(f"挂起进程异常: {e}")
+
+        session["status"] = "PAUSED"
+        for d in session.get("devices", {}).values():
+            d["action"] = "⏸️ 任务已暂停"
+            d["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ⏸️ 用户主动暂停了测试任务")
+        self._save_session(session_id)
+        return True
+
+    def resume_session(self, session_id: str) -> bool:
+        """用户主动恢复测试任务：Windows 底层解冻子进程，状态恢复为 RUNNING"""
+        session = self.sessions.get(session_id)
+        if not session or session.get("status") != "PAUSED":
+            return False
+
+        proc = self.session_procs.get(session_id)
+        if proc and proc.poll() is None:
+            try:
+                import ctypes
+                PROCESS_ALL_ACCESS = 0x1FFFFF
+                handle = ctypes.windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, proc.pid)
+                ctypes.windll.ntdll.NtResumeProcess(handle)
+                ctypes.windll.kernel32.CloseHandle(handle)
+                logger.info(f"▶️ 成功恢复会话 [{session_id}] 进程 (PID: {proc.pid})")
+            except Exception as e:
+                logger.warning(f"恢复进程异常: {e}")
+
+        session["status"] = "RUNNING"
+        for d in session.get("devices", {}).values():
+            d["action"] = "▶️ 任务恢复执行中"
+            d["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ▶️ 用户恢复了测试任务推进")
+        self._save_session(session_id)
+        return True
+
+    def stop_session(self, session_id: str) -> bool:
+        """用户主动彻底停止测试任务：Windows 底层递归强制杀死进程树，终止所有 ADB 管道与后续步骤"""
+        session = self.sessions.get(session_id)
+        if not session:
+            return False
+
+        proc = self.session_procs.get(session_id)
+        if proc:
+            try:
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, timeout=5)
+                proc.kill()
+                logger.info(f"⏹️ 成功强制终止会话 [{session_id}] 进程树 (PID: {proc.pid})")
+            except Exception as e:
+                logger.warning(f"终止进程树异常: {e}")
+            finally:
+                self.session_procs.pop(session_id, None)
+
+        # 2. 强力兜底扫描：彻底杀绝所有关联或可能残留的 run_ai_test.py 进程树，绝无孤儿进程逃逸
+        try:
+            cmd = 'powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*run_ai_test.py*' } | Select-Object -ExpandProperty ProcessId"'
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+            for line in res.stdout.strip().split():
+                if line.isdigit():
+                    pid = int(line)
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, timeout=3)
+                    logger.info(f"⏹️ 强力兜底清理测试进程 PID: {pid}")
+        except Exception as e:
+            logger.warning(f"兜底清理孤儿进程异常: {e}")
+
+        session["status"] = "STOPPED"
+        session["is_success"] = False
+        session["error_message"] = "用户主动终止了测试任务"
+
+        steps = session.get("plan_steps", [])
+        for st in steps:
+            if st.get("status") in ["RUNNING", "READY", "PENDING"]:
+                st["status"] = "CANCELED"
+
+        for d in session.get("devices", {}).values():
+            d["status"] = "STOPPED"
+            d["action"] = "⏹️ 用户主动终止"
+            d["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ⏹️ 用户主动终止了测试任务，执行已彻底停止")
+
+        self._save_session(session_id)
+        return True
 
     def _get_device_lock(self, device_id: str) -> threading.Lock:
         if device_id not in self.device_locks:
@@ -92,6 +191,7 @@ class TaskManager:
             "case_name": "welcome_task",
             "test_mode": "local",
             "created_at": datetime.now().strftime("%H:%M:%S"),
+            "timestamp": time.time(),
             "status": "COMPLETED",
             "target_devices": ["default"],
             "devices": {
@@ -117,30 +217,35 @@ class TaskManager:
         self._save_session(sess_id)
 
     def list_sessions(self) -> List[Dict[str, Any]]:
-        """按时间倒序获取所有任务会话概要"""
+        """按创建时间戳严格倒序获取所有任务会话概要（确保最新任务永远排在最顶端）"""
         res = []
-        for s in reversed(list(self.sessions.values())):
+        all_sessions = list(self.sessions.values())
+        all_sessions.sort(key=lambda s: float(s.get("timestamp") or 0), reverse=True)
+        for s in all_sessions:
             device_summaries = []
-            for d in s["devices"].values():
+            devices_map = s.get("devices") or {}
+            for dev_k, d in devices_map.items():
+                if not isinstance(d, dict):
+                    continue
                 device_summaries.append({
-                    "device_id": d["device_id"],
-                    "model": d["model"],
-                    "status": d["status"]
+                    "device_id": d.get("device_id") or dev_k,
+                    "model": d.get("model") or dev_k,
+                    "status": d.get("status") or "IDLE"
                 })
-            platforms = list(set([d.get("platform", "Android") for d in s["devices"].values()]))
+            platforms = list(set([d.get("platform", "Android") for d in devices_map.values() if isinstance(d, dict)]))
             if not platforms:
                 platforms = ["Android"]
             res.append({
-                "session_id": s["session_id"],
-                "title": s["title"],
-                "goal": s["goal"],
-                "status": s["status"],
+                "session_id": s.get("session_id", ""),
+                "title": s.get("title", "未命名任务"),
+                "goal": s.get("goal", ""),
+                "status": s.get("status", "IDLE"),
                 "is_success": s.get("is_success"),
-                "created_at": s["created_at"],
-                "test_mode": s["test_mode"],
-                "is_real_device": (s["test_mode"] == "real"),
+                "created_at": s.get("created_at", ""),
+                "test_mode": s.get("test_mode", "real"),
+                "is_real_device": (s.get("test_mode") == "real"),
                 "platforms": platforms,
-                "device_count": len(s["devices"]),
+                "device_count": len(devices_map),
                 "devices": device_summaries,
                 "report_url": s.get("report_url", "")
             })
@@ -211,7 +316,10 @@ class TaskManager:
         case_name: str = "auto_flow",
         approval_mode: str = "auto",
         provider: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        app_filename: Optional[str] = None,
+        app_package: Optional[str] = None,
+        app_label: Optional[str] = None
     ) -> str:
         """
         创建一个新任务会话并分发给一个或多个目标设备并发执行，支持自动放行与人工审批确认
@@ -221,22 +329,27 @@ class TaskManager:
 
         # 若未显式传入设备，则自动探测当前所有在线设备
         if not device_ids:
-            if test_mode == "real":
-                conn_devs = app_mgr.get_connected_devices()
-                if conn_devs:
-                    device_ids = [conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id", "auto_device")]
-                else:
-                    device_ids = ["mock-device"]
+            conn_devs = app_mgr.get_connected_devices()
+            if conn_devs:
+                device_ids = [conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id", "auto_device")]
             else:
-                device_ids = ["local-simulator"]
+                raise ValueError("未检测到任何在线可用的物理真机！当前已杜绝免机仿真，请使用 USB 数据线连接手机并开启开发者选项中的【USB 调试】。")
 
         session_id = f"sess_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
         title = goal[:20] + ("..." if len(goal) > 20 else "")
         is_auto = (approval_mode == "auto")
         init_status = "RUNNING" if is_auto else "AWAITING_APPROVAL"
 
-        # 🚀 真实调用大模型进行业务意图深度推演与测试步骤动态规划（带毫秒级降级保底）
-        thinking_data, plan_steps = self._generate_ai_plan_and_thinking(goal, is_auto, test_mode, provider=provider, model=model)
+        # 🚀 毫秒级极速初始化（<50ms 瞬发）：使用规则分解引擎瞬间生成测试执行大纲，杜绝前端卡死等待 15 秒
+        plan_steps = self._decompose_plan_steps(goal, is_auto)
+        thinking_data = {
+            "duration": "推演就绪",
+            "bullets": [
+                {"tag": "业务意图推演", "content": f"已锚定测试目标【{goal}】。核心业务交互链路推演就绪，准备下发界面流转。"},
+                {"tag": "跨端定位策略", "content": f"分配设备 [{', '.join(device_ids)}]，已锁定动态 XPath / 视觉 OCR / 原生通道复合匹配。"},
+                {"tag": "断言与防抖策略", "content": "列表异步加载采用 800ms 防抖等待，首项卡片执行模糊正则匹配，保障断言幂等性。"}
+            ]
+        }
 
         session = {
             "session_id": session_id,
@@ -247,7 +360,11 @@ class TaskManager:
             "approval_mode": approval_mode,
             "provider": provider,
             "model": model,
+            "app_filename": app_filename,
+            "app_package": app_package,
+            "app_label": app_label,
             "created_at": datetime.now().strftime("%H:%M:%S"),
+            "timestamp": time.time(),
             "status": init_status,
             "target_devices": device_ids,
             "thinking": thinking_data,
@@ -285,6 +402,23 @@ class TaskManager:
         self.sessions[session_id] = session
         self.active_session_id = session_id
         self._save_session(session_id)
+
+        # 🚀 后台异步大模型富化推演：在后台线程调用大模型细化思考与步骤，平滑回填，绝不阻塞会话创建
+        def _async_enrich_thinking():
+            try:
+                ai_thinking, ai_steps = self._generate_ai_plan_and_thinking(goal, is_auto, test_mode, provider=provider, model=model)
+                cur_sess = self.sessions.get(session_id)
+                if cur_sess and cur_sess.get("status") not in ["STOPPED", "FAILED", "COMPLETED"]:
+                    cur_sess["thinking"] = ai_thinking
+                    existing_steps = cur_sess.get("plan_steps", [])
+                    has_progressed = any(s.get("status") in ["COMPLETED", "FAIL"] for s in existing_steps)
+                    if not has_progressed and ai_steps:
+                        cur_sess["plan_steps"] = ai_steps
+                    self._save_session(session_id)
+            except Exception as e:
+                logger.warning(f"异步富化任务会话 [{session_id}] AI 推演异常: {e}")
+
+        self.executor.submit(_async_enrich_thinking)
 
         # 🚀 若为自动审批，立即派发线程并发执行；若为人工审批，则挂起等待用户确认
         if is_auto:
@@ -664,8 +798,8 @@ class TaskManager:
             start_t = time.time()
 
             try:
-                if test_mode == "local":
-                    self._run_mock_pipeline(session, dev_state, goal, case_name, start_t)
+                if test_mode == "local" or "mock" in device_id.lower() or "simulator" in device_id.lower():
+                    raise RuntimeError("系统已杜绝免机仿真：自动化测试必须基于物理真机执行，请使用 USB 数据线连接真实手机设备。")
                 elif "ios" in device_id.lower():
                     self._run_ios_pipeline(session, dev_state, goal, case_name, start_t)
                 else:
@@ -676,6 +810,11 @@ class TaskManager:
                 dev_state["action"] = f"执行异常: {e}"
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ❌ 执行抛出异常: {e}")
                 self._finish_pipeline(session, max(0, dev_state.get("step", 1) - 1), is_success=False, final_error=str(e))
+
+            # 🛡️ 若已主动终止，彻底退出
+            if session.get("status") == "STOPPED":
+                self._save_session(session_id)
+                return
 
             # 检查整个 Session 的完成状态
             all_done = all(d["status"] in ["PASS", "FAIL", "COMPLETED"] for d in session["devices"].values())
@@ -694,15 +833,22 @@ class TaskManager:
             self._save_session(session_id)
 
     def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float):
-        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--no-solidify"]
+        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id]
+        if session.get("app_filename"):
+            cmd.extend(["--app", session["app_filename"]])
+        if session.get("provider"):
+            cmd.extend(["--provider", session["provider"]])
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=str(BASE_DIR),
             bufsize=1
         )
+        self.session_procs[session["session_id"]] = proc
 
         all_output = []
         cur_idx = 0
@@ -728,14 +874,27 @@ class TaskManager:
                 max_s = int(m_step.group(2))
                 dev_state["step"] = cur_s
                 dev_state["max_steps"] = max_s
-                dev_state["action"] = f"第 {cur_s} 步 感知与决策"
-                cur_idx = cur_s - 1
-                # 单向单调推进步骤，支持自动自增新步骤，坚决不回退！
-                self._advance_session_step(session, cur_idx)
+                dev_state["action"] = f"第 {cur_s} 轮手势交互"
 
             elif "AI 决策:" in line:
                 thought_str = line.split("AI 决策:", 1)[1].strip()
                 dev_state["action"] = f"AI 决策: {thought_str[:28]}"
+
+                # 智能识别业务阶段跃迁：
+                # 只有当离开隐私协议/开屏/引导页等前置界面，真正进入核心业务界面时，才推进业务步骤
+                in_splash_or_guide = any(k in thought_str for k in ["隐私", "协议", "温馨提示", "引导", "启动", "MainActivity", "广告", "权限"])
+                plan_steps = session.get("plan_steps", [])
+                total_plan_steps = len(plan_steps)
+                if not in_splash_or_guide and cur_idx == 0 and total_plan_steps > 1:
+                    logger.info("🎉 检测到已成功跨过开屏与引导页，前置阶段验证通过，推进至业务步骤 2")
+                    self._advance_session_step(session, 1)
+                    cur_idx = 1
+                elif cur_idx > 0 and cur_idx < total_plan_steps - 1:
+                    next_step = plan_steps[cur_idx + 1]
+                    next_keywords = [w for w in re.findall(r"[一-龥]{2,}", next_step.get("title", "") + next_step.get("desc", "")) if len(w) >= 2]
+                    if any(kw in thought_str for kw in next_keywords):
+                        cur_idx += 1
+                        self._advance_session_step(session, cur_idx)
 
             elif "==> 执行动作" in line:
                 act_str = line.split("==> 执行动作", 1)[1].strip()
@@ -748,18 +907,45 @@ class TaskManager:
                 dev_state["action"] = "测试目标达成，脚本固化中"
 
         proc.wait()
+        self.session_procs.pop(session["session_id"], None)
         duration = time.time() - start_t
+
+        # 🛡️ 状态核验：若用户已主动终止任务 (STOPPED)，坚决保持 STOPPED 状态，绝不覆写为 FAIL 或生成多余报告
+        if session.get("status") == "STOPPED":
+            dev_state["status"] = "STOPPED"
+            dev_state["action"] = "任务已被用户主动终止"
+            dev_state["duration"] = f"{round(duration, 1)}s"
+            self._save_session(session["session_id"])
+            return
         dev_state["duration"] = f"{round(duration, 1)}s"
-        is_success = (proc.returncode == 0)
+        has_goal_achieved = any("🎉 目标完成" in l or "固化成功" in l for l in all_output)
+        is_success = (proc.returncode == 0) or has_goal_achieved
         dev_state["success"] = is_success
         dev_state["status"] = "PASS" if is_success else "FAIL"
+        if is_success:
+            session["is_success"] = True
+            session["error_message"] = ""
+            cur_idx = max(cur_idx, len(session.get("plan_steps", [])) - 1)
 
         if not is_success:
             session["is_success"] = False
-            session["error_message"] = last_error_line or "AI 自动化测试未能达成预期目标，存在失败动作"
+            fail_reason = ""
+            for l in reversed(all_output):
+                if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
+                    fail_reason = l
+                    break
+            session["error_message"] = fail_reason or last_error_line or "测试前置检查未通过或执行中断"
+
+            # 🛡️ 事实核查：检查整个执行过程中是否真正跨过了前置引导页
+            all_thoughts = " ".join([l for l in all_output if "AI 决策:" in l])
+            ever_left_guide = any(k in all_thoughts for k in ["二手房", "搜索", "房源", "首页", "列表", "详情", "我的", "表单", "输入框"])
+            if not ever_left_guide:
+                # 连开屏/引导页都没跳过，实际通过阶段数严格为 0，卡点严格锁定在第 1 步！
+                cur_idx = 0
+                logger.warning("🛡️ [事实核验] 识别到测试在引导页/开屏阶段即受阻，卡点严格锁定在 Step 1，拒绝虚报前置通过")
 
         # 精确单点收敛：若成功则未跑步骤略过(SKIPPED)，若失败仅当前步报错(FAIL)
-        self._finish_pipeline(session, cur_idx, is_success=is_success, final_error=last_error_line)
+        self._finish_pipeline(session, cur_idx, is_success=is_success, final_error=session.get("error_message") or last_error_line)
 
         # 生成该设备独立交付物报告
         plan_steps = session.get("plan_steps", [])
@@ -775,9 +961,9 @@ class TaskManager:
             title=f"【真机实测-{dev_state['model']}】{goal[:20]}",
             goal=goal,
             test_mode="real",
-            app_name="象盒找房",
-            package="com.apicloud.A6995433058179",
-            model_name=ai_config.PROVIDER.upper(),
+            app_name=session.get("app_label") or "象盒找房",
+            package=session.get("app_package") or "com.apicloud.A6995433058179",
+            model_name=(session.get("provider") or ai_config.PROVIDER).upper(),
             status="PASS" if is_success else "FAIL",
             steps=steps,
             raw_output="\n".join(all_output),

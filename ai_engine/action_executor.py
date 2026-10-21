@@ -53,8 +53,38 @@ class ActionExecutor:
 
             elif action == "swipe":
                 direction = action_dict.get("direction", "up").lower()
-                self._swipe(direction)
+                repeat = max(1, int(action_dict.get("repeat", 1)))
+                for i in range(repeat):
+                    self._swipe(direction)
+                    if i < repeat - 1:
+                        time.sleep(0.35)
                 trace_item["direction"] = direction
+                trace_item["repeat"] = repeat
+
+            elif action in ["fast_forward_guide", "skip_guide"]:
+                # 引导页极速穿透宏动作：一气呵成连滑 3 次直达末页并点击体验/进入
+                logger.info("⚡ 执行【引导页极速穿透宏动作】：快速连翻 3 页直达末页...")
+                for _ in range(3):
+                    self._swipe("left")
+                    time.sleep(0.3)
+                time.sleep(0.6)
+                # 尝试点击进入按钮（优先点击 OCR 识别到的‘马上体验/立即体验/跳过/进入’，若未提取则盲按标准底部按钮区域）
+                clicked = False
+                for el in elements_map:
+                    txt = el.get("text", "")
+                    if any(kw in txt for kw in ["马上体验", "立即体验", "立即进入", "开始体验", "跳过", "进入首页", "随便看看"]):
+                        self._locate_and_click(el, None)
+                        clicked = True
+                        break
+                if not clicked:
+                    # 黄金标准体验按钮区域：屏幕水平居中偏下位置
+                    win_size = getattr(self.driver, "get_window_size", lambda: {"width": 1080, "height": 2160})()
+                    btn_x = win_size.get("width", 1080) // 2
+                    btn_y = int(win_size.get("height", 2160) * 0.75)
+                    logger.info(f"点击引导页标准体验按钮区: ({btn_x}, {btn_y})")
+                    if hasattr(self.driver, "execute_adb"):
+                        self.driver.execute_adb(["shell", "input", "tap", str(btn_x), str(btn_y)])
+                trace_item["macro"] = "fast_forward_guide"
 
             elif action == "press_key":
                 key = action_dict.get("key", "back").lower()
@@ -245,9 +275,10 @@ class ActionExecutor:
             elif direction == "down":
                 self.driver.execute_adb(["shell", "input", "swipe", "540", "950", "540", "1350", "600"])
             elif direction == "left":
-                self.driver.execute_adb(["shell", "input", "swipe", "800", "1000", "300", "1000", "600"])
+                # 水平翻页手势：采用快速跨屏滑动 (跨度 830px，时长 300ms)，确保顺利触发 ViewPager 翻页
+                self.driver.execute_adb(["shell", "input", "swipe", "950", "1000", "120", "1000", "300"])
             elif direction == "right":
-                self.driver.execute_adb(["shell", "input", "swipe", "300", "1000", "800", "1000", "600"])
+                self.driver.execute_adb(["shell", "input", "swipe", "120", "1000", "950", "1000", "300"])
             return
 
         size = self.driver.get_window_size()

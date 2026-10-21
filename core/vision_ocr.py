@@ -59,11 +59,11 @@ class VisionOCR:
         # 1. 计算当前截屏感知指纹
         current_fp = compute_image_fingerprint(image_bytes)
 
-        # 2. 判断是否命中缓存（汉明距离 <= 1，允许轻微状态栏时间跳动）
+        # 2. 判断是否命中缓存（汉明距离 == 0，即屏幕完全无变动，避免轮播图相似帧误判）
         if use_cache and _LAST_OCR_FINGERPRINT is not None and _LAST_OCR_RESULTS:
             dist = hamming_distance(current_fp, _LAST_OCR_FINGERPRINT)
-            if dist <= 1:
-                logger.info(f"⚡ [OCR缓存命中] 屏幕指纹高度一致 (差异距离:{dist}<=1)，0 耗时复用上一次识别的 {len(_LAST_OCR_RESULTS)} 个元素！")
+            if dist == 0:
+                logger.info(f"⚡ [OCR缓存命中] 屏幕指纹完全一致，0 耗时复用上一次识别的 {len(_LAST_OCR_RESULTS)} 个元素！")
                 # 返回深拷贝避免外界篡改缓存
                 import copy
                 cached_res = copy.deepcopy(_LAST_OCR_RESULTS)

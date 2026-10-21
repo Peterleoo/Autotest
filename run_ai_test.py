@@ -34,13 +34,28 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
     pkg = apk_info.get("package") or settings.ANDROID_APP_PACKAGE
     act = apk_info.get("activity") or settings.ANDROID_APP_ACTIVITY
 
-    is_installed = app_mgr.is_app_installed(pkg)
+    is_installed = app_mgr.is_app_installed(pkg, device_id=device_id)
     if is_installed:
         print(f"\n📱 [状态核实] 真机已安装应用 [{pkg}]，直接调起运行，无需重复安装！")
     else:
-        if target_app and settings.PLATFORM == "android":
-            print(f"\n📦 真机未检测到应用，开始初次安装: {target_app.name}...")
-            app_mgr.install_android_app(target_app)
+        if not target_app:
+            logger.error(f"❌ 真机未安装应用 [{pkg}]，且未在 apps 目录下找到可供安装的安装包！测试终止。")
+            print(f"\n💡 提示: 请将待测 APK 安装包放入 apps/ 目录，或提前在真机上手动安装该应用。")
+            sys.exit(1)
+
+        if settings.PLATFORM == "android":
+            print(f"\n📦 真机未检测到应用，开始初次安装: {target_app.name} 到设备 {device_id or '默认设备'}...")
+            install_ok = app_mgr.install_android_app(target_app, device_id=device_id)
+            if not install_ok:
+                logger.error(f"❌ 待测应用 [{target_app.name}] 安装失败！请检查设备是否在线 (USB 调试/授权) 或存储空间是否充足。测试立即终止。")
+                print(f"\n💡 提示: 请确保手机屏幕解锁并已在弹窗中允许 USB 调试与应用安装。")
+                sys.exit(1)
+
+            # 安装后二次复核，杜绝假安装
+            if not app_mgr.is_app_installed(pkg, device_id=device_id):
+                logger.error(f"❌ 安装命令已执行但真机校验应用 [{pkg}] 仍处于未安装状态！测试立即终止。")
+                sys.exit(1)
+            print(f"✅ [应用就绪] 待测应用 [{pkg}] 安装并校验通过！")
 
     # 2. 检查是否有已连接的设备或正在运行的 Appium Server
     driver = None
@@ -74,7 +89,11 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
             print(f"   pytest {solid_file} -v -s")
 
         if not result.get("success"):
-            logger.error("❌ AI 自动化测试未能达成预期目标！")
+            err_reason = result.get("error_reason")
+            if err_reason:
+                logger.error(f"❌ 测试受阻详情:\n{err_reason}")
+            else:
+                logger.error("❌ AI 自动化测试未能达成预期目标！")
             sys.exit(1)
 
     finally:

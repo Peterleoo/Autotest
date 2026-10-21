@@ -22,7 +22,7 @@ class AIConfig:
     # 1. 象盒企业 Hermes 网关（DeepSeek-Flash，实测连通）
     @property
     def HERMES_API_KEY(self) -> str:
-        return os.getenv("HERMES_API_KEY", "sk-nrjzRWUv3pQq3AEYQMPEWT4UkOW7sJtayQae1qU4v5rES1zQ")
+        return os.getenv("HERMES_API_KEY", "")
 
     @property
     def HERMES_BASE_URL(self) -> str:

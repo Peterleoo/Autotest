@@ -66,7 +66,56 @@ class Solidifier:
 
             elif action == "swipe":
                 direction = step.get("direction", "up")
-                steps_code.append(f"    # 步骤 {i}: 滑动手势 [{direction}]\n    # 自适应窗口滚动\n    size = driver.get_window_size()\n    driver.swipe(size['width']//2, int(size['height']*0.7), size['width']//2, int(size['height']*0.3), 600)\n    time.sleep(1)")
+                repeat = step.get("repeat", 1)
+                if repeat > 1:
+                    if direction == "left":
+                        steps_code.append(
+                            f"    # 步骤 {i}: 连续向左快速翻页 {repeat} 次\n"
+                            f"    size = driver.get_window_size()\n"
+                            f"    w, h = size['width'], size['height']\n"
+                            f"    for _ in range({repeat}):\n"
+                            f"        driver.swipe(int(w * 0.88), h // 2, int(w * 0.12), h // 2, 300)\n"
+                            f"        time.sleep(0.35)\n"
+                            f"    time.sleep(1)"
+                        )
+                    else:
+                        steps_code.append(
+                            f"    # 步骤 {i}: 连续滑动手势 [{direction}] ({repeat} 次)\n"
+                            f"    size = driver.get_window_size()\n"
+                            f"    for _ in range({repeat}):\n"
+                            f"        driver.swipe(size['width']//2, int(size['height']*0.7), size['width']//2, int(size['height']*0.3), 500)\n"
+                            f"        time.sleep(0.35)\n"
+                            f"    time.sleep(1)"
+                        )
+                else:
+                    if direction == "left":
+                        steps_code.append(
+                            f"    # 步骤 {i}: 滑动手势 [left]\n"
+                            f"    size = driver.get_window_size()\n"
+                            f"    w, h = size['width'], size['height']\n"
+                            f"    driver.swipe(int(w * 0.88), h // 2, int(w * 0.12), h // 2, 300)\n"
+                            f"    time.sleep(1)"
+                        )
+                    else:
+                        steps_code.append(
+                            f"    # 步骤 {i}: 滑动手势 [{direction}]\n"
+                            f"    size = driver.get_window_size()\n"
+                            f"    driver.swipe(size['width']//2, int(size['height']*0.7), size['width']//2, int(size['height']*0.3), 500)\n"
+                            f"    time.sleep(1)"
+                        )
+
+            elif action in ["fast_forward_guide", "skip_guide"]:
+                steps_code.append(
+                    f"    # 步骤 {i}: 引导页极速穿透宏动作（快速翻页至末页并进入首页）\n"
+                    f"    size = driver.get_window_size()\n"
+                    f"    w, h = size['width'], size['height']\n"
+                    f"    for _ in range(3):\n"
+                    f"        driver.swipe(int(w * 0.88), h // 2, int(w * 0.12), h // 2, 300)\n"
+                    f"        time.sleep(0.3)\n"
+                    f"    time.sleep(0.5)\n"
+                    f"    driver.tap([(w // 2, int(h * 0.75))])\n"
+                    f"    time.sleep(1)"
+                )
 
             elif action == "press_key":
                 key = step.get("key", "back")

@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-10-21 10:48:00",
+  "devices": {
+    "Xiaomi_MIX 2": {
+      "brand": "Xiaomi",
+      "model": "MIX 2",
+      "rom": "MIUI",
+      "records": [
+        {
+          "issue_key": "miui_inject_events_blocked",
+          "pattern": "INJECT_EVENTS|injectInputEvent|permission denied.*input|Permission denied.*injecting event",
+          "title": "小米 MIUI 系统手势模拟点击拦截 (缺少 INJECT_EVENTS 权限)",
+          "situation": "检测到小米手机未开启【USB 调试（安全设置）】，导致所有 input tap / swipe 触控事件被系统底层直接丢弃，手机界面无任何触控反应。",
+          "solution": "1. 拿起小米手机，进入【设置】->【更多设置】->【开发者选项】；\n2. 找到并开启【USB 调试（安全设置）】；\n3. 系统弹出 3 次 5 秒安全确认时点击允许即可完成授权。"
+        }
+      ]
+    }
+  },
+  "brand_rules": {
+    "Xiaomi": {
+      "brand": "Xiaomi",
+      "records": [
+        {
+          "issue_key": "xiaomi_general_security_debug",
+          "pattern": "INJECT_EVENTS|injectInputEvent|permission denied.*input|Permission denied.*injecting event",
+          "title": "小米/红米设备手势注入安全拦截",
+          "situation": "小米 MIUI / HyperOS 系统要求单独授权 USB 模拟触控权限，未开启时 ADB 点击和滑动指令会被系统静默丢弃。",
+          "solution": "请在手机【设置 ➔ 更多设置 ➔ 开发者选项】中开启【USB 调试（安全设置）】并确认授权。"
+        }
+      ]
+    },
+    "Huawei": {
+      "brand": "Huawei",
+      "records": [
+        {
+          "issue_key": "huawei_pure_mode_install_block",
+          "pattern": "INSTALL_FAILED_USER_RESTRICTED|纯净模式|HarmonyOS",
+          "title": "华为 HarmonyOS 纯净模式/安装拦截",
+          "situation": "华为鸿蒙系统开启了【纯净模式】或未允许通过 ADB 修改权限，导致测试安装包部署或手势受阻。",
+          "solution": "1. 进入【设置 ➔ 系统和更新 ➔ 纯净模式】，点击退出纯净模式；\n2. 在【开发者选项】中开启【仅充电模式下允许 ADB 调试】及【允许通过 adb 调试修改权限】。"
+        }
+      ]
+    },
+    "vivo": {
+      "brand": "vivo",
+      "records": [
+        {
+          "issue_key": "vivo_security_input",
+          "pattern": "vivo.*input|INSTALL_FAILED_USER_RESTRICTED",
+          "title": "vivo / iQOO 设备模拟点击或安装拦截",
+          "situation": "vivo OriginOS 默认限制通过 USB 模拟点击或需要锁屏密码确认安装。",
+          "solution": "请在【开发者选项】中开启【USB 模拟点击】并开启【允许通过 USB 安装应用（免密安装）】。"
+        }
+      ]
+    },
+    "OPPO": {
+      "brand": "OPPO",
+      "records": [
+        {
+          "issue_key": "oppo_permission_monitor",
+          "pattern": "oppo.*permission|ColorOS",
+          "title": "OPPO / OnePlus / realme ColorOS 权限监控拦截",
+          "situation": "ColorOS 启用了严格的权限监控，会导致自动化手势和辅助功能频繁弹窗阻断。",
+          "solution": "进入【开发者选项】，开启【禁止权限监控】，并确保【USB 调试】保持启用。"
+        }
+      ]
+    }
+  }
+}

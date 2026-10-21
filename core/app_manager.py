@@ -73,27 +73,34 @@ class AppManager:
         logger.warning(f"在 {self.apps_dir} 目录下未找到 {ext} 安装包")
         return None
 
-    def is_app_installed(self, package_name: str) -> bool:
+    def is_app_installed(self, package_name: str, device_id: Optional[str] = None) -> bool:
         """检查手机上是否已经安装了指定包名的应用（使用 0.1s 极速精准的 pm path）"""
         if not package_name or self.platform != "android":
             return False
         try:
-            res = subprocess.run([self.adb_bin, "shell", "pm", "path", package_name], capture_output=True, text=True, timeout=10)
+            cmd = [self.adb_bin]
+            if device_id and device_id not in ["mock-device", "local-simulator", "default"]:
+                cmd.extend(["-s", device_id])
+            cmd.extend(["shell", "pm", "path", package_name])
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             is_ins = "package:" in res.stdout
-            logger.info(f"检查应用 [{package_name}] 安装状态: {'已安装' if is_ins else '未安装'}")
+            logger.info(f"检查应用 [{package_name}] 在设备 [{device_id or 'default'}] 安装状态: {'已安装' if is_ins else '未安装'}")
             return is_ins
         except Exception as e:
             logger.warning(f"检查包安装状态异常: {e}")
             return False
 
-    def install_android_app(self, apk_path: Path, grant_permissions: bool = True) -> bool:
+    def install_android_app(self, apk_path: Path, grant_permissions: bool = True, device_id: Optional[str] = None) -> bool:
         """通过 adb 安装 Android APK，-r 覆盖安装，-g 授予所有运行时权限"""
         if not apk_path.exists():
             logger.error(f"APK 文件不存在: {apk_path}")
             return False
 
         logger.info(f"开始安装 Android APK: {apk_path.name} ...")
-        cmd = [self.adb_bin, "install", "-r"]
+        cmd = [self.adb_bin]
+        if device_id and device_id not in ["mock-device", "local-simulator", "default"]:
+            cmd.extend(["-s", device_id])
+        cmd.extend(["install", "-r"])
         if grant_permissions:
             cmd.append("-g")
         cmd.append(str(apk_path))
@@ -103,9 +110,39 @@ class AppManager:
             if "Success" in res.stdout:
                 logger.info(f"APK 安装成功: {apk_path.name}")
                 return True
-            else:
-                logger.error(f"APK 安装失败: {res.stdout} {res.stderr}")
-                return False
+
+            err_out = (res.stdout + " " + res.stderr).strip()
+            # 若报权限安全异常 (如小米 MIUI 拦截 -g)，降级为普通 install -r
+            if grant_permissions and ("INSTALL_GRANT_RUNTIME_PERMISSIONS" in err_out or "SecurityException" in err_out):
+                logger.info(f"检测到 -g 权限拦截，降级为纯覆盖安装 (install -r)...")
+                cmd_retry = [c for c in cmd if c != "-g"]
+                res2 = subprocess.run(cmd_retry, capture_output=True, text=True, timeout=120)
+                if "Success" in res2.stdout:
+                    logger.info(f"APK 降级安装成功: {apk_path.name}")
+                    return True
+                err_out = (res2.stdout + " " + res2.stderr).strip()
+
+            # 若报 INSTALL_FAILED_USER_RESTRICTED (如小米 MIUI 拦截通过 USB install)，尝试 push 到 /data/local/tmp 然后 pm install -r
+            if "INSTALL_FAILED_USER_RESTRICTED" in err_out:
+                logger.info("检测到系统拦截 USB 安装，尝试转为 push + pm install -r 绕过...")
+                remote_apk = f"/data/local/tmp/{apk_path.name}"
+                push_cmd = [self.adb_bin]
+                if device_id and device_id not in ["mock-device", "local-simulator", "default"]:
+                    push_cmd.extend(["-s", device_id])
+                push_cmd.extend(["push", str(apk_path), remote_apk])
+                subprocess.run(push_cmd, capture_output=True, timeout=120)
+                pm_cmd = [self.adb_bin]
+                if device_id and device_id not in ["mock-device", "local-simulator", "default"]:
+                    pm_cmd.extend(["-s", device_id])
+                pm_cmd.extend(["shell", "pm", "install", "-r", remote_apk])
+                res3 = subprocess.run(pm_cmd, capture_output=True, text=True, timeout=120)
+                if "Success" in res3.stdout:
+                    logger.info(f"APK push+pm 安装成功: {apk_path.name}")
+                    return True
+                err_out = (res3.stdout + " " + res3.stderr).strip()
+
+            logger.error(f"APK 安装失败: {err_out}")
+            return False
         except Exception as e:
             logger.error(f"执行 adb 安装命令异常: {e}")
             return False
