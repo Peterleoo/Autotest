@@ -202,7 +202,15 @@ class NativeADBDriver:
         self.execute_adb(["shell", "input", "keyevent", "4"])
 
     def launch_app(self, package: str, activity: str):
-        """直接调起真机目标应用前台，零重装零弹窗"""
+        """直接调起真机目标应用前台，零重装零弹窗（支持前台智能就地接管）"""
+        try:
+            res_focus = self.execute_adb(["shell", "dumpsys", "window"])
+            if package in res_focus.stdout and "mCurrentFocus" in res_focus.stdout:
+                logger.info(f"⚡ [就地接管] 目标应用 [{package}] 已经处于前台活跃状态，保留当前页面现场，无需重复冷启动！")
+                return
+        except Exception:
+            pass
+
         logger.info(f"原生 ADB 秒级调起应用: {package}/{activity}")
         res = self.execute_adb(["shell", "am", "start", "-n", f"{package}/{activity}"])
         output = (res.stdout + " " + res.stderr).strip()

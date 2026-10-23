@@ -109,20 +109,45 @@ async def get_devices():
     return {"android_devices": devices, "ios_node": ios_node}
 
 @app.get("/api/devices/{device_id}/screenshot")
-async def get_device_screenshot(device_id: str):
-    """获取指定真机设备的实时屏幕截图 (PNG 二进制流)"""
+@app.get("/api/device/screenshot")
+async def get_device_screenshot(device_id: Optional[str] = None, format: str = "png", quality: int = 70):
+    """获取指定真机设备的实时屏幕截图 (支持 PNG 与极速轻量 JPEG 格式)"""
+    import io
+    from PIL import Image
+
+    target_dev = device_id
+    if not target_dev or target_dev in ["mock-device", "local-simulator", "default", "auto"]:
+        try:
+            connected = app_mgr.get_connected_devices()
+            if connected:
+                target_dev = connected[0].get("id")
+        except Exception:
+            pass
+    if not target_dev:
+        target_dev = "2145189e"
+
     adb_bin = app_mgr.adb_bin
     try:
         # 1. 尝试直接通过原生 ADB exec-out screencap -p 抓取端侧画面
-        if device_id and device_id not in ["mock-device", "local-simulator", "default"]:
-            res = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap", "-p"], capture_output=True, timeout=6)
-            if res.returncode == 0 and res.stdout and len(res.stdout) > 200:
-                img_bytes = res.stdout
-                if not img_bytes.startswith(b"\x89PNG\r\n\x1a\n") and b"PNG" in img_bytes[:16]:
-                    img_bytes = img_bytes.replace(b"\r\r\n", b"\n").replace(b"\r\n", b"\n")
-                return Response(content=img_bytes, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+        res = subprocess.run([adb_bin, "-s", target_dev, "exec-out", "screencap", "-p"], capture_output=True, timeout=5)
+        if res.returncode == 0 and res.stdout and len(res.stdout) > 200:
+            img_bytes = res.stdout
+            if not img_bytes.startswith(b"\x89PNG\r\n\x1a\n") and b"PNG" in img_bytes[:16]:
+                img_bytes = img_bytes.replace(b"\r\r\n", b"\n").replace(b"\r\n", b"\n")
+            
+            if format.lower() in ["jpeg", "jpg"]:
+                im = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                w, h = im.size
+                target_w = 480
+                target_h = int(h * (target_w / w))
+                im_thumb = im.resize((target_w, target_h), Image.Resampling.BILINEAR)
+                buf = io.BytesIO()
+                im_thumb.save(buf, format="JPEG", quality=quality)
+                return Response(content=buf.getvalue(), media_type="image/jpeg", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+            
+            return Response(content=img_bytes, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     except Exception as e:
-        logger.warning(f"获取设备 [{device_id}] 实时屏幕截图失败: {e}")
+        logger.warning(f"获取设备 [{target_dev}] 实时屏幕截图失败: {e}")
 
     # 2. 若直连抓取受阻，查找最近一次自动化执行产出的视觉感知截屏作为兜底
     try:
@@ -131,7 +156,7 @@ async def get_device_screenshot(device_id: str):
             pngs = sorted(screenshots_dir.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
             if pngs:
                 with open(pngs[0], "rb") as f:
-                    return Response(content=f.read(), media_type="image/png")
+                    return Response(content=f.read(), media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     except Exception:
         pass
 

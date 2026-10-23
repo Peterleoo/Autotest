@@ -1,6 +1,6 @@
 """
 由 AI 自动化测试智能体自动固化生成的测试用例
-测试目标: 这里的小区明显要选择啊 侧哪里去了？
+测试目标: 点击底部或首页'二手房'入口，进入列表后点击'区域'筛选'岳麓区'，排序选择'总价从低到高'，验证列表已按照价格排序更新
 生成时间: 自动化录制后生成
 执行方式: pytest test_matrix_flow.py -v -s
 """
@@ -25,76 +25,48 @@ def api_client():
     return APIClient()
 
 @allure.feature("固化测试套件")
-@allure.story("这里的小区明显要选择啊 侧哪里去了？")
+@allure.story("点击底部或首页'二手房'入口，进入列表后点击'区域'筛选'岳麓区'，排序选择'总价从低到高'，验证列表已按照价格排序更新")
 def test_test_matrix_flow(driver, api_client):
     """
     自动化用例: test_matrix_flow
-    这里的小区明显要选择啊 侧哪里去了？
+    点击底部或首页'二手房'入口，进入列表后点击'区域'筛选'岳麓区'，排序选择'总价从低到高'，验证列表已按照价格排序更新
     """
-    # 步骤 1: 点击顶部‘请输入小区名或地名’搜索框，进入小区选择与搜索页面 (坐标点击)
-    driver.tap([(438, 152)])
-    time.sleep(1)
-
-    # 步骤 2: 在搜索框输入小区关键字以展示小区联想选择列表
-    el = driver.switch_to.active_element
-    el.send_keys('万达')
-    time.sleep(0.5)
-
-    # 步骤 3: 在搜索框重新输入有效的小区关键词以唤起小区联想列表供选择
-    el = driver.switch_to.active_element
-    el.send_keys('保利')
-    time.sleep(0.5)
-
-    # 步骤 4: 点击桌面上的‘象盒找房’应用图标重新进入应用 (坐标点击)
+    # 步骤 1: 点击启动象盒找房App (坐标点击)
     driver.tap([(668, 824)])
     time.sleep(1)
 
-    # 步骤 5: 在搜索框输入小区关键字以展示小区选择列表
-    el = driver.switch_to.active_element
-    el.send_keys('万达')
-    time.sleep(0.5)
-
-    # 步骤 6: 在搜索框输入真实小区名称‘万达’以唤起小区联想选择列表
-    el = driver.switch_to.active_element
-    el.send_keys('万达')
-    time.sleep(0.5)
-
-    # 步骤 7: 清空搜索框中的无效字符以展示小区列表 (坐标点击)
-    driver.tap([(889, 309)])
-    time.sleep(1)
-
-    # 步骤 8: 在搜索框输入小区关键字以唤起小区联想列表供选择
-    el = driver.switch_to.active_element
-    el.send_keys('万科')
-    time.sleep(0.5)
-
-    # 步骤 9: 点击清空按钮清除搜索框中的乱码字符 (坐标点击)
-    driver.tap([(889, 309)])
-    time.sleep(1)
-
-    # 步骤 10: 模拟返回键
+    # 步骤 2: 模拟返回键
     driver.back()
     time.sleep(1)
 
-    # 步骤 11: 在搜索框输入小区关键词触发联想列表展示
-    el = driver.switch_to.active_element
-    el.send_keys('万科')
-    time.sleep(0.5)
-
-    # 步骤 12: 清空搜索框内的无效乱码字符 (坐标点击)
-    driver.tap([(889, 309)])
+    # 步骤 3: 点击首页金刚区的'二手房'入口 (坐标点击)
+    driver.tap([(335, 458)])
     time.sleep(1)
 
-    # 步骤 13: 在搜索框输入小区名称以呼出小区候选列表供选择
-    el = driver.switch_to.active_element
-    el.send_keys('保利')
-    time.sleep(0.5)
-
-    # 步骤 14: 点击搜索框内的清空按钮清除无效内容 (坐标点击)
-    driver.tap([(889, 309)])
+    # 步骤 4: 模拟返回键
+    driver.back()
     time.sleep(1)
 
-    # 步骤 15: 在搜索框输入小区名称‘万达’以调出小区候选列表
-    el = driver.switch_to.active_element
-    el.send_keys('万达')
-    time.sleep(0.5)
+    # 步骤 5: 点击左上角返回按钮回到二手房列表页 (坐标点击)
+    driver.tap([(81, 165)])
+    time.sleep(1)
+
+    # 步骤 6: 点击'区域'筛选项以展开区域选择面板 (坐标点击)
+    driver.tap([(118, 297)])
+    time.sleep(1)
+
+    # 步骤 7: 在区域筛选列表中选择'岳麓区' (坐标点击)
+    driver.tap([(306, 845)])
+    time.sleep(1)
+
+    # 步骤 8: 点击确定按钮应用'岳麓区'筛选条件 (坐标点击)
+    driver.tap([(744, 1595)])
+    time.sleep(1)
+
+    # 步骤 9: 点击'排序'展开排序选项菜单 (坐标点击)
+    driver.tap([(912, 579)])
+    time.sleep(1)
+
+    # 步骤 10: 选择'总价从低到高'排序选项 (坐标点击)
+    driver.tap([(147, 552)])
+    time.sleep(1)

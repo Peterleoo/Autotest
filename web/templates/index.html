@@ -3390,18 +3390,19 @@
         .floating-device-window {
             position: fixed;
             z-index: 9999 !important; /* 保证实时端侧在全局最顶层，绝不被左右面板或抽屉遮挡 */
-            width: 240px !important;
-            height: auto !important; /* 依据真实手机屏幕宽高比自适应贴合，绝不强行截断 */
+            width: 250px !important;
+            height: auto !important;
+            min-height: 536px !important; /* 锁定机身完整高度，杜绝高度塌陷 */
             bottom: auto !important;
-            background: #000000;
-            border: 1px solid var(--border-strong);
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+            background: #09090b;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
             display: none;
             flex-direction: column;
             overflow: hidden;
-            top: 55px;
-            right: 480px;
+            top: 60px;
+            right: 28px; /* 默认靠右停靠，绝不遮挡主聊天与用例列表 */
             user-select: none;
             pointer-events: auto;
         }
@@ -3456,7 +3457,8 @@
         .device-screen-body {
             position: relative;
             width: 100%;
-            height: auto;
+            height: 480px !important;
+            min-height: 480px !important; /* 严格锁定 480px (1:1.92~1:2 手机屏幕黄金比例)，绝对不发生坍塌 */
             background: #000000;
             display: flex;
             align-items: center;
@@ -4133,7 +4135,8 @@
         .device-screen-body {
             position: relative;
             width: 100%;
-            height: auto;
+            height: 480px !important;
+            min-height: 480px !important; /* 严格锁定 480px (1:1.92~1:2 手机屏幕黄金比例)，绝对不发生坍塌 */
             background: #000000;
             display: flex;
             align-items: center;
@@ -7183,14 +7186,16 @@
                         window._renderedBlockIds.add(blkId);
                     }
                 } else {
-                    // 局部更新（例如 todo_list 状态更新）
-                    if (blk.type === "todo_list") {
+                    // 局部更新（支持 todo_list, step_execution, step_result 等节点动态流式刷新与折叠状态响应）
+                    if (blk.type === "todo_list" || blk.type === "step_execution" || blk.type === "step_result") {
                         const newHtml = buildBlockHtml(blk, sessionData);
-                        const temp = document.createElement("div");
-                        temp.innerHTML = newHtml;
-                        const newEl = temp.firstElementChild;
-                        if (newEl) {
-                            existingEl.replaceWith(newEl);
+                        if (newHtml) {
+                            const temp = document.createElement("div");
+                            temp.innerHTML = newHtml;
+                            const newEl = temp.firstElementChild;
+                            if (newEl) {
+                                existingEl.replaceWith(newEl);
+                            }
                         }
                     }
                 }
