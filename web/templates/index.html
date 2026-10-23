@@ -7469,11 +7469,6 @@
             loadSuggestedCases();
             refreshAppSuggestedCases();
             refreshPreflightStatus();
-            // 确保首次加载默认进入新建任务界面
-            const initUrlNav = new URLSearchParams(window.location.search);
-            if (!initUrlNav.get("session_id")) {
-                startNewChat();
-            }
             loadSessions();
             loadReports();
             loadSolidifiedCases();
@@ -7677,14 +7672,16 @@
 
                 const urlParamsNav = new URLSearchParams(window.location.search);
                 const urlSessionId = urlParamsNav.get("session_id");
-                // 🌟 1:1 响应用户需求：首次进入或刷新界面默认进【新建任务界面】，绝不自动切入历史或正在运行的任务；
-                // 仅当用户在 URL 中显式指定 ?session_id=xxx 时才精准切入
+                // 🌟 仅当 URL 中显式带 ?session_id=xxx 时才精准切入指定历史任务；
+                // 默认首次进入或刷新始终保持【新建任务】界面，绝不自动跳入历史任务或正在运行的任务
                 if (urlSessionId && currentSessions.some(s => s.session_id === urlSessionId)) {
                     switchSession(urlSessionId);
                 } else if (!activeSessionId) {
-                    startNewChat();
+                    resetToNewChatView();
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error("加载会话列表异常:", e);
+            }
         }
 
         function renderSessionList() {
@@ -7728,7 +7725,7 @@
             box.innerHTML = html;
         }
 
-        function startNewChat() {
+        function resetToNewChatView() {
             activeSessionId = null;
             localStorage.removeItem("autotest_active_session_id");
             if (sessionPollTimer) clearInterval(sessionPollTimer);
@@ -7757,13 +7754,14 @@
             const btnRight = document.getElementById("btnToggleRight");
             if (btnRight) btnRight.classList.remove("active");
 
-            refreshAppSuggestedCases();
+            // 4. 重置输入框为新任务引导
+            const ta = document.getElementById("taskInputText");
+            if (ta) {
+                ta.placeholder = "描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）...";
+                ta.value = "";
+            }
 
-            // 1. 新建任务时：展示模式切换分段按钮 (AI测试 / 本地用例)
-            const segmented = document.getElementById("mainWorkspaceSegmented");
-            if (segmented) segmented.classList.remove("d-none");
-
-            // 2. 隐藏并清空已有会话的原有配置芯片与环境提醒
+            // 5. 隐藏并清空已有会话的原有配置芯片与环境提醒
             const chips = document.getElementById("sessionEnvChips");
             if (chips) chips.innerHTML = "";
             const alertBanner = document.getElementById("sessionEnvAlertBanner");
@@ -7772,22 +7770,19 @@
                 alertBanner.innerHTML = "";
             }
 
-            // 4. 重置输入框为新任务引导
-            const ta = document.getElementById("taskInputText");
-            if (ta) {
-                ta.placeholder = "描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）...";
-                ta.value = "";
-                ta.focus();
+            // 6. 安全更新（若节点或控制台容器存在才更新，防止 null 报错阻断全局脚本）
+            const pNodes = document.getElementById("pipelineNodesList");
+            if (pNodes) {
+                pNodes.innerHTML = `
+                    <div class="canvas-empty-state">
+                        <div class="canvas-empty-icon"><i class="bi bi-diagram-3"></i></div>
+                        <div class="canvas-empty-title">等待规划测试执行流水线</div>
+                        <div class="canvas-empty-desc">在左侧输入测试需求后，AI 决策大脑将智能拆解任务并生成结构化规划节点。</div>
+                    </div>
+                `;
             }
-
-            document.getElementById("pipelineNodesList").innerHTML = `
-                <div class="canvas-empty-state">
-                    <div class="canvas-empty-icon"><i class="bi bi-diagram-3"></i></div>
-                    <div class="canvas-empty-title">等待规划测试执行流水线</div>
-                    <div class="canvas-empty-desc">在左侧输入测试需求后，AI 决策大脑将智能拆解任务并生成结构化规划节点。</div>
-                </div>
-            `;
-            document.getElementById("nodesSummaryBadge").innerText = "0 节点";
+            const nBadge = document.getElementById("nodesSummaryBadge");
+            if (nBadge) nBadge.innerText = "0 节点";
             const runLogs = document.getElementById("runLogs");
             if (runLogs) {
                 runLogs.innerHTML = `
@@ -7798,6 +7793,16 @@
                     </div>
                 `;
             }
+
+            if (typeof refreshAppSuggestedCases === "function") {
+                refreshAppSuggestedCases();
+            }
+        }
+
+        function startNewChat() {
+            resetToNewChatView();
+            const ta = document.getElementById("taskInputText");
+            if (ta) ta.focus();
         }
 
         async function switchSession(sessionId) {
