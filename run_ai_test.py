@@ -18,7 +18,7 @@ from ai_engine.solidifier import Solidifier
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MainRunner")
 
-def run_test(goal: str, case_name: str, app_file: str = None, provider: str = None, auto_solidify: bool = True, device_id: str = None):
+def run_test(goal: str, case_name: str, app_file: str = None, provider: str = None, auto_solidify: bool = True, device_id: str = None, session_id: str = None, turn_id: int = 1):
     print("=" * 60)
     print(f"🤖 AI 移动端全自动测试与固化引擎")
     print(f"🎯 测试目标: {goal}")
@@ -72,9 +72,25 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
         sys.exit(1)
 
     try:
-        # 3. 运行 AI 智能体
+        # 3. 提取会话记忆上下文 (Conversation Memory)
+        memory_context = ""
+        if session_id:
+            from pathlib import Path
+            import json
+            sess_file = Path("outputs/sessions") / f"{session_id}.json"
+            if sess_file.exists():
+                try:
+                    sess_data = json.loads(sess_file.read_text(encoding="utf-8"))
+                    from core.memory_manager import MemoryManager
+                    memory_context = MemoryManager.build_memory_context(sess_data)
+                    est_t = MemoryManager.estimate_tokens(memory_context)
+                    print(f"🧠 [记忆注入] 已载入会话 [{session_id}] 结构化历史事实与目标演进链 (约 {est_t} Tokens)")
+                except Exception as e:
+                    logger.warning(f"载入会话记忆异常: {e}")
+
+        # 4. 运行 AI 智能体 (传入连续上下文)
         agent = AITestAgent(driver=driver, llm_provider=provider)
-        result = agent.run_goal(goal)
+        result = agent.run_goal(goal, memory_context=memory_context)
 
         # 4. 后期固化为标准测试脚本
         if auto_solidify and result.get("history"):
@@ -108,6 +124,8 @@ if __name__ == "__main__":
     parser.add_argument("--device", "-d", type=str, default=None, help="指定运行的目标设备序列号")
     parser.add_argument("--provider", "-p", type=str, default=None, help="AI 模型提供商 (claude / deepseek / antigravity / openai)")
     parser.add_argument("--no-solidify", action="store_true", help="不自动生成固化脚本")
+    parser.add_argument("--session-id", type=str, default=None, help="关联的 Web 会话 ID")
+    parser.add_argument("--turn-id", type=int, default=1, help="当前执行的交互轮次 (Turn)")
 
     args = parser.parse_args()
     run_test(
@@ -116,5 +134,7 @@ if __name__ == "__main__":
         app_file=args.app,
         device_id=args.device,
         provider=args.provider,
-        auto_solidify=not args.no_solidify
+        auto_solidify=not args.no_solidify,
+        session_id=args.session_id,
+        turn_id=args.turn_id
     )

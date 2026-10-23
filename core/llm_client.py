@@ -103,12 +103,20 @@ class LLMClient:
         except Exception:
             return False
 
-    def chat_decision(self, system_prompt: str, user_prompt: str, image_base64: Optional[str] = None) -> Dict[str, Any]:
+    def chat_decision(self, system_prompt: str, user_prompt: str, image_base64: Optional[str] = None, memory_context: Optional[str] = None) -> Dict[str, Any]:
         """
         向大模型发送意图并获得 JSON 格式的测试动作决策
         """
         if not self.client:
             raise RuntimeError(f"模型客户端 [{self.provider}] 未就绪，请检查 API Key 与 Base URL 配置。")
+
+        # 🚀 自动装配连续会话记忆与端侧事实上下文 (Conversation Memory Injection)
+        if memory_context and memory_context.strip():
+            user_prompt = f"{memory_context.strip()}\n\n{user_prompt}"
+
+        from core.memory_manager import MemoryManager
+        est_tokens = MemoryManager.estimate_tokens(system_prompt + "\n" + user_prompt)
+        self.last_estimated_tokens = est_tokens
 
         # 若是 Google Antigravity 官方授权，直接使用 AntigravityDirectClient 原生直连端点！
         if self.provider in ["antigravity", "gemini"]:

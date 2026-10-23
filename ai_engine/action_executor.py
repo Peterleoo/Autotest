@@ -45,8 +45,13 @@ class ActionExecutor:
 
             elif action == "type":
                 target_idx = action_dict.get("target_index")
-                text = action_dict.get("text", "")
+                raw_text = action_dict.get("text", "")
                 el_info = self._find_element_by_index(target_idx, elements_map)
+                
+                # 接入 SmartFormFiller 智能推断引擎
+                from ai_engine.form_filler import SmartFormFiller
+                text = SmartFormFiller.infer_value(el_info, raw_text=raw_text)
+                
                 locator = self._locate_and_type(el_info, text)
                 trace_item["locator"] = locator
                 trace_item["text"] = text

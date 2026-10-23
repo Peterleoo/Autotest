@@ -86,7 +86,7 @@ class AITestAgent:
                 except Exception:
                     pass
 
-    def run_goal(self, goal: str, max_steps: int = 15) -> Dict[str, Any]:
+    def run_goal(self, goal: str, max_steps: int = 15, memory_context: Optional[str] = None) -> Dict[str, Any]:
         """
         根据自然语言目标执行自动化测试主循环
         """
@@ -203,10 +203,26 @@ class AITestAgent:
                 "log": f"AI 模型 ({self.llm.model_name}) 正在结合视觉感知分析界面并规划下一步..."
             })
             try:
+                # 🛡️ 步骤级弹窗感知与自愈小闭环 (Step Healing)
+                dialog_keywords = ["我知道了", "稍后再说", "暂不升级", "残忍拒绝", "跳过", "以后再说"]
+                found_dismiss_el = None
+                for el in screen_info.get("elements", []):
+                    t_clean = (el.get("text") or el.get("content_desc") or "").strip()
+                    if any(kw == t_clean for kw in dialog_keywords):
+                        found_dismiss_el = el
+                        break
+                if found_dismiss_el and step_count > 1 and not any(kw in goal for kw in ["升级", "取消", "跳过"]):
+                    d_text = found_dismiss_el.get("text") or found_dismiss_el.get("content_desc") or "遮罩"
+                    logger.info(f"🛡️ [步骤自愈] 探测到界面临时遮罩浮层【{d_text}】，派发轻量关闭手势原地恢复...")
+                    self.executor.tap_element(found_dismiss_el)
+                    time.sleep(1.0)
+                    screen_info = ScreenParser.get_screen_summary(self.driver)
+
                 decision = self.llm.chat_decision(
                     system_prompt=SYSTEM_PROMPT,
                     user_prompt=user_prompt,
-                    image_base64=screen_info["image_b64"]
+                    image_base64=screen_info["image_b64"],
+                    memory_context=memory_context
                 )
                 thought = decision.get('thought', '')
                 logger.info(f"AI 决策: {thought}")

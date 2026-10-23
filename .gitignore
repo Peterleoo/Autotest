@@ -44,6 +44,10 @@ reports/allure_results/*
 reports/screenshots/*
 !reports/screenshots/.gitkeep
 
+# 运行时生成的 Markdown 测试报告
+data/reports/markdown/*
+!data/reports/markdown/.gitkeep
+
 # 临时调试图片与截图
 *.png
 *.jpg
@@ -63,6 +67,8 @@ scratch/
 .pm/
 *.tmp
 *.log
+*.bak
+*.bak*
 
 # ==============================================================================
 # 5. 操作系统与 IDE 配置

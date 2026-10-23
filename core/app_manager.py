@@ -207,3 +207,20 @@ class AppManager:
                 p.wait()
                 subprocess.run([self.adb_bin, "shell", "input", "tap", "540", "2200"], capture_output=True)
         return self.is_uiautomator2_ready()
+
+    def get_current_foreground_app(self, device_id: str = None) -> dict:
+        """获取指定设备当前前台运行的应用包名与 Activity"""
+        cmd = [self.adb_bin]
+        if device_id:
+            cmd.extend(["-s", device_id])
+        cmd.extend(["shell", "dumpsys", "window"])
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=4)
+            for line in res.stdout.splitlines():
+                if "mCurrentFocus" in line or "mFocusedApp" in line:
+                    m = re.search(r"([a-zA-Z0-9_\.]+)\/([a-zA-Z0-9_\.]+)", line)
+                    if m:
+                        return {"package": m.group(1), "activity": m.group(2)}
+        except Exception:
+            pass
+        return {"package": "", "activity": ""}

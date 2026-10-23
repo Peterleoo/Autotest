@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoTest AI - 任务驾驶舱高保真原型 (支持多轮迭代与即时追加插桩)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #09090b;
+            --bg-sidebar: #0d0d10;
+            --bg-surface: #141417;
+            --bg-surface-elevated: #1a1a1f;
+            --bg-card: #18181c;
+            --bg-code: #101014;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-medium: rgba(255, 255, 255, 0.15);
+            --border-hover: rgba(255, 255, 255, 0.28);
+            --text-primary: #f4f4f5;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --text-faint: #52525b;
+            --accent-primary: #ffffff;
+            --accent-on-primary: #000000;
+            --status-green: #22c55e;
+            --status-green-bg: rgba(34, 197, 94, 0.12);
+            --status-green-border: rgba(34, 197, 94, 0.3);
+            --status-blue: #38bdf8;
+            --status-blue-bg: rgba(56, 189, 248, 0.12);
+            --status-amber: #f59e0b;
+            --status-amber-bg: rgba(245, 158, 11, 0.14);
+            --status-amber-border: rgba(245, 158, 11, 0.35);
+            --status-purple: #a855f7;
+            --status-purple-bg: rgba(168, 85, 247, 0.14);
+            --status-purple-border: rgba(168, 85, 247, 0.35);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        body.theme-light {
+            --bg-base: #f4f4f5;
+            --bg-sidebar: #ffffff;
+            --bg-surface: #ffffff;
+            --bg-surface-elevated: #f4f4f6;
+            --bg-card: #ffffff;
+            --bg-code: #f1f2f5;
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-medium: rgba(0, 0, 0, 0.14);
+            --border-hover: rgba(0, 0, 0, 0.25);
+            --text-primary: #09090b;
+            --text-secondary: #52525b;
+            --text-muted: #71717a;
+            --text-faint: #a1a1aa;
+            --accent-primary: #09090b;
+            --accent-on-primary: #ffffff;
+            --status-green: #16a34a;
+            --status-green-bg: rgba(22, 163, 74, 0.1);
+            --status-green-border: rgba(22, 163, 74, 0.25);
+            --status-blue: #0284c7;
+            --status-blue-bg: rgba(2, 132, 199, 0.1);
+            --status-amber: #d97706;
+            --status-amber-bg: rgba(217, 119, 6, 0.1);
+            --status-amber-border: rgba(217, 119, 6, 0.25);
+            --status-purple: #9333ea;
+            --status-purple-bg: rgba(147, 51, 234, 0.1);
+            --status-purple-border: rgba(147, 51, 234, 0.25);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 1. 顶栏 (42px) */
+        .global-header {
+            height: 42px;
+            background-color: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            font-size: 12px;
+            user-select: none;
+            flex-shrink: 0;
+            z-index: 20;
+        }
+        .header-brand { display: flex; align-items: center; gap: 10px; }
+        .header-badge {
+            font-family: var(--font-mono);
+            font-size: 10.5px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            border: 1px solid var(--border-medium);
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+        }
+        .pill-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .pill-green { background: var(--status-green-bg); color: var(--status-green); border: 1px solid var(--status-green-border); }
+        .pill-amber { background: var(--status-amber-bg); color: var(--status-amber); border: 1px solid var(--status-amber-border); }
+        .pill-purple { background: var(--status-purple-bg); color: var(--status-purple); border: 1px solid var(--status-purple-border); }
+
+        .app-body { flex: 1; display: flex; overflow: hidden; position: relative; }
+
+        /* 左侧栏 */
+        .left-sidebar {
+            width: 240px;
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .sidebar-header { padding: 12px; border-bottom: 1px solid var(--border-subtle); }
+        .btn-new-task {
+            width: 100%;
+            padding: 7px 12px;
+            background-color: var(--accent-primary);
+            color: var(--accent-on-primary);
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        .session-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .session-item {
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid transparent;
+        }
+        .session-item:hover { background: var(--bg-surface); color: var(--text-primary); }
+        .session-item.active {
+            background: var(--bg-surface-elevated);
+            color: var(--text-primary);
+            border-color: var(--border-subtle);
+            font-weight: 500;
+        }
+
+        /* 中部核心驾驶舱 */
+        .cockpit-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-base);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 轮次标签栏 (Iteration Rounds Tabs · 借鉴 PM-product) */
+        .rounds-tab-bar {
+            height: 38px;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+            background: var(--bg-surface);
+            flex-shrink: 0;
+        }
+        .round-pills-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .round-pill {
+            padding: 3px 9px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            background: var(--bg-surface-elevated);
+            transition: all 0.15s;
+        }
+        .round-pill.active {
+            background: var(--bg-card);
+            border-color: var(--border-medium);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .round-pill:hover { border-color: var(--border-hover); }
+
+        .cockpit-workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            padding: 12px;
+            gap: 12px;
+        }
+
+        /* 中部左翼：流水线推进器 */
+        .wing-pipeline {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            gap: 10px;
+            overflow: hidden;
+        }
+        .pipeline-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* 历史轮次折叠卡片 (上一轮已归档) */
+        .card-history-round {
+            background: var(--bg-surface-elevated);
+            border: 1px dashed var(--border-medium);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            font-size: 11.5px;
+            transition: all 0.15s;
+        }
+        .card-history-round:hover {
+            border-color: var(--status-green-border);
+            background: var(--status-green-bg);
+        }
+
+        /* 目标卡片 */
+        .card-intent {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+        .intent-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* 步骤条目 */
+        .step-node {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 10px 12px;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .step-node.running {
+            border-color: var(--status-blue);
+            box-shadow: 0 0 0 1px var(--status-blue-bg);
+        }
+        .step-node.completed { border-color: var(--border-subtle); }
+        .step-node.blocked {
+            border-color: var(--status-amber);
+            background: var(--bg-surface-elevated);
+        }
+
+        /* 🌟 核心：用户追加指令的即时高亮插桩节点 */
+        .step-node.user-patched {
+            border: 1.5px solid var(--status-purple);
+            background: var(--status-purple-bg);
+            animation: pulsePatch 2s infinite;
+        }
+        @keyframes pulsePatch {
+            0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(168, 85, 247, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .step-meta {
+            font-family: var(--font-mono);
+            font-size: 10.5px;
+            color: var(--text-muted);
+        }
+
+        .micro-action-stream {
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: var(--bg-code);
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pulsing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--status-blue);
+            animation: pulseAnim 1.5s infinite;
+        }
+        @keyframes pulseAnim {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.5; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+
+        /* 紧凑决策条 (26px) */
+        .inline-decision-strip {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid var(--status-amber-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+        }
+        .btn-decision {
+            height: 26px;
+            padding: 0 10px;
+            font-size: 11px;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid var(--border-medium);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+        .btn-decision-primary {
+            background: var(--text-primary);
+            color: var(--bg-base);
+            border-color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        /* 底部 Prompt 输入框 (支持追加指令) */
+        .cockpit-input-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .cockpit-textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 12.5px;
+            outline: none;
+            resize: none;
+            height: 28px;
+            font-family: inherit;
+        }
+
+        /* 中部右翼：真机视界 */
+        .wing-device-viewport {
+            width: 320px;
+            flex-shrink: 0;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            transition: all 0.25s ease-in-out;
+        }
+        .viewport-header {
+            height: 34px;
+            padding: 0 10px;
+            background: var(--bg-surface-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            user-select: none;
+        }
+        .btn-detach {
+            color: var(--status-blue);
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            cursor: pointer;
+            background: var(--status-blue-bg);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .phone-stage {
+            flex: 1;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000000;
+            position: relative;
+        }
+        .phone-frame {
+            width: 100%;
+            max-width: 260px;
+            height: 100%;
+            border-radius: 14px;
+            border: 3px solid #27272a;
+            position: relative;
+            overflow: hidden;
+            background: #18181b;
+        }
+        .phone-screen-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        .touch-ripple-marker {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            left: 54%;
+            top: 48%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.4);
+            border: 2px solid #ef4444;
+            animation: touchPulse 1.2s infinite;
+            pointer-events: none;
+        }
+        @keyframes touchPulse {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+        }
+
+        /* 脱离悬浮态 */
+        .wing-device-viewport.detached {
+            position: fixed;
+            width: 270px;
+            height: 520px;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border: 1px solid var(--border-medium);
+            cursor: move;
+        }
+
+        /* 右侧深度抽屉 */
+        .right-drawer {
+            width: 380px;
+            background: var(--bg-sidebar);
+            border-left: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: width 0.2s;
+        }
+        .right-drawer.collapsed { width: 0; overflow: hidden; border-left: none; }
+        .drawer-header {
+            height: 38px;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .drawer-body { flex: 1; overflow-y: auto; padding: 14px; font-size: 12px; line-height: 1.6; }
+    </style>
+</head>
+<body class="theme-dark">
+
+    <!-- 1. 全局通栏 -->
+    <header class="global-header">
+        <div class="header-brand">
+            <span style="font-weight: 700; letter-spacing: 0.5px; font-size: 13px;">AUTOTEST AI</span>
+            <span class="header-badge">TASK COCKPIT · 原型</span>
+            <div class="pill-badge pill-green">
+                <i class="bi bi-phone"></i>
+                <span>Xiaomi MIX 2 · 实时互联</span>
+            </div>
+            <div class="pill-badge pill-purple" id="appendIndicator">
+                <i class="bi bi-person-lines-fill"></i>
+                <span>支持即时追加插桩</span>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn-decision" onclick="toggleTheme()">
+                <i class="bi bi-circle-half"></i>
+                <span id="themeLabel">浅色模式</span>
+            </button>
+            <button class="btn-decision" onclick="toggleDrawer()">
+                <i class="bi bi-layout-sidebar-reverse"></i>
+                <span>交付物抽屉</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. 主体三栏 -->
+    <div class="app-body">
+        
+        <!-- 左侧栏 -->
+        <aside class="left-sidebar">
+            <div class="sidebar-header">
+                <button class="btn-new-task">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>新建测试任务</span>
+                </button>
+            </div>
+            <div class="session-list">
+                <div class="session-item active">
+                    <div style="font-weight: 500;">进入委托服务验证表单</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">象盒找房 · 包含2轮迭代与追加</div>
+                </div>
+                <div class="session-item">
+                    <div>首页二手房搜索回归</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">16用例全过 · 昨天</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中部核心：驾驶舱 -->
+        <main class="cockpit-main">
+            
+            <!-- 🌟 顶栏多轮迭代标签 (Iteration Rounds · 彻底解决追加后的任务组织) -->
+            <div class="rounds-tab-bar">
+                <div class="round-pills-group">
+                    <span style="color: var(--text-muted); font-size: 11px; margin-right: 4px;">任务演进:</span>
+                    <div class="round-pill" onclick="switchRound(1)" title="点击回溯上一轮测试记录">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 11px;"></i>
+                        <span>轮次 1: 委托售房必填校验 (6步全通)</span>
+                    </div>
+                    <div class="round-pill active" onclick="switchRound(2)" title="当前正在执行的轮次">
+                        <i class="bi bi-lightning-charge-fill text-primary" style="font-size: 11px;"></i>
+                        <span>轮次 2: 追加“委托出租”并插入自定义指令</span>
+                    </div>
+                </div>
+                <span style="font-size: 10.5px; color: var(--status-blue); font-family: var(--font-mono);">
+                    <i class="bi bi-cpu me-1"></i>deepseek-flash
+                </span>
+            </div>
+
+            <!-- 驾驶舱工作台 -->
+            <div class="cockpit-workspace">
+                
+                <!-- 【左翼】：任务流水线推进器 -->
+                <section class="wing-pipeline">
+                    
+                    <div class="pipeline-scroll-area" id="pipelineScroll">
+                        
+                        <!-- 历史轮次折叠收起态 (点击可展开回溯) -->
+                        <div class="card-history-round" onclick="alert('已展开轮次 1 的 6 项基线测试快照与日志')">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-folder-check text-success" style="font-size: 13px;"></i>
+                                <span style="font-weight: 500;">【轮次 1 成果已归档】 象盒找房 · 委托售房校验通过 (6/6 PASS · 2.1s)</span>
+                            </div>
+                            <span class="text-muted" style="font-size: 10.5px;">点击展开历史 ➔</span>
+                        </div>
+
+                        <!-- 当前第二轮测试目标卡片 -->
+                        <div class="card-intent">
+                            <div class="intent-title">
+                                <span>🎯 轮次 2：用户追加任务与动态协同执行</span>
+                                <span class="pill-badge pill-purple" style="font-size: 10px;">追加意图已吸收</span>
+                            </div>
+                            <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.5;">
+                                承接首轮上下文：返回委托服务中心，测试“委托出租”表单必填校验；并接纳用户运行期的微调指令。
+                            </div>
+                        </div>
+
+                        <!-- 步骤 1：已通过 -->
+                        <div class="step-node completed">
+                            <div class="step-header">
+                                <span style="color: var(--status-green);"><i class="bi bi-check-circle-fill me-1.5"></i>Step 1: 页面回退并重新定位“委托服务”</span>
+                                <span class="step-meta">0.6s · PASS</span>
+                            </div>
+                        </div>
+
+                        <!-- 🌟 核心亮点：用户在运行中追加指令的即时高亮插桩节点 -->
+                        <div class="step-node user-patched" id="userPatchedStep">
+                            <div class="step-header">
+                                <span style="color: var(--status-purple); font-weight: 600;">
+                                    <i class="bi bi-person-fill me-1"></i>Step 1.1: 👤 [用户即时追加指令介入] “往下滑动一屏寻找出租入口”
+                                </span>
+                                <span class="pill-badge pill-purple" style="font-size: 9.5px;">动态插桩执行中</span>
+                            </div>
+                            <div class="micro-action-stream" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed var(--status-purple-border);">
+                                <span class="pulsing-dot" style="background: var(--status-purple);"></span>
+                                <span style="color: var(--text-primary);">执行端侧物理手势: swipe(540, 1600, 540, 600, duration=350ms)</span>
+                            </div>
+                        </div>
+
+                        <!-- 步骤 2：接续执行中 -->
+                        <div class="step-node running">
+                            <div class="step-header">
+                                <span style="color: var(--status-blue);"><i class="bi bi-arrow-repeat spin me-1.5"></i>Step 2: 点击“委托出租”进入表单页</span>
+                                <span class="step-meta" style="color: var(--status-blue);">RUNNING</span>
+                            </div>
+                            <div class="micro-action-stream">
+                                <span class="pulsing-dot"></span>
+                                <span>视觉多模态定位: target="委托出租" ➔ 匹配度 98.6%</span>
+                            </div>
+                        </div>
+
+                        <!-- 步骤 3：阻断与就地决策条 -->
+                        <div class="step-node blocked">
+                            <div class="step-header">
+                                <span style="color: var(--status-amber);"><i class="bi bi-exclamation-triangle-fill me-1.5"></i>Step 3: 必填表单断言 —— 租金与联系人</span>
+                                <span class="step-meta" style="color: var(--status-amber);">WAITING</span>
+                            </div>
+                            <div class="inline-decision-strip">
+                                <span>💡 检测到表单需输入租金范围，请选择追加策略：</span>
+                                <div class="d-flex gap-1.5">
+                                    <button class="btn-decision btn-decision-primary" onclick="appendAction('自动填入租金 3500 元/月')">填入 3500元</button>
+                                    <button class="btn-decision" onclick="appendAction('留空并直接点击提交验证必填')">测试空提交校验</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 容器：供用户亲自在下方打字追加动态插入的步骤 -->
+                        <div id="dynamicAppendedContainer"></div>
+
+                    </div>
+
+                    <!-- 底部 Prompt 输入框：用户可以随时打字追加指令！ -->
+                    <div class="cockpit-input-box">
+                        <textarea class="cockpit-textarea" id="appendInput" placeholder="输入追加指令或新意图（如：'输入手机号13800000000' 或 '点右上角关闭'），按 Enter 即刻插桩执行..."></textarea>
+                        <div class="d-flex justify-content-between align-items-center pt-1 border-top" style="border-color: var(--border-subtle) !important;">
+                            <span class="text-muted" style="font-size: 11px;">
+                                <i class="bi bi-info-circle me-1"></i>按 Enter 发送即可见证实时追加插桩到上方流水线
+                            </span>
+                            <button class="btn-decision btn-decision-primary" style="height: 24px; padding: 0 10px;" onclick="handleSendAppend()">
+                                <span>追加执行</span>
+                                <i class="bi bi-arrow-up-short"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 【右翼】：真机实时视界 -->
+                <section class="wing-device-viewport" id="deviceViewport">
+                    <div class="viewport-header" id="viewportDragHandle">
+                        <div class="d-flex align-items-center gap-1.5" style="font-weight: 500;">
+                            <i class="bi bi-phone"></i>
+                            <span>真机视界 · 实时投屏</span>
+                            <span style="width: 6px; height: 6px; background: var(--status-green); border-radius: 50%; display: inline-block;"></span>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <button class="btn-detach" id="btnToggleDetach" onclick="toggleDetachViewport()">
+                                <i class="bi bi-box-arrow-up-right" id="detachIcon"></i>
+                                <span id="detachText">脱离悬浮</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 手机屏幕拟物外壳 -->
+                    <div class="phone-stage">
+                        <div class="phone-frame">
+                            <img class="phone-screen-img" src="/static/phone_screen_current.png" onerror="this.src='https://via.placeholder.com/260x540/18181b/a1a1aa?text=Xiaomi+MIX+2+Live';" alt="真机屏幕">
+                            <div class="touch-ripple-marker" id="touchRipple"></div>
+                        </div>
+                    </div>
+
+                    <div style="padding: 6px 10px; background: var(--bg-surface-elevated); border-top: 1px solid var(--border-subtle); font-size: 10px; color: var(--text-muted); display: flex; justify-content: space-between;">
+                        <span id="viewportModeText">模式: 停靠中 (Docked)</span>
+                        <span>Xiaomi MIX 2</span>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+
+        <!-- 3. 右侧深度抽屉 -->
+        <aside class="right-drawer" id="rightDrawer">
+            <div class="drawer-header">
+                <div class="d-flex align-items-center gap-1.5">
+                    <i class="bi bi-file-earmark-text text-primary"></i>
+                    <span>多轮测试交付物报告</span>
+                </div>
+                <button class="btn-decision" style="height: 22px; padding: 0 6px;" onclick="toggleDrawer()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="drawer-body">
+                <div style="background: var(--bg-surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle); margin-bottom: 10px;">
+                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">📌 轮次 1 交付物 (已固化)</div>
+                    <div style="font-size: 11.5px; color: var(--text-secondary);">已生成 <code>test_entrust_sale.py</code>，6项断言证据已存证。</div>
+                </div>
+                <div style="background: var(--bg-surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">⚡ 轮次 2 动态增量</div>
+                    <div style="font-size: 11.5px; color: var(--text-secondary);">正在捕获用户追加的自定义输入与出租表单断言数据。</div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- 交互脚本 -->
+    <script>
+        let isDetached = false;
+        let appendCount = 1;
+        const viewport = document.getElementById('deviceViewport');
+        const detachBtn = document.getElementById('btnToggleDetach');
+        const detachText = document.getElementById('detachText');
+        const detachIcon = document.getElementById('detachIcon');
+        const dragHandle = document.getElementById('viewportDragHandle');
+        const drawer = document.getElementById('rightDrawer');
+        const appendInput = document.getElementById('appendInput');
+        const dynamicContainer = document.getElementById('dynamicAppendedContainer');
+        const pipelineScroll = document.getElementById('pipelineScroll');
+
+        // 回车发送追加
+        appendInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendAppend();
+            }
+        });
+
+        function handleSendAppend() {
+            const val = appendInput.value.trim();
+            if (!val) return;
+            appendAction(val);
+            appendInput.value = '';
+        }
+
+        // 🌟 核心逻辑：即时将用户的追加指令插桩到流水线中
+        function appendAction(instructionText) {
+            appendCount++;
+            const stepNum = '2.' + appendCount;
+            const node = document.createElement('div');
+            node.className = 'step-node user-patched mt-2';
+            node.innerHTML = `
+                <div class="step-header">
+                    <span style="color: var(--status-purple); font-weight: 600;">
+                        <i class="bi bi-person-fill me-1"></i>Step ${stepNum}: 👤 [用户实时追加] “${instructionText}”
+                    </span>
+                    <span class="pill-badge pill-purple" style="font-size: 9.5px;">即时插桩生效</span>
+                </div>
+                <div class="micro-action-stream" style="background: rgba(168, 85, 247, 0.15); border: 1px dashed var(--status-purple-border);">
+                    <span class="pulsing-dot" style="background: var(--status-purple);"></span>
+                    <span style="color: var(--text-primary);">已下发真机执行: adb shell input text "${instructionText}"</span>
+                </div>
+            `;
+            dynamicContainer.appendChild(node);
+            pipelineScroll.scrollTop = pipelineScroll.scrollHeight;
+
+            // 触发真机屏幕波纹动画
+            const ripple = document.getElementById('touchRipple');
+            ripple.style.display = 'none';
+            void ripple.offsetWidth;
+            ripple.style.display = 'block';
+        }
+
+        function toggleDetachViewport() {
+            isDetached = !isDetached;
+            if (isDetached) {
+                viewport.classList.add('detached');
+                detachText.innerText = '吸附归位';
+                detachIcon.className = 'bi bi-pin-angle';
+                document.getElementById('viewportModeText').innerText = '模式: 自由拖拽中';
+                makeDraggable(viewport, dragHandle);
+            } else {
+                viewport.classList.remove('detached');
+                viewport.style.left = '';
+                viewport.style.top = '';
+                viewport.style.right = '';
+                viewport.style.bottom = '';
+                detachText.innerText = '脱离悬浮';
+                detachIcon.className = 'bi bi-box-arrow-up-right';
+                document.getElementById('viewportModeText').innerText = '模式: 停靠中 (Docked)';
+            }
+        }
+
+        function makeDraggable(element, handle) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            handle.onmousedown = function(e) {
+                if (!isDetached) return;
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = function() {
+                    document.onmouseup = null;
+                    document.onmousemove = null;
+                };
+                document.onmousemove = function(e) {
+                    e.preventDefault();
+                    pos1 = pos3 - e.clientX;
+                    pos2 = pos4 - e.clientY;
+                    pos3 = e.clientX;
+                    pos4 = e.clientY;
+                    element.style.top = (element.offsetTop - pos2) + "px";
+                    element.style.left = (element.offsetLeft - pos1) + "px";
+                    element.style.right = 'auto';
+                    element.style.bottom = 'auto';
+                };
+            };
+        }
+
+        function toggleDrawer() { drawer.classList.toggle('collapsed'); }
+
+        function toggleTheme() {
+            const body = document.body;
+            const label = document.getElementById('themeLabel');
+            if (body.classList.contains('theme-dark')) {
+                body.classList.remove('theme-dark');
+                body.classList.add('theme-light');
+                label.innerText = '深色模式';
+            } else {
+                body.classList.remove('theme-light');
+                body.classList.add('theme-dark');
+                label.innerText = '浅色模式';
+            }
+        }
+
+        function switchRound(num) {
+            alert('切换至轮次 ' + num + '：左翼流水线与右翼视界已同步切换');
+        }
+    </script>
+</body>
+</html>

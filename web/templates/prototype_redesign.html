@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoTest AI - 极简黑白高保真原型 (中间文本+右侧抽屉式测试报告与MD明细)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 极简黑白高级调色系统 (Vercel / Linear / Monochrome Style) */
+            --bg-base: #09090b;
+            --bg-sidebar: #0d0d10;
+            --bg-surface: #141417;
+            --bg-surface-elevated: #1a1a1f;
+            --bg-card: #18181c;
+            --bg-code: #101014;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-medium: rgba(255, 255, 255, 0.14);
+            --border-hover: rgba(255, 255, 255, 0.24);
+            --text-primary: #f4f4f5;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --text-faint: #52525b;
+            --accent-primary: #ffffff;
+            --accent-on-primary: #000000;
+            --status-green: #22c55e;
+            --status-green-bg: rgba(34, 197, 94, 0.12);
+            --status-green-border: rgba(34, 197, 94, 0.3);
+            --status-blue: #38bdf8;
+            --status-blue-bg: rgba(56, 189, 248, 0.12);
+            --status-amber: #f59e0b;
+            --status-amber-bg: rgba(245, 158, 11, 0.12);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        body.theme-light {
+            --bg-base: #f4f4f5;
+            --bg-sidebar: #fcfcfd;
+            --bg-surface: #ffffff;
+            --bg-surface-elevated: #f4f4f6;
+            --bg-card: #ffffff;
+            --bg-code: #f1f2f5;
+            --border-subtle: rgba(0, 0, 0, 0.07);
+            --border-medium: rgba(0, 0, 0, 0.13);
+            --border-hover: rgba(0, 0, 0, 0.24);
+            --text-primary: #09090b;
+            --text-secondary: #52525b;
+            --text-muted: #71717a;
+            --text-faint: #a1a1aa;
+            --accent-primary: #09090b;
+            --accent-on-primary: #ffffff;
+            --status-green: #16a34a;
+            --status-green-bg: rgba(22, 163, 74, 0.1);
+            --status-green-border: rgba(22, 163, 74, 0.25);
+            --status-blue: #0284c7;
+            --status-blue-bg: rgba(2, 132, 199, 0.1);
+            --status-amber: #d97706;
+            --status-amber-bg: rgba(217, 119, 6, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 1. 全局通栏 (40px) */
+        .global-header {
+            height: 40px;
+            background-color: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            font-size: 12px;
+            user-select: none;
+            flex-shrink: 0;
+            z-index: 20;
+        }
+        .brand-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+        }
+        .brand-dot {
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border-radius: 2px;
+        }
+        body.theme-light .brand-dot { background: #000; }
+
+        /* 全局环境就绪指示胶囊 */
+        .header-ready-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            background: var(--status-green-bg);
+            border: 1px solid var(--status-green-border);
+            color: var(--status-green);
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .ready-pulse {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--status-green);
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+            animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+            70% { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 9px;
+            border-radius: 6px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .header-chip:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        /* 2. 主体三栏工作区架构 (左边栏 + 中间对话流 + 右侧详情抽屉) */
+        .workspace-body {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 40px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 左侧边栏 (240px) */
+        .sidebar-panel {
+            width: 240px;
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .sidebar-top {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .btn-new-task {
+            width: 100%;
+            height: 32px;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-new-task:hover {
+            border-color: var(--border-medium);
+            background-color: var(--bg-surface-elevated);
+        }
+        .kbd-hint {
+            font-size: 10px;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1px 4px;
+            border-radius: 3px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .session-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .session-item {
+            padding: 8px 10px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 12px;
+            transition: all 0.12s ease;
+            position: relative;
+        }
+        .session-item:hover {
+            background-color: var(--bg-surface);
+            color: var(--text-primary);
+        }
+        .session-item.active {
+            background-color: var(--bg-surface);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .session-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 6px;
+            bottom: 6px;
+            width: 3px;
+            background-color: var(--accent-primary);
+            border-radius: 0 2px 2px 0;
+        }
+        .session-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 170px;
+        }
+        .status-dot-sm {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--status-green);
+        }
+
+        .sidebar-bottom {
+            padding: 12px 14px;
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        /* 3. 中间主画布区 (严格遵循用户需求：测试报告以文本形式呈现，md文件在文本中体现，点击在右侧打开) */
+        .main-canvas {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-base);
+            position: relative;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .canvas-header {
+            height: 44px;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--bg-surface);
+            flex-shrink: 0;
+        }
+        .active-task-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .task-name-text {
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: -0.2px;
+            max-width: 440px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mono-pill {
+            font-family: var(--font-mono);
+            font-size: 10.5px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+        }
+
+        /* 中间滚动流 */
+        .content-scrollable {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px 130px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 820px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* 用户指令气泡 */
+        .user-message-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 2px;
+        }
+        .user-bubble {
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px 12px 2px 12px;
+            padding: 10px 14px;
+            font-size: 13px;
+            line-height: 1.55;
+            max-width: 680px;
+        }
+        body.theme-light .user-bubble {
+            background: #e2e8f0;
+            color: #0f172a;
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .ai-meta-line {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 2px;
+            user-select: none;
+        }
+
+        /* 重点组件 1: 任务步骤折叠卡片 (参考用户截图) */
+        .task-card-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        }
+        .task-card-header {
+            padding: 9px 14px;
+            background: var(--bg-surface-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+        .task-card-header:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .task-card-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .task-step-list {
+            padding: 8px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .task-step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .step-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        .step-dot.done {
+            background-color: var(--status-green);
+        }
+        .step-dot.running {
+            background-color: var(--status-blue);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+            animation: pulse-dot 1.5s infinite;
+        }
+        .step-dot.pending {
+            background-color: var(--text-faint);
+            opacity: 0.5;
+        }
+        @keyframes pulse-dot {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.8; }
+        }
+
+        .step-content {
+            flex: 1;
+        }
+        .step-action-bold {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .step-desc-text {
+            color: var(--text-muted);
+            margin-left: 4px;
+        }
+
+        /* 端侧感知诊断条 */
+        .diagnostic-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-left: 3px solid var(--status-amber);
+            border-radius: 8px;
+            padding: 9px 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            font-size: 11.5px;
+            line-height: 1.5;
+        }
+        .diagnostic-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .diagnostic-desc {
+            color: var(--text-secondary);
+        }
+
+        /* 重点组件 2 (用户指定): 中间栏纯文本形式的测试总结与MD链接卡片 */
+        .test-summary-message {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .summary-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .summary-title-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .summary-title-badge .pass-icon {
+            color: var(--status-green);
+            font-size: 15px;
+        }
+        .summary-text-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.55;
+            margin: 0;
+        }
+
+        .summary-metrics-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .summary-metric-tag {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+        }
+        .summary-metric-tag strong {
+            color: var(--text-primary);
+        }
+
+        /* 交付资产文件清单 (用户需求：在文本中体现MD文件，点击在右侧打开明细) */
+        .summary-assets-box {
+            margin-top: 2px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .assets-hint-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .asset-clickable-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 10px;
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .asset-clickable-row:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-card);
+        }
+        .asset-left-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .asset-name-link {
+            font-weight: 500;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+        .asset-action-tip {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .asset-clickable-row:hover .asset-action-tip {
+            color: var(--accent-primary);
+        }
+
+        /* 4. 重点组件 3 (用户指定): 右侧区域——测试报告结构化明细与MD文档检视抽屉 (Right Inspector Panel) */
+        .right-inspector-panel {
+            width: 480px;
+            background-color: var(--bg-sidebar);
+            border-left: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 15;
+            transition: transform 0.25s ease, width 0.25s ease;
+        }
+        .inspector-header {
+            height: 44px;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-surface);
+            flex-shrink: 0;
+        }
+        .inspector-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .inspector-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-action-sm {
+            height: 26px;
+            padding: 0 8px;
+            border-radius: 4px;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+        .btn-action-sm:hover {
+            border-color: var(--border-medium);
+            color: var(--text-primary);
+            background: var(--bg-surface-elevated);
+        }
+        .btn-action-sm.active {
+            background: var(--accent-primary);
+            color: var(--accent-on-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .inspector-content-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* 右侧面板内部：结构化指标卡 */
+        .right-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .right-metric-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .right-metric-lbl {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .right-metric-val {
+            font-family: var(--font-mono);
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* 右侧面板内部：断言明细表格 */
+        .right-assert-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .right-assert-header {
+            padding: 8px 12px;
+            background: var(--bg-surface-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 11.5px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .right-assert-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11.5px;
+        }
+        .right-assert-table th {
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            font-size: 10.5px;
+            text-align: left;
+        }
+        .right-assert-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+        }
+        .right-assert-table tr:last-child td {
+            border-bottom: none;
+        }
+        .badge-mini-pass {
+            font-size: 9.5px;
+            font-family: var(--font-mono);
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: var(--status-green-bg);
+            color: var(--status-green);
+            border: 1px solid var(--status-green-border);
+        }
+
+        /* 右侧面板内部：Markdown 内容渲染框 */
+        .right-md-container {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .right-md-header {
+            padding: 8px 12px;
+            background: var(--bg-surface-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 11.5px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .right-md-body {
+            background: var(--bg-code);
+            padding: 14px 16px;
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+            line-height: 1.65;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 380px;
+            overflow-y: auto;
+        }
+        .md-h1 { color: var(--accent-primary); font-weight: 700; font-size: 13px; display: block; margin-bottom: 6px; }
+        .md-h2 { color: var(--text-primary); font-weight: 600; font-size: 12px; display: block; margin-top: 10px; margin-bottom: 4px; }
+        .md-pass { color: var(--status-green); font-weight: 600; }
+
+        /* 5. 底部悬浮指令胶囊 (带测试就绪药丸) */
+        .bottom-command-bar {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 48px);
+            max-width: 760px;
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-medium);
+            border-radius: 12px;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+            padding: 8px 12px 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            backdrop-filter: blur(12px);
+            z-index: 10;
+        }
+        .command-textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 13px;
+            line-height: 1.4;
+            resize: none;
+            height: 34px;
+            font-family: inherit;
+        }
+        .command-textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .command-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 4px;
+            border-top: 1px solid var(--border-subtle);
+        }
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pill-capsule {
+            height: 26px;
+            padding: 0 9px;
+            border-radius: 9999px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .pill-capsule:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .pill-ready-status {
+            background: var(--status-green-bg);
+            border: 1px solid var(--status-green-border);
+            color: var(--status-green);
+            font-weight: 500;
+        }
+        .pill-ready-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--status-green);
+        }
+
+        .btn-send-round {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            color: var(--accent-on-primary);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.12s ease;
+        }
+        .btn-send-round:hover {
+            transform: scale(1.05);
+        }
+        /* 7. 重点组件: 可自由拖动的端侧实时悬浮窗 (Floating Draggable Device Screen) */
+        .floating-device-window {
+            position: fixed;
+            top: 60px;
+            right: 500px;
+            width: 250px;
+            height: 490px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-medium);
+            border-radius: 14px;
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 99;
+            user-select: none;
+            backdrop-filter: blur(16px);
+        }
+        .device-window-header {
+            height: 32px;
+            background: var(--bg-surface-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: grab;
+        }
+        .device-window-header:active {
+            cursor: grabbing;
+        }
+        .device-window-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .device-window-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .device-btn-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .device-btn-icon:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+        .device-screen-body {
+            flex: 1;
+            background: #000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .device-screen-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .device-action-ripple {
+            position: absolute;
+            top: 52%;
+            left: 50%;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid var(--status-blue);
+            background: rgba(56, 189, 248, 0.25);
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.3);
+            animation: pulse-tap 1.5s infinite;
+            pointer-events: none;
+        }
+        @keyframes pulse-tap {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+        }
+        .device-status-footer {
+            height: 24px;
+            background: var(--bg-surface-elevated);
+            border-top: 1px solid var(--border-subtle);
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 9.5px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+    </style>
+</head>
+<body id="prototypeBody">
+
+    <!-- 1. 全局单行极简顶栏 (40px) -->
+    <header class="global-header">
+        <div class="brand-box">
+            <div class="brand-dot"></div>
+            <span>AUTOTEST AI</span>
+            <!-- 全局测试就绪标识 -->
+            <div class="header-ready-pill" id="readyPill" title="测试环境自检全通：真机已连通、应用已安装、AI模型已授权">
+                <span class="ready-pulse"></span>
+                <span>环境就绪 · 随时可测</span>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <!-- 目标设备 (点击可打开/关闭端侧可拖拽浮窗) -->
+            <div class="header-chip" onclick="toggleFloatingDevice()" title="点击打开/关闭端侧可拖拽实时投屏">
+                <i class="bi bi-phone" style="font-size: 11px;"></i>
+                <span>Xiaomi MIX 2 (投屏)</span>
+                <span class="status-dot-sm" style="width: 5px; height: 5px;"></span>
+            </div>
+            <!-- 待测应用 -->
+            <div class="header-chip" title="当前待测目标应用">
+                <i class="bi bi-box-seam" style="font-size: 11px;"></i>
+                <span>象盒找房 v4.9.11 (已安装)</span>
+            </div>
+            <!-- 主题切换 -->
+            <div class="header-chip" onclick="toggleTheme()" title="切换极简黑白模式 (深色/浅色)">
+                <i class="bi bi-circle-half" style="font-size: 11px;"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- 2. 主体工作区架构 (左边栏 + 中间对话流 + 右侧详情抽屉) -->
+    <div class="workspace-body">
+
+        <!-- 左侧纯粹黑白边栏 -->
+        <aside class="sidebar-panel">
+            <div class="sidebar-top">
+                <button class="btn-new-task">
+                    <span class="d-flex align-items-center gap-1.5">
+                        <i class="bi bi-plus-lg" style="font-size: 11px;"></i>
+                        <span>新建自测任务</span>
+                    </span>
+                    <span class="kbd-hint">⌘N</span>
+                </button>
+            </div>
+
+            <!-- 会话列表 -->
+            <div class="session-list">
+                <div class="session-item active">
+                    <div class="d-flex align-items-center gap-2 overflow-hidden">
+                        <i class="bi bi-chat-left-text" style="font-size: 11px; opacity: 0.8;"></i>
+                        <span class="session-title">首页推荐房源进入与微聊验证</span>
+                    </div>
+                    <span class="status-dot-sm"></span>
+                </div>
+                <div class="session-item">
+                    <div class="d-flex align-items-center gap-2 overflow-hidden">
+                        <i class="bi bi-chat-left-text" style="font-size: 11px; opacity: 0.8;"></i>
+                        <span class="session-title">搜索望京两居室，筛选租金5000</span>
+                    </div>
+                </div>
+                <div class="session-item">
+                    <div class="d-flex align-items-center gap-2 overflow-hidden">
+                        <i class="bi bi-chat-left-text" style="font-size: 11px; opacity: 0.8;"></i>
+                        <span class="session-title">冷启动应用，核验开屏广告跳过</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 侧栏底部 -->
+            <div class="sidebar-bottom">
+                <div class="user-pill">
+                    <div class="user-avatar">PM</div>
+                    <div class="d-flex flex-column" style="line-height: 1.2;">
+                        <span style="font-weight: 500; font-size: 11.5px;">AutoTest Studio</span>
+                        <span style="font-size: 10px; color: var(--text-muted);">Xiaomi MIX 2 · 已连接</span>
+                    </div>
+                </div>
+                <i class="bi bi-gear" style="color: var(--text-muted); cursor: pointer;" title="全局设置"></i>
+            </div>
+        </aside>
+
+        <!-- 中间主执行画布 (纯净会话流，不直接铺开大表格，而是纯文本 + 快捷点击在右侧打开) -->
+        <main class="main-canvas">
+
+            <!-- 画布顶部信息条 -->
+            <div class="canvas-header">
+                <div class="active-task-meta">
+                    <span class="task-name-text">在首页点击第一套推荐房源，验证咨询窗口正确弹出</span>
+                    <span class="mono-pill" style="color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border);">PASS</span>
+                    <span class="mono-pill">耗时 5.1s · 6 步通过</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn-action-sm active" id="btnToggleRight" onclick="toggleRightInspector()" title="展开/收起右侧测试报告与MD明细">
+                        <i class="bi bi-layout-sidebar-reverse"></i>
+                        <span>右侧明细面板</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 滚动流区 (中间对话栏：保持清爽极简) -->
+            <div class="content-scrollable" id="scrollContent">
+
+                <!-- 1. 用户提问意图 -->
+                <div class="user-message-row">
+                    <div class="user-bubble">
+                        冷启动象盒找房，在首页点击第一套推荐房源进入详情页，查看户型与VR看房标识，点击'微聊'按钮验证咨询窗口正确弹出。
+                    </div>
+                </div>
+
+                <!-- 2. AI 推演耗时元信息 -->
+                <div class="ai-meta-line">
+                    <i class="bi bi-cpu" style="font-size: 11px;"></i>
+                    <span>AI 决策推理用时 2.4s · DeepSeek V3</span>
+                </div>
+
+                <!-- 3. 参考用户截图的任务流折叠卡片 (Task Progress Card) -->
+                <div class="task-card-container">
+                    <div class="task-card-header" onclick="toggleTaskCard()">
+                        <div class="task-card-title">
+                            <i class="bi bi-list-check" style="font-size: 14px; color: var(--text-secondary);"></i>
+                            <span>自动化执行流 (4 已完成 · 1 执行中 · 1 待执行)</span>
+                        </div>
+                        <i class="bi bi-chevron-up" id="taskCardChevron" style="font-size: 11px; color: var(--text-muted); transition: transform 0.2s;"></i>
+                    </div>
+
+                    <!-- 步骤清单 (大白话自然语言) -->
+                    <div class="task-step-list" id="taskStepList">
+                        <div class="task-step-item">
+                            <span class="step-dot done"></span>
+                            <div class="step-content">
+                                <span class="step-action-bold">检查 ADB 连接与物理真机握手</span>
+                                <span class="step-desc-text">· 设备 [Xiaomi MIX 2 · 2145189e] 通道就绪 (耗时 0.2s)</span>
+                            </div>
+                        </div>
+
+                        <div class="task-step-item">
+                            <span class="step-dot done"></span>
+                            <div class="step-content">
+                                <span class="step-action-bold">核验目标待测应用安装状态</span>
+                                <span class="step-desc-text">· 包名 com.apicloud.A6995433058179 已就绪，无需重复安装 (耗时 0.1s)</span>
+                            </div>
+                        </div>
+
+                        <div class="task-step-item">
+                            <span class="step-dot done"></span>
+                            <div class="step-content">
+                                <span class="step-action-bold">调起 MainActivity 冷启动并跳过开屏</span>
+                                <span class="step-desc-text">· 自动识别跳过广告与隐私许可弹窗 (耗时 1.1s)</span>
+                            </div>
+                        </div>
+
+                        <div class="task-step-item">
+                            <span class="step-dot done"></span>
+                            <div class="step-content">
+                                <span class="step-action-bold">OCR 视觉扫描与定位: 提取首页‘第一套推荐房源’</span>
+                                <span class="step-desc-text">· 命中目标控件区块 (锚点坐标: 540, 960)</span>
+                            </div>
+                        </div>
+
+                        <div class="task-step-item">
+                            <span class="step-dot running"></span>
+                            <div class="step-content">
+                                <span class="step-action-bold" style="color: var(--status-blue);">正在执行点击与流转: 轻触房源卡片进入详情页...</span>
+                                <span class="step-desc-text" style="color: rgba(56, 189, 248, 0.7);">· 端侧手势指令 input tap 540 960 正在下发，等待详情页渲染</span>
+                            </div>
+                        </div>
+
+                        <div class="task-step-item">
+                            <span class="step-dot pending"></span>
+                            <div class="step-content">
+                                <span class="step-action-bold" style="color: var(--text-muted);">OCR 断言识别: 校验‘微聊’交互窗口正确唤起</span>
+                                <span class="step-desc-text" style="color: var(--text-faint);">· 等待页面跳转后执行断言核验</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 端侧实时感知诊断条 -->
+                <div class="diagnostic-card">
+                    <i class="bi bi-lightbulb" style="color: var(--status-amber); font-size: 14px; margin-top: 1px;"></i>
+                    <div>
+                        <div class="diagnostic-title">实时端侧感知诊断</div>
+                        <div class="diagnostic-desc">已在真机截屏画面中检测到首屏房源瀑布流，正在下发手势点击进入详情页，右侧投屏与端侧驱动保持 60fps 实时同步。</div>
+                    </div>
+                </div>
+
+                <!-- 4. 【用户核心诉求】中间栏：以纯文本形式展示测试报告总结，带md文件链接，点击在右侧打开明细 -->
+                <div class="test-summary-message">
+                    <div class="summary-header-row">
+                        <div class="summary-title-badge">
+                            <i class="bi bi-check-circle-fill pass-icon"></i>
+                            <span>自动化测试全流程验证通过 (PASS)</span>
+                        </div>
+                        <span class="mono-pill" style="font-size: 9.5px;">TR-20261021-01</span>
+                    </div>
+
+                    <!-- 纯文本总结 -->
+                    <p class="summary-text-desc">
+                        已在物理真机（Xiaomi MIX 2）上成功跑通象盒找房冷启动、跳过开屏广告、首页推荐房源视觉定位、详情页跳转及微聊咨询窗口激活，端侧渲染及断言核验全部通过，未发生 Crash 或卡顿。
+                    </p>
+
+                    <!-- 紧凑指标药丸 -->
+                    <div class="summary-metrics-row">
+                        <span class="summary-metric-tag">总耗时: <strong>5.1s</strong></span>
+                        <span class="summary-metric-tag">执行步数: <strong>6/6 PASS</strong></span>
+                        <span class="summary-metric-tag">断言覆盖率: <strong>100%</strong></span>
+                        <span class="summary-metric-tag">目标机型: <strong>Xiaomi MIX 2</strong></span>
+                    </div>
+
+                    <!-- 交付 MD 资产列表 (1:1 响应用户需求：在文本中体现，快捷点击在右侧打开明细) -->
+                    <div class="summary-assets-box">
+                        <div class="assets-hint-label">交付自测资产与报告（点击在右侧面板打开明细）：</div>
+                        
+                        <div class="asset-clickable-row" onclick="openRightDoc('report')">
+                            <div class="asset-left-info">
+                                <i class="bi bi-file-earmark-text text-primary"></i>
+                                <span class="asset-name-link">TEST_REPORT_20261021_HOUSING.md</span>
+                                <span class="mono-pill" style="font-size: 9px;">12.4 KB</span>
+                            </div>
+                            <div class="asset-action-tip">
+                                <span>在右侧打开明细</span>
+                                <i class="bi bi-box-arrow-up-right" style="font-size: 10px;"></i>
+                            </div>
+                        </div>
+
+                        <div class="asset-clickable-row" onclick="openRightDoc('case')">
+                            <div class="asset-left-info">
+                                <i class="bi bi-file-earmark-code text-secondary"></i>
+                                <span class="asset-name-link">TEST_CASE_HOUSING_VERIFICATION.md</span>
+                                <span class="mono-pill" style="font-size: 9px;">4.8 KB</span>
+                            </div>
+                            <div class="asset-action-tip">
+                                <span>在右侧打开明细</span>
+                                <i class="bi bi-box-arrow-up-right" style="font-size: 10px;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 5. 底部悬浮指令胶囊 (带测试就绪药丸) -->
+            <div class="bottom-command-bar">
+                <textarea class="command-textarea" rows="1" placeholder="在此输入后续指令（例如：'返回上一页'，'点击右上角分享'），按 Enter 发送..."></textarea>
+                
+                <div class="command-toolbar">
+                    <div class="toolbar-group">
+                        <div class="pill-capsule pill-ready-status" title="当前环境就绪，随时可以开始测试">
+                            <span class="pill-ready-dot"></span>
+                            <span>测试就绪</span>
+                        </div>
+                        <div class="pill-capsule" title="当前连接真机">
+                            <i class="bi bi-phone" style="font-size: 11px;"></i>
+                            <span>Xiaomi MIX 2</span>
+                            <i class="bi bi-chevron-down" style="font-size: 8px;"></i>
+                        </div>
+                        <div class="pill-capsule" title="当前待测应用">
+                            <i class="bi bi-box-seam" style="font-size: 11px;"></i>
+                            <span>象盒找房</span>
+                            <i class="bi bi-chevron-down" style="font-size: 8px;"></i>
+                        </div>
+                        <div class="pill-capsule" title="放行审批流">
+                            <i class="bi bi-lightning-charge" style="font-size: 11px;"></i>
+                            <span>自动放行</span>
+                        </div>
+                    </div>
+
+                    <div class="toolbar-group">
+                        <div class="pill-capsule" title="当前推理模型">
+                            <span>DeepSeek V3</span>
+                            <i class="bi bi-chevron-down" style="font-size: 8px;"></i>
+                        </div>
+                        <button class="btn-send-round" title="发送执行 (Enter)">
+                            <i class="bi bi-arrow-up" style="font-size: 13px; font-weight: bold;"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- 6. 【用户核心诉求】右侧区域：测试报告结构化明细与MD文档检视抽屉 (Right Inspector Panel) -->
+        <aside class="right-inspector-panel" id="rightInspector">
+            <!-- 抽屉头部 -->
+            <div class="inspector-header">
+                <div class="inspector-title">
+                    <i class="bi bi-file-earmark-medical text-primary" style="font-size: 13px;"></i>
+                    <span id="inspectorDocTitle">TEST_REPORT_20261021_HOUSING.md</span>
+                </div>
+                <div class="inspector-actions">
+                    <button class="btn-action-sm" onclick="copyMdContent()" title="复制 Markdown 源码">
+                        <i class="bi bi-clipboard"></i> 复制
+                    </button>
+                    <button class="btn-action-sm" onclick="downloadMd()" title="下载 .md 文件">
+                        <i class="bi bi-download"></i> 下载
+                    </button>
+                    <button class="btn-action-sm" onclick="toggleRightInspector()" title="收起右侧面板">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 抽屉滚动内容区 -->
+            <div class="inspector-content-scroll">
+
+                <!-- 1. 结构化指标卡片 -->
+                <div class="right-metrics-grid">
+                    <div class="right-metric-card">
+                        <span class="right-metric-lbl">测试结果</span>
+                        <div class="d-flex align-items-center gap-1.5 mt-0.5">
+                            <span class="badge-mini-pass">PASS</span>
+                            <span class="right-metric-val" style="font-size: 12px; color: var(--status-green);">全链路通过</span>
+                        </div>
+                    </div>
+                    <div class="right-metric-card">
+                        <span class="right-metric-lbl">总执行耗时</span>
+                        <span class="right-metric-val">5.14 秒</span>
+                    </div>
+                    <div class="right-metric-card">
+                        <span class="right-metric-lbl">步骤通过率</span>
+                        <span class="right-metric-val" style="color: var(--status-green);">6 / 6 (100%)</span>
+                    </div>
+                    <div class="right-metric-card">
+                        <span class="right-metric-lbl">崩溃 / ANR</span>
+                        <span class="right-metric-val">0 次</span>
+                    </div>
+                </div>
+
+                <!-- 2. 步骤断言结构化明细 -->
+                <div class="right-assert-card">
+                    <div class="right-assert-header">
+                        <span>步骤断言实测对比</span>
+                        <span class="mono-pill" style="font-size: 9px;">4 核心节点</span>
+                    </div>
+                    <table class="right-assert-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 55px;">步骤</th>
+                                <th style="width: 110px;">检验节点</th>
+                                <th>实测结果</th>
+                                <th style="width: 45px; text-align: right;">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="font-monospace">STEP 1</td>
+                                <td style="font-weight: 500; color: var(--text-primary);">真机与冷启动</td>
+                                <td>Xiaomi MIX 2 通畅，跳过闪屏</td>
+                                <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
+                            </tr>
+                            <tr>
+                                <td class="font-monospace">STEP 2</td>
+                                <td style="font-weight: 500; color: var(--text-primary);">首屏视觉定位</td>
+                                <td>命中锚点 (540, 960) 并触发轻触</td>
+                                <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
+                            </tr>
+                            <tr>
+                                <td class="font-monospace">STEP 3</td>
+                                <td style="font-weight: 500; color: var(--text-primary);">详情页渲染</td>
+                                <td>检测到 VR 房型与总价标签</td>
+                                <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
+                            </tr>
+                            <tr>
+                                <td class="font-monospace">STEP 4</td>
+                                <td style="font-weight: 500; color: var(--text-primary);">微聊咨询唤起</td>
+                                <td>成功调起 IM 对话窗口</td>
+                                <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 3. 标准 Markdown 文档预览容器 -->
+                <div class="right-md-container">
+                    <div class="right-md-header">
+                        <div class="d-flex align-items-center gap-1.5">
+                            <i class="bi bi-markdown" style="font-size: 13px;"></i>
+                            <span>Markdown 内容预览</span>
+                        </div>
+                        <span class="mono-pill" style="font-size: 9.5px;">GFM 渲染</span>
+                    </div>
+                    <div class="right-md-body" id="inspectorMdBox">
+<span class="md-h1"># 象盒找房自动化测试执行报告 (TR-20261021-01)</span>
+
+> **测试时间**: 2026-10-21 15:42:10  
+> **执行环境**: Xiaomi MIX 2 (MIUI 12 / Android 9.0)  
+> **待测应用**: 象盒找房 (v4.9.11, com.apicloud.A6995433058179)  
+> **最终结论**: <span class="md-pass">**PASS (全部 6 项断言通过)**</span>
+
+---
+
+<span class="md-h2">## 一、 测试执行摘要</span>
+
+| 指标项 | 测量值 | 状态 |
+| :--- | :--- | :--- |
+| 执行总耗时 | 5.14 秒 | <span class="md-pass">PASS</span> |
+| 视觉识别定位次数 | 2 次 (OCR + 模板匹配) | <span class="md-pass">PASS</span> |
+| 端侧手势操作 | 1 次轻触 (坐标: 540, 960) | <span class="md-pass">PASS</span> |
+| 异常与崩溃数 | 0 次 Crash / 0 次 ANR | <span class="md-pass">PASS</span> |
+
+---
+
+<span class="md-h2">## 二、 步骤流水与断言证据</span>
+
+- [x] **STEP 1 [0.2s]**: 检查物理真机连通性与 ADB 握手通道
+- [x] **STEP 2 [0.1s]**: 探测目标应用包名安装状态，无需重复安装
+- [x] **STEP 3 [1.1s]**: 调起应用冷启动，自动化跳过开屏广告
+- [x] **STEP 4 [0.8s]**: OCR 提取首屏第一套推荐房源卡片锚点 (540, 960)
+- [x] **STEP 5 [1.4s]**: 执行轻触流转进入房源详情页，捕获 VR 房型标识
+- [x] **STEP 6 [1.5s]**: 触发底部微聊按钮，确认客服咨询窗口弹出正常
+
+---
+
+<span class="md-h2">## 三、 归档说明与建议</span>
+本测试已自动固化为团队回归用例 `TEST_CASE_HOUSING_VERIFICATION.md`，可作为发版质量门禁自动化执行。
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- 7. 【用户指定重点】可自由拖拽的端侧实时画面悬浮窗 (Floating Draggable Device Screen) -->
+        <div class="floating-device-window" id="floatingDeviceWindow" style="display: flex;">
+            <!-- 拖拽把手标题栏 -->
+            <div class="device-window-header" id="deviceDragHandle">
+                <div class="device-window-title">
+                    <span class="status-dot-sm" style="width: 5px; height: 5px;"></span>
+                    <span>Xiaomi MIX 2 · 实时端侧</span>
+                </div>
+                <div class="device-window-actions">
+                    <button class="device-btn-icon" onclick="resetDevicePos()" title="复位位置">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </button>
+                    <button class="device-btn-icon" onclick="toggleFloatingDevice()" title="关闭画面">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 端侧真机投屏画面主体 -->
+            <div class="device-screen-body">
+                <!-- 真实端侧截图背景 (相对路径与绝对路径双备选) -->
+                <img src="../static/phone_screen_current.png" onerror="this.src='/static/phone_screen_current.png'" class="device-screen-img" alt="端侧实时画面">
+                
+                <!-- 当前 AI 决策手势点击锚点微光涟漪 -->
+                <div class="device-action-ripple" title="当前端侧下发操作: tap (540, 960)"></div>
+            </div>
+
+            <!-- 底部状态条 -->
+            <div class="device-status-footer">
+                <span>60 FPS · 延迟 38ms</span>
+                <span>触控注入就绪</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('theme-light');
+        }
+
+        // --- 自由拖拽悬浮窗逻辑 (Draggable Floating Window) ---
+        const floatingWin = document.getElementById('floatingDeviceWindow');
+        const dragHandle = document.getElementById('deviceDragHandle');
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        dragHandle.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = floatingWin.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+            floatingWin.style.right = 'auto'; // 取消 right 锁定
+            floatingWin.style.left = initialLeft + 'px';
+            floatingWin.style.top = initialTop + 'px';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            let newLeft = initialLeft + dx;
+            let newTop = initialTop + dy;
+
+            // 屏幕边界碰撞检测，防止拖出可视窗口之外
+            newLeft = Math.max(10, Math.min(window.innerWidth - floatingWin.offsetWidth - 10, newLeft));
+            newTop = Math.max(45, Math.min(window.innerHeight - floatingWin.offsetHeight - 10, newTop));
+
+            floatingWin.style.left = newLeft + 'px';
+            floatingWin.style.top = newTop + 'px';
+        });
+
+        document.addEventListener('mouseup', function() {
+            isDragging = false;
+            document.body.style.userSelect = '';
+        });
+
+        function toggleFloatingDevice() {
+            if (floatingWin.style.display === 'none') {
+                floatingWin.style.display = 'flex';
+            } else {
+                floatingWin.style.display = 'none';
+            }
+        }
+
+        function resetDevicePos() {
+            floatingWin.style.left = 'auto';
+            floatingWin.style.right = '500px';
+            floatingWin.style.top = '60px';
+        }
+
+        function toggleTaskCard() {
+            const list = document.getElementById('taskStepList');
+            const chevron = document.getElementById('taskCardChevron');
+            if (list.style.display === 'none') {
+                list.style.display = 'flex';
+                chevron.style.transform = 'rotate(0deg)';
+            } else {
+                list.style.display = 'none';
+                chevron.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function toggleRightInspector() {
+            const inspector = document.getElementById('rightInspector');
+            const btn = document.getElementById('btnToggleRight');
+            if (inspector.style.display === 'none') {
+                inspector.style.display = 'flex';
+                btn.classList.add('active');
+            } else {
+                inspector.style.display = 'none';
+                btn.classList.remove('active');
+            }
+        }
+
+        function openRightDoc(type) {
+            const inspector = document.getElementById('rightInspector');
+            const btn = document.getElementById('btnToggleRight');
+            inspector.style.display = 'flex';
+            btn.classList.add('active');
+
+            const titleEl = document.getElementById('inspectorDocTitle');
+            const box = document.getElementById('inspectorMdBox');
+
+            if (type === 'case') {
+                titleEl.innerText = 'TEST_CASE_HOUSING_VERIFICATION.md';
+                box.innerHTML = `<span class="md-h1"># 象盒找房自动化测试用例 (TC-HOUSING-001)</span>
+
+> **用例名称**: 首页推荐房源进入与微聊验证  
+> **编写人员**: PM 业务自测团队  
+> **固化时间**: 2026-10-21  
+
+<span class="md-h2">## 前置条件</span>
+1. 真机已连接且已开启开发者 USB 调试  
+2. 已安装象盒找房 App (com.apicloud.A6995433058179)  
+
+<span class="md-h2">## 测试步骤</span>
+1. 启动应用并跳过广告  
+2. 视觉定位首页第一套房源卡片并轻触  
+3. 核验进入详情页后 VR 看房标识正常展示  
+4. 点击右下角微聊按钮，断言咨询弹窗唤起  `;
+            } else {
+                titleEl.innerText = 'TEST_REPORT_20261021_HOUSING.md';
+                box.innerHTML = `<span class="md-h1"># 象盒找房自动化测试执行报告 (TR-20261021-01)</span>
+
+> **测试时间**: 2026-10-21 15:42:10  
+> **执行环境**: Xiaomi MIX 2 (MIUI 12 / Android 9.0)  
+> **待测应用**: 象盒找房 (v4.9.11, com.apicloud.A6995433058179)  
+> **最终结论**: <span class="md-pass">**PASS (全部 6 项断言通过)**</span>
+
+---
+
+<span class="md-h2">## 一、 测试执行摘要</span>
+
+| 指标项 | 测量值 | 状态 |
+| :--- | :--- | :--- |
+| 执行总耗时 | 5.14 秒 | <span class="md-pass">PASS</span> |
+| 视觉识别定位次数 | 2 次 (OCR + 模板匹配) | <span class="md-pass">PASS</span> |
+| 端侧手势操作 | 1 次轻触 (坐标: 540, 960) | <span class="md-pass">PASS</span> |
+| 异常与崩溃数 | 0 次 Crash / 0 次 ANR | <span class="md-pass">PASS</span> |
+
+---
+
+<span class="md-h2">## 二、 步骤流水与断言证据</span>
+
+- [x] **STEP 1 [0.2s]**: 检查物理真机连通性与 ADB 握手通道
+- [x] **STEP 2 [0.1s]**: 探测目标应用包名安装状态，无需重复安装
+- [x] **STEP 3 [1.1s]**: 调起应用冷启动，自动化跳过开屏广告
+- [x] **STEP 4 [0.8s]**: OCR 提取首屏第一套推荐房源卡片锚点 (540, 960)
+- [x] **STEP 5 [1.4s]**: 执行轻触流转进入房源详情页，捕获 VR 房型标识
+- [x] **STEP 6 [1.5s]**: 触发底部微聊按钮，确认客服咨询窗口弹出正常`;
+            }
+        }
+
+        function copyMdContent() {
+            const text = document.getElementById('inspectorMdBox').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已成功复制 Markdown 源码！');
+            });
+        }
+
+        function downloadMd() {
+            const text = document.getElementById('inspectorMdBox').innerText;
+            const docName = document.getElementById('inspectorDocTitle').innerText;
+            const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = docName || 'TEST_REPORT.md';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
