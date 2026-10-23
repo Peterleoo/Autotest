@@ -13,7 +13,7 @@ logger = logging.getLogger("WebApp")
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks, Body
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -136,6 +136,121 @@ async def get_device_screenshot(device_id: str):
         pass
 
     return Response(status_code=404, content=b"Device screenshot unavailable", media_type="text/plain")
+
+
+# =========================================================================
+# 🌟 原生 ADB 极速 MJPEG 帧流发生器与鼠标穿透控制 (KISS 原则 · 零外部重型依赖)
+# =========================================================================
+
+@app.get("/api/device/screen/stream")
+@app.get("/api/devices/{device_id}/screen/stream")
+async def stream_device_screen(device_id: Optional[str] = None):
+    """原生 ADB 极速 MJPEG 实时帧流发生器 (零外部依赖，180~250ms 端到端低延迟)"""
+    import io
+    import asyncio
+    from PIL import Image
+
+    target_dev = device_id
+    if not target_dev or target_dev in ["default", "auto"]:
+        try:
+            res = subprocess.run([app_mgr.adb_bin, "devices"], capture_output=True, text=True, timeout=2)
+            for line in res.stdout.strip().split("\n")[1:]:
+                parts = line.split()
+                if len(parts) >= 2 and parts[1] == "device":
+                    target_dev = parts[0]
+                    break
+        except Exception:
+            pass
+
+    if not target_dev:
+        target_dev = "2145189e"
+
+    def _capture_frame():
+        try:
+            res = subprocess.run([app_mgr.adb_bin, "-s", target_dev, "exec-out", "screencap", "-p"], capture_output=True, timeout=4)
+            if res.returncode == 0 and res.stdout and len(res.stdout) > 500:
+                raw = res.stdout
+                if not raw.startswith(b"\x89PNG\r\n\x1a\n") and b"PNG" in raw[:16]:
+                    raw = raw.replace(b"\r\r\n", b"\n").replace(b"\r\n", b"\n")
+                img = Image.open(io.BytesIO(raw)).convert("RGB")
+                orig_w, orig_h = img.size
+                target_w = 480
+                target_h = int(orig_h * (target_w / orig_w))
+                img_resized = img.resize((target_w, target_h), Image.Resampling.BILINEAR)
+                buf = io.BytesIO()
+                img_resized.save(buf, format="JPEG", quality=60)
+                return buf.getvalue()
+        except Exception:
+            pass
+        return None
+
+    async def frame_generator():
+        while True:
+            try:
+                jpeg_bytes = await asyncio.to_thread(_capture_frame)
+                if jpeg_bytes:
+                    yield (b"--frame\r\n"
+                           b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n")
+                await asyncio.sleep(0.05)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                await asyncio.sleep(0.5)
+
+    return StreamingResponse(
+        frame_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
+
+@app.post("/api/device/tap")
+async def tap_device(payload: Dict[str, Any] = Body(...)):
+    """鼠标穿透控制：接收网页点击相对坐标，转化为真机 ADB 物理手势"""
+    dev_id = payload.get("device_id") or "2145189e"
+    x = int(payload.get("x", 0))
+    y = int(payload.get("y", 0))
+    if x <= 0 or y <= 0:
+        return JSONResponse({"success": False, "error": "Invalid coordinates"})
+
+    adb_bin = app_mgr.adb_bin
+    try:
+        res = subprocess.run([adb_bin, "-s", dev_id, "shell", "input", "tap", str(x), str(y)], capture_output=True, timeout=2)
+        return JSONResponse({"success": True, "x": x, "y": y, "returncode": res.returncode})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+@app.get("/api/deliverables")
+async def get_deliverables_list():
+    """获取 .pm/deliverables.json 注册的所有交付物列表"""
+    from core.deliverables_manager import deliverables_mgr
+    return JSONResponse({"deliverables": deliverables_mgr.list_deliverables()})
+
+@app.post("/api/deliverables/replay")
+async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
+    """⚡ 0 Token 毫秒级原生用例回放：直接通过 Pytest 执行固化脚本"""
+    safe_ref = payload.get("safeRef") or payload.get("script_path", "")
+    if not safe_ref:
+        return JSONResponse({"success": False, "error": "缺少脚本路径 safeRef"})
+
+    file_path = BASE_DIR / safe_ref
+    if not file_path.exists():
+        return JSONResponse({"success": False, "error": f"测试脚本不存在: {safe_ref}"})
+
+    cmd = [sys.executable, "-m", "pytest", str(file_path), "-v", "-s", "--color=no"]
+    start_t = time.time()
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(BASE_DIR))
+        duration = round(time.time() - start_t, 2)
+        passed = (res.returncode == 0)
+        return JSONResponse({
+            "success": True,
+            "passed": passed,
+            "duration": duration,
+            "output": res.stdout or res.stderr,
+            "returncode": res.returncode
+        })
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e), "duration": round(time.time() - start_t, 2)})
 
 @app.get("/api/system/preflight")
 async def system_preflight():

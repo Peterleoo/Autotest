@@ -178,4 +178,16 @@ def test_{clean_name}(driver, api_client):
 '''
         file_path.write_text(template, encoding="utf-8")
         logger.info(f"✅ 固化脚本生成成功: {file_path.name}")
+        
+        try:
+            from core.deliverables_manager import deliverables_mgr
+            rel_path = f"tests/solidified/{file_path.name}"
+            deliverables_mgr.register_test_script(
+                script_relative_path=rel_path,
+                title=f"{clean_name}: {goal[:32]}",
+                case_id=clean_name
+            )
+        except Exception as ex:
+            logger.warning(f"注册交付物至 .pm/deliverables.json 失败: {ex}")
+
         return file_path
