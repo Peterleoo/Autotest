@@ -1086,9 +1086,12 @@ class TaskManager:
             elif any(k in c for k in ['滑动', '下滑', '翻页', '上滑', '滚动']):
                 steps_def.append((c_clean[:20], f"下发滑动手势：{c_clean}，触发列表数据异步分页加载"))
             elif any(k in c for k in ['点击', '进入', '切换', '选择', '打开', '跳转']):
-                steps_def.append((c_clean[:20], f"视觉定位并下发原生交互：{c_clean}"))
+                desc_tip = f"视觉定位并下发原生交互：{c_clean}"
+                if any(kw in c_clean for kw in ['委托', '服务']):
+                    desc_tip += " (结合先验经验：若金刚区首屏未见则自动执行左滑翻页寻路)"
+                steps_def.append((c_clean[:20], desc_tip))
             elif any(k in c for k in ['输入', '搜索', '填写', '键入']):
-                steps_def.append((c_clean[:20], f"激活输入组件，原生通道键入参数：{c_clean}"))
+                steps_def.append((c_clean[:20], f"激活智能表单填充引擎，自动填充合规测试数据：{c_clean}"))
             else:
                 steps_def.append((c_clean[:20], f"端侧执行业务流转：{c_clean}"))
                 

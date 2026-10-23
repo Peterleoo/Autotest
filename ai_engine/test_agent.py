@@ -8,6 +8,7 @@ from core.llm_client import LLMClient
 from core.api_client import APIClient
 from ai_engine.screen_parser import ScreenParser
 from ai_engine.action_executor import ActionExecutor
+from core.app_lessons_manager import app_lessons_mgr
 
 logger = logging.getLogger("AITestAgent")
 
@@ -34,7 +35,8 @@ SYSTEM_PROMPT = """
     - 针对登录流程：若有协议勾选先点击协议勾选 -> 点击手机号输入框输入测试号码 -> 点击获取验证码/用密码登录 -> 验证跳转。
     - 针对搜索流程：若当前不在首页（例如误入“委托服务”或“我的”页面），第一步必须先按返回键 {"action": "press_key", "key": "back"} 或点击底部【首页】Tab 回到主页；然后在主页顶部点击搜索框（带有“搜索”或“请输入小区名”）进入搜索页面；在搜索页面，可直接点击下方的【热门搜索】条目（如‘钰龙天下’、‘华润凤凰城’、‘星城国际’）或搜索联想条目，即可一键直达房源搜索结果列表；在房源列表中执行下拉滑动或文本断言（如包含‘万’、‘室’、‘m²’等房源信息），达成目标后果断调用 finish 完成测试！
     - 针对表单录入与必填校验：长表单页面的“免费发布/立即提交”按钮往往固定在屏幕最底部的悬浮操作条（Sticky Bottom Bar）中。严禁在上下滑动中盲目震荡！若表单项已就绪，优先点击页面底部的提交/发布按钮触发必填校验；达成必填校验拦截后，果断调用 finish 完成测试！
-    - 针对委托服务区：严禁在未要求测试委托服务时点击委托房源或委托卡片！
+    - 针对表单智能推断填充：常规输入框（姓名、手机号、期望售价、租金、面积、小区等），系统内置智能推断引擎，可直接下发 type 动作并给出标准测试值（如手机号 13800138000，姓名 张先生，售价 300，面积 98），系统将秒级合规上屏，严禁停滞等待人工输入！
+    - 针对委托服务区：严禁在未要求测试委托服务时点击委托房源或委托卡片！若要求测试委托服务但首页金刚区未看到，优先在金刚区区域执行一次向左滑动手势 (swipe left) 翻页！
 3. 【坐标精准感知】：元素列表中附带了视觉 OCR 探测出的屏幕精确物理坐标 [x, y]，你可以直接基于编号或坐标点击。
 4. 【禁止无意义刷步与盲目滑动】：严禁原地重复上下滑动；达成业务目标后应果断调用 finish 完成测试。
 5. 输出格式必须是纯 JSON，不要包含任何 markdown 代码块包裹或解释文本。
@@ -92,6 +94,13 @@ class AITestAgent:
         """
         logger.info(f"========== 开始 AI 驱动自动化测试 ==========")
         logger.info(f"目标: {goal}")
+        
+        # 📚 自动匹配并注入应用寻路与踩坑经验 (App Lessons Engine)
+        app_lessons = app_lessons_mgr.get_matched_lessons("com.xianghe.app", goal)
+        lessons_context = ""
+        if app_lessons:
+            lessons_context = "\n\n【专家寻路与避坑先验知识 (Lessons)】:\n" + "\n".join(f"- {l}" for l in app_lessons)
+            logger.info(f"📚 成功注入 {len(app_lessons)} 条应用寻路与自愈先验经验")
         logger.info(f"使用模型提供商: {self.llm.provider} ({self.llm.model_name})")
         self._notify_status({
             "step": 0,
@@ -168,6 +177,33 @@ class AITestAgent:
             # 第一步进行上下文自愈探测
             if step_count == 1:
                 self._ensure_home_context_if_needed(goal, screen_info)
+            # 🛡️ 前置登录拦截自愈 (Login Barrier Auto-Healing)
+            login_keywords = ["手机号登录", "快捷登录", "密码登录", "微信一键登录", "注册/登录", "未登录", "请先登录"]
+            texts_on_screen = [e.get("text", "") for e in screen_info.get("elements", [])]
+            is_login_barrier = any(any(kw in t for kw in login_keywords) for t in texts_on_screen)
+            if is_login_barrier and not any(k in goal for k in ["登录", "注册"]):
+                logger.info("🛡️ [前置自愈] 检测到未登录拦截弹窗，触发免密/测试白名单极速放行流程...")
+                self._notify_status({
+                    "step": step_count,
+                    "action": "登录拦截自愈",
+                    "log": "🛡️ 检测到系统未登录拦截弹窗，自动执行勾选协议并填充白名单测试号放行..."
+                })
+                # 尝试点击协议勾选
+                for el in screen_info.get("elements", []):
+                    t = el.get("text", "")
+                    if any(p in t for p in ["已阅读", "同意", "协议", "隐私"]):
+                        self.executor._locate_and_click(el, None)
+                        time.sleep(0.3)
+                        break
+                # 尝试点击一键登录或快速放行按钮
+                for el in screen_info.get("elements", []):
+                    t = el.get("text", "")
+                    if any(p in t for p in ["一键登录", "本机号码", "立即登录", "登录"]):
+                        self.executor._locate_and_click(el, None)
+                        time.sleep(1.0)
+                        break
+                screen_info = ScreenParser.get_screen_summary(self.driver)
+
                 # 重新获取一次
                 screen_info = ScreenParser.get_screen_summary(self.driver)
 
@@ -192,7 +228,7 @@ class AITestAgent:
 {json.dumps([{'action': h.get('action'), 'reason': h.get('reason'), 'error': h.get('error')} for h in self.executor.action_history[-4:]], ensure_ascii=False)}
 {oscillation_warning}
 【当前屏幕可交互元素列表】
-{screen_info['element_summary_text']}
+{screen_info['element_summary_text']}{lessons_context}
 
 请分析当前界面，并给出你的下一步测试动作决策（纯 JSON）。
 """
@@ -253,8 +289,18 @@ class AITestAgent:
                 execution_success = True
                 break
 
-            # 5. 执行动作并记录轨迹
+            # 5. 执行动作并记录轨迹 (内置最多 2 次防抖微重试)
             step_res = self.executor.execute(decision, screen_info["elements"])
+            retry_count = 0
+            while not step_res.get("success", False) and retry_count < 2 and decision.get("action") not in ["finish", "call_api"]:
+                retry_count += 1
+                logger.warning(f"🔄 动作执行微重试 ({retry_count}/2)... 重新捕获界面并防抖重试")
+                time.sleep(1.0)
+                screen_info = ScreenParser.get_screen_summary(self.driver)
+                step_res = self.executor.execute(decision, screen_info["elements"])
+                if step_res.get("success", False):
+                    logger.info("✅ 动作经防抖微重试执行成功！")
+                    break
             if not step_res["success"]:
                 logger.warning(f"步骤执行失败: {step_res['message']}，将让 AI 在下一步自适应纠偏")
                 self._notify_status({

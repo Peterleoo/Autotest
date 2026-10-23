@@ -61,9 +61,9 @@ class SmartFormFiller:
         # 5. 小区名称 / 楼盘
         if re.search(r"小区|楼盘|物业名称|房源位置|community", context_str, re.I):
             # 优先从用户的测试目标中提取具体小区（如“华润凤凰城”、“钰龙天下”）
-            match = re.search(r"['\"]?([^\s,，。]+(?:小区|家园|天下|花园|城|苑|公馆|国际|村|湾))['\"]?", goal)
+            match = re.search(r"['\"]?([^\s,，。、]+?(?:小区|家园|天下|花园|城|苑|公馆|国际|村|湾))['\"]?", goal)
             if match:
-                extracted = match.group(1).strip("'\"")
+                extracted = re.sub(r'^(在|于|去|进入|到|测试)', '', match.group(1).strip("'\""))
                 logger.info(f"💡 [智能表单] 从用户目标提取小区名，自动填充: {extracted}")
                 return extracted
             return cls.DEFAULT_PRESETS["community"]
