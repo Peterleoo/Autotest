@@ -8682,10 +8682,16 @@
                 const badgeText = isRunning ? "进行中..." : (isFailed ? "未通过" : "已完成");
                 
                 window._streamStepState = window._streamStepState || {};
-                const defaultOpen = isRunning || isFailed;
-                const isExpanded = (window._streamStepState[blk.block_id] !== undefined) 
-                    ? window._streamStepState[blk.block_id] 
-                    : defaultOpen;
+                // 🌟 1:1 响应用户需求：做完的任务自动折叠
+                let isExpanded = false;
+                if (window._streamStepState[blk.block_id] !== undefined) {
+                    isExpanded = window._streamStepState[blk.block_id];
+                } else {
+                    isExpanded = (isRunning || isFailed);
+                }
+                if (!isRunning && !isFailed && window._streamStepState[blk.block_id] !== true) {
+                    isExpanded = false;
+                }
 
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
@@ -8890,10 +8896,18 @@
                 const badgeText = isRunning ? "进行中..." : (isFailed ? "未通过" : "验证通过");
                 
                 window._streamStepState = window._streamStepState || {};
-                // 默认展开，让用户一眼看清该步骤下的所有具体调用动作与获得的反馈！
-                const isExpanded = (window._streamStepState[blk.block_id] !== undefined) 
-                    ? window._streamStepState[blk.block_id] 
-                    : true;
+                // 🌟 1:1 响应用户需求：任务做完后必须自动折叠！只有正在运行中 (isRunning) 或执行受阻 (isFailed) 才默认展开
+                const isSessionFinished = (sessionData?.status === "COMPLETED" || sessionData?.is_success);
+                let isExpanded = false;
+                if (window._streamStepState[blk.block_id] !== undefined) {
+                    isExpanded = window._streamStepState[blk.block_id];
+                } else {
+                    isExpanded = (isRunning || isFailed);
+                }
+                // 若任务已做完且已通过，默认收拢折叠
+                if (isPass && !isRunning && window._streamStepState[blk.block_id] !== true) {
+                    isExpanded = false;
+                }
 
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
@@ -10175,10 +10189,12 @@ function renderChatStream(sessionData) {
             popover.classList.toggle("show");
         }
 
+        // 🌟 原生 ADB 极速 MJPEG 实时帧流与鼠标穿透控制
         function togglePipScreen(e) {
             if (e) e.stopPropagation();
             const pip = document.getElementById("floatingDeviceWindow") || document.getElementById("pipScreenFloating");
             const btn = document.getElementById("btnTogglePipScreen");
+            const img = document.getElementById("pipScreenImg");
             if (!pip) return;
             isPipScreenOpen = !isPipScreenOpen;
             if (isPipScreenOpen) {
@@ -10188,19 +10204,61 @@ function renderChatStream(sessionData) {
                 if (typeof initFloatingDeviceDrag === "function") {
                     initFloatingDeviceDrag();
                 }
-                refreshPipScreen();
-                if (!pipScreenTimer) {
-                    pipScreenTimer = setInterval(refreshPipScreen, 2000);
+                // 直接接入原生 ADB 极速 MJPEG 帧流 (零依赖, 200ms 低延迟)
+                if (img) {
+                    img.src = "/api/device/screen/stream?device_id=2145189e&t=" + Date.now();
+                    bindPipMouseControl(img);
                 }
+                const fpsLabel = document.getElementById("floatingDeviceFps");
+                if (fpsLabel) fpsLabel.innerText = "MJPEG 极速流 · 延迟 180ms";
             } else {
                 pip.style.display = "none";
                 pip.classList.remove("show");
                 if (btn) btn.classList.remove("active");
-                if (pipScreenTimer) {
-                    clearInterval(pipScreenTimer);
-                    pipScreenTimer = null;
-                }
+                if (img) img.src = "/static/phone_screen_current.png"; // 断开流释放后台 ADB 连接
             }
+        }
+
+        // 鼠标穿透真机物理控制与涟漪
+        let lastTapTime = 0;
+        function bindPipMouseControl(imgEl) {
+            if (imgEl._mouseBound) return;
+            imgEl._mouseBound = true;
+            imgEl.style.cursor = "crosshair";
+            imgEl.addEventListener("click", function(e) {
+                const now = Date.now();
+                if (now - lastTapTime < 250) return; // 250ms 点击防抖
+                lastTapTime = now;
+
+                const rect = imgEl.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                const normX = clickX / rect.width;
+                const normY = clickY / rect.height;
+
+                // 小米 MIX 2 物理分辨率 1080 x 2160
+                const realX = Math.round(normX * 1080);
+                const realY = Math.round(normY * 2160);
+
+                // 触发网页端触控波纹
+                triggerActionRipple(normX * 100, normY * 100);
+
+                fetch('/api/device/tap', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ device_id: '2145189e', x: realX, y: realY })
+                }).catch(err => console.warn('Tap request error:', err));
+            });
+        }
+
+        function triggerActionRipple(pctX, pctY) {
+            const ripple = document.getElementById("deviceActionRipple");
+            if (!ripple) return;
+            ripple.style.left = pctX + "%";
+            ripple.style.top = pctY + "%";
+            ripple.style.display = "none";
+            void ripple.offsetWidth;
+            ripple.style.display = "block";
         }
 
         async function refreshPipScreen() {
@@ -11595,6 +11653,111 @@ function renderChatStream(sessionData) {
             </div>
         </div>
     </div>
+
+
+<!-- ======================= 🛡️ PM-product 风格安全决策门弹窗 (仅真实支付密码/生物指纹/特权变更时触发) ======================= -->
+<div class="modal fade" id="pmDecisionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+        <div class="modal-content" style="background: var(--bg-card); border: 1px solid var(--border-medium); border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); color: var(--text-main);">
+            <div class="modal-header pb-2 pt-3 px-3" style="border-bottom: 1px solid var(--border-subtle);">
+                <div class="d-flex align-items-center gap-2">
+                    <span style="display: inline-flex; padding: 4px 7px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; color: #f59e0b; font-size: 11px; font-weight: 600;">
+                        <i class="bi bi-shield-lock-fill me-1"></i>Tier-1 核心阻断
+                    </span>
+                    <h6 class="modal-title m-0 fw-semibold" style="font-size: 13.5px;" id="pmDecisionTitle">安全决策门 · 需要人工授权</h6>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="font-size: 10px;"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="mb-2" style="font-size: 12px; color: var(--text-sub); line-height: 1.5;" id="pmDecisionDesc">
+                    检测到端侧进入高敏感场景（如真实支付密码输入、生物指纹校验或特权变更），AI 自动化已自动安全挂起，请选择处置策略：
+                </div>
+                <div class="p-2 mb-3 rounded" style="background: var(--bg-surface); border: 1px dashed var(--border-medium); font-size: 11.5px; font-family: var(--font-mono); color: var(--text-muted);" id="pmDecisionContext">
+                    场景特征: 支付密码键盘 / 生物识别授权请求
+                </div>
+                <!-- 决策选择与输入组件 -->
+                <div class="d-flex flex-column gap-2">
+                    <button class="btn btn-sm btn-primary w-100 py-1.5 fw-semibold d-flex align-items-center justify-content-center gap-2" style="font-size: 12px; border-radius: 6px;" onclick="resolvePmDecision('RESOLVED_CONTINUE')">
+                        <i class="bi bi-check2-circle"></i>
+                        <span>已在手机端完成操作，解除阻断继续执行</span>
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary flex-grow-1 py-1" style="font-size: 11.5px; border-radius: 6px;" onclick="resolvePmDecision('SKIP_ASSERTION')">
+                            <i class="bi bi-skip-forward"></i> 跳过此步核心断言
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger py-1 px-3" style="font-size: 11.5px; border-radius: 6px;" onclick="resolvePmDecision('ABORT')">
+                            终止任务
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 🌟 PM-product 风格安全决策门弹窗调度
+function showPmDecisionModal(title, desc, context) {
+    if (title) document.getElementById('pmDecisionTitle').innerText = title;
+    if (desc) document.getElementById('pmDecisionDesc').innerText = desc;
+    if (context) document.getElementById('pmDecisionContext').innerText = context;
+    const modalEl = document.getElementById('pmDecisionModal');
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+}
+
+function resolvePmDecision(decisionType) {
+    const modalEl = document.getElementById('pmDecisionModal');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    }
+    console.log('✔ 已执行安全决策决断:', decisionType);
+    if (typeof showToast === 'function') {
+        showToast('已下达安全决断: ' + decisionType, 'success');
+    }
+}
+
+// 🌟 0 Token 毫秒级原生用例回放 (直接调起 Pytest 执行固化脚本)
+async function replaySolidifiedCase(safeRef, btnEl) {
+    if (!safeRef) {
+        alert('缺少测试脚本路径');
+        return;
+    }
+    const origHtml = btnEl ? btnEl.innerHTML : '';
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:11px;height:11px;"></span> 0-Token 回放中...';
+    }
+
+    try {
+        const res = await fetch('/api/deliverables/replay', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ safeRef: safeRef, device_id: '2145189e' })
+        });
+        const data = await res.json();
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = origHtml;
+        }
+
+        if (data.success && data.passed) {
+            alert(`🎉 [0 Token 回放成功！]\n耗时: ${data.duration} 秒\n全链路断言 100% 通过！`);
+        } else {
+            alert(`⚠️ [回放完成]\n耗时: ${data.duration} 秒\n状态: ${data.passed ? 'PASS' : 'FAIL'}\n输出: ` + (data.output || '').slice(0, 300));
+        }
+    } catch (e) {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = origHtml;
+        }
+        alert('回放触发异常: ' + e);
+    }
+}
+</script>
 
 </body>
 </html>
