@@ -7469,6 +7469,11 @@
             loadSuggestedCases();
             refreshAppSuggestedCases();
             refreshPreflightStatus();
+            // 确保首次加载默认进入新建任务界面
+            const initUrlNav = new URLSearchParams(window.location.search);
+            if (!initUrlNav.get("session_id")) {
+                startNewChat();
+            }
             loadSessions();
             loadReports();
             loadSolidifiedCases();
@@ -7672,11 +7677,12 @@
 
                 const urlParamsNav = new URLSearchParams(window.location.search);
                 const urlSessionId = urlParamsNav.get("session_id");
-                const savedId = urlSessionId || localStorage.getItem("autotest_active_session_id");
-                if (savedId && currentSessions.some(s => s.session_id === savedId)) {
-                    switchSession(savedId);
-                } else if (!activeSessionId && currentSessions.length > 0) {
-                    switchSession(data.active_id || currentSessions[0].session_id);
+                // 🌟 1:1 响应用户需求：首次进入或刷新界面默认进【新建任务界面】，绝不自动切入历史或正在运行的任务；
+                // 仅当用户在 URL 中显式指定 ?session_id=xxx 时才精准切入
+                if (urlSessionId && currentSessions.some(s => s.session_id === urlSessionId)) {
+                    switchSession(urlSessionId);
+                } else if (!activeSessionId) {
+                    startNewChat();
                 }
             } catch (e) {}
         }
@@ -7728,9 +7734,29 @@
             if (sessionPollTimer) clearInterval(sessionPollTimer);
             updateStopButtonState("IDLE");
             renderSessionList();
-            document.getElementById("emptyStateBox").classList.remove("d-none");
-            document.getElementById("messagesFlow").innerHTML = "";
-            document.getElementById("currentSessionTitleDisplay").innerText = "新测试任务";
+
+            // 1. 显式显示中央推荐用例看板与空状态
+            const emptyBox = document.getElementById("emptyStateBox");
+            if (emptyBox) emptyBox.classList.remove("d-none");
+            const flow = document.getElementById("messagesFlow");
+            if (flow) flow.innerHTML = "";
+
+            // 2. 任务标题与徽章重置为新建状态
+            const titleDisplay = document.getElementById("currentSessionTitleDisplay");
+            if (titleDisplay) titleDisplay.innerText = "新建测试任务";
+            const topBadge = document.getElementById("topActiveTaskBadge");
+            if (topBadge) topBadge.classList.add("d-none");
+            const topMeta = document.getElementById("topActiveTaskMeta");
+            if (topMeta) topMeta.innerText = "准备就绪";
+
+            // 3. 收起右侧明细面板，保持纯净视野
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && !canvas.classList.contains("collapsed")) {
+                canvas.classList.add("collapsed");
+            }
+            const btnRight = document.getElementById("btnToggleRight");
+            if (btnRight) btnRight.classList.remove("active");
+
             refreshAppSuggestedCases();
 
             // 1. 新建任务时：展示模式切换分段按钮 (AI测试 / 本地用例)
