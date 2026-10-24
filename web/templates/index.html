@@ -5314,59 +5314,96 @@
         }
 
 
-        /* 🌟 极简纯净分段导航 (彻底移除双层厚背景与数字徽标，通透干练) */
+                /* 🌟 苹果流体物理滑动胶囊 (Apple Liquid Sliding Segmented Control: 全圆角跑道胶囊 + 阻尼弹性滑块) */
         .sidebar-bottom {
             padding: 8px 10px;
             border-top: 1px solid var(--border-subtle);
         }
         .sidebar-mode-switcher {
+            position: relative;
             display: flex;
             align-items: center;
             width: 100%;
-            background: transparent !important;
-            border: none !important;
-            padding: 0;
-            gap: 4px;
+            height: 32px;
+            border-radius: 9999px;
+            padding: 2.5px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             user-select: none;
-            box-shadow: none !important;
+            overflow: hidden;
+            box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.2);
         }
+        body.theme-light .sidebar-mode-switcher, body[data-theme="light"] .sidebar-mode-switcher {
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: inset 0 0.5px 1.5px rgba(0, 0, 0, 0.04);
+        }
+        /* 内部物理滑块：苹果签名阻尼回弹曲线 + 微浮动/微磨砂质感 */
+        .mode-slider-thumb {
+            position: absolute;
+            top: 2.5px;
+            left: 2.5px;
+            width: calc(50% - 2.5px);
+            height: calc(100% - 5px);
+            border-radius: 9999px;
+            z-index: 1;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.16);
+            border: 0.5px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 0.5px 0 rgba(255, 255, 255, 0.25);
+            transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateX(0);
+        }
+        body.theme-light .mode-slider-thumb, body[data-theme="light"] .mode-slider-thumb {
+            background: #ffffff;
+            border: 0.5px solid rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+        .sidebar-mode-switcher.is-local .mode-slider-thumb {
+            transform: translateX(100%);
+        }
+        /* 分段纯文本按钮：浮于滑块上方，背景透明，平滑变色 */
         .sidebar-mode-btn {
+            position: relative;
+            z-index: 2;
             flex: 1;
+            height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 6px 4px;
-            border-radius: 6px;
-            border: none;
-            background: transparent;
-            color: var(--text-dim);
+            padding: 0 6px;
+            border-radius: 9999px;
+            border: none !important;
+            background: transparent !important;
+            color: rgba(255, 255, 255, 0.55);
             font-size: 11.5px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.18s ease;
+            transition: color 0.2s ease, font-weight 0.18s ease;
             white-space: nowrap;
             box-shadow: none !important;
         }
+        body.theme-light .sidebar-mode-btn, body[data-theme="light"] .sidebar-mode-btn {
+            color: #64748b;
+        }
         .sidebar-mode-btn:hover {
-            color: var(--text-main);
-            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.85);
         }
         body.theme-light .sidebar-mode-btn:hover, body[data-theme="light"] .sidebar-mode-btn:hover {
-            background: rgba(0, 0, 0, 0.03);
+            color: #334155;
         }
-        /* 仅选中态带有一层极轻微、通透的淡色微薄层，无生硬厚重大白块 */
         .sidebar-mode-btn.active {
-            color: var(--text-main) !important;
+            color: #ffffff !important;
             font-weight: 600;
-            background: rgba(255, 255, 255, 0.08) !important;
         }
         body.theme-light .sidebar-mode-btn.active, body[data-theme="light"] .sidebar-mode-btn.active {
-            background: rgba(0, 0, 0, 0.05) !important;
             color: #09090b !important;
+            font-weight: 600;
         }
 
-        /* 📁 本地回归模式下：左侧 App 项目工程单行极简流线 (与 AI 会话列表 1:1 统一设计规范) */
-        .app-project-list {
+.app-project-list {
             flex: 1;
             overflow-y: auto;
             padding: 2px 7px 12px 7px;
@@ -5562,6 +5599,7 @@
         <!-- 侧栏底部：AI 智能编排 与 本地回归测试 随时切换胶囊 (左下角) -->
         <div class="sidebar-bottom" style="padding: 10px 12px; border-top: 1px solid var(--border-subtle);">
             <div class="sidebar-mode-switcher" id="sidebarModeSwitcher">
+                <div class="mode-slider-thumb" id="modeSliderThumb"></div>
                 <button type="button" class="sidebar-mode-btn active" id="btnModeAi" onclick="switchMainWorkspaceMode('ai')" title="进入 AI 智能测试编排视图">
                     <span>AI 智能编排</span>
                 </button>
@@ -6504,6 +6542,9 @@
             const viewLocal = document.getElementById("workspaceLocalView");
             const sidebarAi = document.getElementById("sidebarViewAi");
             const sidebarLocal = document.getElementById("sidebarViewLocal");
+
+            const switcher = document.getElementById("sidebarModeSwitcher");
+            if (switcher) switcher.classList.toggle("is-local", mode === "local");
 
             if (btnAi) btnAi.classList.toggle("active", mode === "ai");
             if (btnLocal) btnLocal.classList.toggle("active", mode === "local");

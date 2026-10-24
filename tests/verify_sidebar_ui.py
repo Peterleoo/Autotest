@@ -18,67 +18,62 @@ async def main():
         sidebar = await page.wait_for_selector("#gptSidebar", timeout=5000)
         assert sidebar is not None, "Sidebar not found!"
 
-        # 1. 验证夜间模式高对比度 (新建按钮与搜索框占位文本清晰可辨)
-        btn_new = await page.wait_for_selector(".btn-new-task")
-        search_inp = await page.wait_for_selector("#sessionSearchInput")
-        assert btn_new is not None and search_inp is not None
+        switcher = await page.wait_for_selector("#sidebarModeSwitcher")
+        thumb = await page.wait_for_selector("#modeSliderThumb")
+        assert switcher is not None and thumb is not None, "Liquid slider switcher/thumb not found!"
 
-        # 验证没有残留的数字药丸
+        # 1. 验证没有残留的数字药丸，没有多余图标
         count_pills = await page.query_selector_all(".mode-count-pill")
-        print(f"Verified mode count pills count: {len(count_pills)} (Expected 0)")
         assert len(count_pills) == 0, "All mode-count-pills should be completely removed!"
+        icons = await switcher.query_selector_all("i")
+        assert len(icons) == 0, "No extra icons should be inside segmented control!"
 
-        # 验证没有厚重大白块滑块
-        thumbs = await page.query_selector_all(".mode-slider-thumb")
-        print(f"Verified mode-slider-thumb count: {len(thumbs)} (Expected 0)")
-        assert len(thumbs) == 0, "mode-slider-thumb should be removed!"
+        # 2. 验证深色模式下流体滑块在 AI 模式的状态
+        bottom_box = await page.wait_for_selector(".sidebar-bottom")
+        dark_ai_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_dark_ai.png")
+        await bottom_box.screenshot(path=dark_ai_shot)
+        print(f"Saved: {dark_ai_shot}")
 
-        # 截图存证：夜间模式高对比度
-        dark_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_dark_high_contrast.png")
-        await sidebar.screenshot(path=dark_shot)
-        print(f"Saved: {dark_shot}")
-
-        # 2. 验证底部无厚重背景切换按钮
+        # 3. 点击“本地回归”，验证阻尼滑动和 is-local 状态
         btn_local = await page.wait_for_selector("#btnModeLocal")
         await btn_local.click()
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.4)  # 等待 260ms 阻尼动画完成
 
-        # 3. 验证本地回归文件夹树极简流线呈现
-        project_items = await page.query_selector_all(".app-project-item")
-        print(f"Found {len(project_items)} app project items in local mode.")
-        if len(project_items) > 0:
-            first_proj = project_items[0]
-            proj_dot = await first_proj.query_selector(".project-status-dot")
-            proj_title = await first_proj.query_selector(".project-title")
-            proj_count = await first_proj.query_selector(".project-cases-count")
-            assert proj_dot is not None and proj_title is not None and proj_count is not None, "Project item structure mismatch!"
-            print("Project item text:", (await first_proj.inner_text()).replace("\n", " "))
+        is_local_class = await switcher.get_attribute("class")
+        assert "is-local" in is_local_class, "Switcher should have 'is-local' class!"
 
-        # 截图存证：本地回归极简文件夹列表
-        local_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_local_projects_minimal.png")
-        await sidebar.screenshot(path=local_shot)
-        print(f"Saved: {local_shot}")
+        dark_local_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_dark_local.png")
+        await bottom_box.screenshot(path=dark_local_shot)
+        print(f"Saved: {dark_local_shot}")
 
-        # 切回 AI 模式
-        btn_ai = await page.wait_for_selector("#btnModeAi")
-        await btn_ai.click()
-        await asyncio.sleep(0.5)
-
-        # 4. 验证白天模式 (Light Mode) 纯净无背景 Tab 导航与一体化高质感
+        # 4. 验证白天模式 (Light Mode) 下的苹果微浮动纯白卡片与浅灰底槽
         print("Switching to light mode...")
         await page.evaluate("document.body.setAttribute('data-theme', 'light'); document.body.classList.add('theme-light');")
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.3)
 
-        light_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_light_no_bg_tabs.png")
-        await sidebar.screenshot(path=light_shot)
-        print(f"Saved: {light_shot}")
+        light_local_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_light_local.png")
+        await bottom_box.screenshot(path=light_local_shot)
+        print(f"Saved: {light_local_shot}")
 
-        full_light = os.path.join(ARTIFACT_DIR, "verify_fullpage_minimal_light2.png")
-        await page.screenshot(path=full_light)
-        print(f"Saved: {full_light}")
+        # 点击切回 AI 模式，验证白天模式下滑块丝滑回弹
+        btn_ai = await page.wait_for_selector("#btnModeAi")
+        await btn_ai.click()
+        await asyncio.sleep(0.4)
+
+        is_local_class_after = await switcher.get_attribute("class")
+        assert "is-local" not in is_local_class_after, "Switcher should NOT have 'is-local' class!"
+
+        light_ai_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_light_ai.png")
+        await bottom_box.screenshot(path=light_ai_shot)
+        print(f"Saved: {light_ai_shot}")
+
+        # 5. 白天模式下侧边栏整体截图
+        sidebar_light_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_apple_capsule_light.png")
+        await sidebar.screenshot(path=sidebar_light_shot)
+        print(f"Saved: {sidebar_light_shot}")
 
         await browser.close()
-        print("\n>>> ALL CHECKS PASSED: HIGH CONTRAST, NO-BG TABS, MINIMAL LOCAL FOLDERS! <<<")
+        print("\n>>> ALL CHECKS PASSED: APPLE LIQUID SLIDING CAPSULE VERIFIED! <<<")
 
 if __name__ == "__main__":
     asyncio.run(main())
