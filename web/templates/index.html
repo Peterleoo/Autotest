@@ -3587,73 +3587,72 @@
             background: var(--bg-surface-hover);
         }
 
-        /* ================= 升级：左侧边栏高质感 UI 交互体系 (Linear / Raycast / macOS 级) ================= */
+        /* ================= 升级：左侧边栏极简主义 UI 体系 (Linear / Raycast / macOS 级) ================= */
         .sidebar-top {
             padding: 12px 10px 8px 10px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 7px;
             flex-shrink: 0;
         }
 
-        /* 1. 新建任务 Hero CTA 按钮 (微质感微渐变 + 快捷键徽章 + 悬停微上浮动效) */
+        /* 1. 新建任务 Hero CTA 按钮 (去除花哨生硬渐变，采用纯净工程微质感，白天/深色浑然一体) */
         .btn-new-task {
             width: 100%;
-            height: 36px;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%), var(--bg-surface-elevated);
-            border: 1px solid rgba(255, 255, 255, 0.09);
-            border-radius: 8px;
+            height: 33px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 7px;
             color: var(--text-main);
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: 500;
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 10px;
             cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), inset 0 1px 0.5px rgba(255, 255, 255, 0.12);
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
             user-select: none;
         }
         body.theme-light .btn-new-task, body[data-theme="light"] .btn-new-task {
-            background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+            background: #ffffff;
             border: 1px solid rgba(0, 0, 0, 0.08);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), inset 0 1px 0.5px #ffffff;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            color: var(--text-main);
         }
         .btn-new-task:hover {
-            transform: translateY(-1px);
-            border-color: rgba(56, 189, 248, 0.4);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(56, 189, 248, 0.25);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(56, 189, 248, 0.35);
             color: var(--text-main);
         }
         body.theme-light .btn-new-task:hover, body[data-theme="light"] .btn-new-task:hover {
-            border-color: #0284c7;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(2, 132, 199, 0.2);
+            background: #ffffff;
+            border-color: rgba(2, 132, 199, 0.35);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
         }
         .btn-new-task:active {
-            transform: translateY(0);
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+            transform: scale(0.99);
         }
         .btn-new-task .new-task-icon {
-            font-size: 12px;
+            font-size: 11px;
             color: #38bdf8;
-            transition: transform 0.2s ease;
-        }
-        .btn-new-task:hover .new-task-icon {
-            transform: rotate(90deg);
         }
         .kbd-hint {
-            font-size: 10px;
+            font-size: 9.5px;
             font-family: var(--font-mono);
             color: var(--text-dim);
-            background: var(--bg-base);
-            padding: 1.5px 5px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1px 5px;
             border-radius: 4px;
-            border: 1px solid var(--border-subtle);
-            box-shadow: inset 0 1px 1px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        body.theme-light .kbd-hint, body[data-theme="light"] .kbd-hint {
+            background: #f1f5f9;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            color: #64748b;
         }
 
-        /* 2. 行内即时过滤搜索框 (Capsule Search) */
+        /* 2. 行内即时过滤搜索框 (内嵌凹槽式，与新建按钮自然呼应消除断层) */
         .sidebar-search-box {
             position: relative;
             display: flex;
@@ -3663,13 +3662,18 @@
         .sidebar-search-input {
             width: 100%;
             height: 28px;
-            background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
+            background: rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 6px;
-            padding: 0 24px 0 26px;
+            padding: 0 24px 0 25px;
             font-size: 11.5px;
             color: var(--text-main);
-            transition: all 0.2s ease;
+            transition: all 0.18s ease;
+        }
+        body.theme-light .sidebar-search-input, body[data-theme="light"] .sidebar-search-input {
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid transparent;
+            color: #09090b;
         }
         .sidebar-search-input::placeholder {
             color: var(--text-dim);
@@ -3681,10 +3685,15 @@
             background: var(--bg-surface-elevated);
             box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15);
         }
+        body.theme-light .sidebar-search-input:focus, body[data-theme="light"] .sidebar-search-input:focus {
+            background: #ffffff;
+            border-color: #0284c7;
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.12);
+        }
         .sidebar-search-box .search-icon {
             position: absolute;
             left: 8px;
-            font-size: 11px;
+            font-size: 10.5px;
             color: var(--text-dim);
             pointer-events: none;
         }
@@ -3706,30 +3715,30 @@
             color: var(--text-main);
         }
 
-        /* 3. 滚动容器与遮罩淡出 (上下边缘柔和渐隐，杜绝硬切断) */
+        /* 3. 滚动容器与遮罩淡出 */
         .session-list {
             flex: 1;
             overflow-y: auto;
-            padding: 2px 8px 12px 8px;
+            padding: 2px 7px 12px 7px;
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 1.5px;
             min-height: 0;
             mask-image: linear-gradient(to bottom, transparent 0px, black 8px, black calc(100% - 12px), transparent 100%);
             -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 8px, black calc(100% - 12px), transparent 100%);
         }
         .session-list::-webkit-scrollbar {
-            width: 4px;
+            width: 3.5px;
         }
         .session-list::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.08);
             border-radius: 4px;
         }
         body.theme-light .session-list::-webkit-scrollbar-thumb, body[data-theme="light"] .session-list::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.12);
+            background: rgba(0, 0, 0, 0.1);
         }
 
-        /* 4. 时间分组标题 (微型大写灰字) */
+        /* 4. 时间分组标头 (支持点击一键折叠展开，微型箭头旋转过渡) */
         .session-group-header {
             padding: 8px 8px 3px 8px;
             font-size: 9.5px;
@@ -3741,9 +3750,15 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: color 0.15s ease;
         }
         .session-group-header:first-of-type {
             padding-top: 4px;
+        }
+        .session-group-header:hover {
+            color: var(--text-sub);
         }
         .session-group-count {
             font-size: 9px;
@@ -3751,88 +3766,68 @@
             opacity: 0.7;
             font-family: var(--font-mono);
         }
+        .group-toggle-icon {
+            font-size: 8px;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: rotate(0deg);
+            opacity: 0.7;
+            display: inline-block;
+        }
+        .session-group-header.is-collapsed .group-toggle-icon {
+            transform: rotate(-90deg);
+        }
 
-        /* 5. 双行微卡片条目 (Two-Line Micro Card) */
+        /* 5. 极简单行流线微卡片 (Pure Minimalist Session Item: 彻底移除设备徽标与 PASS 标签，圆点全权代言) */
         .session-item {
             position: relative;
             display: flex;
-            flex-direction: column;
-            gap: 4px;
-            padding: 7px 9px;
-            border-radius: 7px;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 8px;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 0.15s ease;
             border: 1px solid transparent;
             background: transparent;
             user-select: none;
+            overflow: hidden;
         }
         .session-item:hover {
-            background: var(--bg-surface);
-            border-color: var(--border-subtle);
+            background: var(--bg-surface-hover);
         }
         .session-item.active {
             background: var(--bg-surface-elevated);
-            border-color: rgba(56, 189, 248, 0.25);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+            color: var(--text-main);
+            font-weight: 500;
         }
         body.theme-light .session-item.active, body[data-theme="light"] .session-item.active {
             background: #ffffff;
-            border-color: rgba(2, 132, 199, 0.3);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
-        /* 激活指示条：左侧 3px 青蓝/天蓝发光渐变条 */
+        /* 激活指示条：左侧贴合 3px 柔和天蓝/青绿微光条 */
         .session-item.active::before {
             content: "";
             position: absolute;
-            left: -2px;
-            top: 7px;
-            bottom: 7px;
-            width: 3.5px;
-            border-radius: 2px;
+            left: 0;
+            top: 5px;
+            bottom: 5px;
+            width: 3px;
+            border-radius: 0 2px 2px 0;
             background: linear-gradient(180deg, #38bdf8 0%, #22c55e 100%);
-            box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+            box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
         }
 
-        /* 卡片首行：状态点 + 标题 + 悬浮操作图标 */
-        .session-item-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            gap: 6px;
-        }
-        .session-header-main {
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            flex: 1;
-            min-width: 0;
-        }
-        .session-title {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-main);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            line-height: 1.3;
-        }
-        .session-item:not(.active):not(:hover) .session-title {
-            color: var(--text-sub);
-        }
-
-        /* 会话左侧状态指示点 (正在运行显示脉冲微光小绿点) */
+        /* 会话左侧状态微圆点 (运行中呼吸绿光，通过青绿，失败警示红，就绪柔灰) */
         .session-status-dot {
-            width: 7px;
-            height: 7px;
+            width: 6.5px;
+            height: 6.5px;
             border-radius: 50%;
             display: inline-block;
             flex-shrink: 0;
             background-color: var(--text-muted);
-            opacity: 0.4;
+            opacity: 0.35;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        /* 正在运行中：翡翠绿呼吸微光点 (1:1 响应用户需求: 正在运行的对话 左侧的点要是绿色的 表示正在进行) */
         .session-status-dot.running {
             background-color: var(--status-green) !important;
             opacity: 1 !important;
@@ -3845,26 +3840,62 @@
         }
         .session-status-dot.failed {
             background-color: #ef4444 !important;
-            opacity: 0.9 !important;
+            opacity: 0.9;
         }
 
-        /* 悬浮快捷操作菜单 (✏️重命名 / 🗑️删除) */
+        /* 任务标题 (单行文本自适应截断，消除多余噪点) */
+        .session-title {
+            flex: 1;
+            min-width: 0;
+            font-size: 12px;
+            font-weight: 450;
+            color: var(--text-sub);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+        .session-item:hover .session-title, .session-item.active .session-title {
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        /* 末尾时间戳 */
+        .session-time-text {
+            font-size: 10px;
+            font-family: var(--font-mono);
+            color: var(--text-dim);
+            margin-left: auto;
+            flex-shrink: 0;
+            opacity: 0.75;
+            transition: opacity 0.15s ease;
+        }
+
+        /* 悬浮隐蔽操作菜单 (平时 0% 视觉负担，Hover 时时间戳平滑淡出，操作菜单原地浮现) */
         .session-actions {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
             display: flex;
             align-items: center;
-            gap: 3px;
+            gap: 2px;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.15s ease;
-            flex-shrink: 0;
+            background: inherit;
+            padding-left: 4px;
         }
         .session-item:hover .session-actions {
             opacity: 1;
             pointer-events: auto;
         }
+        .session-item:hover .session-time-text {
+            opacity: 0;
+        }
         .session-action-btn {
-            width: 20px;
-            height: 20px;
+            width: 19px;
+            height: 19px;
             border-radius: 4px;
             display: flex;
             align-items: center;
@@ -3874,7 +3905,7 @@
             color: var(--text-dim);
             cursor: pointer;
             transition: all 0.15s ease;
-            font-size: 11px;
+            font-size: 10.5px;
             padding: 0;
         }
         .session-action-btn:hover {
@@ -3884,60 +3915,6 @@
         .session-action-btn.btn-delete:hover {
             color: #ef4444;
             background: rgba(239, 68, 68, 0.12);
-        }
-
-        /* 卡片次行：时间戳 + 执行元数据徽标 */
-        .session-item-meta {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            font-size: 10px;
-            color: var(--text-dim);
-            padding-left: 14px;
-        }
-        .session-time-text {
-            font-family: var(--font-mono);
-            font-size: 10px;
-            color: var(--text-dim);
-            white-space: nowrap;
-        }
-        .session-meta-tags {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            overflow: hidden;
-        }
-        .session-meta-pill {
-            padding: 0.5px 4.5px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-family: var(--font-mono);
-            font-weight: 500;
-            border: 1px solid var(--border-subtle);
-            background: var(--bg-base);
-            display: inline-flex;
-            align-items: center;
-            gap: 2.5px;
-            white-space: nowrap;
-        }
-        .session-meta-pill.success {
-            color: #22c55e;
-            border-color: rgba(34, 197, 94, 0.25);
-            background: rgba(34, 197, 94, 0.08);
-        }
-        .session-meta-pill.failed {
-            color: #ef4444;
-            border-color: rgba(239, 68, 68, 0.25);
-            background: rgba(239, 68, 68, 0.08);
-        }
-        .session-meta-pill.running {
-            color: #38bdf8;
-            border-color: rgba(56, 189, 248, 0.3);
-            background: rgba(56, 189, 248, 0.08);
-        }
-        .session-meta-pill.device {
-            color: var(--text-dim);
         }
 
         .status-dot-sm {
@@ -5332,44 +5309,74 @@
         }
 
 
-        /* 🌟 左下角工作台模式切换胶囊 (AI编排 vs 本地回归) */
+        /* 🌟 苹果流体物理滑动分段控制器 (Apple Liquid Sliding Segmented Control) */
         .sidebar-mode-switcher {
+            position: relative;
             display: flex;
             align-items: center;
             width: 100%;
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(0, 0, 0, 0.22);
             border: 1px solid var(--border-subtle);
             border-radius: 8px;
-            padding: 2.5px;
-            gap: 2px;
+            padding: 3px;
+            user-select: none;
+            overflow: hidden;
         }
+        body.theme-light .sidebar-mode-switcher, body[data-theme="light"] .sidebar-mode-switcher {
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        /* 物理背衬滑块 (苹果签名阻尼回弹曲线: cubic-bezier(0.16, 1, 0.3, 1)) */
+        .mode-slider-thumb {
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            left: 3px;
+            width: calc(50% - 3px);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.2);
+            transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+            z-index: 1;
+        }
+        body.theme-light .mode-slider-thumb, body[data-theme="light"] .mode-slider-thumb {
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0.5px 1px rgba(0, 0, 0, 0.05);
+        }
+
+        /* 本地回归模式：滑块以阻尼动效物理平移 100% */
+        .sidebar-mode-switcher.is-local .mode-slider-thumb {
+            transform: translateX(100%);
+        }
+
         .sidebar-mode-btn {
+            position: relative;
+            z-index: 2;
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
-            padding: 6px 4px;
+            gap: 4px;
+            padding: 5.5px 4px;
             border-radius: 6px;
             border: none;
-            background: transparent;
+            background: transparent !important;
             color: var(--text-muted);
             font-size: 11px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            position: relative;
+            transition: color 0.2s ease;
             white-space: nowrap;
+            box-shadow: none !important;
         }
         .sidebar-mode-btn:hover {
             color: var(--text-main);
-            background: rgba(255, 255, 255, 0.04);
         }
         .sidebar-mode-btn.active {
-            color: var(--text-main);
-            background: rgba(255, 255, 255, 0.12);
+            color: var(--text-main) !important;
             font-weight: 600;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
         }
         .mode-count-pill {
             font-size: 9.5px;
@@ -5568,13 +5575,12 @@
 
         <!-- 侧栏底部：AI 智能编排 与 本地回归测试 随时切换胶囊 (左下角) -->
         <div class="sidebar-bottom" style="padding: 10px 12px; border-top: 1px solid var(--border-subtle);">
-            <div class="sidebar-mode-switcher">
+            <div class="sidebar-mode-switcher" id="sidebarModeSwitcher">
+                <div class="mode-slider-thumb" id="modeSliderThumb"></div>
                 <button type="button" class="sidebar-mode-btn active" id="btnModeAi" onclick="switchMainWorkspaceMode('ai')" title="进入 AI 智能测试编排视图">
-                    <i class="bi bi-cpu"></i>
                     <span>AI 智能编排</span>
                 </button>
                 <button type="button" class="sidebar-mode-btn" id="btnModeLocal" onclick="switchMainWorkspaceMode('local')" title="进入本地自动化回归测试看板">
-                    <i class="bi bi-folder-check"></i>
                     <span>本地回归</span>
                     <span class="mode-count-pill" id="sidebarLocalCaseCount">24</span>
                 </button>
@@ -6514,7 +6520,10 @@
             const viewLocal = document.getElementById("workspaceLocalView");
             const sidebarAi = document.getElementById("sidebarViewAi");
             const sidebarLocal = document.getElementById("sidebarViewLocal");
+            const switcher = document.getElementById("sidebarModeSwitcher");
 
+            // 联动苹果流体滑块位移
+            if (switcher) switcher.classList.toggle("is-local", mode === "local");
             if (btnAi) btnAi.classList.toggle("active", mode === "ai");
             if (btnLocal) btnLocal.classList.toggle("active", mode === "local");
 
@@ -8284,8 +8293,19 @@
             }
         }
 
-        // ================= 全局搜索过滤与快捷键状态 =================
+        // ================= 全局搜索过滤、快捷键状态与时间分组折叠 =================
         let sessionSearchKeyword = "";
+        // 默认折叠较早的历史任务，展开今天、昨天、近 7 天
+        let collapsedTimeGroups = new Set(["更早"]);
+
+        function toggleTimeGroup(grpName) {
+            if (collapsedTimeGroups.has(grpName)) {
+                collapsedTimeGroups.delete(grpName);
+            } else {
+                collapsedTimeGroups.add(grpName);
+            }
+            renderSessionList();
+        }
 
         function filterSessionList(val) {
             sessionSearchKeyword = (val || "").trim().toLowerCase();
@@ -8367,7 +8387,7 @@
             return { group, timeStr, ts: t };
         }
 
-        // 重构：渲染左侧双行微卡片与智能时间分组列表
+        // 重构：极简主义单行流线会话列表 + 可折叠时间累计分组
         function renderSessionList() {
             const box = document.getElementById("sessionList");
             if (!box) return;
@@ -8391,7 +8411,6 @@
             if (!filtered || filtered.length === 0) {
                 box.innerHTML = `
                     <div class="p-3 text-center text-muted" style="font-size: 11px;">
-                        <i class="bi bi-search mb-1 d-block" style="font-size: 14px; opacity: 0.5;"></i>
                         <span>未找到匹配的任务</span>
                         <div class="mt-2">
                             <button type="button" class="btn btn-xs btn-outline-secondary py-0.5 px-2" style="font-size: 10px; border-radius: 4px;" onclick="clearSessionSearch()">清空搜索</button>
@@ -8419,7 +8438,7 @@
                 groupsMap[info.group].push(s);
             });
 
-            // 3. 构建高质感 HTML (分组标题 + 双行微卡片 + 悬浮操作)
+            // 3. 构建极简主义 HTML (折叠标头 + 纯净单行卡片 + 圆点代言成败)
             let html = "";
             const groupKeys = ["今天", "昨天", "近 7 天", "更早", "历史归档"];
 
@@ -8427,78 +8446,67 @@
                 const list = groupsMap[grp];
                 if (!list || list.length === 0) return;
 
+                // 搜索时强制全部展开；非搜索时根据 Set 状态折叠
+                const isCollapsed = !sessionSearchKeyword && collapsedTimeGroups.has(grp);
+
                 html += `
-                    <div class="session-group-header">
-                        <span>${grp}</span>
+                    <div class="session-group-header ${isCollapsed ? 'is-collapsed' : ''}" onclick="toggleTimeGroup('${grp}')" title="点击展开/折叠">
+                        <div class="d-flex align-items-center gap-1.5">
+                            <i class="bi bi-chevron-down group-toggle-icon"></i>
+                            <span>${grp}</span>
+                        </div>
                         <span class="session-group-count">${list.length}</span>
                     </div>
                 `;
 
-                list.forEach(s => {
-                    const isActive = (s.session_id === activeSessionId) ? "active" : "";
-                    const title = s.title || s.goal || `测试任务 ${s.session_id.slice(-6)}`;
+                if (!isCollapsed) {
+                    list.forEach(s => {
+                        const isActive = (s.session_id === activeSessionId) ? "active" : "";
+                        const title = s.title || s.goal || `测试任务 ${s.session_id.slice(-6)}`;
 
-                    // 状态与光效判断
-                    const isRunning = (s.status === "RUNNING" || s.status === "IN_PROGRESS" || (typeof liveRunningSessions !== "undefined" && liveRunningSessions.has(s.session_id)));
-                    const isFailed = (s.status === "FAILED" || s.is_success === false);
-                    const isSuccess = (s.status === "READY_FOR_REVIEW" || s.status === "COMPLETED" || s.is_success === true);
+                        // 状态与光效判断 (圆点全权代言状态，杜绝次行 PASS/FAIL 堆叠)
+                        const isRunning = (s.status === "RUNNING" || s.status === "IN_PROGRESS" || (typeof liveRunningSessions !== "undefined" && liveRunningSessions.has(s.session_id)));
+                        const isFailed = (s.status === "FAILED" || s.is_success === false);
+                        const isSuccess = (s.status === "READY_FOR_REVIEW" || s.status === "COMPLETED" || s.is_success === true);
 
-                    let dotClass = "session-status-dot";
-                    let statusHint = "已归档";
-                    let statusPill = "";
+                        let dotClass = "session-status-dot";
+                        let statusHint = "已归档";
 
-                    if (isRunning) {
-                        dotClass = "session-status-dot running";
-                        statusHint = "正在运行中";
-                        statusPill = `<span class="session-meta-pill running"><span class="spinner-grow spinner-grow-sm" style="width: 4px; height: 4px;"></span>运行中</span>`;
-                    } else if (isFailed) {
-                        dotClass = "session-status-dot failed";
-                        statusHint = "测试未通过";
-                        statusPill = `<span class="session-meta-pill failed"><i class="bi bi-x"></i>FAIL</span>`;
-                    } else if (isSuccess) {
-                        dotClass = "session-status-dot success";
-                        statusHint = "测试通过";
-                        statusPill = `<span class="session-meta-pill success"><i class="bi bi-check2"></i>PASS</span>`;
-                    } else {
-                        statusPill = `<span class="session-meta-pill">就绪</span>`;
-                    }
+                        if (isRunning) {
+                            dotClass = "session-status-dot running";
+                            statusHint = "正在运行中";
+                        } else if (isFailed) {
+                            dotClass = "session-status-dot failed";
+                            statusHint = "测试未通过";
+                        } else if (isSuccess) {
+                            dotClass = "session-status-dot success";
+                            statusHint = "测试通过";
+                        } else {
+                            dotClass = "session-status-dot idle";
+                            statusHint = "准备就绪";
+                        }
 
-                    // 设备微标签
-                    let devPill = "";
-                    if (s.devices && s.devices.length > 0 && s.devices[0].model) {
-                        devPill = `<span class="session-meta-pill device" title="执行设备: ${escapeHtml(s.devices[0].model)}"><i class="bi bi-phone" style="font-size: 8.5px;"></i>${escapeHtml(s.devices[0].model)}</span>`;
-                    }
+                        const timeStr = s._dateInfo ? s._dateInfo.timeStr : "";
 
-                    const timeStr = s._dateInfo ? s._dateInfo.timeStr : "";
-
-                    html += `
-                        <div class="session-item ${isActive} ${isRunning ? 'is-running' : ''}" 
-                             onclick="switchSession('${s.session_id}')" 
-                             title="${escapeHtml(title)} · ${statusHint}">
-                            <div class="session-item-header">
-                                <div class="session-header-main">
-                                    <span class="${dotClass}"></span>
-                                    <span class="session-title">${escapeHtml(title)}</span>
-                                </div>
+                        html += `
+                            <div class="session-item ${isActive} ${isRunning ? 'is-running' : ''}" 
+                                 onclick="switchSession('${s.session_id}')" 
+                                 title="${escapeHtml(title)} · ${statusHint}">
+                                <span class="${dotClass}"></span>
+                                <span class="session-title">${escapeHtml(title)}</span>
+                                <span class="session-time-text">${timeStr}</span>
                                 <div class="session-actions" onclick="event.stopPropagation()">
-                                    <button type="button" class="session-action-btn" onclick="renameSessionItem(event, '${s.session_id}', '${escapeAttrVal(title)}')" title="重命名任务">
+                                    <button type="button" class="session-action-btn" onclick="renameSessionItem(event, '${s.session_id}', '${escapeAttrVal(title)}')" title="重命名">
                                         <i class="bi bi-pencil"></i>
                                     </button>
-                                    <button type="button" class="session-action-btn btn-delete" onclick="deleteSessionItem(event, '${s.session_id}')" title="删除任务">
+                                    <button type="button" class="session-action-btn btn-delete" onclick="deleteSessionItem(event, '${s.session_id}')" title="删除">
                                         <i class="bi bi-trash3"></i>
                                     </button>
                                 </div>
                             </div>
-                            <div class="session-item-meta">
-                                <span class="session-time-text">${timeStr}</span>
-                                <div class="session-meta-tags">
-                                    ${devPill}
-                                    ${statusPill}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
+                        `;
+                    });
+                }
             });
 
             box.innerHTML = html;
