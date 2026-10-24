@@ -5315,15 +5315,21 @@
 
                         /* 🌟 苹果流体物理滑动胶囊 (Apple Liquid Sliding Segmented Control: 全圆角跑道胶囊 + 苹果电光蓝物理滑块) */
         .sidebar-bottom {
-            padding: 8px 10px 12px 10px;
+            padding: 8px 10px 14px 10px;
             border-top: none !important;
             background: transparent !important;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
         }
         .sidebar-mode-switcher {
             position: relative;
             display: flex;
             align-items: center;
-            width: 100%;
+            width: 196px;
+            max-width: 196px;
+            flex-shrink: 0;
             height: 38px;
             border-radius: 9999px;
             padding: 3px;

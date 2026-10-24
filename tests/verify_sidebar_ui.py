@@ -23,61 +23,56 @@ async def main():
         bottom_box = await page.wait_for_selector(".sidebar-bottom")
         assert switcher is not None and thumb is not None and bottom_box is not None
 
-        # 验证高度增高为 38px
+        # 1. 验证默认侧栏宽度 (240px) 下，switcher 尺寸固定为 196px x 38px
         box_metrics = await switcher.bounding_box()
-        print(f"Switcher height: {box_metrics['height']}px (Expected ~38px)")
-        assert box_metrics['height'] >= 36.0, f"Height too small: {box_metrics['height']}"
+        print(f"Default switcher metrics: width={box_metrics['width']}px, height={box_metrics['height']}px")
+        assert abs(box_metrics['width'] - 196) <= 2.0, f"Width not fixed to 196px: {box_metrics['width']}"
+        assert abs(box_metrics['height'] - 38) <= 2.0, f"Height not fixed to 38px: {box_metrics['height']}"
 
-        # 1. 夜间模式下的蓝色流体胶囊截图
-        dark_ai_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_dark_ai.png")
-        await bottom_box.screenshot(path=dark_ai_shot)
-        print(f"Saved: {dark_ai_shot}")
+        # 2. 模拟用户将侧栏拖拽拉宽至 380px
+        print("Expanding sidebar width to 380px...")
+        await page.evaluate("document.getElementById('gptSidebar').style.width = '380px';")
+        await asyncio.sleep(0.3)
 
-        # 点击“本地回归”，验证滑动与深色蓝色胶囊
+        # 再次获取 switcher 尺寸
+        expanded_metrics = await switcher.bounding_box()
+        print(f"Expanded sidebar switcher metrics: width={expanded_metrics['width']}px, height={expanded_metrics['height']}px")
+        assert abs(expanded_metrics['width'] - 196) <= 2.0, f"Switcher width changed when sidebar expanded: {expanded_metrics['width']}"
+
+        # 3. 验证在拉宽状态下，点击切换“本地回归”滑块顺滑滑动，保持居中
         btn_local = await page.wait_for_selector("#btnModeLocal")
         await btn_local.click()
         await asyncio.sleep(0.4)
 
-        dark_local_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_dark_local.png")
-        await bottom_box.screenshot(path=dark_local_shot)
-        print(f"Saved: {dark_local_shot}")
+        # 截取深色模式下拉宽侧栏的全局效果
+        expanded_dark_shot = os.path.join(ARTIFACT_DIR, "verify_fixed_capsule_expanded_dark.png")
+        await sidebar.screenshot(path=expanded_dark_shot)
+        print(f"Saved: {expanded_dark_shot}")
 
-        # 2. 白天模式验证 (Light Mode)
+        # 4. 切换到白天模式并切回 AI 模式
         print("Switching to light mode...")
         await page.evaluate("document.body.setAttribute('data-theme', 'light'); document.body.classList.add('theme-light');")
         await asyncio.sleep(0.3)
 
-        # 验证没有底部长方形白色背景
-        bottom_bg = await page.evaluate("window.getComputedStyle(document.querySelector('.sidebar-bottom')).backgroundColor")
-        print(f"Computed sidebar-bottom backgroundColor: {bottom_bg}")
-
-        light_local_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_light_local.png")
-        await bottom_box.screenshot(path=light_local_shot)
-        print(f"Saved: {light_local_shot}")
-
-        # 点击切回 AI 模式
         btn_ai = await page.wait_for_selector("#btnModeAi")
         await btn_ai.click()
         await asyncio.sleep(0.4)
 
-        light_ai_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_light_ai.png")
-        await bottom_box.screenshot(path=light_ai_shot)
-        print(f"Saved: {light_ai_shot}")
+        # 截取白天模式下拉宽侧栏的全局效果
+        expanded_light_shot = os.path.join(ARTIFACT_DIR, "verify_fixed_capsule_expanded_light.png")
+        await sidebar.screenshot(path=expanded_light_shot)
+        print(f"Saved: {expanded_light_shot}")
 
-        # 侧栏全貌截图 (白天模式)
-        sidebar_light_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_blue_capsule_light.png")
-        await sidebar.screenshot(path=sidebar_light_shot)
-        print(f"Saved: {sidebar_light_shot}")
-
-        # 侧栏全貌截图 (夜间模式)
-        await page.evaluate("document.body.removeAttribute('data-theme'); document.body.classList.remove('theme-light');")
+        # 5. 还原侧栏为默认 240px，截取标准形态
+        await page.evaluate("document.getElementById('gptSidebar').style.width = '240px';")
         await asyncio.sleep(0.3)
-        sidebar_dark_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_blue_capsule_dark.png")
-        await sidebar.screenshot(path=sidebar_dark_shot)
-        print(f"Saved: {sidebar_dark_shot}")
+
+        standard_light_shot = os.path.join(ARTIFACT_DIR, "verify_fixed_capsule_standard_light.png")
+        await sidebar.screenshot(path=standard_light_shot)
+        print(f"Saved: {standard_light_shot}")
 
         await browser.close()
-        print("\n>>> ALL CHECKS PASSED: TALLER BLUE CAPSULE WITHOUT WHITE BG VERIFIED! <<<")
+        print("\n>>> ALL CHECKS PASSED: FIXED 196x38 CAPSULE WON'T STRETCH ON EXPAND! <<<")
 
 if __name__ == "__main__":
     asyncio.run(main())
