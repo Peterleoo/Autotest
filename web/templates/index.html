@@ -3931,12 +3931,11 @@
             box-shadow: 0 0 5px rgba(34, 197, 94, 0.4);
         }
         .sidebar-bottom {
-            padding: 10px 12px;
-            border-top: none;
+            padding: 8px 10px 12px 10px;
+            border-top: none !important;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            background: var(--bg-surface);
+            background: transparent !important;
         }
         .user-pill {
             display: flex;
@@ -5314,19 +5313,20 @@
         }
 
 
-                /* 🌟 苹果流体物理滑动胶囊 (Apple Liquid Sliding Segmented Control: 全圆角跑道胶囊 + 阻尼弹性滑块) */
+                        /* 🌟 苹果流体物理滑动胶囊 (Apple Liquid Sliding Segmented Control: 全圆角跑道胶囊 + 苹果电光蓝物理滑块) */
         .sidebar-bottom {
-            padding: 8px 10px;
-            border-top: 1px solid var(--border-subtle);
+            padding: 8px 10px 12px 10px;
+            border-top: none !important;
+            background: transparent !important;
         }
         .sidebar-mode-switcher {
             position: relative;
             display: flex;
             align-items: center;
             width: 100%;
-            height: 32px;
+            height: 38px;
             border-radius: 9999px;
-            padding: 2.5px;
+            padding: 3px;
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(12px);
@@ -5337,34 +5337,33 @@
         }
         body.theme-light .sidebar-mode-switcher, body[data-theme="light"] .sidebar-mode-switcher {
             background: rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.04);
             box-shadow: inset 0 0.5px 1.5px rgba(0, 0, 0, 0.04);
         }
-        /* 内部物理滑块：苹果签名阻尼回弹曲线 + 微浮动/微磨砂质感 */
+        /* 内部物理滑块：苹果电光蓝（深色与白天共用，复刻 Apple TV 图2 科技蓝高光胶囊），阻尼弹性滑动 */
         .mode-slider-thumb {
             position: absolute;
-            top: 2.5px;
-            left: 2.5px;
-            width: calc(50% - 2.5px);
-            height: calc(100% - 5px);
+            top: 3px;
+            left: 3px;
+            width: calc(50% - 3px);
+            height: calc(100% - 6px);
             border-radius: 9999px;
             z-index: 1;
             pointer-events: none;
-            background: rgba(255, 255, 255, 0.16);
-            border: 0.5px solid rgba(255, 255, 255, 0.14);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 0.5px 0 rgba(255, 255, 255, 0.25);
+            background: #007aff;
+            border: none;
+            box-shadow: 0 3px 12px rgba(0, 122, 255, 0.42), 0 1px 3px rgba(0, 122, 255, 0.2);
             transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
             transform: translateX(0);
         }
         body.theme-light .mode-slider-thumb, body[data-theme="light"] .mode-slider-thumb {
-            background: #ffffff;
-            border: 0.5px solid rgba(0, 0, 0, 0.04);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+            background: #007aff;
+            box-shadow: 0 3px 10px rgba(0, 122, 255, 0.32), 0 1px 3px rgba(0, 122, 255, 0.16);
         }
         .sidebar-mode-switcher.is-local .mode-slider-thumb {
             transform: translateX(100%);
         }
-        /* 分段纯文本按钮：浮于滑块上方，背景透明，平滑变色 */
+        /* 分段纯文本按钮：浮于蓝色滑块上方，字号 12.5px，触控靶心更宽裕舒适 */
         .sidebar-mode-btn {
             position: relative;
             z-index: 2;
@@ -5373,12 +5372,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 6px;
+            padding: 0 8px;
             border-radius: 9999px;
             border: none !important;
             background: transparent !important;
             color: rgba(255, 255, 255, 0.55);
-            font-size: 11.5px;
+            font-size: 12.5px;
             font-weight: 500;
             cursor: pointer;
             transition: color 0.2s ease, font-weight 0.18s ease;
@@ -5392,14 +5391,15 @@
             color: rgba(255, 255, 255, 0.85);
         }
         body.theme-light .sidebar-mode-btn:hover, body[data-theme="light"] .sidebar-mode-btn:hover {
-            color: #334155;
+            color: #1e293b;
         }
+        /* 选中态：夜间与白天均在蓝色滑块上呈现高纯度纯白文本 */
         .sidebar-mode-btn.active {
             color: #ffffff !important;
             font-weight: 600;
         }
         body.theme-light .sidebar-mode-btn.active, body[data-theme="light"] .sidebar-mode-btn.active {
-            color: #09090b !important;
+            color: #ffffff !important;
             font-weight: 600;
         }
 
@@ -5597,7 +5597,7 @@
         </div>
 
         <!-- 侧栏底部：AI 智能编排 与 本地回归测试 随时切换胶囊 (左下角) -->
-        <div class="sidebar-bottom" style="padding: 10px 12px; border-top: 1px solid var(--border-subtle);">
+        <div class="sidebar-bottom">
             <div class="sidebar-mode-switcher" id="sidebarModeSwitcher">
                 <div class="mode-slider-thumb" id="modeSliderThumb"></div>
                 <button type="button" class="sidebar-mode-btn active" id="btnModeAi" onclick="switchMainWorkspaceMode('ai')" title="进入 AI 智能测试编排视图">

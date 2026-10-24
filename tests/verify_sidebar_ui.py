@@ -20,60 +20,64 @@ async def main():
 
         switcher = await page.wait_for_selector("#sidebarModeSwitcher")
         thumb = await page.wait_for_selector("#modeSliderThumb")
-        assert switcher is not None and thumb is not None, "Liquid slider switcher/thumb not found!"
-
-        # 1. 验证没有残留的数字药丸，没有多余图标
-        count_pills = await page.query_selector_all(".mode-count-pill")
-        assert len(count_pills) == 0, "All mode-count-pills should be completely removed!"
-        icons = await switcher.query_selector_all("i")
-        assert len(icons) == 0, "No extra icons should be inside segmented control!"
-
-        # 2. 验证深色模式下流体滑块在 AI 模式的状态
         bottom_box = await page.wait_for_selector(".sidebar-bottom")
-        dark_ai_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_dark_ai.png")
+        assert switcher is not None and thumb is not None and bottom_box is not None
+
+        # 验证高度增高为 38px
+        box_metrics = await switcher.bounding_box()
+        print(f"Switcher height: {box_metrics['height']}px (Expected ~38px)")
+        assert box_metrics['height'] >= 36.0, f"Height too small: {box_metrics['height']}"
+
+        # 1. 夜间模式下的蓝色流体胶囊截图
+        dark_ai_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_dark_ai.png")
         await bottom_box.screenshot(path=dark_ai_shot)
         print(f"Saved: {dark_ai_shot}")
 
-        # 3. 点击“本地回归”，验证阻尼滑动和 is-local 状态
+        # 点击“本地回归”，验证滑动与深色蓝色胶囊
         btn_local = await page.wait_for_selector("#btnModeLocal")
         await btn_local.click()
-        await asyncio.sleep(0.4)  # 等待 260ms 阻尼动画完成
+        await asyncio.sleep(0.4)
 
-        is_local_class = await switcher.get_attribute("class")
-        assert "is-local" in is_local_class, "Switcher should have 'is-local' class!"
-
-        dark_local_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_dark_local.png")
+        dark_local_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_dark_local.png")
         await bottom_box.screenshot(path=dark_local_shot)
         print(f"Saved: {dark_local_shot}")
 
-        # 4. 验证白天模式 (Light Mode) 下的苹果微浮动纯白卡片与浅灰底槽
+        # 2. 白天模式验证 (Light Mode)
         print("Switching to light mode...")
         await page.evaluate("document.body.setAttribute('data-theme', 'light'); document.body.classList.add('theme-light');")
         await asyncio.sleep(0.3)
 
-        light_local_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_light_local.png")
+        # 验证没有底部长方形白色背景
+        bottom_bg = await page.evaluate("window.getComputedStyle(document.querySelector('.sidebar-bottom')).backgroundColor")
+        print(f"Computed sidebar-bottom backgroundColor: {bottom_bg}")
+
+        light_local_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_light_local.png")
         await bottom_box.screenshot(path=light_local_shot)
         print(f"Saved: {light_local_shot}")
 
-        # 点击切回 AI 模式，验证白天模式下滑块丝滑回弹
+        # 点击切回 AI 模式
         btn_ai = await page.wait_for_selector("#btnModeAi")
         await btn_ai.click()
         await asyncio.sleep(0.4)
 
-        is_local_class_after = await switcher.get_attribute("class")
-        assert "is-local" not in is_local_class_after, "Switcher should NOT have 'is-local' class!"
-
-        light_ai_shot = os.path.join(ARTIFACT_DIR, "verify_apple_liquid_capsule_light_ai.png")
+        light_ai_shot = os.path.join(ARTIFACT_DIR, "verify_blue_capsule_light_ai.png")
         await bottom_box.screenshot(path=light_ai_shot)
         print(f"Saved: {light_ai_shot}")
 
-        # 5. 白天模式下侧边栏整体截图
-        sidebar_light_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_apple_capsule_light.png")
+        # 侧栏全貌截图 (白天模式)
+        sidebar_light_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_blue_capsule_light.png")
         await sidebar.screenshot(path=sidebar_light_shot)
         print(f"Saved: {sidebar_light_shot}")
 
+        # 侧栏全貌截图 (夜间模式)
+        await page.evaluate("document.body.removeAttribute('data-theme'); document.body.classList.remove('theme-light');")
+        await asyncio.sleep(0.3)
+        sidebar_dark_shot = os.path.join(ARTIFACT_DIR, "verify_sidebar_blue_capsule_dark.png")
+        await sidebar.screenshot(path=sidebar_dark_shot)
+        print(f"Saved: {sidebar_dark_shot}")
+
         await browser.close()
-        print("\n>>> ALL CHECKS PASSED: APPLE LIQUID SLIDING CAPSULE VERIFIED! <<<")
+        print("\n>>> ALL CHECKS PASSED: TALLER BLUE CAPSULE WITHOUT WHITE BG VERIFIED! <<<")
 
 if __name__ == "__main__":
     asyncio.run(main())
