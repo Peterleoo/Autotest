@@ -5492,7 +5492,572 @@
             flex-shrink: 0;
             opacity: 0.75;
         }
-    </style>
+    
+        /* ================= 🌟 中间主工作台工程级极简质感重塑 (Linear / Raycast / Apple 规范) ================= */
+
+        /* 1. 顶栏 44px 极简通透 */
+        .canvas-header {
+            height: 44px;
+            min-height: 44px;
+            max-height: 44px;
+            padding: 0 18px;
+            background: transparent !important;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 25;
+            box-sizing: border-box;
+        }
+        body.theme-light .canvas-header, body[data-theme="light"] .canvas-header {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            background: rgba(255, 255, 255, 0.8) !important;
+            backdrop-filter: blur(12px);
+        }
+        .active-task-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .task-name-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+        }
+        .btn-action-sm {
+            height: 28px;
+            padding: 0 10px;
+            border-radius: 9999px;
+            border: 1px solid var(--border-subtle);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-sub);
+            font-size: 11.5px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.16s ease;
+            user-select: none;
+        }
+        body.theme-light .btn-action-sm, body[data-theme="light"] .btn-action-sm {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #334155;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+        .btn-action-sm:hover, .btn-action-sm.active {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border-color: rgba(56, 189, 248, 0.35);
+        }
+        body.theme-light .btn-action-sm:hover, body[data-theme="light"] .btn-action-sm:hover,
+        body.theme-light .btn-action-sm.active, body[data-theme="light"] .btn-action-sm.active {
+            background: #ffffff;
+            color: #007aff;
+            border-color: rgba(0, 122, 255, 0.35);
+            box-shadow: 0 2px 5px rgba(0, 122, 255, 0.12);
+        }
+
+        /* 2. 模式 A (AI测试视图): 智能推荐紧凑双列微卡片 */
+        .app-suggest-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-top: 10px;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+        body.theme-light .app-suggest-box, body[data-theme="light"] .app-suggest-box {
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        .suggest-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .suggest-app-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 9999px;
+            padding: 2px 9px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-main);
+        }
+        body.theme-light .suggest-app-badge, body[data-theme="light"] .suggest-app-badge {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #09090b;
+        }
+        .suggest-refresh-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-sub);
+            border-radius: 9999px;
+            padding: 2px 9px;
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        body.theme-light .suggest-refresh-btn, body[data-theme="light"] .suggest-refresh-btn {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #64748b;
+        }
+        .suggest-refresh-btn:hover {
+            color: var(--text-main);
+            border-color: rgba(0, 122, 255, 0.4);
+        }
+        .suggest-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .suggest-card-item {
+            background: #14151c;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 9px 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        body.theme-light .suggest-card-item, body[data-theme="light"] .suggest-card-item {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+        .suggest-card-item:hover {
+            background: #1a1c26;
+            border-color: rgba(0, 122, 255, 0.5);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0, 122, 255, 0.12);
+        }
+        body.theme-light .suggest-card-item:hover, body[data-theme="light"] .suggest-card-item:hover {
+            background: #ffffff;
+            border-color: rgba(0, 122, 255, 0.45);
+            box-shadow: 0 3px 8px rgba(0, 122, 255, 0.1);
+        }
+        .suggest-card-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .suggest-card-desc {
+            font-size: 11px;
+            color: var(--text-dim);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* 3. 底部悬浮控制台 (Floating Glass Dock) */
+        .gpt-input-area {
+            position: absolute;
+            bottom: 14px;
+            left: 0;
+            right: 0;
+            width: 100%;
+            transform: none !important;
+            padding: 0 24px;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 30;
+        }
+        .gpt-input-box {
+            width: 100%;
+            max-width: 780px;
+            background: rgba(18, 19, 25, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 14px;
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+            padding: 8px 12px 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            pointer-events: auto;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        body.theme-light .gpt-input-box, body[data-theme="light"] .gpt-input-box {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
+        }
+        .gpt-input-box:focus-within {
+            border-color: rgba(0, 122, 255, 0.6);
+            box-shadow: 0 16px 42px rgba(0, 122, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        .token-pressure-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2px;
+            font-size: 10.5px;
+            color: var(--text-dim);
+            border-bottom: none !important;
+            margin-bottom: 2px;
+        }
+        .gpt-textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            color: var(--text-main);
+            font-size: 13px;
+            line-height: 1.5;
+            max-height: 120px;
+            min-height: 30px;
+            padding: 2px;
+        }
+        .gpt-textarea::placeholder {
+            color: #8e95a5;
+        }
+        body.theme-light .gpt-textarea::placeholder, body[data-theme="light"] .gpt-textarea::placeholder {
+            color: #94a3b8;
+        }
+        .gpt-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 4px;
+            padding-top: 0;
+            border-top: none;
+        }
+        /* 工具栏跑道微胶囊 */
+        .pill-btn, .pill-ready-status, .model-select-pill {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-sub);
+            border-radius: 9999px;
+            padding: 3px 9px;
+            font-size: 11px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        body.theme-light .pill-btn, body.theme-light .pill-ready-status, body.theme-light .model-select-pill,
+        body[data-theme="light"] .pill-btn, body[data-theme="light"] .pill-ready-status, body[data-theme="light"] .model-select-pill {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            color: #475569;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+        .pill-btn:hover, .model-select-pill:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            border-color: rgba(0, 122, 255, 0.4);
+        }
+        body.theme-light .pill-btn:hover, body.theme-light .model-select-pill:hover,
+        body[data-theme="light"] .pill-btn:hover, body[data-theme="light"] .model-select-pill:hover {
+            background: #f8fafc;
+            color: #09090b;
+            border-color: rgba(0, 122, 255, 0.35);
+        }
+        .btn-send-round {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #007aff;
+            color: #ffffff;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+        }
+        .btn-send-round:hover {
+            transform: scale(1.05);
+            background: #006ee6;
+            box-shadow: 0 3px 10px rgba(0, 122, 255, 0.45);
+        }
+
+        /* 4. 模式 B (本地回归看板视图): 苹果电光蓝跑道分段条 + 紧凑型流线卡片 */
+        .local-workspace-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            padding: 14px 20px 10px;
+        }
+        .local-workspace-header {
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        /* 分类过滤跑道胶囊组 */
+        .local-filter-group-capsule {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 9999px;
+            padding: 2.5px;
+            gap: 2px;
+            user-select: none;
+        }
+        body.theme-light .local-filter-group-capsule, body[data-theme="light"] .local-filter-group-capsule {
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .local-filter-pill {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            border-radius: 9999px;
+            padding: 3px 11px;
+            font-size: 11.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            white-space: nowrap;
+        }
+        .local-filter-pill:hover {
+            color: var(--text-main);
+        }
+        .local-filter-pill.active {
+            background: #007aff !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+        }
+
+        /* 5. 本地回归用例：工程级紧凑型流线卡片 (Compact Streamlined Row Cards: 54px 高度) */
+        .local-workspace-body {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-right: 4px;
+            padding-bottom: 20px;
+        }
+        .case-card-compact {
+            background: #14151c;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.16s ease;
+            cursor: pointer;
+            position: relative;
+        }
+        body.theme-light .case-card-compact, body[data-theme="light"] .case-card-compact {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+        .case-card-compact:hover {
+            background: #1a1b24;
+            border-color: rgba(0, 122, 255, 0.4);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        body.theme-light .case-card-compact:hover, body[data-theme="light"] .case-card-compact:hover {
+            background: #ffffff;
+            border-color: rgba(0, 122, 255, 0.35);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        }
+        /* 主行单行流线 */
+        .case-row-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 32px;
+            gap: 12px;
+        }
+        .case-row-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+        .case-status-indicator {
+            width: 6.5px;
+            height: 6.5px;
+            border-radius: 50%;
+            background: #10b981;
+            flex-shrink: 0;
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+        }
+        .case-id-badge {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            background: rgba(255, 255, 255, 0.06);
+            padding: 1px 5px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        body.theme-light .case-id-badge, body[data-theme="light"] .case-id-badge {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        .case-priority-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 5px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+        }
+        .case-priority-p1 {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+        }
+        .case-title-text {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 380px;
+        }
+        .case-meta-tag {
+            font-size: 10.5px;
+            color: var(--text-dim);
+            background: rgba(255, 255, 255, 0.04);
+            padding: 1px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        body.theme-light .case-meta-tag, body[data-theme="light"] .case-meta-tag {
+            background: rgba(0, 0, 0, 0.04);
+            color: #64748b;
+        }
+        .case-script-name {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 140px;
+        }
+        .case-metric-text {
+            font-size: 11px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .case-row-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        /* 操作按钮 */
+        .btn-case-ai {
+            height: 24px;
+            padding: 0 8px;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-sub);
+            font-size: 11px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        body.theme-light .btn-case-ai, body[data-theme="light"] .btn-case-ai {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.09);
+            color: #334155;
+        }
+        .btn-case-ai:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(0, 122, 255, 0.35);
+        }
+        .btn-case-replay {
+            height: 24px;
+            padding: 0 9px;
+            border-radius: 5px;
+            border: none;
+            background: #007aff;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 3px rgba(0, 122, 255, 0.3);
+        }
+        .btn-case-replay:hover {
+            background: #006ee6;
+            transform: translateY(-0.5px);
+        }
+        .btn-case-expand {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-size: 11px;
+            padding: 2px 4px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .case-card-compact.expanded .btn-case-expand {
+            transform: rotate(180deg);
+        }
+        /* 抽屉微展开区 */
+        .case-details-drawer {
+            display: none;
+            padding-top: 8px;
+            margin-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 11.5px;
+            color: var(--text-sub);
+            line-height: 1.5;
+        }
+        body.theme-light .case-details-drawer, body[data-theme="light"] .case-details-drawer {
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            color: #475569;
+        }
+        .case-card-compact.expanded .case-details-drawer {
+            display: block;
+        }
+</style>
 
 </head>
 <body data-theme="dark">
@@ -5886,7 +6451,7 @@
 
                 <!-- 模块分类与检索过滤条 -->
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div class="d-flex align-items-center gap-1 flex-wrap" id="localCategoryTabs">
+                    <div class="local-filter-group-capsule" id="localCategoryTabs">
                         <span class="local-filter-pill active" onclick="filterLocalCases('ALL', this)">全部</span>
                         <span class="local-filter-pill" onclick="filterLocalCases('房源搜索', this)">房源搜索</span>
                         <span class="local-filter-pill" onclick="filterLocalCases('业务表单', this)">业务表单</span>
@@ -6677,59 +7242,53 @@
             });
 
             if (filtered.length === 0) {
-                box.innerHTML = `<div class="small text-muted p-4 text-center">未检索到匹配的本地回归用例</div>`;
+                box.innerHTML = `<div class="small text-muted p-4 text-center" style="font-size: 11.5px;">未检索到匹配的本地回归用例</div>`;
                 return;
             }
 
             let html = "";
-            filtered.forEach(c => {
+            filtered.forEach((c, idx) => {
                 const isP0 = (c.level === "P0");
-                const levelBadge = isP0 
-                    ? `<span class="mono-tag mono-tag-active">${c.level} 核心</span>` 
-                    : `<span class="mono-tag">${c.level}</span>`;
-
                 const safeTitle = (c.title || c.filename).replace(/'/g, "\\'");
                 const safeDesc = (c.desc || '').replace(/'/g, "\\'");
+                const cardId = `compactCaseCard_${idx}`;
 
                 html += `
-                    <div class="case-card">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="mono-tag">${c.id || 'CASE'}</span>
-                                ${levelBadge}
-                                <span class="small fw-semibold" style="font-size: 13px; color: var(--text-main);">${c.title}</span>
-                                <span class="mono-tag" style="font-size: 10px;">${c.module || '通用'}</span>
+                    <div class="case-card-compact" id="${cardId}" onclick="toggleCaseDetails('${cardId}')" title="点击查看用例详细前置条件与脚本说明">
+                        <div class="case-row-main">
+                            <!-- 左侧：状态呼吸微点 + ID + 优先级 + 业务标题 -->
+                            <div class="case-row-left">
+                                <span class="case-status-indicator" title="回归状态: 已通过"></span>
+                                <span class="case-id-badge">${escapeHtml(c.id || 'C-' + (idx+1))}</span>
+                                <span class="case-priority-badge ${isP0 ? '' : 'case-priority-p1'}">${isP0 ? 'P0' : (c.level || 'P1')}</span>
+                                <span class="case-title-text" title="${escapeHtml(c.title || '')}">${escapeHtml(c.title || c.filename)}</span>
+                                <span class="case-meta-tag">${escapeHtml(c.module || '通用')}</span>
+                                <span class="case-script-name" title="${escapeHtml(c.filename)}">${escapeHtml(c.filename)}</span>
+                                <span class="case-metric-text">${c.pass_rate || '100%'} · ${c.avg_duration || '2.5s'}</span>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <button class="case-action-btn-primary" onclick="reuseCaseForAi('${c.filename}', '${safeTitle}', '${safeDesc}')" title="一键将该脚本填入 AI 输入流接续探索">
-                                    <i class="bi bi-robot"></i> AI复用
+
+                            <!-- 右侧：AI接续 + 本地回放 + 展开微箭头 -->
+                            <div class="case-row-right" onclick="event.stopPropagation()">
+                                <button type="button" class="btn-case-ai" onclick="reuseCaseForAi('${c.filename}', '${safeTitle}', '${safeDesc}')" title="一键将该脚本填入 AI 输入流接续深度探索">
+                                    <i class="bi bi-robot"></i>
+                                    <span>AI接续</span>
                                 </button>
-                                <button class="case-action-btn-secondary" onclick="replayLocalCaseDirect('${c.filename}')" title="直接在本地执行该确定性脚本">
-                                    <i class="bi bi-play-fill"></i> 本地回放
+                                <button type="button" class="btn-case-replay" onclick="replayLocalCaseDirect('${c.filename}')" title="立即在设备上自动回放执行该脚本">
+                                    <i class="bi bi-play-fill"></i>
+                                    <span>本地回放</span>
+                                </button>
+                                <button type="button" class="btn-case-expand" onclick="toggleCaseDetails('${cardId}'); event.stopPropagation();" title="展开/收起详情">
+                                    <i class="bi bi-chevron-down"></i>
                                 </button>
                             </div>
                         </div>
 
-                        <div class="small text-sub" style="font-size: 12px; line-height: 1.5;">
-                            ${c.desc || '自动化标准测试脚本。'}
-                        </div>
-
-                        ${c.precondition ? `
-                        <div class="small text-muted d-flex align-items-center gap-1" style="font-size: 11px;">
-                            <i class="bi bi-info-circle" style="font-size: 10px;"></i>
-                            <span>前置条件：${c.precondition}</span>
-                        </div>
-                        ` : ''}
-
-                        <div class="d-flex justify-content-between align-items-center pt-2 border-top" style="border-color: var(--border-subtle) !important; font-size: 11px;">
-                            <div class="text-muted font-monospace d-flex align-items-center gap-1">
-                                <i class="bi bi-file-earmark-code"></i>
-                                <span>${c.filename}</span>
-                                <span class="ms-1">(${c.size || ''})</span>
-                            </div>
-                            <div class="d-flex align-items-center gap-3 text-muted">
-                                <span>通过率: <strong style="color: var(--text-main);">${c.pass_rate || '100%'}</strong></span>
-                                <span>耗时: <strong style="color: var(--text-main);">${c.avg_duration || '2.5s'}</strong></span>
+                        <!-- 抽屉微展开区：展示描述与前置条件 -->
+                        <div class="case-details-drawer">
+                            <div class="d-flex flex-column gap-1">
+                                <div><strong>业务描述：</strong>${escapeHtml(c.desc || '自动化标准测试脚本。')}</div>
+                                ${c.precondition ? `<div><strong>前置条件：</strong>${escapeHtml(c.precondition)}</div>` : ''}
+                                <div class="text-muted font-monospace" style="font-size: 10.5px;">脚本文件: ${escapeHtml(c.filename)} ${c.size ? '(' + c.size + ')' : ''}</div>
                             </div>
                         </div>
                     </div>
@@ -6737,6 +7296,13 @@
             });
 
             box.innerHTML = html;
+        }
+
+        function toggleCaseDetails(cardId) {
+            const card = document.getElementById(cardId);
+            if (card) {
+                card.classList.toggle("expanded");
+            }
         }
 
         function reuseCaseForAi(filename, title, desc) {
