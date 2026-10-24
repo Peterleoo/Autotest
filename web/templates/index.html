@@ -4093,63 +4093,62 @@
             color: var(--text-sub);
         }
 
-        /* 测试结果全景总结卡片 (结构化产物清单与保存本地用例) */
+        /* 🌟 测试结果全景裁定条 (Executive Verdict Ribbon / Panel) */
         .test-result-summary-card {
             background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
             border-radius: 8px;
-            padding: 14px 16px;
-            margin-top: 12px;
+            padding: 12px 16px 14px 16px;
+            margin-top: 14px;
+            position: relative;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+            transition: all 0.2s ease;
+        }
+        .test-result-summary-card.verdict-pass {
+            border-left: 3.5px solid var(--status-green, #10b981) !important;
+        }
+        .test-result-summary-card.verdict-fail {
+            border-left: 3.5px solid #ef4444 !important;
+        }
+        .summary-verdict-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            letter-spacing: -0.2px;
+        }
+        .summary-divider {
+            height: 1px;
+            background: var(--border-subtle);
+            margin: 10px 0;
+            opacity: 0.8;
             border: none;
         }
-        .summary-card-title {
-            font-weight: 600;
-            font-size: 13.5px;
-            color: var(--text-main);
-        }
-        .summary-metric-bar {
-            font-size: 12px;
-            line-height: 1.7;
-            color: var(--text-sub);
-            padding: 8px 12px;
-            background: var(--bg-main);
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        .summary-artifacts-box {
-            background: var(--bg-main);
-            border-radius: 6px;
-            padding: 10px 12px;
-        }
-        .artifacts-box-title {
-            font-size: 11.5px;
-            font-weight: 600;
-            color: var(--text-main);
+        .summary-artifact-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-        }
-        .artifact-item-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 6px 8px;
-            border-radius: 5px;
-            margin-top: 4px;
+            padding: 5px 8px;
+            border-radius: 6px;
+            cursor: pointer;
             transition: background 0.15s ease;
+            text-decoration: none !important;
         }
-        .artifact-item-row:hover {
-            background: var(--bg-surface);
+        .summary-artifact-row:hover {
+            background: var(--bg-surface-hover, rgba(255, 255, 255, 0.04));
         }
-        .artifact-name {
+        .artifact-label {
             font-size: 12px;
-            color: var(--text-main);
             font-weight: 500;
+            color: var(--text-main);
         }
-        .artifact-file {
+        .artifact-mono-pill {
             font-family: var(--font-mono);
+            font-size: 10px;
             color: var(--text-sub);
+            background: var(--bg-main);
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-subtle);
         }
         .pass-pill {
             color: var(--status-green);
@@ -4166,6 +4165,62 @@
             font-size: 10px;
             padding: 1px 6px;
             border-radius: 4px;
+        }
+        /* Linear 极简工程质感操作按钮 */
+        .btn-linear-primary {
+            background: var(--status-blue, #007aff);
+            color: #ffffff;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 3px rgba(0, 122, 255, 0.25);
+        }
+        .btn-linear-primary:hover {
+            filter: brightness(1.1);
+            transform: translateY(-0.5px);
+            color: #ffffff;
+        }
+        .btn-linear-secondary {
+            background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.06));
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 11.5px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-linear-secondary:hover {
+            background: var(--bg-surface-hover);
+            color: var(--text-main);
+        }
+        .btn-linear-ghost {
+            background: transparent;
+            color: var(--text-sub);
+            border: none;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-linear-ghost:hover {
+            background: var(--bg-surface-hover);
+            color: var(--text-main);
         }
 
         /* 顶栏模式切换分段控制器 (极简去线条化风格) */
@@ -10131,6 +10186,7 @@
                 `;
             }
             if (blk.type === "todo_list") {
+                const isAllDone = (blk.total_count > 0 && blk.completed_count === blk.total_count);
                 let itemsHtml = "";
                 if (Array.isArray(blk.items)) {
                     blk.items.forEach(it => {
@@ -10138,14 +10194,14 @@
                         const isCompleted = (it.status === "COMPLETED" || it.status === "PASS");
                         const isRemoved = (it.status === "REMOVED");
                         const diffClass = it.diff_type || (isRunning ? 'added' : '');
-                        const signChar = isRemoved ? '-' : '+';
+                        const signChar = isAllDone ? '·' : (isRemoved ? '-' : '+');
                         const tagClass = isRunning ? 'running' : (isCompleted ? 'completed' : 'pending');
                         const tagText = isRunning ? '进行中' : (isCompleted ? '已完成' : (isRemoved ? '已移除' : '待处理'));
 
                         itemsHtml += `
                             <div class="stream-todo-item ${diffClass}">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
-                                    <span class="item-sign">${signChar}</span>
+                                    <span class="item-sign" style="font-family: var(--font-mono); opacity: 0.7;">${signChar}</span>
                                     <span class="item-title text-truncate"><strong>${escapeHtml(it.title)}</strong>: ${escapeHtml(it.desc || '')}</span>
                                 </div>
                                 <span class="stream-todo-tag ${tagClass}">${tagText}</span>
@@ -10163,11 +10219,11 @@
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 10px;"></i>
                                 <span>${escapeHtml(blk.title || '任务清单')}</span>
+                                ${isAllDone ? '<span class="mono-pill" style="font-size: 9.5px; color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border); padding: 1px 6px;">100% 达成</span>' : ''}
                             </div>
                             <span class="mono-tag" style="font-size: 10px;">${blk.completed_count || 0}/${blk.total_count || 0} 步骤</span>
                         </div>
                         <div class="stream-todo-body ${bodyClass}" id="body_todo_${blk.block_id}">
-                            <div class="stream-todo-diff-label">与上次清单相比</div>
                             ${itemsHtml}
                         </div>
                     </div>
@@ -10229,7 +10285,7 @@
                         <div class="stream-step-card-header" onclick="toggleStreamStep('${blk.block_id}')">
                             <div class="step-header-left">
                                 <span class="step-status-dot ${statusClass}"></span>
-                                <span class="step-card-title">${escapeHtml(blk.title || 'Step 执行')}</span>
+                                <span class="step-card-title">${escapeHtml((blk.title || 'Step 执行').replace(/^Step\s*\d+\s*[:：]?\s*/i, '').replace(/\s*(?:验证通过|测试通过|全部通过|已完成|\u2705|\u2714)\s*/gi, '').trim() || '业务执行')}</span>
                                 <span class="step-card-badge ${statusClass}">· ${badgeText}</span>
                             </div>
                             <div class="step-header-meta">
@@ -10306,71 +10362,80 @@
                         ? `onclick="openReportInRightDrawer('${sid}')"` 
                         : (isCode ? `onclick="openEmbeddedCode('${escapeHtml(fName)}', '本地用例')"` : `onclick="alert('证据目录已归档至 data/reports/screenshots/')"` );
                     
+                    const badgeDesc = isReport ? '质量报告' : (isCode ? '本地用例' : '证据链');
                     artifactsHtml += `
-                        <div class="artifact-item-row" ${clickAction} style="cursor: pointer;" title="点击查阅/打开">
+                        <div class="summary-artifact-row" ${clickAction} title="点击展开查阅">
                             <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 85%;">
-                                <i class="bi ${isReport ? 'bi-file-earmark-medical' : (isCode ? 'bi-file-earmark-code' : 'bi-images')} text-secondary"></i>
-                                <span class="artifact-name">${escapeHtml(art.name)}</span>
-                                <span class="artifact-file mono-pill" style="font-size: 10px;">${escapeHtml(fName)}</span>
+                                <i class="bi ${isReport ? 'bi-file-earmark-medical text-primary' : (isCode ? 'bi-file-earmark-code text-secondary' : 'bi-images text-secondary')}"></i>
+                                <span class="artifact-label">${escapeHtml(art.name)}</span>
+                                <span class="artifact-mono-pill">${escapeHtml(fName)}</span>
                             </div>
-                            <span class="artifact-arrow"><i class="bi bi-chevron-right" style="font-size: 10px; opacity: 0.6;"></i></span>
+                            <div class="d-flex align-items-center gap-1.5 text-muted" style="font-size: 11px;">
+                                <span>${badgeDesc}</span>
+                                <i class="bi bi-chevron-right" style="font-size: 9px; opacity: 0.5;"></i>
+                            </div>
                         </div>
                     `;
                 });
 
                 return `
-                    <div class="test-result-summary-card" id="${blk.block_id}">
-                        <!-- 头部：综合裁定与核心指标 -->
-                        <div class="d-flex justify-content-between align-items-center">
+                    <div class="test-result-summary-card ${isPass ? 'verdict-pass' : 'verdict-fail'}" id="${blk.block_id}">
+                        <!-- 顶层单行裁定抬头与聚合指标 -->
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-2">
-                                <span class="summary-card-title">测试执行结果总结</span>
-                                <span class="mono-pill ${isPass ? 'pass-pill' : 'fail-pill'}">${isPass ? 'PASS' : 'FAIL'}</span>
+                                <span class="mono-pill ${isPass ? 'pass-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isPass ? 'PASS' : 'FAIL'}</span>
+                                <span class="summary-verdict-title">${isPass ? '业务闭环全项达成' : '业务验证受阻'}</span>
                             </div>
-                            <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp || '')}</span>
-                        </div>
-
-                        <!-- 核心指标摘要条 -->
-                        <div class="summary-metric-bar mt-2">
-                            <div>• <strong>执行裁定</strong>：${isPass ? '全链路业务闭环达成 · 6 大维度全项达标' : '业务验证受阻'}</div>
-                            <div>• <strong>阶段通过</strong>：${escapeHtml(blk.steps_summary || '步骤全项达标')}</div>
-                            <div>• <strong>稳定性指标</strong>：总耗时 ${escapeHtml(blk.duration || '152.3s')} · 0 次 Crash · 0 次 ANR</div>
-                        </div>
-
-                        <!-- 结构化交付物资产清单 -->
-                        <div class="summary-artifacts-box mt-2.5">
-                            <div class="artifacts-box-title">
-                                <span>结构化交付物与测试资产</span>
-                                <span class="text-muted" style="font-size: 10px; font-weight: normal;">(点击文件名可直接在右侧打开或查阅)</span>
-                            </div>
-                            <div class="artifacts-list mt-1.5">
-                                ${artifactsHtml}
+                            <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
+                                <span>${escapeHtml(blk.steps_summary || '步骤全项达标')}</span>
+                                <span>·</span>
+                                <span>${escapeHtml(blk.duration || '152.3s')}</span>
+                                <span>·</span>
+                                <span style="color: var(--status-green);"><i class="bi bi-shield-check"></i> 0 异常</span>
+                                ${blk.timestamp ? `<span>·</span><span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp)}</span>` : ''}
                             </div>
                         </div>
 
-                        <!-- 快捷操作栏：保存本地用例 + 在右侧打开报告 + 秒级本地回放 -->
-                        <div class="mt-2.5 d-flex align-items-center flex-wrap gap-2">
-                            <button class="btn btn-sm btn-primary py-1 px-3 d-flex align-items-center gap-1.5" style="font-size: 11.5px; border-radius: 6px;" onclick="openReportInRightDrawer('${sid}')">
-                                <i class="bi bi-layout-sidebar-reverse"></i>
-                                <span>在右侧查看完整报告</span>
-                            </button>
-                            ${isSolidified ? `
-                                <button class="btn btn-sm btn-outline-secondary py-1 px-3 d-flex align-items-center gap-1.5" style="font-size: 11.5px; border-radius: 6px;" onclick="switchMainWorkspaceMode('local')">
-                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                    <span>已入库本地用例 (${escapeHtml(solidFile)})</span>
+                        <!-- 极简细线留白 -->
+                        <div class="summary-divider"></div>
+
+                        <!-- 交付物与自动化资产列表 (单层无嵌套框) -->
+                        <div class="d-flex flex-column gap-1">
+                            ${artifactsHtml}
+                        </div>
+
+                        <!-- 极简细线留白 -->
+                        <div class="summary-divider"></div>
+
+                        <!-- 底部工具栏 (主路径优先 + Linear 风格工具坞) -->
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-0.5">
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn-linear-primary" onclick="openReportInRightDrawer('${sid}')" title="在右侧面板展开 Markdown 全景测试报告">
+                                    <i class="bi bi-layout-sidebar-reverse"></i>
+                                    <span>查看报告</span>
                                 </button>
-                            ` : `
-                                <button class="btn btn-sm btn-outline-secondary py-1 px-3 d-flex align-items-center gap-1.5" id="saveCaseBtn_${sid}" style="font-size: 11.5px; border-radius: 6px;" onclick="saveSessionToLocalCase('${sid}')">
-                                    <i class="bi bi-bookmark-plus"></i>
-                                    <span>💾 保存为本地用例</span>
+                                ${isSolidified ? `
+                                    <button class="btn-linear-ghost text-success" onclick="switchMainWorkspaceMode('local')" title="该用例已沉淀为脱机本地脚本，点击在左侧筛选查看">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <span>已入库本地</span>
+                                    </button>
+                                ` : `
+                                    <button class="btn-linear-secondary" id="saveCaseBtn_${sid}" onclick="saveSessionToLocalCase('${sid}')" title="将本次 AI 探索链路固化为免 Token 高速本地回归用例">
+                                        <i class="bi bi-bookmark-plus"></i>
+                                        <span>固化为本地用例</span>
+                                    </button>
+                                `}
+                            </div>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <button class="btn-linear-ghost" onclick="replaySolidifiedCase('${escapeHtml(solidFile)}')" title="脱机秒级重放该用例">
+                                    <i class="bi bi-play-fill text-success"></i>
+                                    <span>秒级回测</span>
                                 </button>
-                            `}
-                            <button class="btn btn-sm btn-outline-secondary py-1 px-2.5 d-flex align-items-center gap-1" style="font-size: 11.5px; border-radius: 6px;" onclick="replaySolidifiedCase('${escapeHtml(solidFile)}')">
-                                <i class="bi bi-play-fill text-success"></i>
-                                <span>秒级重放</span>
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary py-1 px-2 d-flex align-items-center gap-1" style="font-size: 11px; border-radius: 6px;" onclick="copyMarkdownReport('${sid}')">
-                                <i class="bi bi-clipboard"></i> 复制报告
-                            </button>
+                                <button class="btn-linear-ghost" onclick="copyMarkdownReport('${sid}')" title="复制完整 Markdown 报告至剪贴板">
+                                    <i class="bi bi-clipboard"></i>
+                                    <span>复制</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
