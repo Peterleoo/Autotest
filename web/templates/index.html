@@ -5497,14 +5497,14 @@
     
         /* ================= 🌟 中间主工作台工程级极简质感重塑 (Linear / Raycast / Apple 规范) ================= */
 
-        /* 1. 顶栏 44px 极简通透 */
+        /* 1. 顶栏 44px 极简纯透 (和中间栏底色 100% 统一，无白色发白断层) */
         .canvas-header {
             height: 44px;
             min-height: 44px;
             max-height: 44px;
             padding: 0 18px;
             background: transparent !important;
-            border-bottom: 1px solid var(--border-subtle);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -5512,9 +5512,40 @@
             box-sizing: border-box;
         }
         body.theme-light .canvas-header, body[data-theme="light"] .canvas-header {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-            background: rgba(255, 255, 255, 0.8) !important;
-            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+            background: transparent !important;
+            backdrop-filter: none !important;
+        }
+        /* 右侧明细面板纯图标按钮 (去除文字噪音，28px 经典极简图标键) */
+        .btn-header-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-dim);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 13.5px;
+            transition: all 0.16s ease;
+            user-select: none;
+        }
+        .btn-header-icon:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        body.theme-light .btn-header-icon:hover, body[data-theme="light"] .btn-header-icon:hover {
+            color: #007aff;
+            background: rgba(0, 0, 0, 0.04);
+            border-color: rgba(0, 122, 255, 0.2);
+        }
+        .btn-header-icon.active {
+            color: #007aff !important;
+            background: rgba(0, 122, 255, 0.1) !important;
+            border-color: rgba(0, 122, 255, 0.25) !important;
         }
         .active-task-meta {
             display: flex;
@@ -6193,16 +6224,16 @@
         <!-- 极简顶栏 -->
         <!-- 画布顶部信息条 (1:1 还原原型规范) -->
         <div class="canvas-header" id="canvasHeaderBar">
-            <div class="active-task-meta">
-                <span class="task-name-text" id="currentSessionTitleDisplay">自动化测试业务链路验证</span>
-                <span class="mono-pill" id="topActiveTaskBadge" style="color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border);">PASS</span>
-                <span class="mono-pill" id="topActiveTaskMeta">全链路校验通过</span>
+            <!-- 顶栏左侧：本地回归或新任务时绝对隐藏，仅进入具体任务时显示 -->
+            <div class="active-task-meta d-none" id="activeTaskMeta">
+                <span class="task-name-text" id="currentSessionTitleDisplay"></span>
+                <span class="mono-pill d-none" id="topActiveTaskBadge" style="color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border);">PASS</span>
+                <span class="mono-pill d-none" id="topActiveTaskMeta"></span>
             </div>
-            <div class="d-flex align-items-center gap-2">
-                <!-- 顶栏模式切换：AI 智能编排 vs 本地用例回归 -->
-                <button class="btn-action-sm active" id="btnToggleRight" onclick="toggleCanvas()" title="展开/收起右侧测试报告与MD明细">
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <!-- 右侧明细面板：仅保留纯图标，去除文字噪音 -->
+                <button class="btn-header-icon active" id="btnToggleRight" onclick="toggleCanvas()" title="展开/收起右侧测试报告与明细">
                     <i class="bi bi-layout-sidebar-reverse"></i>
-                    <span>右侧明细面板</span>
                 </button>
             </div>
         </div>
@@ -7130,6 +7161,15 @@
             // 🌟 左侧栏双态智能换装：AI会话时间线 vs App项目文件夹树
             if (sidebarAi) sidebarAi.classList.toggle("d-none", mode !== "ai");
             if (sidebarLocal) sidebarLocal.classList.toggle("d-none", mode !== "local");
+
+            const taskMeta = document.getElementById("activeTaskMeta");
+            if (taskMeta) {
+                if (mode === "local" || !activeSessionId) {
+                    taskMeta.classList.add("d-none");
+                } else {
+                    taskMeta.classList.remove("d-none");
+                }
+            }
 
             if (mode === "local") {
                 loadAppProjects();
@@ -9192,6 +9232,9 @@
             if (flow) flow.innerHTML = "";
 
             // 2. 任务标题与徽章重置为新建状态
+            const topMetaWrap = document.getElementById("activeTaskMeta");
+            if (topMetaWrap) topMetaWrap.classList.add("d-none");
+
             const titleDisplay = document.getElementById("currentSessionTitleDisplay");
             if (titleDisplay) titleDisplay.innerText = "新建测试任务";
             const topBadge = document.getElementById("topActiveTaskBadge");
@@ -9289,6 +9332,8 @@
                 if (segmented) segmented.classList.remove("d-none");
 
                 // 2. 更新会话标题与输入提示
+                const metaWrap = document.getElementById("activeTaskMeta");
+                if (metaWrap && currentWorkspaceMode === "ai") metaWrap.classList.remove("d-none");
                 document.getElementById("currentSessionTitleDisplay").innerText = data.title;
                 const ta = document.getElementById("taskInputText");
                 if (ta) ta.placeholder = "在此会话中发送接续指令或补充测试目标（Enter 发送）...";
