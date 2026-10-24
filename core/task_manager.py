@@ -244,6 +244,7 @@ class TaskManager:
                 "status": s.get("status", "IDLE"),
                 "is_success": s.get("is_success"),
                 "created_at": s.get("created_at", ""),
+                "timestamp": float(s.get("timestamp") or 0),
                 "test_mode": s.get("test_mode", "real"),
                 "is_real_device": (s.get("test_mode") == "real"),
                 "platforms": platforms,

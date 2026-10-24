@@ -55,18 +55,25 @@ async def index(request: Request):
     response.headers["Expires"] = "0"
     return response
 
+# ================= 优化：设备列表内存级低开销缓存 (5秒 TTL，杜绝高频 ADB 子进程与物理点击探针) =================
+_DEVICE_CACHE = {"timestamp": 0.0, "data": None}
+
 @app.get("/api/devices")
-async def get_devices():
-    """获取所有连接的真机/模拟器设备"""
+async def get_devices(probe: bool = False, force: bool = False):
+    """获取所有连接的真机/模拟器设备 (带 5秒轻量缓存与安全探针，杜绝重复进程与 ADB 管道抢占)"""
+    global _DEVICE_CACHE
+    now = time.time()
+    if not force and not probe and _DEVICE_CACHE["data"] is not None and (now - _DEVICE_CACHE["timestamp"] < 5.0):
+        return _DEVICE_CACHE["data"]
+
     devices = []
     adb_bin = app_mgr.adb_bin
     try:
-        res = subprocess.run([adb_bin, "devices", "-l"], capture_output=True, text=True, timeout=5)
+        res = await asyncio.to_thread(lambda: subprocess.run([adb_bin, "devices", "-l"], capture_output=True, text=True, timeout=3))
         for line in res.stdout.strip().split("\n")[1:]:
             parts = line.split()
             if len(parts) >= 2 and parts[1] == "device":
                 dev_id = parts[0]
-                # 获取设备型号与系统版本
                 model = "Android 真机"
                 version = "14.0"
                 for p in parts[2:]:
@@ -75,15 +82,13 @@ async def get_devices():
                     elif p.startswith("device:"):
                         dev_id_alias = p.replace("device:", "")
                 
-                # 获取真实系统版本与电量
-                ver_res = subprocess.run([adb_bin, "-s", dev_id, "shell", "getprop", "ro.build.version.release"], capture_output=True, text=True)
-                if ver_res.stdout.strip():
-                    version = ver_res.stdout.strip()
-
-                # 🚀 联动设备画像与自学习知识库
+                # 🚀 联动设备画像（避免常规轮询打真实 tap 探针，仅在 probe=True 时探测）
                 from core.device_knowledge_manager import device_knowledge_mgr
                 dev_fp = device_knowledge_mgr.get_device_fingerprint(dev_id)
-                input_healthy, input_tip = device_knowledge_mgr.probe_input_permission(dev_id)
+                input_healthy = True
+                input_tip = ""
+                if probe:
+                    input_healthy, input_tip = device_knowledge_mgr.probe_input_permission(dev_id)
                 
                 devices.append({
                     "id": dev_id,
@@ -100,7 +105,6 @@ async def get_devices():
     except Exception as e:
         pass
 
-    # 检查局域网 iOS 节点
     ios_node = {
         "id": "remote-ios",
         "model": settings.IOS_DEVICE_NAME,
@@ -109,7 +113,10 @@ async def get_devices():
         "status": f"局域网 Mac: {settings.APPIUM_SERVER_URL}"
     }
 
-    return {"android_devices": devices, "ios_node": ios_node}
+    result = {"android_devices": devices, "ios_node": ios_node}
+    _DEVICE_CACHE["timestamp"] = now
+    _DEVICE_CACHE["data"] = result
+    return result
 
 @app.get("/api/devices/{device_id}/screenshot")
 @app.get("/api/device/screenshot")
@@ -211,6 +218,50 @@ async def tap_device(payload: Dict[str, Any] = Body(...)):
         res = await asyncio.to_thread(lambda: subprocess.run([adb_bin, "-s", dev_id, "shell", "input", "tap", str(x), str(y)], capture_output=True, timeout=2))
         screen_stream_hub.invalidate_cache(dev_id)
         return JSONResponse({"success": True, "x": x, "y": y, "returncode": res.returncode})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+@app.post("/api/device/swipe")
+async def swipe_device(payload: Dict[str, Any] = Body(...)):
+    """真机拖拽/滑动穿透控制：接收滑动起点与终点物理坐标及持续时间"""
+    dev_id = payload.get("device_id") or "2145189e"
+    x1 = int(payload.get("x1", 0))
+    y1 = int(payload.get("y1", 0))
+    x2 = int(payload.get("x2", 0))
+    y2 = int(payload.get("y2", 0))
+    duration = int(payload.get("duration", 300))
+    if x1 <= 0 or y1 <= 0 or x2 <= 0 or y2 <= 0:
+        return JSONResponse({"success": False, "error": "Invalid coordinates"})
+
+    adb_bin = app_mgr.adb_bin
+    try:
+        res = await asyncio.to_thread(lambda: subprocess.run(
+            [adb_bin, "-s", dev_id, "shell", "input", "swipe", str(x1), str(y1), str(x2), str(y2), str(duration)],
+            capture_output=True, timeout=3
+        ))
+        screen_stream_hub.invalidate_cache(dev_id)
+        return JSONResponse({"success": True, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": duration, "returncode": res.returncode})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+@app.post("/api/device/key")
+async def send_device_key(payload: Dict[str, Any] = Body(...)):
+    """真机按键控制：支持返回、桌面、多任务等虚拟导航键"""
+    dev_id = payload.get("device_id") or "2145189e"
+    key = str(payload.get("key", "")).lower()
+    key_map = {"back": "4", "home": "3", "app_switch": "187", "menu": "82", "volume_up": "24", "volume_down": "25"}
+    keycode = key_map.get(key, key)
+    if not keycode:
+        return JSONResponse({"success": False, "error": "Invalid key"})
+
+    adb_bin = app_mgr.adb_bin
+    try:
+        res = await asyncio.to_thread(lambda: subprocess.run(
+            [adb_bin, "-s", dev_id, "shell", "input", "keyevent", keycode],
+            capture_output=True, timeout=2
+        ))
+        screen_stream_hub.invalidate_cache(dev_id)
+        return JSONResponse({"success": True, "key": key, "keycode": keycode, "returncode": res.returncode})
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)})
 
@@ -705,9 +756,32 @@ async def get_app_projects():
 
     return {"projects": projects, "current_project_id": projects[0]["id"] if projects else "xianghe_zhaofang"}
 
+def parse_case_timestamp(file_path: Path, meta: dict) -> tuple:
+    """提取用例的高精度时间戳与可读时间字符串，确保绝对时间倒序"""
+    created_at_str = meta.get("created_at")
+    if created_at_str:
+        try:
+            dt = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
+            return dt.timestamp(), dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+
+    m = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", file_path.name)
+    if m:
+        try:
+            dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                          int(m.group(4)), int(m.group(5)), int(m.group(6)))
+            return dt.timestamp(), dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+
+    mtime = file_path.stat().st_mtime
+    dt = datetime.fromtimestamp(mtime)
+    return mtime, dt.strftime("%Y-%m-%d %H:%M")
+
 @app.get("/api/solidified_cases")
 async def get_solidified_cases(app_id: Optional[str] = None):
-    """获取指定 App 项目文件夹下的测试用例资产（跟随 App 隔离）"""
+    """获取指定 App 项目文件夹下的测试用例资产（按真实时间严格倒序排列）"""
     cases = []
     if app_id:
         target_dir = settings.SOLIDIFIED_DIR / app_id
@@ -719,9 +793,9 @@ async def get_solidified_cases(app_id: Optional[str] = None):
             target_dir = settings.SOLIDIFIED_DIR
 
     metadata = load_cases_metadata(target_dir)
-    py_files = sorted(target_dir.glob("*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
+    py_files = list(target_dir.glob("*.py"))
     if not py_files and target_dir != settings.SOLIDIFIED_DIR:
-        py_files = sorted(settings.SOLIDIFIED_DIR.glob("*.py"), key=lambda x: x.stat().st_mtime, reverse=True)
+        py_files = list(settings.SOLIDIFIED_DIR.glob("*.py"))
 
     for f in py_files:
         if f.name in metadata:
@@ -740,15 +814,22 @@ async def get_solidified_cases(app_id: Optional[str] = None):
             }
             metadata[f.name] = meta
 
+        sort_ts, time_display = parse_case_timestamp(f, meta)
+
         cases.append({
             "filename": f.name,
             "path": str(f),
             "app_id": app_id or target_dir.name,
             "size": f"{f.stat().st_size} 字节",
             "modified": f.stat().st_mtime,
+            "sort_timestamp": sort_ts,
+            "time_display": time_display,
+            "created_at": meta.get("created_at") or time_display,
             **meta
         })
 
+    # 🌟 严格按真实生成时间从新到旧倒序排列
+    cases.sort(key=lambda c: c.get("sort_timestamp", 0), reverse=True)
     return {"cases": cases, "app_id": target_dir.name}
 
 @app.post("/api/sessions/{session_id}/save_to_local_case")
@@ -816,16 +897,29 @@ async def save_session_to_local_case(
             {"action": "assert_text", "reason": "业务目标校验", "expected": goal[:10]}
         ]
 
+    # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 xianghe_zhaofang)
+    app_id = session.get("app_id")
+    if not app_id and session.get("target_app"):
+        app_id = Path(session["target_app"]).stem
+    if not app_id:
+        app_id = "xianghe_zhaofang"
+
+    target_app_dir = settings.SOLIDIFIED_DIR / app_id
+    target_app_dir.mkdir(parents=True, exist_ok=True)
+
     solid_file = Solidifier.solidify_test_case(
         case_name=case_name,
         goal=goal,
-        action_history=action_trace
+        action_history=action_trace,
+        output_dir=target_app_dir
     )
 
-    # 4. 更新持久化用例元数据
-    metadata = load_cases_metadata()
+    # 4. 更新持久化用例元数据至该 App 项目目录
+    now_dt = datetime.now()
+    now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+    metadata = load_cases_metadata(target_app_dir)
     case_id = f"CASE-{len(metadata)+1:02d}"
-    metadata[solid_file.name] = {
+    meta_entry = {
         "id": case_id,
         "title": final_title,
         "module": module,
@@ -835,26 +929,39 @@ async def save_session_to_local_case(
         "pass_rate": "100%",
         "avg_duration": session.get("duration", "2.8s"),
         "session_id": session_id,
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "created_at": now_str,
+        "timestamp": now_dt.timestamp()
     }
-    save_cases_metadata(metadata)
+    metadata[solid_file.name] = meta_entry
+    save_cases_metadata(metadata, target_app_dir)
+
+    # 同时根目录同步一份兼容
+    try:
+        root_meta = load_cases_metadata(settings.SOLIDIFIED_DIR)
+        root_meta[solid_file.name] = meta_entry
+        save_cases_metadata(root_meta, settings.SOLIDIFIED_DIR)
+    except Exception:
+        pass
 
     # 5. 更新会话状态并持久化
     session["is_solidified"] = True
     session["solidified_filename"] = solid_file.name
     session["solidified_module"] = module
     session["solidified_case_id"] = case_id
+    session["solidified_app_id"] = app_id
     task_mgr._save_session(session_id)
 
-    logger.info(f"💾 用户主动将测试会话 [{session_id}] 固化保存为本地用例: {solid_file.name} (自动归类: {module})")
+    logger.info(f"💾 用户主动将测试会话 [{session_id}] 固化保存为本地用例: {solid_file.name} (项目目录: {app_id}, 归类: {module})")
     return {
         "success": True,
         "filename": solid_file.name,
+        "app_id": app_id,
         "module": module,
         "title": final_title,
         "level": auto_level,
         "case_id": case_id,
-        "message": f"用例已成功保存并自动归类至【{module}】"
+        "created_at": now_str,
+        "message": f"用例已成功保存至【{app_id}】项目库，自动归类至【{module}】"
     }
 
 @app.post("/api/solidified_cases/batch_run")
@@ -1374,6 +1481,19 @@ async def delete_task_session(session_id: str):
     """删除指定的测试会话记录"""
     ok = task_mgr.delete_session(session_id)
     return {"success": ok}
+
+@app.post("/api/sessions/{session_id}/rename")
+async def rename_session(session_id: str, payload: Dict[str, Any] = Body(...)):
+    """重命名测试会话标题"""
+    new_title = (payload.get("title") or "").strip()
+    if not new_title:
+        return JSONResponse({"success": False, "error": "标题不能为空"})
+    session = task_mgr.get_session(session_id)
+    if not session:
+        return JSONResponse({"success": False, "error": "会话不存在"})
+    session["title"] = new_title
+    task_mgr._save_session_to_disk(session)
+    return JSONResponse({"success": True, "title": new_title})
 
 @app.post("/api/sessions/{session_id}/message")
 async def append_session_message(

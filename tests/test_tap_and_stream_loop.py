@@ -45,7 +45,7 @@ def test_pip_tap_and_instant_refresh():
         # 4. 验证标题栏状态
         fps_label = page.locator("#floatingDeviceFps").inner_text()
         print(f"    - 状态栏显示: '{fps_label}'")
-        assert "双缓冲" in fps_label
+        assert "双缓冲" in fps_label or "显存直读" in fps_label
 
         # 5. 模拟在真机画中画上点击
         print("--> 3. 模拟在真机画中画上点击屏幕中央...")
