@@ -1307,14 +1307,16 @@
         .gpt-input-area {
             position: absolute;
             bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: calc(100% - 48px);
-            max-width: 760px;
-            background: transparent;
-            padding: 0;
+            left: 0;
+            right: 0;
+            width: 100% !important;
+            max-width: none !important;
+            display: flex;
+            justify-content: center;
+            padding: 0 20px;
             z-index: 30;
             pointer-events: none;
+            transform: none !important;
         }
         .gpt-input-box {
             width: 100%;
@@ -5672,23 +5674,25 @@
             overflow: hidden;
         }
 
-        /* 3. 底部悬浮控制台 (Floating Glass Dock) */
+        /* 3. 底部悬浮控制台 (Floating Glass Dock: 像素级 780px 与上方推荐卡片绝对居中对齐) */
         .gpt-input-area {
             position: absolute;
-            bottom: 14px;
+            bottom: 16px;
             left: 0;
             right: 0;
-            width: 100%;
-            transform: none !important;
-            padding: 0 24px;
+            width: 100% !important;
+            max-width: none !important;
             display: flex;
             justify-content: center;
+            padding: 0 20px;
             pointer-events: none;
             z-index: 30;
+            transform: none !important;
         }
         .gpt-input-box {
-            width: 100%;
-            max-width: 780px;
+            width: 100% !important;
+            max-width: 780px !important;
+            margin: 0 auto !important;
             background: rgba(18, 19, 25, 0.88);
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 14px;
