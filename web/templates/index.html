@@ -3596,14 +3596,14 @@
             flex-shrink: 0;
         }
 
-        /* 1. 新建任务 Hero CTA 按钮 (去除花哨生硬渐变，采用纯净工程微质感，白天/深色浑然一体) */
+        /* 1. 新建任务 Hero CTA 按钮 (夜间高对比度阶梯明度 + 白天纯白轻卡片，轮廓分明) */
         .btn-new-task {
             width: 100%;
-            height: 33px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            height: 34px;
+            background: #181920;
+            border: 1px solid rgba(255, 255, 255, 0.16);
             border-radius: 7px;
-            color: var(--text-main);
+            color: #f4f4f5;
             font-size: 12px;
             font-weight: 500;
             display: flex;
@@ -3613,21 +3613,22 @@
             cursor: pointer;
             transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
             user-select: none;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
         }
         body.theme-light .btn-new-task, body[data-theme="light"] .btn-new-task {
             background: #ffffff;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
             color: var(--text-main);
         }
         .btn-new-task:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(56, 189, 248, 0.35);
-            color: var(--text-main);
+            background: #20222b;
+            border-color: rgba(56, 189, 248, 0.5);
+            color: #ffffff;
         }
         body.theme-light .btn-new-task:hover, body[data-theme="light"] .btn-new-task:hover {
             background: #ffffff;
-            border-color: rgba(2, 132, 199, 0.35);
+            border-color: rgba(2, 132, 199, 0.4);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
         }
         .btn-new-task:active {
@@ -3640,19 +3641,19 @@
         .kbd-hint {
             font-size: 9.5px;
             font-family: var(--font-mono);
-            color: var(--text-dim);
-            background: rgba(255, 255, 255, 0.05);
+            color: #a1a1aa;
+            background: rgba(255, 255, 255, 0.08);
             padding: 1px 5px;
             border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
         }
         body.theme-light .kbd-hint, body[data-theme="light"] .kbd-hint {
             background: #f1f5f9;
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(0, 0, 0, 0.08);
             color: #64748b;
         }
 
-        /* 2. 行内即时过滤搜索框 (内嵌凹槽式，与新建按钮自然呼应消除断层) */
+        /* 2. 行内即时过滤搜索框 (夜间清晰轮廓与 WCAG AA 级高对比度占位文本) */
         .sidebar-search-box {
             position: relative;
             display: flex;
@@ -3661,29 +3662,33 @@
         }
         .sidebar-search-input {
             width: 100%;
-            height: 28px;
-            background: rgba(0, 0, 0, 0.22);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            height: 29px;
+            background: #14151c;
+            border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 6px;
-            padding: 0 24px 0 25px;
+            padding: 0 24px 0 26px;
             font-size: 11.5px;
-            color: var(--text-main);
+            color: #f4f4f5;
             transition: all 0.18s ease;
         }
         body.theme-light .sidebar-search-input, body[data-theme="light"] .sidebar-search-input {
             background: rgba(0, 0, 0, 0.04);
-            border: 1px solid transparent;
+            border: 1px solid rgba(0, 0, 0, 0.08);
             color: #09090b;
         }
         .sidebar-search-input::placeholder {
-            color: var(--text-dim);
-            font-size: 11px;
+            color: #8e95a5 !important;
+            font-size: 11.5px;
+            opacity: 1;
+        }
+        body.theme-light .sidebar-search-input::placeholder, body[data-theme="light"] .sidebar-search-input::placeholder {
+            color: #94a3b8 !important;
         }
         .sidebar-search-input:focus {
             outline: none;
             border-color: #38bdf8;
-            background: var(--bg-surface-elevated);
-            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15);
+            background: #191b24;
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
         }
         body.theme-light .sidebar-search-input:focus, body[data-theme="light"] .sidebar-search-input:focus {
             background: #ffffff;
@@ -3693,8 +3698,8 @@
         .sidebar-search-box .search-icon {
             position: absolute;
             left: 8px;
-            font-size: 10.5px;
-            color: var(--text-dim);
+            font-size: 11px;
+            color: #94a3b8;
             pointer-events: none;
         }
         .sidebar-search-box .search-clear-btn {
@@ -3703,7 +3708,7 @@
             background: none;
             border: none;
             padding: 0;
-            color: var(--text-dim);
+            color: #94a3b8;
             cursor: pointer;
             font-size: 11px;
             display: flex;
@@ -3712,7 +3717,7 @@
             transition: color 0.15s ease;
         }
         .sidebar-search-box .search-clear-btn:hover {
-            color: var(--text-main);
+            color: #ffffff;
         }
 
         /* 3. 滚动容器与遮罩淡出 */
@@ -5309,155 +5314,140 @@
         }
 
 
-        /* 🌟 苹果流体物理滑动分段控制器 (Apple Liquid Sliding Segmented Control) */
+        /* 🌟 极简纯净分段导航 (彻底移除双层厚背景与数字徽标，通透干练) */
+        .sidebar-bottom {
+            padding: 8px 10px;
+            border-top: 1px solid var(--border-subtle);
+        }
         .sidebar-mode-switcher {
-            position: relative;
             display: flex;
             align-items: center;
             width: 100%;
-            background: rgba(0, 0, 0, 0.22);
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            padding: 3px;
+            background: transparent !important;
+            border: none !important;
+            padding: 0;
+            gap: 4px;
             user-select: none;
-            overflow: hidden;
+            box-shadow: none !important;
         }
-        body.theme-light .sidebar-mode-switcher, body[data-theme="light"] .sidebar-mode-switcher {
-            background: rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(0, 0, 0, 0.04);
-        }
-
-        /* 物理背衬滑块 (苹果签名阻尼回弹曲线: cubic-bezier(0.16, 1, 0.3, 1)) */
-        .mode-slider-thumb {
-            position: absolute;
-            top: 3px;
-            bottom: 3px;
-            left: 3px;
-            width: calc(50% - 3px);
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.12);
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), inset 0 0.5px 0.5px rgba(255, 255, 255, 0.2);
-            transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
-            pointer-events: none;
-            z-index: 1;
-        }
-        body.theme-light .mode-slider-thumb, body[data-theme="light"] .mode-slider-thumb {
-            background: #ffffff;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0.5px 1px rgba(0, 0, 0, 0.05);
-        }
-
-        /* 本地回归模式：滑块以阻尼动效物理平移 100% */
-        .sidebar-mode-switcher.is-local .mode-slider-thumb {
-            transform: translateX(100%);
-        }
-
         .sidebar-mode-btn {
-            position: relative;
-            z-index: 2;
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            padding: 5.5px 4px;
+            padding: 6px 4px;
             border-radius: 6px;
             border: none;
-            background: transparent !important;
-            color: var(--text-muted);
-            font-size: 11px;
+            background: transparent;
+            color: var(--text-dim);
+            font-size: 11.5px;
             font-weight: 500;
             cursor: pointer;
-            transition: color 0.2s ease;
+            transition: all 0.18s ease;
             white-space: nowrap;
             box-shadow: none !important;
         }
         .sidebar-mode-btn:hover {
             color: var(--text-main);
+            background: rgba(255, 255, 255, 0.04);
         }
+        body.theme-light .sidebar-mode-btn:hover, body[data-theme="light"] .sidebar-mode-btn:hover {
+            background: rgba(0, 0, 0, 0.03);
+        }
+        /* 仅选中态带有一层极轻微、通透的淡色微薄层，无生硬厚重大白块 */
         .sidebar-mode-btn.active {
             color: var(--text-main) !important;
             font-weight: 600;
+            background: rgba(255, 255, 255, 0.08) !important;
         }
-        .mode-count-pill {
-            font-size: 9.5px;
-            padding: 1px 5px;
-            border-radius: 10px;
-            background: rgba(16, 185, 129, 0.15);
-            color: #34d399;
-            font-family: var(--font-mono);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            line-height: 1.1;
+        body.theme-light .sidebar-mode-btn.active, body[data-theme="light"] .sidebar-mode-btn.active {
+            background: rgba(0, 0, 0, 0.05) !important;
+            color: #09090b !important;
         }
 
-        /* 📁 本地回归模式下：左侧 App 项目文件夹卡片 */
-        .app-project-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 10px;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid transparent;
-            margin-bottom: 6px;
-            cursor: pointer;
-            transition: all 0.18s ease;
-        }
-        .app-project-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: var(--border-subtle);
-        }
-        .app-project-item.active {
-            background: rgba(56, 189, 248, 0.08);
-            border-color: rgba(56, 189, 248, 0.35);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        }
-        .app-project-item.active .project-folder-icon {
-            color: #38bdf8;
-        }
-        .project-folder-icon {
-            font-size: 15px;
-            color: var(--text-muted);
-            transition: color 0.18s ease;
-        }
-        .project-meta-box {
+        /* 📁 本地回归模式下：左侧 App 项目工程单行极简流线 (与 AI 会话列表 1:1 统一设计规范) */
+        .app-project-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2px 7px 12px 7px;
             display: flex;
             flex-direction: column;
-            gap: 1px;
-            min-width: 0;
-            flex: 1;
-            margin-left: 8px;
-            margin-right: 6px;
+            gap: 1.5px;
         }
-        .project-name-text {
-            font-size: 12px;
-            font-weight: 500;
+        .app-project-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+            background: transparent;
+            user-select: none;
+            overflow: hidden;
+        }
+        .app-project-item:hover {
+            background: var(--bg-surface-hover);
+        }
+        .app-project-item.active {
+            background: var(--bg-surface-elevated);
             color: var(--text-main);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-weight: 500;
         }
-        .project-pkg-text {
-            font-size: 9.5px;
+        body.theme-light .app-project-item.active, body[data-theme="light"] .app-project-item.active {
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        /* 激活指示条：左侧贴合 3px 柔和天蓝/青绿微光条 (与 AI 会话项完全一致) */
+        .app-project-item.active::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 5px;
+            bottom: 5px;
+            width: 3px;
+            border-radius: 0 2px 2px 0;
+            background: linear-gradient(180deg, #38bdf8 0%, #22c55e 100%);
+            box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+        }
+        .app-project-item .project-status-dot {
+            width: 6.5px;
+            height: 6.5px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+            background-color: var(--text-muted);
+            opacity: 0.35;
+        }
+        .app-project-item.is-current .project-status-dot {
+            background-color: var(--status-green) !important;
+            opacity: 1 !important;
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        }
+        .app-project-item .project-title {
+            flex: 1;
+            min-width: 0;
+            font-size: 12px;
+            font-weight: 450;
             color: var(--text-sub);
-            font-family: var(--font-mono);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            line-height: 1.4;
         }
-        .project-case-tag {
+        .app-project-item:hover .project-title, .app-project-item.active .project-title {
+            color: var(--text-main);
+            font-weight: 500;
+        }
+        .app-project-item .project-cases-count {
             font-size: 10px;
-            padding: 1.5px 6px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-muted);
             font-family: var(--font-mono);
-            border: 1px solid var(--border-subtle);
-            white-space: nowrap;
-        }
-        .app-project-item.active .project-case-tag {
-            background: rgba(56, 189, 248, 0.15);
-            color: #38bdf8;
-            border-color: rgba(56, 189, 248, 0.3);
+            color: var(--text-dim);
+            margin-left: auto;
+            flex-shrink: 0;
+            opacity: 0.75;
         }
     </style>
 
@@ -5554,15 +5544,11 @@
         <!-- 态 2：本地用例回归模式下的左侧栏 (App 项目文件夹树) -->
         <div class="sidebar-mode-view d-none" id="sidebarViewLocal" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
             <!-- 侧栏顶部：App 项目操作栏 -->
-            <div class="sidebar-top" style="padding: 10px 12px 6px;">
+            <div class="sidebar-top" style="padding: 12px 10px 8px 10px;">
                 <div class="d-flex align-items-center justify-content-between w-100">
-                    <div class="d-flex align-items-center gap-1.5 fw-semibold" style="font-size: 12px; color: var(--text-main);">
-                        <i class="bi bi-folder2-open" style="color: #38bdf8;"></i>
-                        <span>应用项目文件夹</span>
-                    </div>
-                    <button class="btn btn-sm btn-outline-secondary py-0.5 px-2 d-flex align-items-center gap-1" onclick="openAppPackagesModal()" style="font-size: 10.5px; border-radius: 5px;" title="上传新 APK 并建立项目文件夹">
-                        <i class="bi bi-cloud-arrow-up"></i>
-                        <span>新包</span>
+                    <span style="font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-dim);">应用工程项目</span>
+                    <button class="btn btn-xs btn-outline-secondary py-0.5 px-2 d-flex align-items-center gap-1" onclick="openAppPackagesModal()" style="font-size: 10.5px; border-radius: 4px;" title="上传新 APK 并建立项目文件夹">
+                        <span>+ 新应用</span>
                     </button>
                 </div>
             </div>
@@ -5576,13 +5562,11 @@
         <!-- 侧栏底部：AI 智能编排 与 本地回归测试 随时切换胶囊 (左下角) -->
         <div class="sidebar-bottom" style="padding: 10px 12px; border-top: 1px solid var(--border-subtle);">
             <div class="sidebar-mode-switcher" id="sidebarModeSwitcher">
-                <div class="mode-slider-thumb" id="modeSliderThumb"></div>
                 <button type="button" class="sidebar-mode-btn active" id="btnModeAi" onclick="switchMainWorkspaceMode('ai')" title="进入 AI 智能测试编排视图">
                     <span>AI 智能编排</span>
                 </button>
                 <button type="button" class="sidebar-mode-btn" id="btnModeLocal" onclick="switchMainWorkspaceMode('local')" title="进入本地自动化回归测试看板">
                     <span>本地回归</span>
-                    <span class="mode-count-pill" id="sidebarLocalCaseCount">24</span>
                 </button>
             </div>
         </div>
@@ -6520,10 +6504,7 @@
             const viewLocal = document.getElementById("workspaceLocalView");
             const sidebarAi = document.getElementById("sidebarViewAi");
             const sidebarLocal = document.getElementById("sidebarViewLocal");
-            const switcher = document.getElementById("sidebarModeSwitcher");
 
-            // 联动苹果流体滑块位移
-            if (switcher) switcher.classList.toggle("is-local", mode === "local");
             if (btnAi) btnAi.classList.toggle("active", mode === "ai");
             if (btnLocal) btnLocal.classList.toggle("active", mode === "local");
 
@@ -6547,16 +6528,10 @@
                 allAppProjects = data.projects || [];
                 
                 const listEl = document.getElementById("sidebarAppProjectList");
-                const countBadge = document.getElementById("sidebarLocalCaseCount");
-
-                let totalCases = 0;
-                allAppProjects.forEach(p => { totalCases += (p.case_count || 0); });
-                if (countBadge) countBadge.innerText = totalCases;
-
                 if (!listEl) return;
 
                 if (allAppProjects.length === 0) {
-                    listEl.innerHTML = `<div class="small text-muted p-3 text-center">暂无 App 项目工程</div>`;
+                    listEl.innerHTML = `<div class="small text-muted p-3 text-center" style="font-size: 11px;">暂无 App 项目工程</div>`;
                     return;
                 }
 
@@ -6564,23 +6539,17 @@
                 allAppProjects.forEach(p => {
                     const isActive = (p.id === activeAppProjectId);
                     const isCurrent = p.is_current;
+                    const casesCount = p.case_count || 0;
                     html += `
-                        <div class="app-project-item ${isActive ? 'active' : ''}" onclick="selectAppProject('${p.id}')" title="进入该 App 项目专属用例文件夹: ${p.folder}">
-                            <div class="d-flex align-items-center min-w-0" style="flex: 1;">
-                                <i class="bi bi-folder-fill project-folder-icon"></i>
-                                <div class="project-meta-box">
-                                    <div class="project-name-text">
-                                        ${escapeHtml(p.name)}
-                                        ${isCurrent ? '<span class="status-dot-sm ms-1" style="width: 5px; height: 5px; background: var(--status-green); display: inline-block;" title="当前待测应用"></span>' : ''}
-                                    </div>
-                                    <div class="project-pkg-text">${escapeHtml(p.package || p.filename)}</div>
-                                </div>
-                            </div>
-                            <span class="project-case-tag">${p.case_count} 用例</span>
+                        <div class="app-project-item ${isActive ? 'active' : ''} ${isCurrent ? 'is-current' : ''}" 
+                             onclick="selectAppProject('${p.id}')" 
+                             title="App工程: ${escapeHtml(p.name)} (${casesCount}条用例)">
+                            <span class="project-status-dot" title="${isCurrent ? '当前设备挂载运行中' : '就绪'}"></span>
+                            <span class="project-title">${escapeHtml(p.name)}</span>
+                            <span class="project-cases-count">${casesCount} 例</span>
                         </div>
                     `;
                 });
-
                 listEl.innerHTML = html;
             } catch (e) {
                 console.warn("加载 App 项目目录失败:", e);
