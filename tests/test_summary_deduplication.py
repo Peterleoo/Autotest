@@ -136,6 +136,10 @@ def test_frontend_ui_summary_deduplication():
         page.evaluate("""(data) => {
             window.activeSessionId = data.session_id;
             window.currentActiveSessionData = data;
+            const hero = document.getElementById("welcomeHero");
+            if (hero) hero.style.display = "none";
+            const cbox = document.getElementById("chatMessagesBox");
+            if (cbox) cbox.style.display = "flex";
             const flow = document.getElementById("messagesFlow");
             if (flow) flow.innerHTML = "";
             window._renderedSessionId = null;
