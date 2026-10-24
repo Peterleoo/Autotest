@@ -149,6 +149,11 @@ class ScreenStreamHub:
             self._locks[device_id] = asyncio.Lock()
         return self._locks[device_id]
 
+    def invalidate_cache(self, device_id: str):
+        """立即将指定设备的缓存置为过期（手势点击/滑动后调用，强制下一次拉取真实转场新帧）"""
+        if device_id in self._cache:
+            self._cache[device_id]["time"] = 0
+
     async def get_frame(self, device_id: str, max_age: float = 0.45) -> Optional[Dict[str, Any]]:
         """
         获取最新帧结构。

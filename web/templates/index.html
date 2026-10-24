@@ -10440,7 +10440,52 @@ function renderChatStream(sessionData) {
             popover.classList.toggle("show");
         }
 
-        // 🌟 原生 ADB 极速 MJPEG 实时帧流与鼠标穿透控制
+        // 🌟 原生 ADB 极速低延迟画中画投屏 (双缓冲无积压推拉 + 手势即时刷新闭环)
+        let isPipLoopActive = false;
+
+        function runPipStreamLoop() {
+            if (!isPipScreenOpen) {
+                isPipLoopActive = false;
+                return;
+            }
+            isPipLoopActive = true;
+            const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
+            const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
+            const preloader = new Image();
+            preloader.onload = () => {
+                if (!isPipScreenOpen) {
+                    isPipLoopActive = false;
+                    return;
+                }
+                const img = document.getElementById("pipScreenImg");
+                if (img) {
+                    img.src = preloader.src;
+                    img.style.display = "block";
+                }
+                // 当前帧在浏览器中成功渲染后，延迟 40ms 拉取下一帧 (零 Socket 缓冲积压)
+                setTimeout(runPipStreamLoop, 40);
+            };
+            preloader.onerror = () => {
+                if (isPipScreenOpen) setTimeout(runPipStreamLoop, 300);
+                else isPipLoopActive = false;
+            };
+            preloader.src = url;
+        }
+
+        function triggerPipImmediateRefresh() {
+            if (!isPipScreenOpen) return;
+            const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
+            const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
+            const preloader = new Image();
+            preloader.onload = () => {
+                const img = document.getElementById("pipScreenImg");
+                if (img && isPipScreenOpen) {
+                    img.src = preloader.src;
+                }
+            };
+            preloader.src = url;
+        }
+
         function togglePipScreen(e) {
             if (e) e.stopPropagation();
             const pip = document.getElementById("floatingDeviceWindow") || document.getElementById("pipScreenFloating");
@@ -10455,22 +10500,21 @@ function renderChatStream(sessionData) {
                 if (typeof initFloatingDeviceDrag === "function") {
                     initFloatingDeviceDrag();
                 }
-                // 直接接入原生 ADB 极速 MJPEG 帧流 (零依赖, 200ms 低延迟)
                 if (img) {
-                    img.src = "/api/device/screen/stream?device_id=2145189e&t=" + Date.now();
                     bindPipMouseControl(img);
                 }
                 const fpsLabel = document.getElementById("floatingDeviceFps");
-                if (fpsLabel) fpsLabel.innerText = "显存 RAW 直读流 · 延迟 ~600ms";
+                if (fpsLabel) fpsLabel.innerText = "显存直读 · 双缓冲低延迟";
+                runPipStreamLoop();
             } else {
                 pip.style.display = "none";
                 pip.classList.remove("show");
                 if (btn) btn.classList.remove("active");
-                if (img) img.src = "/static/phone_screen_current.png"; // 断开流释放后台 ADB 连接
+                isPipLoopActive = false;
             }
         }
 
-        // 鼠标穿透真机物理控制与涟漪
+        // 鼠标穿透真机物理控制与即时转场闭环
         let lastTapTime = 0;
         function bindPipMouseControl(imgEl) {
             if (imgEl._mouseBound) return;
@@ -10478,7 +10522,7 @@ function renderChatStream(sessionData) {
             imgEl.style.cursor = "crosshair";
             imgEl.addEventListener("click", function(e) {
                 const now = Date.now();
-                if (now - lastTapTime < 250) return; // 250ms 点击防抖
+                if (now - lastTapTime < 200) return; // 200ms 防抖
                 lastTapTime = now;
 
                 const rect = imgEl.getBoundingClientRect();
@@ -10491,13 +10535,19 @@ function renderChatStream(sessionData) {
                 const realX = Math.round(normX * 1080);
                 const realY = Math.round(normY * 2160);
 
-                // 触发网页端触控波纹
+                // 立即触发网页端触控波纹 (0ms 交互直感)
                 triggerActionRipple(normX * 100, normY * 100);
 
+                const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
                 fetch('/api/device/tap', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ device_id: '2145189e', x: realX, y: realY })
+                    body: JSON.stringify({ device_id: targetDev, x: realX, y: realY })
+                }).then(() => {
+                    // 🚀 核心优化：手势注入完成后，在 180ms (页面转场完成时) 立即优先拉取最新画面
+                    setTimeout(() => {
+                        triggerPipImmediateRefresh();
+                    }, 180);
                 }).catch(err => console.warn('Tap request error:', err));
             });
         }

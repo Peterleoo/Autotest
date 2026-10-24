@@ -207,7 +207,8 @@ async def tap_device(payload: Dict[str, Any] = Body(...)):
 
     adb_bin = app_mgr.adb_bin
     try:
-        res = subprocess.run([adb_bin, "-s", dev_id, "shell", "input", "tap", str(x), str(y)], capture_output=True, timeout=2)
+        res = await asyncio.to_thread(lambda: subprocess.run([adb_bin, "-s", dev_id, "shell", "input", "tap", str(x), str(y)], capture_output=True, timeout=2))
+        screen_stream_hub.invalidate_cache(dev_id)
         return JSONResponse({"success": True, "x": x, "y": y, "returncode": res.returncode})
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)})

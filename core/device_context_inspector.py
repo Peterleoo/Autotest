@@ -53,12 +53,25 @@ class DeviceContextInspector:
                     result["current_activity"] = match.group(2)
                     result["is_foreground"] = (result["current_package"] == target_package)
 
-            # 3. 超轻量截屏感知与语义定性
-            res_cap = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap", "-p"], capture_output=True, timeout=3)
-            if res_cap.returncode == 0 and res_cap.stdout:
+            # 3. 超轻量截屏感知与语义定性 (优先使用显存 RAW 直读 + PC 端硬件加速)
+            screen_bytes = None
+            try:
+                from core.screen_stream_hub import _capture_raw_and_encode_sync
+                f_data = _capture_raw_and_encode_sync(adb_bin, device_id)
+                if f_data and f_data.get("jpeg"):
+                    screen_bytes = f_data["jpeg"]
+            except Exception:
+                pass
+
+            if not screen_bytes:
+                res_cap = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap", "-p"], capture_output=True, timeout=3)
+                if res_cap.returncode == 0 and res_cap.stdout:
+                    screen_bytes = res_cap.stdout
+
+            if screen_bytes:
                 try:
                     from core.vision_ocr import VisionOCR
-                    elements, _ = VisionOCR.recognize_elements(res_cap.stdout)
+                    elements, _ = VisionOCR.recognize_elements(screen_bytes)
                     texts = [e.get("text", "") for e in elements if e.get("text")]
                     result["screen_keywords"] = texts[:15]
                     all_text_str = " ".join(texts)

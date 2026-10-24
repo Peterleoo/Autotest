@@ -151,7 +151,22 @@ class NativeADBDriver:
         return base64.b64encode(raw_bytes).decode("utf-8")
 
     def get_screenshot_as_png(self) -> bytes:
-        """通过 adb exec-out screencap 获取物理屏幕原图二进制字节"""
+        """通过 adb exec-out screencap 获取物理屏幕原图二进制字节 (优先使用显存 RAW 直读 + PC 端硬件加速)"""
+        try:
+            from core.screen_stream_hub import _capture_raw_and_encode_sync, HAS_OPENCV
+            import cv2
+            target_dev = self.device_id or "2145189e"
+            frame_data = _capture_raw_and_encode_sync(self.adb_bin, target_dev)
+            if frame_data:
+                bgr = frame_data.get("bgr")
+                if HAS_OPENCV and bgr is not None:
+                    _, buf = cv2.imencode('.png', bgr)
+                    return buf.tobytes()
+                elif frame_data.get("jpeg"):
+                    return frame_data["jpeg"]
+        except Exception:
+            pass
+
         full_cmd = [self.adb_bin]
         if self.device_id:
             full_cmd.extend(["-s", self.device_id])
