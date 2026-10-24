@@ -7154,18 +7154,24 @@
                 window._renderedBlockIds = new Set();
             }
 
-            // 🛡️ 步骤卡片防重免疫：同一 step_id 无论 block_id 为何，界面上只保留一个最新容器！
+            // 🛡️ 步骤卡片与总结卡片防重免疫：同一 step_id 或同一 test_summary 界面上只保留最新容器！
             const rawBlocks = sessionData.timeline_blocks || [];
             const seenSteps = new Set();
+            let hasTestSummary = false;
             const blocks = [];
             
-            // 逆序筛选出最新的 step 卡片，再顺序排布
+            // 逆序筛选出最新的 step 卡片和唯一的 summary 卡片，再顺序排布
             for (let i = rawBlocks.length - 1; i >= 0; i--) {
                 const b = rawBlocks[i];
                 if (b.type === "step_execution" || b.type === "step_result") {
                     const sId = b.step_id || 1;
                     if (seenSteps.has(sId)) continue;
                     seenSteps.add(sId);
+                }
+                // 🛡️ 整个会话强行只保留最新的 1 个 test_summary，彻底杜绝重复卡片！
+                if (b.type === "test_summary") {
+                    if (hasTestSummary) continue;
+                    hasTestSummary = true;
                 }
                 blocks.unshift(b);
             }
@@ -7178,6 +7184,10 @@
                 if (!existingEl && (blk.type === "step_execution" || blk.type === "step_result")) {
                     existingEl = flow.querySelector(`.stream-step-card[data-step-id="${blk.step_id}"]`);
                 }
+                // 🛡️ 兼容定位已渲染的总结卡片（即使 block_id 不一致也原地替换，绝不向页面插入第二个！）
+                if (!existingEl && blk.type === "test_summary") {
+                    existingEl = flow.querySelector(".test-result-summary-card");
+                }
 
                 if (!existingEl) {
                     const html = buildBlockHtml(blk, sessionData);
@@ -7186,8 +7196,8 @@
                         window._renderedBlockIds.add(blkId);
                     }
                 } else {
-                    // 局部更新（支持 todo_list, step_execution, step_result 等节点动态流式刷新与折叠状态响应）
-                    if (blk.type === "todo_list" || blk.type === "step_execution" || blk.type === "step_result") {
+                    // 局部更新（支持 todo_list, step_execution, step_result, test_summary 等节点动态流式刷新与折叠状态响应）
+                    if (blk.type === "todo_list" || blk.type === "step_execution" || blk.type === "step_result" || blk.type === "test_summary") {
                         const newHtml = buildBlockHtml(blk, sessionData);
                         if (newHtml) {
                             const temp = document.createElement("div");
@@ -7200,6 +7210,14 @@
                     }
                 }
             });
+
+            // 🛡️ 页面冗余总结卡片自愈兜底：若因网络抖动或旧状态在 DOM 中存在多个，自动清理只保留最后 1 个
+            const summaryCards = flow.querySelectorAll(".test-result-summary-card");
+            if (summaryCards.length > 1) {
+                for (let i = 0; i < summaryCards.length - 1; i++) {
+                    summaryCards[i].remove();
+                }
+            }
 
             // 悬浮画中画或步骤微胶囊保持同步
             renderStepsDrawerBody(sessionData, sessionData.plan_steps || []);

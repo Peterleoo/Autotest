@@ -233,7 +233,7 @@ class TimelineManager:
             }
         ]
         return {
-            "block_id": f"blk_summary_{turn_id}_{uuid.uuid4().hex[:6]}",
+            "block_id": f"blk_summary_{turn_id}",
             "type": "test_summary",
             "turn_id": turn_id,
             "session_id": session_id,

@@ -421,16 +421,22 @@ class TaskManager:
                         tb.append(TimelineManager.create_report_block(content, s.get("session_id", ""), turn_id=max(0, turn_no - 1)))
                         existing_report_texts.add(content[:100])
 
-            # 🚀 自动同步补齐测试总结卡片与结构化产物 (必须全流程完成且非 RUNNING)
-            has_summary = any(b.get("type") == "test_summary" for b in tb)
+            # 🚀 自动同步补齐测试总结卡片与结构化产物 (必须全流程完成且非 RUNNING，单例强幂等)
+            summary_blocks = [b for b in tb if b.get("type") == "test_summary"]
+            if len(summary_blocks) > 1:
+                for extra in summary_blocks[1:]:
+                    if extra in tb:
+                        tb.remove(extra)
+                summary_blocks = summary_blocks[:1]
+
             steps_list = s.get("plan_steps", [])
             all_steps_done = (len(steps_list) > 0 and sum(1 for st in steps_list if st.get("status") in ["COMPLETED", "PASS"]) == len(steps_list))
             is_session_finished = (s.get("status") in ["COMPLETED", "READY_FOR_REVIEW", "PASS"]) and (s.get("status") != "RUNNING") and all_steps_done
-            if not has_summary and is_session_finished:
+            if is_session_finished:
                 steps = s.get("plan_steps", [])
                 completed_count = sum(1 for st in steps if st.get("status") in ["COMPLETED", "PASS"])
                 turn_no = sum(1 for b in tb if b.get("type") == "user_message")
-                tb.append(TimelineManager.create_test_summary_block(
+                summary_data = TimelineManager.create_test_summary_block(
                     session_id=s.get("session_id", ""),
                     goal=s.get("goal", ""),
                     is_success=(s.get("status") != "FAILED"),
@@ -439,7 +445,11 @@ class TaskManager:
                     is_solidified=s.get("is_solidified", False),
                     solidified_filename=s.get("solidified_filename", f"test_{s.get('session_id', '')}.py"),
                     turn_id=max(0, turn_no - 1)
-                ))
+                )
+                if not summary_blocks:
+                    tb.append(summary_data)
+                else:
+                    summary_blocks[0].update(summary_data)
 
         offsets = offsets or {}
         devices_data = {}
