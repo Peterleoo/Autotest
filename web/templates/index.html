@@ -2950,23 +2950,38 @@
         }
 
         /* 全局前置链路浮动详情弹窗 (Preflight Dropdown Popover) */
+        /* 全局前置链路极简毛玻璃 Micro HUD (左对齐紧凑浮签) */
         .global-preflight-popover {
             position: fixed;
-            top: 42px;
-            right: 14px;
-            width: 380px;
+            top: 38px;
+            left: 14px;
+            right: auto;
+            width: 240px;
             max-width: 90vw;
-            background: var(--bg-surface);
-            border: 1px solid var(--border-strong);
-            border-radius: 12px;
-            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+            background: rgba(18, 18, 22, 0.88);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 10px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
             z-index: 1050;
-            padding: 14px;
+            padding: 10px 12px;
             display: none;
-            animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0;
+            transform: translateY(-4px);
+            transition: opacity 0.16s ease, transform 0.16s ease;
+            pointer-events: none;
+        }
+        body[data-theme="light"] .global-preflight-popover {
+            background: rgba(255, 255, 255, 0.94);
+            border-color: rgba(0, 0, 0, 0.09);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
         }
         .global-preflight-popover.show {
             display: block;
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
         }
 
         /* ================= 6. 悬浮步骤小胶囊与小弹窗 (PM-Product Dock 风格) ================= */
@@ -6572,6 +6587,54 @@
             color: #ef4444;
         }
 
+    
+        /* ================= 融合心跳指示灯与纯文本测试就绪 ================= */
+        .brand-status-trigger {
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 3px 7px 3px 5px;
+            margin-left: -5px;
+            border-radius: 8px;
+            transition: background 0.15s ease;
+            user-select: none;
+        }
+        .brand-status-trigger:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        body[data-theme="light"] .brand-status-trigger:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+        .brand-pulse-dot {
+            width: 7.5px;
+            height: 7.5px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+            margin-right: 7px;
+            background-color: var(--status-green, #22c55e);
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse-green 2.2s infinite;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .brand-pulse-dot.status-unready, .brand-pulse-dot.warning {
+            background-color: #ef4444;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red 2.2s infinite;
+        }
+        .header-ready-pure-text {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--status-green, #22c55e);
+            letter-spacing: 0.2px;
+            transition: color 0.2s ease;
+            line-height: 1;
+        }
+        .brand-pulse-dot.status-unready ~ .header-ready-pure-text,
+        .brand-status-trigger.status-unready .header-ready-pure-text {
+            color: #ef4444;
+        }
+
     </style>
 
 </head>
@@ -6579,16 +6642,16 @@
 
     <!-- ======================= 全局通栏顶部条 (仅保留左侧品牌标识) ======================= -->
     <header class="app-top-chrome" id="appTopChrome">
-        <!-- 左侧品牌标识与高保真常驻测试就绪胶囊 (1:1 还原原型) -->
-        <div class="brand-box">
-            <div class="brand-dot"></div>
-            <span class="fw-bold" style="font-size: 12.5px; letter-spacing: 0.5px; color: var(--text-main);">AUTOTEST AI</span>
-            
-            <!-- 🌟 全局常驻测试就绪指示点与文字 (将对话框中的测试就绪移至左上角绿点后) -->
-            <div class="header-ready-pill status-ready ms-2" id="headerReadyPill" onclick="toggleGlobalPreflightPopover(event)" title="测试环境已就绪 (点击查看全局链路诊断)">
-                <span class="ready-pulse-dot" id="headerReadyPulse"></span>
-                <span id="headerReadyText" class="header-ready-text">测试就绪</span>
-            </div>
+        <!-- 🌟 品牌与全局就绪指示器融合：单心跳圆点 + AUTOTEST AI · 测试就绪 (触碰/点击弹出 Micro HUD) -->
+        <div class="brand-box brand-status-trigger" id="brandStatusTrigger"
+             onmouseenter="handleBrandStatusHover(true)"
+             onmouseleave="handleBrandStatusHover(false)"
+             onclick="toggleBrandStatusPin(event)"
+             title="测试环境已就绪 (悬停查看链路健康度，点击常驻)">
+            <span class="brand-pulse-dot status-ready" id="brandPulseDot"></span>
+            <span class="fw-bold brand-title" style="font-size: 12.5px; letter-spacing: 0.5px; color: var(--text-main);">AUTOTEST AI</span>
+            <span class="brand-status-sep" style="opacity: 0.35; margin: 0 5px; font-size: 10px; color: var(--text-muted);">·</span>
+            <span id="headerReadyText" class="header-ready-pure-text">测试就绪</span>
         </div>
 
         <!-- 🚀 右侧极简三件套 (仅保留投屏、主题、设置纯图标，无文字) -->
@@ -6612,18 +6675,15 @@
         </div>
     </header>
 
-    <!-- 全局前置链路浮动详情弹窗 (Popover) -->
-    <div class="global-preflight-popover" id="globalPreflightPopover">
-        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom" style="border-color: var(--border-subtle) !important;">
-            <div class="d-flex align-items-center gap-1.5 fw-semibold" style="font-size: 12.5px; color: var(--text-main);">
-                <i class="bi bi-shield-check text-success"></i>
-                <span>全局前置链路状态</span>
-            </div>
-            <button class="icon-btn" onclick="toggleGlobalPreflightPopover(event)"><i class="bi bi-x-lg"></i></button>
-        </div>
+    <!-- 全局前置链路浮动详情 Micro HUD (左对齐紧凑浮签，支持触碰展开与移出自动隐藏) -->
+    <div class="global-preflight-popover" id="globalPreflightPopover"
+         onmouseenter="handleBrandStatusHover(true)"
+         onmouseleave="handleBrandStatusHover(false)"
+         onclick="event.stopPropagation()">
         <div id="globalPreflightPopoverBody">
             <div class="text-muted small">正在获取全局链路状态...</div>
         </div>
+    </div>
     </div>
 
     <!-- ======================= 桌面端主工作视口包装层 (承载侧栏与中间/右侧卡片) ======================= -->
@@ -12081,65 +12141,111 @@ function renderChatStream(sessionData) {
             }
         }
 
-        function toggleGlobalPreflightPopover(e) {
+                // ================= 全局前置链路触碰展示 (Hover) 与点击钉住 (Pin) 状态机 =================
+        let _preflightHoverTimer = null;
+        let _preflightIsPinned = false;
+
+        function handleBrandStatusHover(isEnter) {
+            if (_preflightIsPinned) return;
+            const popover = document.getElementById("globalPreflightPopover");
+            if (!popover) return;
+
+            if (isEnter) {
+                if (_preflightHoverTimer) clearTimeout(_preflightHoverTimer);
+                _preflightHoverTimer = setTimeout(() => {
+                    popover.classList.add("show");
+                    renderGlobalPreflightPopoverContent(window._currentPreflightData);
+                }, 120);
+            } else {
+                if (_preflightHoverTimer) clearTimeout(_preflightHoverTimer);
+                _preflightHoverTimer = setTimeout(() => {
+                    if (!_preflightIsPinned) {
+                        popover.classList.remove("show");
+                    }
+                }, 220);
+            }
+        }
+
+        function toggleBrandStatusPin(e) {
             if (e) e.stopPropagation();
             const popover = document.getElementById("globalPreflightPopover");
             if (!popover) return;
-            popover.classList.toggle("show");
-            if (popover.classList.contains("show")) {
+            if (_preflightHoverTimer) clearTimeout(_preflightHoverTimer);
+
+            if (popover.classList.contains("show") && _preflightIsPinned) {
+                popover.classList.remove("show");
+                _preflightIsPinned = false;
+            } else {
+                popover.classList.add("show");
+                _preflightIsPinned = true;
                 renderGlobalPreflightPopoverContent(window._currentPreflightData);
             }
         }
 
+        // 兼容原有的 toggleGlobalPreflightPopover 调用
+        function toggleGlobalPreflightPopover(e) {
+            toggleBrandStatusPin(e);
+        }
+
+        // 点击页面任意外部区域自动解除钉住并收拢
+        document.addEventListener("click", (e) => {
+            const popover = document.getElementById("globalPreflightPopover");
+            const trigger = document.getElementById("brandStatusTrigger");
+            if (!popover || !trigger) return;
+            if (!popover.contains(e.target) && !trigger.contains(e.target)) {
+                popover.classList.remove("show");
+                _preflightIsPinned = false;
+            }
+        });
+
+        // 渲染 240px 极简毛玻璃 Micro HUD 内容
         function renderGlobalPreflightPopoverContent(data) {
             const body = document.getElementById("globalPreflightPopoverBody");
             if (!body) return;
             if (!data) {
-                body.innerHTML = `<div class="text-muted small p-2">正在获取链路状态...</div>`;
+                body.innerHTML = `<div class="text-muted small p-1">正在获取全局链路状态...</div>`;
                 return;
             }
             const checks = data.checks || {};
             const isReady = data.ready;
 
             let html = `
-                <div class="mb-2.5 d-flex align-items-center justify-content-between p-2 rounded" style="background: ${isReady ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)'}; border: 1px solid ${isReady ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'};">
-                    <span class="small fw-semibold" style="color: ${isReady ? '#34d399' : '#fbbf24'};">
-                        <i class="bi ${isReady ? 'bi-shield-check' : 'bi-exclamation-triangle'} me-1"></i>
-                        ${isReady ? '前置基础设施 100% 齐备就绪' : '存在未就绪前置项'}
+                <div class="d-flex justify-content-between align-items-center mb-1.5 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                    <span class="small fw-semibold d-flex align-items-center gap-1" style="font-size: 11px; color: ${isReady ? 'var(--status-green)' : '#ef4444'};">
+                        <i class="bi ${isReady ? 'bi-shield-check' : 'bi-exclamation-triangle'}"></i>
+                        <span>${isReady ? '测试环境完全就绪' : '部分环境依赖未就绪'}</span>
                     </span>
-                    <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 11px;" onclick="refreshPreflightStatus(true)">重新检测</button>
+                    <span class="text-muted" style="font-size: 10px; cursor: pointer;" onclick="refreshPreflightStatus(true)" title="重新检测"><i class="bi bi-arrow-clockwise"></i></span>
                 </div>
-                <div class="d-flex flex-column gap-2 mb-2">
-                    <div class="p-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle);">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-cpu text-info"></i>
-                            <div>
-                                <div class="fw-medium small">AI 大模型推理</div>
-                                <div class="text-muted" style="font-size: 11px;">${escapeHtml(checks.ai?.display_name || checks.ai?.provider || 'Google Antigravity')}</div>
-                            </div>
+                <div class="d-flex flex-column gap-1.5 py-1">
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px;">
+                        <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
+                            <span style="font-size: 7px; color: ${checks.ai?.ready ? 'var(--status-green)' : '#ef4444'};">●</span>
+                            <span class="text-muted">模型:</span>
+                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${escapeHtml(checks.ai?.display_name || checks.ai?.provider || 'Gemini 3.8')}</span>
                         </div>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 10.5px;" onclick="openSettingsModal('models')">配置</button>
+                        <span style="font-size: 10px; color: var(--status-green);"><i class="bi bi-check2"></i></span>
                     </div>
-                    <div class="p-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle);">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-box-seam text-primary"></i>
-                            <div>
-                                <div class="fw-medium small">待测应用包</div>
-                                <div class="text-muted" style="font-size: 11px;">${escapeHtml(checks.app?.current_app || '未检测到包')}</div>
-                            </div>
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px;">
+                        <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
+                            <span style="font-size: 7px; color: ${checks.device?.ready ? 'var(--status-green)' : '#f59e0b'};">●</span>
+                            <span class="text-muted">设备:</span>
+                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${checks.device?.count ? checks.device.count + ' 台真机在线' : '无真机在线'}</span>
                         </div>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 10.5px;" onclick="openAppPackagesModal()">换包</button>
+                        <span style="font-size: 10px; color: ${checks.device?.ready ? 'var(--status-green)' : 'var(--text-muted)'};">${checks.device?.ready ? '<i class="bi bi-check2"></i>' : '0台'}</span>
                     </div>
-                    <div class="p-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle);">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-phone text-success"></i>
-                            <div>
-                                <div class="fw-medium small">物理真机设备</div>
-                                <div class="text-muted" style="font-size: 11px;">${checks.device?.count ? checks.device.count + ' 台真机在线 (' + (checks.device.devices?.[0] || '2145189e') + ')' : '未连接真机'}</div>
-                            </div>
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px;">
+                        <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
+                            <span style="font-size: 7px; color: ${checks.app?.current_app ? 'var(--status-green)' : '#f59e0b'};">●</span>
+                            <span class="text-muted">应用:</span>
+                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${escapeHtml(checks.app?.current_app || '象盒找房')}</span>
                         </div>
-                        <span class="badge ${checks.device?.ready ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}" style="font-size: 10px;">${checks.device?.ready ? '在线' : '离线'}</span>
+                        <span style="font-size: 10px; color: var(--status-green);"><i class="bi bi-check2"></i></span>
                     </div>
+                </div>
+                <div class="mt-1.5 pt-1 border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important;">
+                    <span class="text-muted" style="font-size: 9.5px;">管理模型/设备/应用</span>
+                    <span class="text-primary" style="font-size: 10px; cursor: pointer;" onclick="openSettingsModal()">系统设置 →</span>
                 </div>
             `;
             body.innerHTML = html;
@@ -12174,31 +12280,29 @@ function renderChatStream(sessionData) {
                 const headerText = document.getElementById("headerReadyText");
                 const bottomPill = document.getElementById("bottomReadyPill");
                 const bottomText = document.getElementById("bottomReadyText");
+                const brandDot = document.getElementById("brandPulseDot");
+                const brandTrigger = document.getElementById("brandStatusTrigger");
                 if (isReady) {
-                    if (headerPill) {
-                        headerPill.className = "header-ready-pill status-ready ms-2";
-                        headerPill.title = "测试环境：已就绪 (点击查看全局链路诊断)";
-                        if (headerText) {
-                            headerText.innerText = "测试就绪";
-                            headerText.style.color = "var(--status-green)";
-                        }
+                    if (brandDot) {
+                        brandDot.className = "brand-pulse-dot status-ready";
                     }
-                    if (bottomPill) {
-                        bottomPill.className = "pill-ready-status";
-                        if (bottomText) bottomText.innerText = "测试就绪";
+                    if (brandTrigger) {
+                        brandTrigger.title = "测试环境已就绪 (悬停查看链路健康度，点击常驻)";
+                    }
+                    if (headerText) {
+                        headerText.innerText = "测试就绪";
+                        headerText.style.color = "var(--status-green)";
                     }
                 } else {
-                    if (headerPill) {
-                        headerPill.className = "header-ready-pill status-unready ms-2";
-                        headerPill.title = "测试环境：未就绪 (缺少前置依赖，点击排查)";
-                        if (headerText) {
-                            headerText.innerText = "环境未就绪";
-                            headerText.style.color = "#ef4444";
-                        }
+                    if (brandDot) {
+                        brandDot.className = "brand-pulse-dot status-unready";
                     }
-                    if (bottomPill) {
-                        bottomPill.className = "pill-ready-status warning";
-                        if (bottomText) bottomText.innerText = "环境未就绪";
+                    if (brandTrigger) {
+                        brandTrigger.title = "测试环境未就绪 (缺少前置依赖，点击排查)";
+                    }
+                    if (headerText) {
+                        headerText.innerText = "环境未就绪";
+                        headerText.style.color = "#ef4444";
                     }
                 }
 
