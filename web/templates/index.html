@@ -4534,7 +4534,8 @@
             flex-direction: column;
             overflow: hidden;
             top: 55px;
-            right: 480px;
+            right: 20px;
+            left: auto;
             user-select: none;
             pointer-events: auto;
         }
@@ -6814,7 +6815,7 @@
     </div><!-- /appWindowBody -->
 
     <!-- 📱 【用户指定重点】可全屏自由拖拽的端侧实时投屏悬浮窗 (Floating Draggable Device Screen) -->
-                    <div class="floating-device-window" id="floatingDeviceWindow" style="display: none; width: 240px; height: auto; bottom: auto; z-index: 9999;">
+                    <div class="floating-device-window" id="floatingDeviceWindow" style="display: none; width: 240px; height: auto; top: 55px; right: 20px; left: auto; bottom: auto; z-index: 9999;">
                         <!-- 拖拽把手标题栏 -->
                         <div class="device-window-header" id="deviceDragHandle">
                             <div class="device-window-title">
@@ -7702,6 +7703,8 @@
 
         // 一键批量回归
         async function runBatchLocalRegression(category) {
+            // 🚀 执行回归任务时自动唤起端侧投屏并靠右停靠
+            if (typeof ensurePipScreenOpen === "function") ensurePipScreenOpen();
             const cat = category || "ALL";
             const btn = document.getElementById("btnBatchRunLocal");
             const originalHtml = btn ? btn.innerHTML : "";
@@ -12116,6 +12119,17 @@ function renderChatStream(sessionData) {
             preloader.src = url;
         }
 
+        // ================= 任务执行联动: 全自动唤起并停靠端侧投屏 =================
+        function ensurePipScreenOpen() {
+            if (!isPipScreenOpen) {
+                togglePipScreen();
+            } else {
+                if (typeof resetDevicePos === "function") {
+                    resetDevicePos();
+                }
+            }
+        }
+
         function togglePipScreen(e) {
             if (e) e.stopPropagation();
             const pip = document.getElementById("floatingDeviceWindow") || document.getElementById("pipScreenFloating");
@@ -12132,6 +12146,10 @@ function renderChatStream(sessionData) {
                 }
                 if (container) {
                     bindPipGestureControl(container);
+                }
+                // 每次打开默认归位至右侧停靠点 (与复位悬浮窗位置按钮行为严格一致)
+                if (typeof resetDevicePos === "function") {
+                    resetDevicePos();
                 }
                 const fpsLabel = document.getElementById("floatingDeviceFps");
                 if (fpsLabel) fpsLabel.innerText = "显存直读 · 拖拽/点击就绪";
@@ -12484,6 +12502,8 @@ function renderChatStream(sessionData) {
                         // 立即刷新当前会话详情并重载左侧状态
                         await pollCurrentSession();
                         loadSessions();
+                        // 🚀 执行任务时自动唤起端侧投屏并靠右停靠
+                        ensurePipScreenOpen();
                     } else {
                         alert(data.message || "追加测试指令失败");
                     }
@@ -12518,6 +12538,8 @@ function renderChatStream(sessionData) {
                     delete window._conclusionTypewriterState[data.session_id];
                     await loadSessions();
                     switchSession(data.session_id);
+                    // 🚀 执行任务时自动唤起端侧投屏并靠右停靠
+                    ensurePipScreenOpen();
                 } else {
                     alert(data.message || "创建任务失败");
                 }
