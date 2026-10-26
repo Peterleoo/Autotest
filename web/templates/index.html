@@ -9028,6 +9028,16 @@
                 } else {
                     // 局部更新（支持 todo_list, step_execution, step_result, test_summary 等节点动态流式刷新与折叠状态响应）
                     if (blk.type === "todo_list" || blk.type === "step_execution" || blk.type === "step_result" || blk.type === "test_summary") {
+                        // 🛡️ 状态守卫：若现有步骤动作卡片当前处于展开态，立即固化到状态机，严禁轮询将其重置为折叠态！
+                        if (blk.type === "step_execution" || blk.type === "step_result") {
+                            const curBody = existingEl.querySelector(".agent-trace-body");
+                            if (curBody && !curBody.classList.contains("d-none")) {
+                                window._streamStepState = window._streamStepState || {};
+                                window._streamStepState[blk.block_id] = true;
+                                if (blk.step_id) window._streamStepState["step_" + blk.step_id] = true;
+                                if (existingEl.id) window._streamStepState[existingEl.id] = true;
+                            }
+                        }
                         const newHtml = buildBlockHtml(blk, sessionData);
                         if (newHtml) {
                             const temp = document.createElement("div");
@@ -10724,30 +10734,56 @@
         }
 
         
-                function toggleActionDetail(el, event) {
+        window._streamStepState = window._streamStepState || {};
+        window._actionDetailState = window._actionDetailState || {};
+
+        function toggleActionDetail(el, event) {
             if (event) event.stopPropagation();
             const detail = el.querySelector(".tool-row-detail");
             const arrow = el.querySelector(".tool-chevron-arrow");
             if (detail) detail.classList.toggle("d-none");
+            const isHidden = detail && detail.classList.contains("d-none");
             if (arrow) {
-                const isHidden = detail && detail.classList.contains("d-none");
                 arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(180deg)";
             }
+            const box = el.closest(".agent-trace-box");
+            if (box && el.dataset && el.dataset.actIdx !== undefined) {
+                const k = box.id + "_act_" + el.dataset.actIdx;
+                window._actionDetailState[k] = !isHidden;
+            }
         }
-        function toggleStreamStep(blockId) {
+
+        function toggleStreamStep(blockId, stepId) {
             window._streamStepState = window._streamStepState || {};
             const body = document.getElementById("body_" + blockId);
-            const icon = document.getElementById("chevron_" + blockId);
+            const box = document.getElementById(blockId);
             if (!body) return;
             const isHidden = body.classList.contains("d-none");
-            if (isHidden) {
+            const isNowOpen = isHidden; // 若当前隐藏则展开，反之收起
+            if (isNowOpen) {
                 body.classList.remove("d-none");
-                if (icon) { icon.classList.remove("bi-chevron-down"); icon.classList.add("bi-chevron-up"); }
-                window._streamStepState[blockId] = true;
             } else {
                 body.classList.add("d-none");
-                if (icon) { icon.classList.remove("bi-chevron-up"); icon.classList.add("bi-chevron-down"); }
-                window._streamStepState[blockId] = false;
+            }
+
+            // 同步箭头图标
+            const icon = document.getElementById("chevron_" + blockId) || (box ? box.querySelector(".agent-trace-header i.bi-chevron-up, .agent-trace-header i.bi-chevron-down") : null);
+            if (icon) {
+                icon.className = isNowOpen ? "bi bi-chevron-up" : "bi bi-chevron-down";
+            }
+            // 同步收起/明细文字
+            const label = box ? box.querySelector(".step-toggle-label") : null;
+            if (label) {
+                label.innerText = isNowOpen ? "收起" : "明细";
+            }
+
+            // 多维度稳定记录展开状态，轮询刷新绝不覆盖
+            window._streamStepState[blockId] = isNowOpen;
+            if (stepId) {
+                window._streamStepState["step_" + stepId] = isNowOpen;
+            }
+            if (box && box.dataset && box.dataset.stepId) {
+                window._streamStepState["step_" + box.dataset.stepId] = isNowOpen;
             }
         }
 
@@ -10893,11 +10929,26 @@
                 }
 
                 window._streamStepState = window._streamStepState || {};
+                const sId = blk.step_id || 1;
                 let isExpanded = false;
                 if (window._streamStepState[blk.block_id] !== undefined) {
                     isExpanded = window._streamStepState[blk.block_id];
+                } else if (window._streamStepState["step_" + sId] !== undefined) {
+                    isExpanded = window._streamStepState["step_" + sId];
                 } else {
-                    isExpanded = (isRunning || isFailed);
+                    const domEl = document.getElementById(blk.block_id) || document.querySelector(`.agent-trace-box[data-step-id="${sId}"]`);
+                    if (domEl) {
+                        const domBody = domEl.querySelector(".agent-trace-body");
+                        if (domBody && !domBody.classList.contains("d-none")) {
+                            isExpanded = true;
+                            window._streamStepState[blk.block_id] = true;
+                            window._streamStepState["step_" + sId] = true;
+                        } else {
+                            isExpanded = (isRunning || isFailed);
+                        }
+                    } else {
+                        isExpanded = (isRunning || isFailed);
+                    }
                 }
 
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
@@ -10907,35 +10958,36 @@
                 acts.forEach((act, actIdx) => {
                     const rawName = act.name || act.verb || act.type || '动作';
                     const rawTarget = act.desc || act.target || act.action || '';
-                    const costTime = act.cost_time || act.duration || '18ms';
+                    const rawCostTime = act.cost_time || (act.duration_ms ? `${act.duration_ms}ms` : (act.duration ? act.duration : ''));
                     const observation = act.observation || act.detail || '';
                     const isRunningAct = (act.status === 'RUNNING');
                     const isFailedAct = (act.status === 'FAILED' || act.status === 'FAIL');
                     const isRetry = !!act.is_retry || rawName.includes('重试') || rawTarget.includes('重试');
                     const isWarn = isFailedAct || isRetry;
 
-                    let iconHtml = '<i class="bi bi-terminal text-secondary"></i>';
+                    // 遵循 Linear / Raycast 顶级工程极简：彻底清除彩色 Emoji，采用低饱和微矢量单色图标
+                    let iconHtml = '<i class="bi bi-terminal text-muted" style="font-size: 11px; opacity: 0.7;"></i>';
                     let verb = rawName;
                     if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
-                        iconHtml = '<span>👆</span>';
+                        iconHtml = '<i class="bi bi-hand-index text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                         verb = "物理点击";
                     } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
-                        iconHtml = '<span>👁️</span>';
+                        iconHtml = '<i class="bi bi-eye text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                         verb = "视觉感知";
                     } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
-                        iconHtml = '<span>⌨️</span>';
+                        iconHtml = '<i class="bi bi-keyboard text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                         verb = "文本键入";
                     } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
-                        iconHtml = '<span>↕️</span>';
+                        iconHtml = '<i class="bi bi-arrow-down-up text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                         verb = "滑动手势";
                     } else if (/宏|穿透|fast_forward/i.test(rawName) || /fast_forward/i.test(act.type || '')) {
-                        iconHtml = '<span>⚡</span>';
+                        iconHtml = '<i class="bi bi-lightning-charge text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                         verb = "穿透宏";
                     } else if (/等待|wait/i.test(rawName) || /wait/i.test(act.type || '')) {
-                        iconHtml = '<span>⏳</span>';
+                        iconHtml = '<i class="bi bi-hourglass-split text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                         verb = "状态等待";
                     } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-shield-check text-success"></i>';
+                        iconHtml = '<i class="bi bi-shield-check text-success" style="font-size: 11px; opacity: 0.85;"></i>';
                         verb = "断言校验";
                     }
 
@@ -10955,8 +11007,14 @@
                         `;
                     }
 
+                    const actDetailKey = `${blk.block_id}_act_${actIdx}`;
+                    const isDetailOpen = window._actionDetailState && window._actionDetailState[actDetailKey] === true;
+
+                    // 事实为本：仅在有真实采集耗时才呈现时间微胶囊，杜绝无中生有的 18ms 假数据！
+                    const costTimeHtml = rawCostTime ? `<span>${escapeHtml(rawCostTime)}</span>` : '';
+
                     actionsHtml += `
-                        <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" onclick="toggleActionDetail(this, event)">
+                        <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
                             <div class="tool-row-main d-flex align-items-center justify-content-between">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
                                     <span class="tool-action-icon">${iconHtml}</span>
@@ -10966,11 +11024,11 @@
                                     ${paramHtml}
                                 </div>
                                 <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10px;">
-                                    <span>${escapeHtml(costTime)}</span>
-                                    <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4;"></i>
+                                    ${costTimeHtml}
+                                    <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4; transform: ${isDetailOpen ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
                                 </div>
                             </div>
-                            <div class="tool-row-detail ${isWarn ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
+                            <div class="tool-row-detail ${(isWarn || isDetailOpen) ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
                                 ${detailHtml || '<div class="text-muted" style="font-size: 10px;">状态正常，无额外详细输出</div>'}
                             </div>
                         </div>
@@ -10980,14 +11038,14 @@
                 // Antigravity 2.0 极简动作微流：不带有任务重复标题，不带有冗余的完成/取消徽章
                 return `
                     <div class="agent-trace-box" id="${blk.block_id}" data-step-id="${blk.step_id || 1}">
-                        <div class="agent-trace-header" onclick="toggleStreamStep('${blk.block_id}')">
+                        <div class="agent-trace-header" onclick="toggleStreamStep('${blk.block_id}', '${blk.step_id || 1}')">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
                                 <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(blk.duration || '1.8s')})</span>
                             </div>
                             <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
-                                <span>${isExpanded ? '收起' : '明细'}</span>
-                                <i class="bi ${chevronClass}" style="font-size: 9px;"></i>
+                                <span class="step-toggle-label">${isExpanded ? '收起' : '明细'}</span>
+                                <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 9px;"></i>
                             </div>
                         </div>
                         <div class="agent-trace-body ${bodyClass}" id="body_${blk.block_id}">
@@ -11270,24 +11328,7 @@
         }
 
         // ================= 方案 A：步骤容器化与折叠状态机 =================
-        window._streamStepState = window._streamStepState || {};
-
-        function toggleStreamStep(blockId) {
-            window._streamStepState = window._streamStepState || {};
-            const body = document.getElementById("body_" + blockId);
-            const icon = document.getElementById("chevron_" + blockId);
-            if (!body) return;
-            const isHidden = body.classList.contains("d-none");
-            if (isHidden) {
-                body.classList.remove("d-none");
-                if (icon) { icon.classList.remove("bi-chevron-down"); icon.classList.add("bi-chevron-up"); }
-                window._streamStepState[blockId] = true;
-            } else {
-                body.classList.add("d-none");
-                if (icon) { icon.classList.remove("bi-chevron-up"); icon.classList.add("bi-chevron-down"); }
-                window._streamStepState[blockId] = false;
-            }
-        }
+        // （toggleStreamStep 已在上方统一定义，此处直接复用状态机）
 
         function buildStepExecutionCardHtml(st, sIdx, turnId, sessionData) {
             const stepNum = st.step_number || st.step_id || (sIdx + 1);
@@ -11337,44 +11378,75 @@
                 return "";
             }
 
-            const defaultOpen = (isRunning || isFailed);
-            const isExpanded = (window._streamStepState[blockId] !== undefined)
-                ? window._streamStepState[blockId]
-                : defaultOpen;
+            window._streamStepState = window._streamStepState || {};
+            let isExpanded = false;
+            if (window._streamStepState[blockId] !== undefined) {
+                isExpanded = window._streamStepState[blockId];
+            } else if (window._streamStepState["step_" + stepNum] !== undefined) {
+                isExpanded = window._streamStepState["step_" + stepNum];
+            } else {
+                const domEl = document.getElementById(blockId) || document.querySelector(`.agent-trace-box[data-step-id="${stepNum}"]`);
+                if (domEl) {
+                    const domBody = domEl.querySelector(".agent-trace-body");
+                    if (domBody && !domBody.classList.contains("d-none")) {
+                        isExpanded = true;
+                        window._streamStepState[blockId] = true;
+                        window._streamStepState["step_" + stepNum] = true;
+                    } else {
+                        isExpanded = (isRunning || isFailed);
+                    }
+                } else {
+                    isExpanded = (isRunning || isFailed);
+                }
+            }
 
             const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
             const bodyClass = isExpanded ? "" : "d-none";
 
             let actionsHtml = "";
-            acts.forEach(act => {
+            acts.forEach((act, actIdx) => {
                 const rawName = act.name || act.title || act.verb || act.type || '动作';
                 const rawDesc = act.desc || act.target || act.action || act.detail || '';
                 const param = act.param || '';
+                const rawCostTime = act.cost_time || (act.duration_ms ? `${act.duration_ms}ms` : (act.duration ? act.duration : ''));
                 const isRunningAct = (act.status === 'RUNNING');
                 const isFailedAct = (act.status === 'FAILED' || act.status === 'FAIL');
                 const isWarn = isFailedAct;
 
-                let iconHtml = '<i class="bi bi-terminal text-secondary"></i>';
+                // 遵循 Linear / Raycast 顶级工程极简：彻底清除彩色 Emoji，采用低饱和微矢量单色图标
+                let iconHtml = '<i class="bi bi-terminal text-muted" style="font-size: 11px; opacity: 0.7;"></i>';
                 let verb = rawName;
                 if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
-                    iconHtml = '<span>👆</span>';
+                    iconHtml = '<i class="bi bi-hand-index text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                     verb = "物理点击";
                 } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
-                    iconHtml = '<span>👁️</span>';
+                    iconHtml = '<i class="bi bi-eye text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                     verb = "视觉感知";
                 } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
-                    iconHtml = '<span>⌨️</span>';
+                    iconHtml = '<i class="bi bi-keyboard text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                     verb = "文本键入";
                 } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
-                    iconHtml = '<span>↕️</span>';
+                    iconHtml = '<i class="bi bi-arrow-down-up text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
                     verb = "滑动手势";
+                } else if (/宏|穿透|fast_forward/i.test(rawName) || /fast_forward/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-lightning-charge text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "穿透宏";
+                } else if (/等待|wait/i.test(rawName) || /wait/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-hourglass-split text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "状态等待";
                 } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
-                    iconHtml = '<i class="bi bi-shield-check text-success"></i>';
+                    iconHtml = '<i class="bi bi-shield-check text-success" style="font-size: 11px; opacity: 0.85;"></i>';
                     verb = "断言校验";
                 }
 
+                const actDetailKey = `${blockId}_act_${actIdx}`;
+                const isDetailOpen = window._actionDetailState && window._actionDetailState[actDetailKey] === true;
+
+                // 事实为本：仅在有真实采集耗时才呈现时间微胶囊，杜绝无中生有的 18ms 假数据！
+                const costTimeHtml = rawCostTime ? `<span>${escapeHtml(rawCostTime)}</span>` : '';
+
                 actionsHtml += `
-                    <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" onclick="toggleActionDetail(this, event)">
+                    <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
                         <div class="tool-row-main d-flex align-items-center justify-content-between">
                             <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
                                 <span class="tool-action-icon">${iconHtml}</span>
@@ -11384,11 +11456,11 @@
                                 ${param ? `<span class="tool-action-param">${escapeHtml(param)}</span>` : ''}
                             </div>
                             <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10px;">
-                                <span>${escapeHtml(act.cost_time || act.duration || '18ms')}</span>
-                                <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4;"></i>
+                                ${costTimeHtml}
+                                <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4; transform: ${isDetailOpen ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
                             </div>
                         </div>
-                        <div class="tool-row-detail ${isWarn ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
+                        <div class="tool-row-detail ${(isWarn || isDetailOpen) ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
                             <div class="d-flex align-items-start gap-1.5 text-muted" style="font-size: 11px; line-height: 1.5;">
                                 <span style="color: var(--status-green); font-size: 10px;">↳</span>
                                 <span style="opacity: 0.7;">反馈:</span>
@@ -11402,14 +11474,14 @@
             // Antigravity 2.0 极简动作微流
             return `
                 <div class="agent-trace-box" id="${blockId}" data-step-id="${stepNum}">
-                    <div class="agent-trace-header" onclick="toggleStreamStep('${blockId}')">
+                    <div class="agent-trace-header" onclick="toggleStreamStep('${blockId}', '${stepNum}')">
                         <div class="d-flex align-items-center gap-2">
                             <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
                             <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(stepDuration)})</span>
                         </div>
                         <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
-                            <span>${isExpanded ? '收起' : '明细'}</span>
-                            <i class="bi ${chevronClass}" style="font-size: 9px;"></i>
+                            <span class="step-toggle-label">${isExpanded ? '收起' : '明细'}</span>
+                            <i class="bi ${chevronClass}" id="chevron_${blockId}" style="font-size: 9px;"></i>
                         </div>
                     </div>
                     <div class="agent-trace-body ${bodyClass}" id="body_${blockId}">
@@ -11426,6 +11498,18 @@ function renderChatStream(sessionData) {
             const emptyBox = document.getElementById("emptyStateBox");
             if (emptyBox) emptyBox.classList.add("d-none");
             flow.classList.remove("d-none");
+
+            // 🛡️ 状态守卫：在全量重构 innerHTML 之前，先扫描当前 DOM 中所有展开的 step 盒子，把展开状态固化到 _streamStepState
+            flow.querySelectorAll(".agent-trace-box").forEach(box => {
+                const bId = box.id;
+                const sId = box.dataset.stepId;
+                const body = box.querySelector(".agent-trace-body");
+                if (body && !body.classList.contains("d-none")) {
+                    window._streamStepState = window._streamStepState || {};
+                    if (bId) window._streamStepState[bId] = true;
+                    if (sId) window._streamStepState["step_" + sId] = true;
+                }
+            });
 
             // 1. 数据对齐：确保多轮 Turns 结构可用
             let turns = sessionData.turns;

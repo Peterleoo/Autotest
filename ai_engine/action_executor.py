@@ -36,6 +36,7 @@ class ActionExecutor:
 
         result = {"success": True, "message": ""}
         trace_item = {"action": action, "reason": reason, "raw_dict": action_dict}
+        t_action_start = time.perf_counter()
 
         try:
             if action == "tap":
@@ -134,15 +135,28 @@ class ActionExecutor:
             else:
                 raise ValueError(f"未知动作类型: {action}")
 
+            cost_ms = int((time.perf_counter() - t_action_start) * 1000)
+            cost_str = f"{cost_ms}ms" if cost_ms < 1000 else f"{round(cost_ms / 1000, 2)}s"
+            result["cost_time"] = cost_str
+            result["duration_ms"] = cost_ms
+            trace_item["cost_time"] = cost_str
+            trace_item["duration_ms"] = cost_ms
+
             self.action_history.append(trace_item)
             time.sleep(1.0) # 短暂等待页面渲染
             return result
 
         except Exception as e:
+            cost_ms = int((time.perf_counter() - t_action_start) * 1000)
+            cost_str = f"{cost_ms}ms" if cost_ms < 1000 else f"{round(cost_ms / 1000, 2)}s"
             logger.error(f"执行动作 [{action}] 失败: {e}")
             result["success"] = False
             result["message"] = str(e)
+            result["cost_time"] = cost_str
+            result["duration_ms"] = cost_ms
             trace_item["error"] = str(e)
+            trace_item["cost_time"] = cost_str
+            trace_item["duration_ms"] = cost_ms
             self.action_history.append(trace_item)
             return result
 
@@ -162,9 +176,11 @@ class ActionExecutor:
         if point and hasattr(self.driver, "execute_adb"):
             x, y = point
             name = el_info.get("text") or el_info.get("desc") or "目标位置" if el_info else "坐标"
-            logger.info(f"原生 ADB 物理手势精准点击: ({x}, {y}) [{name}]")
+            t0 = time.perf_counter()
             self.driver.execute_adb(["shell", "input", "tap", str(x), str(y)])
-            return {"by": "coordinates", "value": f"{x},{y}"}
+            cost_ms = int((time.perf_counter() - t0) * 1000)
+            logger.info(f"原生 ADB 物理手势精准点击完成: ({x}, {y}) [{name}] (用时 {cost_ms}ms)")
+            return {"by": "coordinates", "value": f"{x},{y}", "cost_ms": cost_ms}
 
         # 2. 如果是传统 Appium 驱动且元素有定位符
         if el_info:

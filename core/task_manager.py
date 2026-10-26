@@ -1267,7 +1267,7 @@ class TaskManager:
                         prev_card = matching_prev[0]
                         prev_card["block_id"] = f"blk_step_exec_0_{step_index}"
                         prev_card["status"] = "COMPLETED"
-                        prev_card["title"] = f"Step {step_index}: {p_title} 验证通过 ✅"
+                        prev_card["title"] = f"Step {step_index}: {p_title} 验证通过"
                         prev_card["assertion_result"] = f"阶段断言达成：已成功完成并验证【{p_title}】"
                         if prev_card.get("actions"):
                             for a in prev_card["actions"]:
@@ -1275,7 +1275,7 @@ class TaskManager:
                         else:
                             prev_card["actions"] = prev_s.get("actions") or [
                                 {"type": "ocr", "name": "视觉感知", "desc": f"扫描定位【{p_title}】关联锚点", "observation": "文字置信度 98.5% · 成功定位组件中心坐标", "param": "OCR Match 0.985", "status": "COMPLETED"},
-                                {"type": "tap", "name": "手势派发", "desc": f"注入原生触控手势：{p_desc[:24]}", "observation": "真机通道响应 18ms · 视图层级发生有效转场", "param": "tap(x, y)", "status": "COMPLETED"},
+                                {"type": "tap", "name": "手势派发", "desc": f"注入原生触控手势：{p_desc[:24]}", "observation": "真机通道响应就绪 · 视图层级发生有效转场", "param": "tap(x, y)", "status": "COMPLETED"},
                                 {"type": "assert", "name": "智能断言", "desc": "核验端侧业务状态与数据回包", "observation": "无 Crash · 无 ANR · 状态转移单调成立", "param": "PASS (Verified)", "status": "COMPLETED"}
                             ]
                         prev_card["duration"] = "0.8s"
@@ -1686,18 +1686,21 @@ class TaskManager:
                     dev_state["action"] = f"执行 {act_desc[:28]}"
 
             # 4. 捕获原生 ADB 点击坐标与控件反馈
-            elif "原生 ADB 物理手势精准点击:" in line:
-                m_clk = re.search(r"原生 ADB 物理手势精准点击:\s*(\(\d+,\s*\d+\))\s*(?:\[(.*)\])?", line)
+            elif "原生 ADB 物理手势精准点击" in line:
+                m_clk = re.search(r"原生 ADB 物理手势精准点击(?:完成)?:\s*(\(\d+,\s*\d+\))\s*(?:\[(.*?)\])?(?:\s*\(用时 (\d+)ms\))?", line)
                 if m_clk and pending_act and pending_act.get("type") == "tap":
                     coords = m_clk.group(1)
                     lbl = m_clk.group(2) or ""
+                    dur = m_clk.group(3)
+                    cost_str = f"{dur}ms" if dur else ""
                     pending_act["summary_val"] = coords
                     if lbl:
                         pending_act["target"] = lbl
-                    pending_act["cost_time"] = "18ms"
+                    if cost_str:
+                        pending_act["cost_time"] = cost_str
                     pending_act["code_snippet"] = f"# 端侧物理精准点击\ndriver.tap([{coords}])"
                     pending_act["param"] = f"tap{coords}"
-                    pending_act["observation"] = f"真机通道响应 18ms · 触控坐标 {coords}" + (f" [{lbl}]" if lbl else "")
+                    pending_act["observation"] = f"真机通道响应{' ' + cost_str if cost_str else ''} · 触控坐标 {coords}" + (f" [{lbl}]" if lbl else "")
                     pending_act["status"] = "COMPLETED"
                     self._append_action_to_session_step(session, cur_idx, pending_act)
                 dev_state["action"] = "执行原生手势"
@@ -2059,7 +2062,7 @@ class TaskManager:
 
             # 3. 动作 2 (手势派发) 完成，启动动作 3 (状态断言)
             card_actions[1]["status"] = "COMPLETED"
-            card_actions[1]["observation"] = "真机通道响应 18ms · 屏幕层级发生有效转场"
+            card_actions[1]["observation"] = "真机通道响应就绪 · 屏幕层级发生有效转场"
 
             card_actions.append({
                 "type": "assert",
@@ -2081,7 +2084,7 @@ class TaskManager:
             st["status"] = "COMPLETED"
             step_card["status"] = "COMPLETED"
             step_card["duration"] = "0.8s"
-            step_card["title"] = f"Step {step_no}: {st['title']} 验证通过 ✅"
+            step_card["title"] = f"Step {step_no}: {st['title']} 验证通过"
             step_card["assertion_result"] = f"阶段断言达成：已成功完成并验证【{st['title']}】"
             step_card["actions"] = card_actions
 
