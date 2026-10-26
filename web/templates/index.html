@@ -3574,19 +3574,30 @@
         .header-chip {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            background: var(--bg-surface-elevated);
-            border: none;
-            padding: 4px 10px;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            background: transparent;
+            border: 1px solid transparent;
             border-radius: 6px;
-            font-size: 11px;
-            color: var(--text-main);
+            font-size: 13.5px;
+            color: var(--text-sub);
             cursor: pointer;
             transition: all 0.15s ease;
         }
         .header-chip:hover {
-            border-color: var(--border-hover);
-            background: var(--bg-surface-hover);
+            color: var(--text-main);
+            background: var(--bg-surface-hover, rgba(255, 255, 255, 0.06));
+            border-color: var(--border-subtle, rgba(255, 255, 255, 0.08));
+        }
+        body.theme-light .header-chip:hover, body[data-theme="light"] .header-chip:hover {
+            color: #111827;
+            background: rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+        #btnTogglePipScreen.active i {
+            color: var(--status-green, #10b981) !important;
         }
 
         /* ================= 升级：左侧边栏极简主义 UI 体系 (Linear / Raycast / macOS 级) ================= */
@@ -4027,49 +4038,53 @@
             100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
         }
 
-        /* 步骤内微观动作行：调用动作 -> 获得反馈 */
-        .step-micro-action-row {
-            padding: 6px 8px;
+        /* 🌟 现代 AI Agent 单行工具流水线 (Linear / Cursor 规范) */
+        .agent-tool-row {
+            padding: 6px 10px;
             background: var(--bg-main);
             border-radius: 6px;
-            margin-bottom: 5px;
-            font-size: 11.5px;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.14s ease;
+            border: 1px solid transparent;
         }
-        .action-seq-badge {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--bg-surface-elevated, #e2e8f0);
-            color: var(--text-sub);
-            font-size: 9px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-family: var(--font-mono);
-            flex-shrink: 0;
+        .agent-tool-row:hover {
+            background: var(--bg-surface-hover, rgba(255, 255, 255, 0.04));
+            border-color: var(--border-subtle, rgba(255, 255, 255, 0.08));
         }
-        .action-call-text {
+        body.theme-light .agent-tool-row:hover, body[data-theme="light"] .agent-tool-row:hover {
+            background: rgba(0, 0, 0, 0.03);
+            border-color: rgba(0, 0, 0, 0.06);
+        }
+        .tool-row-warn {
+            background: rgba(239, 68, 68, 0.08) !important;
+            border-color: rgba(239, 68, 68, 0.25) !important;
+        }
+        .tool-action-verb {
+            font-weight: 600;
             color: var(--text-main);
-            font-size: 11.5px;
+            letter-spacing: -0.2px;
         }
-        .action-observation-text {
-            padding-left: 24px;
+        .tool-action-target {
             color: var(--text-sub);
-            font-size: 11px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
         }
-        .obs-arrow {
-            color: var(--status-green, #10b981);
-            font-weight: bold;
-        }
-        .obs-label {
-            color: var(--text-muted);
+        .tool-action-param {
+            font-family: var(--font-mono);
             font-size: 10px;
+            color: var(--text-dim, #9ca3af);
+            background: var(--bg-surface);
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-subtle);
+        }
+        .step-assertion-minimal {
+            font-size: 11.5px;
+            color: var(--status-green);
+            padding: 5px 8px;
+            border-radius: 6px;
+            background: rgba(16, 185, 129, 0.06);
+            border: 1px solid rgba(16, 185, 129, 0.15);
         }
 
         /* 三段式受阻人话诊断卡片 */
@@ -6166,30 +6181,23 @@
             </div>
         </div>
 
-        <!-- 🚀 右侧极简三件套 (1:1 还原原型规范) -->
+        <!-- 🚀 右侧极简三件套 (仅保留投屏、主题、设置纯图标，无文字) -->
         <div class="header-actions">
-            <!-- 1. 📱 端侧投屏触发药丸 (带翡翠绿微光点) -->
-            <div class="header-chip" id="btnTogglePipScreen" onclick="togglePipScreen(event)" title="点击打开/关闭端侧可拖拽实时投屏">
-                <i class="bi bi-phone" style="font-size: 11px;"></i>
-                <span id="topBarDeviceLabel">Xiaomi MIX 2 (投屏)</span>
-                <span class="status-dot-sm" style="width: 5px; height: 5px; background: var(--status-green);"></span>
+            <!-- 1. 📱 端侧实时投屏 (纯图标) -->
+            <div class="header-chip" id="btnTogglePipScreen" onclick="togglePipScreen(event)" title="端侧实时投屏">
+                <i class="bi bi-display" style="font-size: 13px;"></i>
+                <span id="topBarDeviceLabel" class="d-none"></span>
             </div>
 
-            <!-- 2. 📦 待测应用药丸 -->
-            <div class="header-chip" onclick="openAppPackagesModal()" title="当前待测目标应用与 APK 管理">
-                <i class="bi bi-box-seam" style="font-size: 11px;"></i>
-                <span id="topBarAppLabel">象盒找房 v4.9.11 (已安装)</span>
+            <!-- 2. 🌓 极简主题外观切换 (纯图标，自适应日月) -->
+            <div class="header-chip" id="btnThemeToggle" onclick="toggleTheme()" title="切换明亮/暗色模式">
+                <i class="bi bi-moon-stars" id="headerThemeIcon" style="font-size: 13px;"></i>
             </div>
 
-            <!-- 3. 🌓 极简黑白主题切换按钮 -->
-            <div class="header-chip" onclick="toggleTheme()" title="切换极简黑白模式 (深色/浅色)">
-                <i class="bi bi-circle-half" style="font-size: 11px;"></i>
-            </div>
-
-            <!-- 4. ⚙️ 全局系统设置中心 (移至右上角) -->
-            <div class="header-chip" onclick="openSettingsModal()" title="全局系统设置 (模型接入 / Gemini OAuth / 环境配置)">
-                <i class="bi bi-gear" style="font-size: 11.5px;"></i>
-                <span>设置</span>
+            <!-- 3. ⚙️ 全局系统设置中心与应用管理 (纯图标) -->
+            <div class="header-chip" onclick="openSettingsModal()" title="全局设置与待测应用管理">
+                <i class="bi bi-gear" style="font-size: 13px;"></i>
+                <span id="topBarAppLabel" class="d-none"></span>
             </div>
         </div>
     </header>
@@ -8002,6 +8010,10 @@
             }
             document.body.setAttribute("data-theme", actualTheme);
             document.body.classList.toggle("theme-light", actualTheme === "light");
+            const headerIcon = document.getElementById("headerThemeIcon");
+            if (headerIcon) {
+                headerIcon.className = (actualTheme === "dark") ? "bi bi-moon-stars" : "bi bi-sun";
+            }
             localStorage.setItem("autotest_theme", theme);
 
             // 更新设置模态框中的 3 张卡片状态
@@ -10106,6 +10118,16 @@
         }
 
         
+                function toggleActionDetail(el, event) {
+            if (event) event.stopPropagation();
+            const detail = el.querySelector(".tool-row-detail");
+            const arrow = el.querySelector(".tool-chevron-arrow");
+            if (detail) detail.classList.toggle("d-none");
+            if (arrow) {
+                const isHidden = detail && detail.classList.contains("d-none");
+                arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(180deg)";
+            }
+        }
         function toggleStreamStep(blockId) {
             window._streamStepState = window._streamStepState || {};
             const body = document.getElementById("body_" + blockId);
@@ -10253,18 +10275,77 @@
                 let actionsHtml = "";
                 const acts = blk.actions || [];
                 acts.forEach((act, actIdx) => {
-                    actionsHtml += `
-                        <div class="step-micro-action-row ${act.status === 'RUNNING' ? 'action-running' : ''}">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="action-seq-badge">${actIdx + 1}</span>
-                                <span class="action-call-text"><strong>${escapeHtml(act.name || '动作')}</strong>: ${escapeHtml(act.desc || act.action || '')}</span>
-                                ${act.status === 'RUNNING' ? `<span class="mono-pill" style="font-size: 9px; color: var(--status-green); background: var(--status-green-bg);"><i class="bi bi-arrow-repeat spin me-1"></i>执行中</span>` : ''}
-                                ${act.param ? `<span class="mono-pill" style="font-size: 9.5px;">${escapeHtml(act.param)}</span>` : ''}
+                    const rawName = act.name || act.verb || act.type || '动作';
+                    const rawTarget = act.desc || act.target || act.action || '';
+                    const costTime = act.cost_time || act.duration || '18ms';
+                    const observation = act.observation || act.detail || '';
+                    const isRunningAct = (act.status === 'RUNNING');
+                    const isFailedAct = (act.status === 'FAILED' || act.status === 'FAIL');
+                    const isRetry = !!act.is_retry || rawName.includes('重试') || rawTarget.includes('重试');
+                    const isWarn = isFailedAct || isRetry;
+
+                    let iconHtml = '<i class="bi bi-terminal text-secondary"></i>';
+                    let verb = rawName;
+                    if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
+                        iconHtml = '<span style="font-size: 12px;">👆</span>';
+                        verb = "手势点击";
+                    } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
+                        iconHtml = '<span style="font-size: 12px;">👁️</span>';
+                        verb = "视觉感知";
+                    } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
+                        iconHtml = '<span style="font-size: 12px;">⌨️</span>';
+                        verb = "键入输入";
+                    } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
+                        iconHtml = '<span style="font-size: 12px;">↕️</span>';
+                        verb = "滑动手势";
+                    } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
+                        iconHtml = '<i class="bi bi-shield-check text-success"></i>';
+                        verb = "断言校验";
+                    } else if (isRetry) {
+                        iconHtml = '<span style="font-size: 12px;">⚠️</span>';
+                        verb = "微重试";
+                    }
+
+                    let paramHtml = "";
+                    if (act.param) {
+                        paramHtml = `<span class="tool-action-param">${escapeHtml(act.param)}</span>`;
+                    }
+
+                    let detailHtml = "";
+                    if (observation) {
+                        detailHtml += `
+                            <div class="d-flex align-items-start gap-1.5 text-muted" style="font-size: 11px; line-height: 1.5;">
+                                <span style="color: var(--status-green); font-size: 10px;">↳</span>
+                                <span style="opacity: 0.7;">反馈:</span>
+                                <span style="color: var(--text-main);">${escapeHtml(observation)}</span>
                             </div>
-                            <div class="action-observation-text">
-                                <span class="obs-arrow">↳</span>
-                                <span class="obs-label">获得反馈：</span>
-                                <span>${act.status === 'RUNNING' ? '<i class="bi bi-hourglass-split me-1 text-muted"></i>' : ''}${escapeHtml(act.observation || act.detail || '屏幕状态响应就绪')}</span>
+                        `;
+                    }
+                    if (act.code_snippet) {
+                        detailHtml += `
+                            <div class="mt-1 p-1.5 rounded" style="background: rgba(0,0,0,0.3); font-family: var(--font-mono); font-size: 10.5px; color: #a5b4fc;">
+                                <code>${escapeHtml(act.code_snippet)}</code>
+                            </div>
+                        `;
+                    }
+
+                    actionsHtml += `
+                        <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" onclick="toggleActionDetail(this, event)">
+                            <div class="tool-row-main d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 82%;">
+                                    <span class="tool-action-icon">${iconHtml}</span>
+                                    <span class="tool-action-verb">${escapeHtml(verb)}</span>
+                                    <span class="tool-action-dot" style="opacity: 0.4;">·</span>
+                                    <span class="tool-action-target text-truncate">${escapeHtml(rawTarget)}</span>
+                                    ${paramHtml}
+                                </div>
+                                <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10.5px;">
+                                    <span>${escapeHtml(costTime)}</span>
+                                    <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4; transition: transform 0.15s ease;"></i>
+                                </div>
+                            </div>
+                            <div class="tool-row-detail ${isWarn ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
+                                ${detailHtml || '<div class="text-muted" style="font-size: 10.5px;">状态正常，无额外详细输出</div>'}
                             </div>
                         </div>
                     `;
@@ -10273,9 +10354,9 @@
                 let assertionHtml = "";
                 if (blk.assertion_result) {
                     assertionHtml = `
-                        <div class="step-assertion-banner mt-1.5">
-                            <i class="bi ${isFailed ? 'bi-exclamation-triangle' : 'bi-shield-check'} me-1"></i>
-                            <span>${escapeHtml(blk.assertion_result)}</span>
+                        <div class="step-assertion-minimal mt-2 d-flex align-items-center gap-2">
+                            <i class="bi bi-shield-check"></i>
+                            <span class="text-truncate">${escapeHtml(blk.assertion_result)}</span>
                         </div>
                     `;
                 }
