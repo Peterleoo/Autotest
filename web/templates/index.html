@@ -7146,6 +7146,13 @@
                             <i class="bi bi-box-seam-fill" style="font-size: 13.5px;"></i>
                             <span>待测应用管理</span>
                         </div>
+                        <div class="settings-nav-item" id="tabNavGoogle" onclick="switchSettingsTab('google')">
+                            <i class="bi bi-google" style="font-size: 13px; color: #4285F4;"></i>
+                            <span class="d-flex align-items-center justify-content-between flex-grow-1">
+                                <span>Google 官方授权</span>
+                                <span class="status-indicator-dot dot-offline" id="navDot_google" style="width: 6.5px; height: 6.5px;" title="未连接"></span>
+                            </span>
+                        </div>
                         <div class="settings-nav-item" id="tabNavModels" onclick="switchSettingsTab('models')">
                             <i class="bi bi-cpu-fill" style="font-size: 13.5px;"></i>
                             <span>AI 模型服务</span>
@@ -7208,6 +7215,72 @@
                     </div>
 
                     <!-- 右侧内容面板 2: AI 模型服务 -->
+                                        <!-- 右侧内容面板: Google 官方授权中心 (独立顶级菜单) -->
+                    <div class="settings-content-area d-none" id="panelSettingsGoogle">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <div class="settings-section-title d-flex align-items-center gap-2">
+                                    <i class="bi bi-google" style="color: #4285F4;"></i>
+                                    <span>Google 官方 OAuth 授权中心</span>
+                                </div>
+                                <div class="settings-section-desc">直连 Google 官方账号凭据，解锁原生 Gemini 多模态视觉感知与深度推理。授权后方可在【AI 模型服务】与底栏中选择 Google 官方模型。</div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" style="font-size: 11px; border-radius: 6px;" onclick="loadAntigravityStatus(true)">
+                                <i class="bi bi-arrow-clockwise me-1"></i>刷新状态
+                            </button>
+                        </div>
+
+                        <!-- Google 官方专属 OAuth 高光卡片 -->
+                        <div class="fidelity-oauth-card mb-3" id="googleOauthBox">
+                            <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                                <div class="fidelity-google-icon-box"><i class="bi bi-google"></i></div>
+                                <div class="text-truncate">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="fw-semibold" style="font-size: 13px; color: var(--text-main); white-space: nowrap;">Google Antigravity 官方账号凭据</span>
+                                        <span class="mono-tag" id="agAuthStatusBadge" style="font-size: 9.5px; padding: 1px 7px;">
+                                            检测中...
+                                        </span>
+                                    </div>
+                                    <div class="text-truncate" style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;" id="agAuthEmail">
+                                        正在查询绑定 Google 账户...
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 重新授权 / 立即授权 按钮 -->
+                            <button class="btn-fidelity-reauth" id="btnAgLogin" onclick="triggerAntigravityLogin()">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                                <span>立即连接 Google 账号</span>
+                            </button>
+                        </div>
+
+                        <!-- 授权特权与解锁模型说明卡片 -->
+                        <div class="p-3 rounded border" style="background: rgba(255, 255, 255, 0.015); border-color: var(--border-subtle) !important;">
+                            <div class="fw-medium mb-2" style="font-size: 12px; color: var(--text-main);">
+                                <i class="bi bi-stars text-warning me-1.5"></i>授权特权与解锁能力
+                            </div>
+                            <div class="d-flex flex-column gap-2" style="font-size: 11px; color: var(--text-sub); line-height: 1.55;">
+                                <div class="d-flex align-items-start gap-2">
+                                    <i class="bi bi-check-circle-fill text-success mt-0.5" style="font-size: 10px;"></i>
+                                    <div><strong>端侧物理视觉直读</strong>：高精识别 Android 原生控件层级与微小文案，置信度达 98.5%+。</div>
+                                </div>
+                                <div class="d-flex align-items-start gap-2">
+                                    <i class="bi bi-check-circle-fill text-success mt-0.5" style="font-size: 10px;"></i>
+                                    <div><strong>解锁官方多模态全系模型</strong>：授权后可在模型下拉框中直接切换 <code>gemini-3.8-flash-high</code>、<code>gemini-2.5-flash</code>、<code>gemini-2.5-pro</code>。</div>
+                                </div>
+                                <div class="d-flex align-items-start gap-2">
+                                    <i class="bi bi-check-circle-fill text-success mt-0.5" style="font-size: 10px;"></i>
+                                    <div><strong>即插即用安全凭据</strong>：基于系统内置安全 OAuth2 通道，无明文泄露风险。</div>
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-2.5 border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important;">
+                                <span class="text-muted" style="font-size: 10.5px;">完成授权后，请前往【AI 模型服务】或底栏切换至 Google 模型</span>
+                                <button class="btn btn-sm btn-primary py-0.5 px-2.5" style="font-size: 11px; border-radius: 6px;" onclick="switchSettingsTab('models')">
+                                    前往模型服务 →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="settings-content-area d-none" id="panelSettingsModels">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
@@ -7234,16 +7307,16 @@
                                 <div style="font-size: 10.5px; color: #71717a; margin-top: 4px;">生效模型: <code id="deepseekActiveDisplay" style="color: #34d399;">deepseek-chat</code></div>
                             </div>
 
-                            <!-- 2. Google 官方 (默认) -->
-                            <div class="provider-choice-card" id="cardProvider_antigravity" onclick="selectProviderForEdit('antigravity')">
+                            <!-- 2. Google 官方 (专属授权凭据驱动) -->
+                            <div class="provider-choice-card" id="cardProvider_antigravity" onclick="selectProviderForEdit('antigravity')" title="需先在【Google 官方授权】中完成账号绑定">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="d-flex align-items-center gap-1.5" style="font-size: 12.5px; font-weight: 600; color: var(--text-main);">
-                                        <span class="status-indicator-dot dot-online" id="statusDot_antigravity"></span>
+                                        <span class="status-indicator-dot dot-offline" id="statusDot_antigravity"></span>
                                         Google 官方 (OAuth)
                                     </span>
-                                    <span class="provider-badge-tag default-tag">默认内置</span>
+                                    <span class="provider-badge-tag default-tag" id="tag_antigravity">检测中</span>
                                 </div>
-                                <div style="font-size: 10.5px; color: #71717a; margin-top: 4px;">官方账号已授权 · 原生视觉</div>
+                                <div style="font-size: 10.5px; color: #71717a; margin-top: 4px;" id="subtitle_antigravity">检测授权凭据中...</div>
                             </div>
 
                             <!-- 3. 第三方 / 自建网关 (支持删除) -->
@@ -7257,29 +7330,6 @@
                                 </div>
                                 <div style="font-size: 10.5px; color: #71717a; margin-top: 4px;">OpenAI 兼容协议 · Base URL</div>
                             </div>
-                        </div>
-
-                        <!-- Google 官方专属 OAuth 高光卡片 (完美深浅双模式) -->
-                        <div class="fidelity-oauth-card d-none" id="googleOauthBox">
-                            <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
-                                <div class="fidelity-google-icon-box"><i class="bi bi-google"></i></div>
-                                <div class="text-truncate">
-                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <span class="fw-semibold" style="font-size: 12.5px; color: var(--text-main); white-space: nowrap;">Google Antigravity 官方授权</span>
-                                        <span class="mono-tag mono-tag-active" style="font-size: 9.5px; padding: 1px 6px;">
-                                            <i class="bi bi-check-circle-fill me-1"></i>已连通
-                                        </span>
-                                    </div>
-                                    <div class="text-truncate" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="agAuthEmail">
-                                        正在查询绑定 Google 账户...
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 重新授权 / 切换账号按钮 -->
-                            <button class="btn-fidelity-reauth" id="btnAgLogin" onclick="triggerAntigravityLogin()">
-                                <i class="bi bi-arrow-repeat text-info"></i>
-                                <span>重新授权 / 切换账号</span>
-                            </button>
                         </div>
 
                         <!-- 接入配置表单卡片 -->
@@ -8591,35 +8641,77 @@
             if (formCard) formCard.scrollIntoView({ behavior: "smooth" });
         }
 
-        async function loadAntigravityStatus() {
+        async function loadAntigravityStatus(isManual = false) {
             try {
                 const res = await fetch("/api/antigravity/status");
                 const data = await res.json();
+                window._antigravityStatusData = data;
+                
                 const statusBadge = document.getElementById("agAuthStatusBadge");
                 const emailEl = document.getElementById("agAuthEmail");
                 const btnLogin = document.getElementById("btnAgLogin");
-                if (data.is_logged_in) {
+                const navDot = document.getElementById("navDot_google");
+                const dotAntigravity = document.getElementById("statusDot_antigravity");
+                const subtitleAntigravity = document.getElementById("subtitle_antigravity");
+                const tagAntigravity = document.getElementById("tag_antigravity");
+
+                const isLoggedIn = !!data.is_logged_in;
+
+                // 侧栏指示灯
+                if (navDot) {
+                    navDot.className = `status-indicator-dot ${isLoggedIn ? 'dot-online' : 'dot-offline'}`;
+                    navDot.title = isLoggedIn ? "Google 官方账号已授权" : "未授权";
+                }
+
+                // AI 模型服务页面的服务商卡片状态
+                if (dotAntigravity) {
+                    dotAntigravity.className = `status-indicator-dot ${isLoggedIn ? 'dot-online' : 'dot-offline'}`;
+                }
+                if (tagAntigravity) {
+                    tagAntigravity.className = `provider-badge-tag ${isLoggedIn ? 'default-tag' : 'tag-locked'}`;
+                    tagAntigravity.innerText = isLoggedIn ? "已授权" : "需授权";
+                }
+                if (subtitleAntigravity) {
+                    subtitleAntigravity.innerText = isLoggedIn ? `已授权 · 原生视觉 (${data.email || 'Google 账号'})` : "未授权 · 点击前往完成授权";
+                }
+
+                if (isLoggedIn) {
                     if (statusBadge) {
                         statusBadge.className = "mono-tag mono-tag-active";
-                        statusBadge.innerText = "已授权绑定";
+                        statusBadge.style.color = "var(--status-green)";
+                        statusBadge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>已授权绑定';
                     }
-                    if (emailEl) emailEl.innerHTML = `<span style="color: var(--text-main); font-weight: 500;"><i class="bi bi-check-circle me-1"></i> 已登录账号:</span> ${data.email || 'Google 账号'}`;
+                    if (emailEl) {
+                        emailEl.innerHTML = `<span style="color: var(--text-main); font-weight: 500;"><i class="bi bi-person-check me-1"></i>已登录账号:</span> ${data.email || 'Google 官方账号'}`;
+                    }
                     if (btnLogin) {
-                        btnLogin.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> 重新授权 / 切换 Google 账号`;
-                        btnLogin.className = "btn btn-sm btn-outline-secondary py-1 px-3 w-100";
+                        btnLogin.innerHTML = `<i class="bi bi-arrow-repeat me-1 text-info"></i><span>重新授权 / 切换 Google 账号</span>`;
+                        btnLogin.className = "btn-fidelity-reauth";
                     }
                 } else {
                     if (statusBadge) {
                         statusBadge.className = "mono-tag";
-                        statusBadge.innerText = "未授权";
+                        statusBadge.style.color = "#f59e0b";
+                        statusBadge.innerHTML = '<i class="bi bi-shield-exclamation me-1"></i>尚未授权';
                     }
-                    if (emailEl) emailEl.innerText = "尚未连接 Google 官方账号，点击下方按钮完成 OAuth 授权即可启用官方大模型。";
+                    if (emailEl) {
+                        emailEl.innerText = "尚未连接 Google 官方账号，点击右侧按钮完成 OAuth 授权后方可启用官方模型。";
+                    }
                     if (btnLogin) {
-                        btnLogin.innerHTML = `<i class="bi bi-box-arrow-up-right me-1"></i> 立即连接 Google Antigravity 账号`;
-                        btnLogin.className = "btn btn-sm btn-light py-1 px-3 w-100 fw-semibold";
+                        btnLogin.innerHTML = `<i class="bi bi-box-arrow-up-right me-1"></i><span>立即连接 Google 账号</span>`;
+                        btnLogin.className = "btn-fidelity-reauth";
                     }
                 }
-            } catch (e) {}
+
+                // 同步刷新模型下拉选单的门禁状态
+                if (window.currentSystemConfig) {
+                    window.currentSystemConfig.antigravity = window.currentSystemConfig.antigravity || {};
+                    window.currentSystemConfig.antigravity.ready = isLoggedIn;
+                    renderModelDropdownMenu(window.currentSystemConfig);
+                }
+            } catch (e) {
+                console.warn("加载 Google 状态异常", e);
+            }
         }
 
         async function triggerAntigravityLogin() {
@@ -12908,28 +13000,33 @@ function renderChatStream(sessionData) {
 
         function switchSettingsTab(tabName) {
             const isApps = (tabName === "apps");
+            const isGoogle = (tabName === "google");
             const isModels = (tabName === "models");
             const isGeneral = (tabName === "general");
 
             const navApps = document.getElementById("tabNavApps");
+            const navGoogle = document.getElementById("tabNavGoogle");
             const navModels = document.getElementById("tabNavModels");
             const navGeneral = document.getElementById("tabNavGeneral");
 
             const panelApps = document.getElementById("panelSettingsApps");
+            const panelGoogle = document.getElementById("panelSettingsGoogle");
             const panelModels = document.getElementById("panelSettingsModels");
             const panelGeneral = document.getElementById("panelSettingsGeneral");
 
             if (navApps) navApps.classList.toggle("active", isApps);
+            if (navGoogle) navGoogle.classList.toggle("active", isGoogle);
             if (navModels) navModels.classList.toggle("active", isModels);
             if (navGeneral) navGeneral.classList.toggle("active", isGeneral);
 
             if (panelApps) panelApps.classList.toggle("d-none", !isApps);
+            if (panelGoogle) panelGoogle.classList.toggle("d-none", !isGoogle);
             if (panelModels) panelModels.classList.toggle("d-none", !isModels);
             if (panelGeneral) panelGeneral.classList.toggle("d-none", !isGeneral);
 
-            if (isApps) {
-                loadApps();
-            }
+            if (isApps) loadApps();
+            if (isGoogle) loadAntigravityStatus();
+            if (isModels) loadModelConfig();
         }
 
         // 统一入驻：openAppPackagesModal 直接平滑切换至设置中的应用管理选项卡
@@ -12964,18 +13061,21 @@ function renderChatStream(sessionData) {
 
             if (badgeEl) badgeEl.innerText = provider.toUpperCase();
 
+            const isAgLoggedIn = !!(window._antigravityStatusData?.is_logged_in || currentSystemConfig?.antigravity?.ready);
             if (provider === "antigravity") {
-                if (titleEl) titleEl.innerHTML = `<i class="bi bi-google me-1 text-primary"></i>配置 Google 官方授权与模型`;
-                if (googleBox) googleBox.classList.remove("d-none");
+                if (!isAgLoggedIn) {
+                    // 🛡️ 门禁提示：未授权时点击直接引导至 Google 官方授权菜单
+                    switchSettingsTab('google');
+                    return;
+                }
+                if (titleEl) titleEl.innerHTML = `<i class="bi bi-google me-1 text-primary"></i>Google 官方生效模型配置`;
                 if (keyAndUrlRow) keyAndUrlRow.classList.add("d-none");
             } else if (provider === "deepseek") {
                 if (titleEl) titleEl.innerHTML = `<i class="bi bi-cpu me-1 text-success"></i>配置 DeepSeek 官方 API 参数`;
-                if (googleBox) googleBox.classList.add("d-none");
                 if (keyAndUrlRow) keyAndUrlRow.classList.remove("d-none");
                 if (urlInput) urlInput.placeholder = "https://api.deepseek.com";
             } else {
                 if (titleEl) titleEl.innerHTML = `<i class="bi bi-sliders me-1 text-warning"></i>配置第三方 / OpenAI 兼容网关`;
-                if (googleBox) googleBox.classList.add("d-none");
                 if (keyAndUrlRow) keyAndUrlRow.classList.remove("d-none");
                 if (urlInput) urlInput.placeholder = "https://api.openai.com/v1 或自建中转地址";
             }
@@ -13248,23 +13348,45 @@ function renderChatStream(sessionData) {
 
             let html = "";
             providerConfigs.forEach(p => {
+                const isGoogle = (p.id === "antigravity");
+                const isGoogleLocked = isGoogle && !p.ready;
+
                 html += `<div class="model-group-title d-flex justify-content-between align-items-center">
-                    <span>${p.name}</span>
-                    <span class="mono-tag" style="font-size: 8.5px;">${p.badge}</span>
+                    <span class="d-flex align-items-center gap-1">
+                        ${isGoogle ? '<i class="bi bi-google" style="font-size: 10px; color: #4285F4;"></i>' : ''}
+                        <span>${p.name}</span>
+                    </span>
+                    <span class="mono-tag" style="font-size: 8.5px; ${isGoogleLocked ? 'color: #f59e0b; cursor: pointer;' : ''}" ${isGoogleLocked ? 'onclick="openSettingsModal(\'google\'); closeAllPopovers();"' : ''}>
+                        ${isGoogleLocked ? '<i class="bi bi-lock-fill me-0.5"></i>需授权' : p.badge}
+                    </span>
                 </div>`;
 
-                p.models.forEach(m => {
-                    const isSelected = (p.id === currentActiveProvider && m === currentActiveModel);
+                if (isGoogleLocked) {
+                    // 🛡️ 严格门禁：未授权时锁定 Google 模型，绝不允许误选，点击引导授权
                     html += `
-                        <div class="model-item-option ${isSelected ? 'active' : ''}" onclick="switchActiveModel('${p.id}', '${m}')">
-                            <div class="d-flex align-items-center gap-1.5 text-truncate">
-                                <span class="status-indicator-dot ${p.ready ? 'dot-online' : 'dot-offline'}"></span>
-                                <span class="text-truncate">${escapeHtml(m)}</span>
+                        <div class="model-item-option model-item-locked" onclick="openSettingsModal('google'); closeAllPopovers();" title="需先在设置中完成 Google 官方授权即可解锁此系列模型" style="opacity: 0.72; cursor: pointer; border-left: 2px solid #f59e0b;">
+                            <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 84%;">
+                                <i class="bi bi-shield-lock text-warning" style="font-size: 11px;"></i>
+                                <span class="text-truncate text-muted" style="font-size: 11px;">未授权 Google 账号 (点击前往授权)</span>
                             </div>
-                            ${isSelected ? '<i class="bi bi-check2 text-success"></i>' : ''}
+                            <span style="font-size: 9.5px; color: var(--text-primary);"><i class="bi bi-box-arrow-up-right"></i></span>
                         </div>
                     `;
-                });
+                } else {
+                    // 已授权或普通服务商：正常渲染模型清单
+                    p.models.forEach(m => {
+                        const isSelected = (p.id === currentActiveProvider && m === currentActiveModel);
+                        html += `
+                            <div class="model-item-option ${isSelected ? 'active' : ''}" onclick="switchActiveModel('${p.id}', '${m}')">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                    <span class="status-indicator-dot ${p.ready ? 'dot-online' : 'dot-offline'}"></span>
+                                    <span class="text-truncate">${escapeHtml(m)}</span>
+                                </div>
+                                ${isSelected ? '<i class="bi bi-check2 text-success"></i>' : ''}
+                            </div>
+                        `;
+                    });
+                }
             });
 
             container.innerHTML = html;
