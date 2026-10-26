@@ -89,7 +89,7 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
                     logger.warning(f"载入会话记忆异常: {e}")
 
         # 4. 运行 AI 智能体 (传入连续上下文)
-        agent = AITestAgent(driver=driver, llm_provider=provider)
+        agent = AITestAgent(driver=driver, llm_provider=provider, app_identifier=app_file, session_id=session_id)
         result = agent.run_goal(goal, memory_context=memory_context)
 
         # 4. 后期固化为标准测试脚本

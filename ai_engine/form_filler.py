@@ -25,20 +25,39 @@ class SmartFormFiller:
     }
 
     @classmethod
-    def infer_value(cls, el_info: Optional[Dict[str, Any]], goal: str = "", raw_text: str = "") -> str:
+    def infer_value(cls, el_info: Optional[Dict[str, Any]], goal: str = "", raw_text: str = "", app_identifier: Optional[str] = None) -> str:
         """
-        根据元素上下文、目标描述及原有文本智能推断最佳上屏数据
+        根据元素上下文、目标描述及原有文本智能推断最佳上屏数据，优先读取 App 预置真实凭证
         """
         # 如果已经传入了有效具体的业务值（非占位符），直接使用
         if raw_text and not cls._is_placeholder(raw_text):
             return raw_text
 
         context_str = cls._extract_context(el_info, raw_text)
+
+        # 0. 尝试获取该应用配置的真实测试凭证
+        app_cred = None
+        if app_identifier:
+            try:
+                from core.credential_manager import CredentialManager
+                app_cred = CredentialManager.get_credential(app_identifier)
+            except Exception:
+                pass
         
-        # 1. 手机号 / 联系方式
-        if re.search(r"手机|电话|联系方式|联系电话|mobile|phone", context_str, re.I):
-            logger.info(f"💡 [智能表单] 命中联系方式规则，自动填充: {cls.DEFAULT_PRESETS['mobile']}")
+        # 1. 手机号 / 联系方式 / 账号
+        if re.search(r"手机|电话|联系方式|联系电话|mobile|phone|账号|用户名", context_str, re.I):
+            if app_cred and app_cred.get("account"):
+                logger.info(f"🔑 [智能表单] 命中真实测试账号，应用预置凭证: {app_cred['account']}")
+                return app_cred["account"]
+            logger.info(f"💡 [智能表单] 命中联系方式规则，自动填充基线测试号: {cls.DEFAULT_PRESETS['mobile']}")
             return cls.DEFAULT_PRESETS["mobile"]
+
+        # 1.1 密码
+        if re.search(r"密码|口令|password|pwd", context_str, re.I):
+            if app_cred and app_cred.get("password"):
+                logger.info(f"🔑 [智能表单] 命中真实测试密码，应用预置凭证")
+                return app_cred["password"]
+            return "Password123"
 
         # 2. 姓名 / 称呼 / 联系人
         if re.search(r"称呼|姓名|联系人|业主姓名|房东|name", context_str, re.I):

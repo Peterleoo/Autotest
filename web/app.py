@@ -122,16 +122,21 @@ async def get_devices(probe: bool = False, force: bool = False):
 @app.get("/api/device/screenshot")
 async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70):
     """获取指定真机设备的实时屏幕截图 (依托显存 RAW 直读与 PC 端 SIMD 硬件级转码，耗时压缩至 0.6s，内存 0ms 秒回)"""
+    # 🌟 第一性原理：先核查真机真实连接状态，无真机在线时坚决返回 404，杜绝伪造假象
+    try:
+        connected = app_mgr.get_connected_devices()
+        conn_ids = [d if isinstance(d, str) else d.get("id") for d in connected if d]
+    except Exception:
+        conn_ids = []
+
+    if not conn_ids:
+        return Response(status_code=404, content=b"No device connected", media_type="text/plain")
+
     target_dev = device_id
     if not target_dev or target_dev in ["mock-device", "local-simulator", "default", "auto"]:
-        try:
-            connected = app_mgr.get_connected_devices()
-            if connected:
-                target_dev = connected[0].get("id")
-        except Exception:
-            pass
-    if not target_dev:
-        target_dev = "2145189e"
+        target_dev = conn_ids[0]
+    elif target_dev not in conn_ids:
+        return Response(status_code=404, content=b"Device offline", media_type="text/plain")
 
     try:
         # 1. 优先通过极速屏幕采集分发中枢获取 (内存缓存命中仅 0.01ms，过期自动极速采集)
@@ -146,16 +151,7 @@ async def get_device_screenshot(device_id: Optional[str] = None, format: str = "
     except Exception as e:
         logger.warning(f"获取设备 [{target_dev}] 极速屏幕截图异常: {e}")
 
-    # 2. 若直连抓取受阻，查找最近一次自动化执行产出的视觉感知截屏作为兜底
-    try:
-        screenshots_dir = settings.REPORTS_DIR / "screenshots"
-        if screenshots_dir.exists():
-            pngs = sorted(screenshots_dir.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
-            if pngs:
-                with open(pngs[0], "rb") as f:
-                    return Response(content=f.read(), media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    except Exception:
-        pass
+    # 🌟 杜绝伪造历史截屏：当物理真机断开时坚决返回 404，由前端平滑呈现未连接排查指引
 
     return Response(status_code=404, content=b"Device screenshot unavailable", media_type="text/plain")
 
@@ -376,11 +372,13 @@ async def system_preflight():
 
 @app.get("/api/apps")
 async def get_apps():
-    """获取已下载的安装包列表与元数据"""
+    """获取已下载的安装包列表与元数据（附带测试凭证）"""
+    from core.credential_manager import CredentialManager
     apks = []
     for f in settings.APPS_DIR.glob("*.apk"):
         info = app_mgr.get_apk_info(f)
         size_mb = round(f.stat().st_size / (1024 * 1024), 1)
+        cred = CredentialManager.get_credential(f.stem) or CredentialManager.get_credential(info.get("package") or "")
         apks.append({
             "filename": f.name,
             "label": info.get("label") or f.stem,
@@ -388,9 +386,26 @@ async def get_apps():
             "activity": info.get("activity") or settings.ANDROID_APP_ACTIVITY,
             "version": info.get("version") or "最新版",
             "size": f"{size_mb} MB",
-            "path": str(f)
+            "path": str(f),
+            "credential": cred
         })
     return {"apps": apks}
+
+@app.post("/api/apps/credentials")
+async def save_app_credentials(data: Dict[str, Any] = Body(...)):
+    """保存应用的预置测试账号凭证"""
+    from core.credential_manager import CredentialManager
+    app_key = data.get("app_key") or data.get("filename") or data.get("package")
+    account = data.get("account", "").strip()
+    password = data.get("password", "").strip()
+    res = CredentialManager.set_credential(app_key, account, password)
+    return {"success": True, "credential": res}
+
+@app.post("/api/sessions/{session_id}/resolve_decision")
+async def resolve_session_decision(session_id: str, payload: Dict[str, Any] = Body(...)):
+    """人机协同：接收用户的凭证注入/投屏手动完成/跳过决策"""
+    success = task_mgr.resolve_decision(session_id, payload)
+    return {"success": success}
 
 @app.get("/api/apps/check_installed")
 async def check_app_installed(package: str, device_id: Optional[str] = None):

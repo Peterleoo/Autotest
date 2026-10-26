@@ -1,3 +1,4 @@
+import time
 import json
 import logging
 import subprocess
@@ -54,12 +55,15 @@ class AITestAgent:
     """
     AI 驱动测试智能体：零门槛驱动移动端交互、功能及接口测试
     """
-    def __init__(self, driver: webdriver.Remote, llm_provider: Optional[str] = None, status_callback: Optional[Any] = None):
+    def __init__(self, driver: webdriver.Remote, llm_provider: Optional[str] = None, status_callback: Optional[Any] = None, app_identifier: Optional[str] = None, session_id: Optional[str] = None):
         self.driver = driver
         self.llm = LLMClient(provider=llm_provider)
         self.api_client = APIClient()
-        self.executor = ActionExecutor(driver=self.driver, api_client=self.api_client)
+        self.app_identifier = app_identifier
+        self.session_id = session_id
+        self.executor = ActionExecutor(driver=self.driver, api_client=self.api_client, app_identifier=app_identifier)
         self.status_callback = status_callback
+        self._has_prompted_credential = False
 
     def _notify_status(self, data: Dict[str, Any]):
         if self.status_callback:
@@ -67,6 +71,108 @@ class AITestAgent:
                 self.status_callback(data)
             except Exception as e:
                 logger.warning(f"状态回调异常: {e}")
+
+    def _check_and_prompt_hitl_credential(self, screen_info: Dict[str, Any], goal: str) -> bool:
+        """
+        人机协同登录决策拦截门禁 (Human-in-the-Loop Credential Gate)
+        若真机界面进入账号密码/验证码登录页面：
+        1. 优先检索当前 App 是否已在设置中心配置预设真实凭证，若有则自动静默注入，保持 100% 无人值守；
+        2. 若未配置凭证，立即挂起任务流，向前端发出协同信号唤出【人机协同决策卡片】，等待用户输入或投屏手动接管。
+        """
+        if getattr(self, "_has_prompted_credential", False):
+            return False
+
+        texts = [e.get("text", "") or e.get("content_desc", "") for e in screen_info.get("elements", [])]
+        combined = " ".join(texts)
+
+        # 识别登录页特征
+        is_login_screen = any(kw in combined for kw in ["手机号登录", "密码登录", "账号密码登录", "获取验证码", "请输入手机号码", "请输入手机号", "验证码登录", "立即登录", "快捷登录"])
+        if not is_login_screen and not any(kw in goal for kw in ["登录", "账号", "密码", "鉴权"]):
+            return False
+
+        if is_login_screen:
+            from core.credential_manager import CredentialManager
+            app_key = self.app_identifier or "xianghe_zhaofang"
+            cred = CredentialManager.get_credential(app_key)
+            if cred and cred.get("account"):
+                logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，将自动注入登录！")
+                return False
+
+            session_id = self.session_id or "default_session"
+            logger.info("🛡️ [人机协同介入] 检测到应用进入登录界面且未预置凭证，挂起测试并等待人工决策...")
+            print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}\n", flush=True)
+
+            self._notify_status({
+                "step": 0,
+                "action": "人机协同介入",
+                "log": "⏸️ 检测到目标应用进入账号密码登录页，已唤起人机协同决策卡片，等待用户输入凭证或在投屏手动登录..."
+            })
+
+            from pathlib import Path
+            import json
+            decision_file = Path(__file__).resolve().parent.parent / "scratch" / f"decision_{session_id}.json"
+            if decision_file.exists():
+                try: decision_file.unlink()
+                except Exception: pass
+
+            wait_start = time.time()
+            while time.time() - wait_start < 300:
+                if decision_file.exists():
+                    try:
+                        data = json.loads(decision_file.read_text(encoding="utf-8"))
+                        if data.get("status") == "RESOLVED":
+                            decision_type = data.get("decision_type", "inject")
+                            logger.info(f"✅ [人机协同] 收到用户决策响应: {decision_type}")
+                            
+                            if decision_type == "inject":
+                                acc = data.get("account", "").strip()
+                                pwd = data.get("password", "").strip()
+                                if acc:
+                                    logger.info(f"💉 注入用户提供的测试账号: {acc}")
+                                    phone_el, pwd_el, agree_el, login_btn = None, None, None, None
+                                    for el in screen_info.get("elements", []):
+                                        t = (el.get("text") or el.get("content_desc") or "").strip()
+                                        if any(k in t for k in ["手机号", "账号", "请输入手机"]):
+                                            phone_el = el
+                                        elif any(k in t for k in ["密码", "请输入密码"]):
+                                            pwd_el = el
+                                        elif any(k in t for k in ["协议", "同意"]):
+                                            agree_el = el
+                                        elif any(k in t for k in ["登录", "进入"]):
+                                            login_btn = el
+                                    
+                                    if agree_el:
+                                        self.executor._locate_and_click(agree_el, None)
+                                        time.sleep(0.5)
+                                    if phone_el:
+                                        self.executor._locate_and_type(phone_el, acc)
+                                        time.sleep(0.5)
+                                    if pwd and pwd_el:
+                                        self.executor._locate_and_type(pwd_el, pwd)
+                                        time.sleep(0.5)
+                                    if login_btn:
+                                        self.executor._locate_and_click(login_btn, None)
+                                        time.sleep(1.5)
+                            elif decision_type == "manual_done":
+                                logger.info("✅ 用户已在投屏手动完成登录，继续自动化测试")
+                                time.sleep(1.5)
+                            elif decision_type == "skip":
+                                logger.info("⏩ 用户选择跳过登录，模拟返回键继续")
+                                try: self.driver.back()
+                                except Exception: pass
+                                time.sleep(1.0)
+
+                            self._has_prompted_credential = True
+                            try: decision_file.unlink()
+                            except Exception: pass
+                            return True
+                    except Exception as e:
+                        logger.warning(f"读取人机协同决策文件异常: {e}")
+                time.sleep(1.0)
+
+            logger.warning("⚠️ 等待人机协同超时 (300s)，降级为默认流程继续")
+            self._has_prompted_credential = True
+            return False
 
     def _ensure_home_context_if_needed(self, goal: str, screen_info: Dict[str, Any]):
         """若测试目标要求在首页或搜索，但当前检测到处于委托服务等二级页面，执行自动自愈返回"""
@@ -84,7 +190,7 @@ class AITestAgent:
                 })
                 try:
                     self.driver.back()
-                    import time; time.sleep(1.0)
+                    time.sleep(1.0)
                 except Exception:
                     pass
 
@@ -127,6 +233,11 @@ class AITestAgent:
 
             # 1. 感知当前屏幕与元素
             screen_info = ScreenParser.get_screen_summary(self.driver)
+
+            # 🛡️ 步骤前置：检查并触发人机协同登录凭证门禁
+            hitl_resolved = self._check_and_prompt_hitl_credential(screen_info, goal)
+            if hitl_resolved:
+                screen_info = ScreenParser.get_screen_summary(self.driver)
             el_count = len(screen_info.get("elements", []))
             ocr_cached = screen_info.get("ocr_cached", False)
             if ocr_cached:

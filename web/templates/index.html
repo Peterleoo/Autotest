@@ -13,21 +13,45 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
                 :root {
-            /* 极简黑白高级调色系统 (1:1 原型复刻: Vercel / Linear / Monochrome Style) */
+            /* 现代工程级极简色彩系统 (统一 Accent: #007aff, 专色专用) */
+            --accent-primary: #007aff;
+            --accent-hover: #006ee6;
+            --accent-subtle: rgba(0, 122, 255, 0.08);
+            --accent-border: rgba(0, 122, 255, 0.35);
+            --accent-on-primary: #ffffff;
+
+            /* 纯粹状态色 (严格语义属性专用) */
+            --status-green: #10b981;
+            --status-green-bg: rgba(16, 185, 129, 0.12);
+            --status-green-border: rgba(16, 185, 129, 0.3);
+            --status-amber: #f59e0b;
+            --status-amber-bg: rgba(245, 158, 11, 0.12);
+            --status-amber-border: rgba(245, 158, 11, 0.3);
+            --status-red: #ef4444;
+            --status-red-bg: rgba(239, 68, 68, 0.12);
+            --status-red-border: rgba(239, 68, 68, 0.3);
+            --status-blue: #38bdf8;
+            --status-blue-bg: rgba(56, 189, 248, 0.12);
+            --status-blue-border: rgba(56, 189, 248, 0.3);
+
+            /* 中性表面与画布层级 (深色基调) */
             --bg-base: #09090b;
             --bg-sidebar: #0d0d10;
             --bg-surface: #141417;
             --bg-surface-elevated: #1a1a1f;
-            --bg-card: #18181c;
+            --bg-surface-hover: rgba(255, 255, 255, 0.05);
+            --bg-card: #141417;
             --bg-code: #101014;
             --bg-app: #09090b;
             --bg-main: #09090b;
-            --bg-input: #1a1a1f;
+            --bg-input: #141417;
+
             --border-subtle: rgba(255, 255, 255, 0.08);
             --border-medium: rgba(255, 255, 255, 0.14);
-            --border-hover: rgba(255, 255, 255, 0.24);
-            --border-strong: rgba(255, 255, 255, 0.24);
+            --border-hover: rgba(255, 255, 255, 0.22);
+            --border-strong: rgba(255, 255, 255, 0.28);
             --border-card: rgba(255, 255, 255, 0.08);
+
             --text-primary: #f4f4f5;
             --text-secondary: #a1a1aa;
             --text-main: #f4f4f5;
@@ -35,21 +59,12 @@
             --text-muted: #71717a;
             --text-faint: #52525b;
             --text-dim: #52525b;
-            --accent-primary: #ffffff;
-            --accent-on-primary: #000000;
-            --btn-send-bg: #ffffff;
-            --btn-send-text: #000000;
-            --btn-disabled: #3f3f46;
-            --btn-disabled-icon: #71717a;
-            --status-green: #22c55e;
-            --status-green-bg: rgba(34, 197, 94, 0.12);
-            --status-green-border: rgba(34, 197, 94, 0.3);
-            --status-blue: #38bdf8;
-            --status-blue-bg: rgba(56, 189, 248, 0.12);
-            --status-blue-border: rgba(56, 189, 248, 0.3);
-            --status-amber: #f59e0b;
-            --status-amber-bg: rgba(245, 158, 11, 0.12);
-            --status-amber-border: rgba(245, 158, 11, 0.3);
+
+            --btn-send-bg: var(--accent-primary);
+            --btn-send-text: #ffffff;
+            --btn-disabled: #27272a;
+            --btn-disabled-icon: #52525b;
+
             --console-bg: #09090b;
             --console-text: #e4e4e7;
             --shadow-float: 0 16px 36px rgba(0, 0, 0, 0.45);
@@ -59,43 +74,58 @@
         }
 
         body.theme-light, body[data-theme="light"] {
-            --bg-base: #f4f4f5;
-            --bg-sidebar: #f8fafc;
-            --bg-surface: #ffffff;
-            --bg-surface-elevated: #f1f5f9;
-            --bg-surface-hover: #e2e8f0;
-            --bg-card: #ffffff;
-            --bg-code: #f1f2f5;
-            --bg-app: #f4f4f5;
-            --bg-main: #ffffff;
-            --bg-input: #f8fafc;
-            --border-subtle: transparent;
-            --border-medium: rgba(0, 0, 0, 0.06);
-            --border-hover: #94a3b8;
-            --border-strong: #64748b;
-            --border-card: #e2e8f0;
-            --text-primary: #09090b;
-            --text-secondary: #52525b;
-            --text-main: #09090b;
-            --text-sub: #52525b;
-            --text-muted: #71717a;
-            --text-faint: #a1a1aa;
-            --text-dim: #a1a1aa;
-            --accent-primary: #09090b;
+            /* 统一 Accent: #007aff (高对比度工程级浅色) */
+            --accent-primary: #007aff;
+            --accent-hover: #006ee6;
+            --accent-subtle: rgba(0, 122, 255, 0.06);
+            --accent-border: rgba(0, 122, 255, 0.35);
             --accent-on-primary: #ffffff;
-            --btn-send-bg: #09090b;
-            --btn-send-text: #ffffff;
-            --btn-disabled: #e4e4e7;
-            --btn-disabled-icon: #a1a1aa;
-            --status-green: #16a34a;
-            --status-green-bg: rgba(22, 163, 74, 0.1);
-            --status-green-border: rgba(22, 163, 74, 0.3);
-            --status-blue: #0284c7;
-            --status-blue-bg: rgba(2, 132, 199, 0.1);
-            --status-blue-border: rgba(2, 132, 199, 0.3);
+
+            /* 浅色纯粹状态色 */
+            --status-green: #059669;
+            --status-green-bg: rgba(5, 150, 105, 0.08);
+            --status-green-border: rgba(5, 150, 105, 0.25);
             --status-amber: #d97706;
-            --status-amber-bg: rgba(217, 119, 6, 0.1);
-            --status-amber-border: rgba(217, 119, 6, 0.3);
+            --status-amber-bg: rgba(217, 119, 6, 0.08);
+            --status-amber-border: rgba(217, 119, 6, 0.25);
+            --status-red: #dc2626;
+            --status-red-bg: rgba(220, 38, 38, 0.08);
+            --status-red-border: rgba(220, 38, 38, 0.25);
+            --status-blue: #0284c7;
+            --status-blue-bg: rgba(2, 132, 199, 0.08);
+            --status-blue-border: rgba(2, 132, 199, 0.25);
+
+            /* 中性表面与画布层级 (浅色基调) */
+            --bg-base: #f8fafc;
+            --bg-sidebar: #f1f5f9;
+            --bg-surface: #ffffff;
+            --bg-surface-elevated: #f8fafc;
+            --bg-surface-hover: rgba(0, 0, 0, 0.04);
+            --bg-card: #ffffff;
+            --bg-code: #f1f5f9;
+            --bg-app: #f8fafc;
+            --bg-main: #f8fafc;
+            --bg-input: #ffffff;
+
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-medium: rgba(0, 0, 0, 0.12);
+            --border-hover: rgba(0, 0, 0, 0.22);
+            --border-strong: rgba(0, 0, 0, 0.28);
+            --border-card: rgba(0, 0, 0, 0.08);
+
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-main: #0f172a;
+            --text-sub: #475569;
+            --text-muted: #64748b;
+            --text-faint: #94a3b8;
+            --text-dim: #94a3b8;
+
+            --btn-send-bg: var(--accent-primary);
+            --btn-send-text: #ffffff;
+            --btn-disabled: #e2e8f0;
+            --btn-disabled-icon: #94a3b8;
+
             --console-bg: #f8fafc;
             --console-text: #0f172a;
             --shadow-float: 0 16px 36px rgba(0, 0, 0, 0.08);
@@ -109,6 +139,17 @@
         }
         *::-webkit-scrollbar { width: 5px; height: 5px; }
         *::-webkit-scrollbar-thumb { background-color: rgba(160, 160, 160, 0.2); border-radius: 9999px; }
+
+        
+        code, .settings-modal-dialog code {
+            font-family: var(--font-mono) !important;
+            color: var(--text-primary) !important;
+            background-color: var(--bg-surface-elevated) !important;
+            padding: 2px 6px !important;
+            border-radius: 4px !important;
+            font-size: 0.88em !important;
+            border: 1px solid var(--border-subtle) !important;
+        }
 
         body {
             background-color: var(--bg-app);
@@ -1797,8 +1838,14 @@
             border-color: var(--border-hover);
         }
         .theme-select-card.active {
-            border-color: var(--text-main);
-            background-color: var(--bg-surface-hover);
+            border-color: var(--status-blue, #007aff) !important;
+            background-color: rgba(0, 122, 255, 0.06) !important;
+            box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.25) !important;
+        }
+        body.theme-light .theme-select-card.active, body[data-theme="light"] .theme-select-card.active {
+            border-color: #007aff !important;
+            background-color: rgba(0, 122, 255, 0.04) !important;
+            box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.2) !important;
         }
 
         /* 模型提供商卡片列表 */
@@ -2035,17 +2082,17 @@
         }
     
         
-        /* ================= 1:1 像素级复刻高保真系统设置中心 CSS (深浅双模式极致适配) ================= */
+        /* ================= 🌟 现代工程级极简系统设置中心 CSS (Linear / Raycast / macOS 规范) ================= */
         .settings-modal-dialog {
-            max-width: 860px !important;
-            width: 90vw !important;
+            max-width: 880px !important;
+            width: 92vw !important;
         }
         .settings-modal-content {
             background-color: var(--bg-surface) !important;
             border: 1px solid var(--border-subtle) !important;
-            border-radius: 14px !important;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5) !important;
-            height: 590px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5) !important;
+            height: 610px !important;
             max-height: 88vh !important;
             display: flex !important;
             flex-direction: column !important;
@@ -2056,7 +2103,7 @@
             min-height: 48px !important;
             background-color: var(--bg-surface) !important;
             border-bottom: 1px solid var(--border-subtle) !important;
-            padding: 0 18px !important;
+            padding: 0 20px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: space-between !important;
@@ -2071,13 +2118,13 @@
             padding: 0 !important;
         }
         .settings-sidebar {
-            width: 195px !important;
+            width: 205px !important;
             background-color: var(--bg-sidebar) !important;
             border-right: 1px solid var(--border-subtle) !important;
-            padding: 14px 10px !important;
+            padding: 12px 8px !important;
             display: flex !important;
             flex-direction: column !important;
-            gap: 4px !important;
+            gap: 3px !important;
             flex-shrink: 0 !important;
         }
         .settings-nav-category {
@@ -2093,23 +2140,31 @@
             align-items: center !important;
             gap: 10px !important;
             padding: 8px 12px !important;
-            border-radius: 8px !important;
+            border-radius: 6px !important;
             color: var(--text-sub) !important;
             font-size: 12.5px !important;
             font-weight: 500 !important;
             cursor: pointer !important;
             transition: all 0.15s ease !important;
             border: 1px solid transparent !important;
+            border-left: 2.5px solid transparent !important;
         }
         .settings-nav-item:hover {
-            background-color: var(--bg-surface-hover) !important;
+            background-color: var(--bg-surface-hover, rgba(255, 255, 255, 0.04)) !important;
             color: var(--text-main) !important;
         }
         .settings-nav-item.active {
-            background-color: rgba(16, 185, 129, 0.12) !important;
-            color: #10b981 !important;
+            background-color: rgba(255, 255, 255, 0.07) !important;
+            color: var(--text-main) !important;
             font-weight: 600 !important;
-            border-color: rgba(16, 185, 129, 0.25) !important;
+            border-color: transparent !important;
+            border-left: 2.5px solid var(--status-blue, #007aff) !important;
+        }
+        body.theme-light .settings-nav-item.active,
+        body[data-theme="light"] .settings-nav-item.active {
+            background-color: rgba(0, 0, 0, 0.05) !important;
+            color: #0f172a !important;
+            border-left: 2.5px solid #007aff !important;
         }
         .settings-sidebar-footer {
             margin-top: auto !important;
@@ -2124,21 +2179,23 @@
         .settings-content-area {
             flex: 1 !important;
             background-color: var(--bg-surface) !important;
-            padding: 18px 22px !important;
+            padding: 20px 24px !important;
             overflow-y: auto !important;
         }
         .settings-section-title {
-            font-size: 15.5px !important;
+            font-size: 15px !important;
             font-weight: 600 !important;
             color: var(--text-main) !important;
+            letter-spacing: -0.2px;
         }
         .settings-section-desc {
-            font-size: 11.5px !important;
+            font-size: 12px !important;
             color: var(--text-muted) !important;
             margin-top: 2px !important;
+            line-height: 1.5;
         }
 
-        /* 1. 服务商并列水平卡片 */
+        /* 1. 服务商水平卡片 (去大绿框，优雅选中态) */
         .provider-list-cards {
             display: flex !important;
             flex-direction: row !important;
@@ -2149,7 +2206,7 @@
             flex: 1 !important;
             background-color: var(--bg-main) !important;
             border: 1px solid var(--border-subtle) !important;
-            border-radius: 9px !important;
+            border-radius: 8px !important;
             padding: 10px 12px !important;
             cursor: pointer !important;
             position: relative !important;
@@ -2158,38 +2215,41 @@
         }
         .provider-choice-card:hover {
             border-color: var(--border-hover) !important;
+            background-color: var(--bg-surface-hover) !important;
         }
         .provider-choice-card.active, .provider-choice-card.selected {
-            border-color: #10b981 !important;
-            background-color: rgba(16, 185, 129, 0.05) !important;
-            box-shadow: 0 0 0 1px #10b981 !important;
+            border-color: rgba(0, 122, 255, 0.45) !important;
+            background-color: rgba(0, 122, 255, 0.05) !important;
+            box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.3) !important;
         }
         .provider-choice-card span, .provider-choice-card div {
             color: inherit;
         }
         .provider-badge-tag {
             font-size: 9.5px !important;
-            padding: 2px 6px !important;
+            padding: 1px 6px !important;
             border-radius: 4px !important;
-            background: rgba(125, 125, 125, 0.12) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
             color: var(--text-sub) !important;
-            font-family: ui-monospace, monospace !important;
+            font-family: var(--font-mono) !important;
+            white-space: nowrap !important;
         }
         .provider-badge-tag.default-tag {
             background-color: rgba(16, 185, 129, 0.15) !important;
-            color: #10b981 !important;
+            color: var(--status-green, #10b981) !important;
             font-weight: 500 !important;
+            white-space: nowrap !important;
         }
 
         /* 2. 接入配置表单卡片 */
         .fidelity-form-box {
             background-color: var(--bg-main) !important;
             border: 1px solid var(--border-subtle) !important;
-            border-radius: 10px !important;
-            padding: 15px !important;
+            border-radius: 8px !important;
+            padding: 14px 16px !important;
         }
         .fidelity-form-box-title {
-            font-size: 13px !important;
+            font-size: 12.5px !important;
             font-weight: 600 !important;
             color: var(--text-main) !important;
             margin-bottom: 12px !important;
@@ -2209,8 +2269,8 @@
             transition: border-color 0.15s !important;
         }
         .fidelity-input:focus {
-            border-color: #10b981 !important;
-            box-shadow: 0 0 0 1px #10b981 !important;
+            border-color: #007aff !important;
+            box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.25) !important;
         }
 
         /* 3. 动态拉取在线模型条 */
@@ -2219,16 +2279,16 @@
             flex-direction: row !important;
             align-items: center !important;
             justify-content: space-between !important;
-            background-color: rgba(16, 185, 129, 0.08) !important;
-            border: 1px solid rgba(16, 185, 129, 0.25) !important;
+            background-color: var(--bg-main) !important;
+            border: 1px solid var(--border-subtle) !important;
             border-radius: 8px !important;
             padding: 8px 12px !important;
             margin-bottom: 12px !important;
         }
         .btn-fidelity-fetch {
-            background-color: rgba(16, 185, 129, 0.15) !important;
-            border: 1px solid rgba(16, 185, 129, 0.35) !important;
-            color: #10b981 !important;
+            background-color: var(--bg-surface-elevated, rgba(255, 255, 255, 0.06)) !important;
+            border: 1px solid var(--border-subtle) !important;
+            color: var(--text-main) !important;
             font-size: 11.5px !important;
             font-weight: 500 !important;
             padding: 4px 12px !important;
@@ -2241,7 +2301,33 @@
             white-space: nowrap !important;
         }
         .btn-fidelity-fetch:hover {
-            background-color: rgba(16, 185, 129, 0.25) !important;
+            background-color: var(--bg-surface-hover) !important;
+            border-color: var(--border-hover) !important;
+        }
+        .btn-fidelity-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.06));
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main) !important;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-fidelity-action:hover {
+            background: var(--bg-surface-hover, rgba(255, 255, 255, 0.1));
+            border-color: var(--border-hover);
+        }
+        body.theme-light .btn-fidelity-action,
+        body[data-theme="light"] .btn-fidelity-action {
+            background: #ffffff;
+            border-color: rgba(0, 0, 0, 0.15);
+            color: #111827 !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
         /* 4. 模型 Chips 胶囊管理器 (深浅双模式 + 限高滚动) */
@@ -2350,8 +2436,8 @@
             width: 36px !important;
             height: 36px !important;
             border-radius: 8px !important;
-            background-color: rgba(16, 185, 129, 0.1) !important;
-            color: #10b981 !important;
+            background-color: var(--accent-subtle) !important;
+            color: var(--accent-primary) !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -2381,9 +2467,9 @@
             border-color: var(--border-hover) !important;
         }
         .theme-select-card.active {
-            border-color: #10b981 !important;
-            background-color: rgba(16, 185, 129, 0.08) !important;
-            box-shadow: 0 0 0 1px #10b981 !important;
+            border-color: var(--accent-primary) !important;
+            background-color: var(--accent-subtle) !important;
+            box-shadow: 0 0 0 1px var(--accent-primary) !important;
         }
 
         /* ================= 白天模式 (Light Mode) 专属高对比度高质感覆盖 ================= */
@@ -2407,8 +2493,9 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
         body[data-theme="light"] .provider-choice-card.active {
-            background-color: #f0fdf4 !important;
-            border-color: #10b981 !important;
+            background-color: var(--accent-subtle) !important;
+            border-color: var(--accent-primary) !important;
+            box-shadow: 0 0 0 1px var(--accent-primary) !important;
         }
         body[data-theme="light"] .fidelity-form-box {
             background-color: #f8fafc !important;
@@ -2446,7 +2533,9 @@
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
         }
         body[data-theme="light"] .theme-select-card.active {
-            background-color: #f0fdf4 !important;
+            background-color: var(--accent-subtle) !important;
+            border-color: var(--accent-primary) !important;
+            box-shadow: 0 0 0 1px var(--accent-primary) !important;
         }
         body[data-theme="light"] .fidelity-env-card {
             background-color: #ffffff !important;
@@ -2502,8 +2591,9 @@
             border-color: rgba(255, 255, 255, 0.2);
         }
         .app-card-item.active {
-            border-color: rgba(59, 130, 246, 0.6) !important;
-            background-color: rgba(59, 130, 246, 0.04) !important;
+            border-color: var(--accent-primary) !important;
+            background-color: var(--accent-subtle) !important;
+            box-shadow: 0 0 0 1px var(--accent-primary) !important;
         }
         body[data-theme="light"] .upload-dropzone {
             background-color: #f8fafc !important;
@@ -2517,8 +2607,9 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.03);
         }
         body[data-theme="light"] .app-card-item.active {
-            background-color: #f0fdf4 !important;
-            border-color: #22c55e !important;
+            background-color: var(--accent-subtle) !important;
+            border-color: var(--accent-primary) !important;
+            box-shadow: 0 0 0 1px var(--accent-primary) !important;
         }
 
         /* 对话流与主工作区前置节点诊断卡片 (Preflight Guide Card) */
@@ -2948,27 +3039,7 @@
                  右侧结构化报告&MD深度抽屉、自由拖拽端侧画中画浮窗、底栏就绪防护
            ========================================================================== */
 
-        :root {
-            --status-green: #22c55e;
-            --status-green-bg: rgba(34, 197, 94, 0.12);
-            --status-green-border: rgba(34, 197, 94, 0.28);
-            --status-amber: #f59e0b;
-            --status-amber-bg: rgba(245, 158, 11, 0.12);
-            --status-amber-border: rgba(245, 158, 11, 0.28);
-            --status-blue: #38bdf8;
-            --status-blue-bg: rgba(56, 189, 248, 0.12);
-            --status-blue-border: rgba(56, 189, 248, 0.28);
-            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        }
-
-        body.theme-light, body[data-theme="light"] {
-            --status-green-bg: rgba(34, 197, 94, 0.10);
-            --status-green-border: rgba(34, 197, 94, 0.35);
-            --status-amber-bg: rgba(245, 158, 11, 0.10);
-            --status-amber-border: rgba(245, 158, 11, 0.35);
-            --status-blue-bg: rgba(2, 132, 199, 0.08);
-            --status-blue-border: rgba(2, 132, 199, 0.3);
-        }
+        /* 状态与字体 Token 统一由页面顶部全局权威变量集托管 */
 
         /* 1. 顶栏高保真极简就绪指示灯 (小绿点 / 小红点 1:1 对齐用户标注需求) */
         .header-ready-dot {
@@ -3831,8 +3902,8 @@
             bottom: 5px;
             width: 3px;
             border-radius: 0 2px 2px 0;
-            background: linear-gradient(180deg, #38bdf8 0%, #22c55e 100%);
-            box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+            background: var(--accent-primary);
+            box-shadow: 0 0 6px rgba(0, 122, 255, 0.45);
         }
 
         /* 会话左侧状态微圆点 (运行中呼吸绿光，通过青绿，失败警示红，就绪柔灰) */
@@ -5524,8 +5595,8 @@
             bottom: 5px;
             width: 3px;
             border-radius: 0 2px 2px 0;
-            background: linear-gradient(180deg, #38bdf8 0%, #22c55e 100%);
-            box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+            background: var(--accent-primary);
+            box-shadow: 0 0 6px rgba(0, 122, 255, 0.45);
         }
         .app-project-item .project-status-dot {
             width: 6.5px;
@@ -6779,7 +6850,7 @@
                 <!-- 顶栏: 标题 + 打开.env文件 + 关闭 -->
                 <div class="settings-modal-header">
                     <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-gear-fill" style="color: #10b981; font-size: 15px;"></i>
+                        <i class="bi bi-gear-fill" style="color: var(--text-primary); font-size: 15px;"></i>
                         <span style="font-size: 14px; font-weight: 600; color: var(--text-main);">系统设置</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
@@ -6793,26 +6864,76 @@
 
                 <!-- 主体双栏 -->
                 <div class="settings-modal-body">
-                    <!-- 左侧分类导航 -->
+                    <!-- 左侧分类导航 (偏好设置三大顶级工程维度) -->
                     <div class="settings-sidebar">
-                        <div class="settings-nav-category">配置管理</div>
-                        <div class="settings-nav-item active" id="tabNavModels" onclick="switchSettingsTab('models')">
-                            <i class="bi bi-cpu-fill" style="font-size: 14px;"></i>
+                        <div class="settings-nav-category">偏好设置</div>
+                        <div class="settings-nav-item active" id="tabNavApps" onclick="switchSettingsTab('apps')">
+                            <i class="bi bi-box-seam-fill" style="font-size: 13.5px;"></i>
+                            <span>待测应用管理</span>
+                        </div>
+                        <div class="settings-nav-item" id="tabNavModels" onclick="switchSettingsTab('models')">
+                            <i class="bi bi-cpu-fill" style="font-size: 13.5px;"></i>
                             <span>AI 模型服务</span>
                         </div>
                         <div class="settings-nav-item" id="tabNavGeneral" onclick="switchSettingsTab('general')">
-                            <i class="bi bi-sliders" style="font-size: 14px;"></i>
+                            <i class="bi bi-sliders" style="font-size: 13.5px;"></i>
                             <span>执行与环境</span>
                         </div>
 
                         <div class="settings-sidebar-footer">
                             <span>Autotest Engine</span>
-                            <span style="color: #10b981;">v2.4 Core</span>
+                            <span style="color: var(--status-green, #10b981);">v2.4 Core</span>
                         </div>
                     </div>
 
-                    <!-- 右侧内容面板 1: AI 模型服务 -->
-                    <div class="settings-content-area" id="panelSettingsModels">
+                    <!-- 右侧内容面板 1: 待测应用与 APK 安装包管理 (高频第一位) -->
+                    <div class="settings-content-area" id="panelSettingsApps">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <div class="settings-section-title">待测应用与 APK 管理</div>
+                                <div class="settings-section-desc">管理端侧自动化目标应用，支持直接拖拽安装包解析与一键安装到手机。</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge rounded-pill bg-secondary-subtle text-secondary" id="appListCountBadge" style="font-size: 11px;">0 个安装包</span>
+                                <button class="btn-fidelity-action" onclick="loadApps()" title="刷新应用列表">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>刷新</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 上传区域：支持拖拽与点击选择 -->
+                        <div class="upload-dropzone p-3 mb-3 text-center position-relative" id="apkDropZone" onclick="triggerFileInput()">
+                            <input type="file" id="appFileInput" class="d-none" accept=".apk,.ipa" onchange="handleAppFileInput(event)">
+                            <div id="dropZonePrompt" class="py-2">
+                                <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 26px;"></i>
+                                <div class="fw-semibold mt-1" style="font-size: 13px; color: var(--text-main);">点击或将待测 APK / IPA 拖拽至此处上传</div>
+                                <div class="text-muted mt-0.5" style="font-size: 11px;">系统将自动使用 aapt 深度解析包名、版本及启动 Activity</div>
+                            </div>
+                            <!-- 实时进度条 -->
+                            <div id="dropZoneProgress" class="d-none py-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="small fw-semibold text-primary" id="uploadStatusText" style="font-size: 11.5px;">正在上传应用包...</span>
+                                    <span class="small fw-bold text-primary" id="uploadPercentBadge" style="font-size: 11.5px;">0%</span>
+                                </div>
+                                <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.08); border-radius: 9999px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="uploadProgressBar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 待测应用卡片列表 -->
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                            <span class="small fw-bold" style="font-size: 12px; color: var(--text-main);">已就绪待测包列表</span>
+                            <div class="small text-muted" id="modalTargetDeviceHint" style="font-size: 11px;">目标设备：检测中...</div>
+                        </div>
+                        <div id="appsList" class="d-flex flex-column gap-2" style="max-height: 290px; overflow-y: auto;">
+                            <div class="p-3 text-center text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>正在读取待测应用库...</div>
+                        </div>
+                    </div>
+
+                    <!-- 右侧内容面板 2: AI 模型服务 -->
+                    <div class="settings-content-area d-none" id="panelSettingsModels">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
                                 <div class="settings-section-title">AI 推理服务商与可用模型</div>
@@ -6869,7 +6990,7 @@
                                 <div class="fidelity-google-icon-box"><i class="bi bi-google"></i></div>
                                 <div class="text-truncate">
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">Google 官方 Antigravity 账号已授权</span>
+                                        <span class="fw-semibold" style="font-size: 12.5px; color: var(--text-main); white-space: nowrap;">Google Antigravity 官方授权</span>
                                         <span class="mono-tag mono-tag-active" style="font-size: 9.5px; padding: 1px 6px;">
                                             <i class="bi bi-check-circle-fill me-1"></i>已连通
                                         </span>
@@ -7001,8 +7122,9 @@
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <span class="provider-badge-tag default-tag" id="adbStatusTag" style="font-size: 11px;">Version 1.0.41 · 服务运行正常</span>
-                                <button class="btn btn-sm btn-outline-light py-0.5 px-2" style="font-size: 11px; border-radius: 6px;" onclick="loadEnvStatus()">
-                                    <i class="bi bi-arrow-clockwise me-1"></i>重新检测
+                                <button class="btn-fidelity-action" onclick="loadEnvStatus()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                    <span>重新检测</span>
                                 </button>
                             </div>
                         </div>
@@ -7010,7 +7132,7 @@
                         <!-- 3. 执行超时时间表单 -->
                         <div class="fidelity-form-box mb-3">
                             <div class="fidelity-form-box-title">
-                                <span><i class="bi bi-stopwatch" style="color: #10b981; margin-right: 6px;"></i>自动化执行超时与重试</span>
+                                <span><i class="bi bi-stopwatch" style="color: var(--text-secondary); margin-right: 6px;"></i>自动化执行超时与重试</span>
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-6">
@@ -7034,14 +7156,15 @@
                         <!-- 4. 本地固化路径指引 -->
                         <div class="fidelity-env-card" style="margin-bottom: 0;">
                             <div class="d-flex align-items-center gap-3">
-                                <div class="fidelity-env-icon-box" style="background: rgba(59, 130, 246, 0.1); color: #60a5fa;"><i class="bi bi-folder2-open"></i></div>
+                                <div class="fidelity-env-icon-box"><i class="bi bi-folder2-open"></i></div>
                                 <div>
                                     <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">用例与报告本地固化路径</div>
                                     <div style="font-size: 11px; color: #71717a; margin-top: 2px;"><code>F:\Autotest\solidified_cases\</code> · 秒级免 Token 确定性回归脚本库</div>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-light py-0.5 px-2" style="font-size: 11px; border-radius: 6px;" onclick="openEnvConfigTip()">
-                                <i class="bi bi-box-arrow-up-right me-1"></i>查看路径
+                            <button class="btn-fidelity-action" onclick="openEnvConfigTip()">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                                <span>查看路径</span>
                             </button>
                         </div>
                     </div>
@@ -12362,12 +12485,13 @@ function renderChatStream(sessionData) {
         let currentActiveModel = "deepseek-chat";
         let dynamicLoadedModels = {};
 
-        function openSettingsModal(initialTab = "models") {
+        function openSettingsModal(initialTab = "apps") {
             closeAllPopovers();
             switchSettingsTab(initialTab);
             loadModelConfig();
             loadAntigravityStatus();
             loadEnvStatus();
+            loadApps();
             
             // 同步当前主题卡片高亮
             const savedTheme = localStorage.getItem("autotest_theme") || "dark";
@@ -12383,16 +12507,34 @@ function renderChatStream(sessionData) {
         }
 
         function switchSettingsTab(tabName) {
+            const isApps = (tabName === "apps");
             const isModels = (tabName === "models");
+            const isGeneral = (tabName === "general");
+
+            const navApps = document.getElementById("tabNavApps");
             const navModels = document.getElementById("tabNavModels");
             const navGeneral = document.getElementById("tabNavGeneral");
+
+            const panelApps = document.getElementById("panelSettingsApps");
             const panelModels = document.getElementById("panelSettingsModels");
             const panelGeneral = document.getElementById("panelSettingsGeneral");
 
+            if (navApps) navApps.classList.toggle("active", isApps);
             if (navModels) navModels.classList.toggle("active", isModels);
-            if (navGeneral) navGeneral.classList.toggle("active", !isModels);
+            if (navGeneral) navGeneral.classList.toggle("active", isGeneral);
+
+            if (panelApps) panelApps.classList.toggle("d-none", !isApps);
             if (panelModels) panelModels.classList.toggle("d-none", !isModels);
-            if (panelGeneral) panelGeneral.classList.toggle("d-none", isModels);
+            if (panelGeneral) panelGeneral.classList.toggle("d-none", !isGeneral);
+
+            if (isApps) {
+                loadApps();
+            }
+        }
+
+        // 统一入驻：openAppPackagesModal 直接平滑切换至设置中的应用管理选项卡
+        function openAppPackagesModal() {
+            openSettingsModal("apps");
         }
 
         function openEnvConfigTip() {

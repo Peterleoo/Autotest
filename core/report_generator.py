@@ -89,17 +89,17 @@ class ReportGenerator:
         for s in plan_steps:
             st = s.get("status", "COMPLETED")
             icon = "✅" if st == "COMPLETED" else ("❌" if st in ["FAIL", "FAILED"] else "⏭️")
-            steps_detail_md += f"- {icon} **Step {s.get('step_id', 1)} [{s.get('title', '业务执行')}]**：{s.get('desc', '验证达成')} ({'通过' if st == 'COMPLETED' else st})\n"
+            steps_detail_md += f"- {icon} **任务目标 [{s.get('title', '业务阶段推进')}]**：{s.get('desc', '验证达成')} ({'通过' if st == 'COMPLETED' else st})\n"
 
         if not steps_detail_md:
-            steps_detail_md = "- ✅ **Step 1 [主干交互执行]**：调起应用并完成端侧意图推演验证 (通过)\n"
+            steps_detail_md = "- ✅ **任务目标 [主干业务推进]**：调起应用并完成端侧意图推演验证 (通过)\n"
 
         # 5. 固化资产状态
         is_solidified = session.get("is_solidified", False)
         solidified_file = session.get("solidified_filename") or f"test_{session_id}.py"
         solidified_path = f"tests/solidified/{solidified_file}"
 
-        conclusion_badge = "✅ PASS（6大测试维度全项达标）" if is_success else f"❌ FAIL（于第 {max(1, dev_state.get('step', 1))} 步受受阻）"
+        conclusion_badge = "✅ PASS（6大测试维度全项达标）" if is_success else f"❌ FAIL（受阻于阶段：{dev_state.get('action', '端侧交互校验')}）"
 
         # 构建完整的 6 大维度 Markdown 测试报告
         md_content = f"""# 📊 移动端自动化测试交付物报告

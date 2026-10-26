@@ -16,9 +16,10 @@ class ActionExecutor:
     """
     负责执行 AI 规划的各种原子操作，并记录详细轨迹（用于后续一键固化）
     """
-    def __init__(self, driver: webdriver.Remote, api_client: Optional[APIClient] = None):
+    def __init__(self, driver: webdriver.Remote, api_client: Optional[APIClient] = None, app_identifier: Optional[str] = None):
         self.driver = driver
         self.api_client = api_client or APIClient()
+        self.app_identifier = app_identifier
         self.action_history: List[Dict[str, Any]] = []
 
     def execute(self, action_dict: Dict[str, Any], elements_map: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -48,9 +49,9 @@ class ActionExecutor:
                 raw_text = action_dict.get("text", "")
                 el_info = self._find_element_by_index(target_idx, elements_map)
                 
-                # 接入 SmartFormFiller 智能推断引擎
+                # 接入 SmartFormFiller 智能推断引擎 (支持优先使用真实应用预置凭证)
                 from ai_engine.form_filler import SmartFormFiller
-                text = SmartFormFiller.infer_value(el_info, raw_text=raw_text)
+                text = SmartFormFiller.infer_value(el_info, raw_text=raw_text, app_identifier=self.app_identifier)
                 
                 locator = self._locate_and_type(el_info, text)
                 trace_item["locator"] = locator

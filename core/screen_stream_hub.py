@@ -178,9 +178,10 @@ class ScreenStreamHub:
             if frame_data:
                 self._cache[device_id] = frame_data
                 return frame_data
-            elif cached:
-                return cached
-            return None
+            else:
+                # 🌟 真机采集失败（已离线或断开），清除旧缓存帧，杜绝假装连接
+                self._cache.pop(device_id, None)
+                return None
 
     async def get_jpeg_bytes(self, device_id: str, max_age: float = 0.45) -> Optional[bytes]:
         """获取压缩后的极速 JPEG 字节流 (约 35KB，加载延迟极低)"""
