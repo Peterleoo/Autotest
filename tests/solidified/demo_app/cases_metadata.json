@@ -1,12 +1,1 @@
-{
-  "test_demo_home_launch.py": {
-    "id": "CASE-DEMO-01",
-    "title": "应用冷启动与核心主页就绪校验",
-    "module": "核心导航",
-    "level": "P0",
-    "desc": "启动 Demo 测试应用，校验主界面各卡片渲染完整无白屏死锁。",
-    "precondition": "应用冷启动完成。",
-    "pass_rate": "100%",
-    "avg_duration": "1.5s"
-  }
-}
+{}

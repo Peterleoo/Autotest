@@ -5838,7 +5838,7 @@
         }
         .suggest-refresh-btn:hover {
             color: var(--text-main);
-            border-color: rgba(0, 122, 255, 0.4);
+            border-color: var(--border-hover);
         }
         .suggest-grid {
             display: grid;
@@ -5995,7 +5995,7 @@
         .pill-btn:hover, .model-select-pill:hover {
             background: rgba(255, 255, 255, 0.1);
             color: var(--text-main);
-            border-color: rgba(0, 122, 255, 0.4);
+            border-color: var(--border-hover);
         }
         body.theme-light .pill-btn:hover, body.theme-light .model-select-pill:hover,
         body[data-theme="light"] .pill-btn:hover, body[data-theme="light"] .model-select-pill:hover {
@@ -6070,10 +6070,17 @@
             color: var(--text-main);
         }
         .local-filter-pill.active {
-            background: #007aff !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-weight: 600;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+        body.theme-light .local-filter-pill.active,
+        body[data-theme="light"] .local-filter-pill.active {
+            background: #09090b !important;
             color: #ffffff !important;
             font-weight: 600;
-            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
         }
 
         /* 5. 本地回归用例：工程级紧凑型流线卡片 (Compact Streamlined Row Cards: 54px 高度) */
@@ -6104,7 +6111,7 @@
         }
         .case-card-compact:hover {
             background: #1a1b24;
-            border-color: rgba(0, 122, 255, 0.4);
+            border-color: var(--border-hover);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
         body.theme-light .case-card-compact:hover, body[data-theme="light"] .case-card-compact:hover {
@@ -6158,8 +6165,15 @@
             color: #f87171;
         }
         .case-priority-p1 {
-            background: rgba(56, 189, 248, 0.15);
-            color: #38bdf8;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-sub);
+            border: 1px solid var(--border-subtle);
+        }
+        body.theme-light .case-priority-p1,
+        body[data-theme="light"] .case-priority-p1 {
+            background: rgba(0, 0, 0, 0.05);
+            color: #475569;
+            border: 1px solid rgba(0, 0, 0, 0.08);
         }
         .case-title-text {
             font-size: 12.5px;
@@ -6233,9 +6247,9 @@
             height: 24px;
             padding: 0 9px;
             border-radius: 5px;
-            border: none;
-            background: #007aff;
-            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: #ffffff;
+            color: #000000;
             font-size: 11px;
             font-weight: 600;
             display: inline-flex;
@@ -6243,11 +6257,24 @@
             gap: 4px;
             cursor: pointer;
             transition: all 0.15s ease;
-            box-shadow: 0 1px 3px rgba(0, 122, 255, 0.3);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
         }
         .btn-case-replay:hover {
-            background: #006ee6;
+            background: #e4e4e7;
             transform: translateY(-0.5px);
+            opacity: 0.95;
+        }
+        body.theme-light .btn-case-replay,
+        body[data-theme="light"] .btn-case-replay {
+            background: #09090b;
+            color: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        body.theme-light .btn-case-replay:hover,
+        body[data-theme="light"] .btn-case-replay:hover {
+            background: #27272a;
+            color: #ffffff;
         }
         .btn-case-expand {
             background: transparent;
@@ -7517,7 +7544,12 @@
             });
 
             if (filtered.length === 0) {
-                box.innerHTML = `<div class="small text-muted p-4 text-center" style="font-size: 11.5px;">未检索到匹配的本地回归用例</div>`;
+                box.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 68px 20px; text-align: center; color: var(--text-dim);">
+                    <i class="bi bi-inbox" style="font-size: 32px; margin-bottom: 12px; opacity: 0.45; color: var(--text-sub);"></i>
+                    <div style="font-size: 13.5px; font-weight: 600; color: var(--text-main); margin-bottom: 6px;">暂无本地固化回归资产</div>
+                    <div style="font-size: 11.5px; color: var(--text-muted); max-width: 380px; line-height: 1.6;">已清空历史沉淀资产。在后续 AI 自愈测试闭环达成后，可一键将其固化为秒级免 Token 的确定性回归脚本。</div>
+                </div>`;
                 return;
             }
 
