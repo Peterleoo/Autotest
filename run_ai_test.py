@@ -92,19 +92,20 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
         agent = AITestAgent(driver=driver, llm_provider=provider, app_identifier=app_file, session_id=session_id)
         result = agent.run_goal(goal, memory_context=memory_context)
 
-        # 4. 后期固化为标准测试脚本
-        if auto_solidify and result.get("history"):
-            print(f"\n💾 正在将测试动作轨迹固化为原生 Pytest 测试脚本...")
-            solid_file = Solidifier.solidify_test_case(
-                case_name=case_name,
-                goal=goal,
-                action_history=result["history"]
-            )
-            print(f"🎉 固化成功！生成文件: {solid_file}")
-            print(f"👉 后续可直接使用原生命令极速回归运行（无需再次调用 AI）:")
-            print(f"   pytest {solid_file} -v -s")
-
-        if not result.get("success"):
+        # 4. 后期固化为标准测试脚本 (仅当测试真正成功且具备执行历史时才予以固化沉淀)
+        if result.get("success"):
+            if auto_solidify and result.get("history"):
+                print(f"\n💾 正在将测试动作轨迹固化为原生 Pytest 测试脚本...")
+                solid_file = Solidifier.solidify_test_case(
+                    case_name=case_name,
+                    goal=goal,
+                    action_history=result["history"]
+                )
+                print(f"🎉 固化成功！生成文件: {solid_file}")
+                print(f"👉 后续可直接使用原生命令极速回归运行（无需再次调用 AI）:")
+                print(f"   pytest {solid_file} -v -s")
+        else:
+            print("\n⚠️ 测试目标未达成或执行受阻中断，已跳过自动化用例固化流程。")
             err_reason = result.get("error_reason")
             if err_reason:
                 logger.error(f"❌ 测试受阻详情:\n{err_reason}")

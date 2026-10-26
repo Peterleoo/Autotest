@@ -87,12 +87,26 @@ class ReportGenerator:
 
         steps_detail_md = ""
         for s in plan_steps:
-            st = s.get("status", "COMPLETED")
-            icon = "✅" if st == "COMPLETED" else ("❌" if st in ["FAIL", "FAILED"] else "⏭️")
-            steps_detail_md += f"- {icon} **任务目标 [{s.get('title', '业务阶段推进')}]**：{s.get('desc', '验证达成')} ({'通过' if st == 'COMPLETED' else st})\n"
+            st = s.get("status", "READY")
+            if st == "COMPLETED":
+                icon = "✅"
+                st_label = "通过"
+            elif st in ["FAIL", "FAILED"]:
+                icon = "❌"
+                st_label = "受阻失败"
+            elif st == "CANCELED":
+                icon = "⏹️"
+                st_label = "已取消"
+            elif st == "SKIPPED":
+                icon = "⏭️"
+                st_label = "已略过"
+            else:
+                icon = "⏳"
+                st_label = "未执行"
+            steps_detail_md += f"- {icon} **任务目标 [{s.get('title', '业务阶段推进')}]**：{s.get('desc', '验证达成')} ({st_label})\n"
 
         if not steps_detail_md:
-            steps_detail_md = "- ✅ **任务目标 [主干业务推进]**：调起应用并完成端侧意图推演验证 (通过)\n"
+            steps_detail_md = "- ✅ **任务目标 [主干业务推进]**：调起应用并完成端侧意图推演验证 (通过)\n" if is_success else "- ❌ **任务目标 [前置环境准备]**：应用启动或前置鉴权受阻 (未通过)\n"
 
         # 5. 固化资产状态
         is_solidified = session.get("is_solidified", False)
@@ -100,6 +114,16 @@ class ReportGenerator:
         solidified_path = f"tests/solidified/{solidified_file}"
 
         conclusion_badge = "✅ PASS（6大测试维度全项达标）" if is_success else f"❌ FAIL（受阻于阶段：{dev_state.get('action', '端侧交互校验')}）"
+
+        if is_success:
+            solidify_section = f"""- **固化回归脚本**：`{solidified_path}`（提炼为零 Token 标准 Python 用例）
+- **本地零 Token 秒级重放命令**：
+  ```bash
+  python {solidified_path} --device {dev_state.get('device_id', 'default')}
+  ```"""
+        else:
+            solidify_section = f"""- **用例固化状态**：⚠️ 本轮测试执行受阻中断，未达成终态目标，已自动跳过自动化回归脚本固化
+- **排查建议**：请根据上述受阻阶段与底层日志定位端侧故障，修复后重试以生成固化用例"""
 
         # 构建完整的 6 大维度 Markdown 测试报告
         md_content = f"""# 📊 移动端自动化测试交付物报告
@@ -120,21 +144,21 @@ class ReportGenerator:
 
 {steps_detail_md}
 ### 2️⃣ UI 视觉与交互感知 (Visual & Interaction)
-- **首屏渲染核验**：首屏组件树与视觉流加载正常，无白屏/黑屏，界面感知稳定
+- **首屏渲染核验**：{"首屏组件树与视觉流加载正常，界面感知稳定" if is_success else "首屏加载异常或停滞在白屏/弹窗状态"}
 - **视觉 OCR 感知**：执行端侧视觉扫描 **{ocr_count}** 轮，平均单屏解析文字项 38+ 个，文字置信度 **98.5%**
 - **原生手势下发**：触控点击 **{max(click_count, 1)}** 次、界面滑动 **{max(swipe_count, 1)}** 次、文本键入 **{input_count}** 次，手势响应零丢包
 
 ### 3️⃣ 智能断言与逻辑校验 (Smart Assertions)
 | 断言类型 | 校验规则 | 实测提取值 | 裁定 |
 | :--- | :--- | :--- | :--- |
-| **存在性断言** | 视窗内必须渲染目标业务功能入口或数据卡片 | 视觉 OCR 成功锚定关键热区与标题文本 | {"✅ 通过" if is_success else "❌ 失败"} |
-| **数学/单调性断言** | 若涉及排序/筛选，结果集需满足单调性或所属关系 | 列表数据项排布校验单调成立 | {"✅ 通过" if is_success else "❌ 失败"} |
-| **状态转移断言** | 触发交互后，界面层级哈希必须发生有效状态迁移 | 成功捕获页面跳转与视图重绘反馈 | {"✅ 通过" if is_success else "❌ 失败"} |
+| **存在性断言** | 视窗内必须渲染目标业务功能入口或数据卡片 | {"视觉 OCR 成功锚定关键热区与标题文本" if is_success else "目标业务热区未渲染或页面加载超时"} | {"✅ 通过" if is_success else "❌ 失败"} |
+| **数学/单调性断言** | 若涉及排序/筛选，结果集需满足单调性或所属关系 | {"列表数据项排布校验单调成立" if is_success else "业务流受阻中断，未进入筛选数据视图"} | {"✅ 通过" if is_success else "⏭️ 未达成"} |
+| **状态转移断言** | 触发交互后，界面层级哈希必须发生有效状态迁移 | {"成功捕获页面跳转与视图重绘反馈" if is_success else "界面状态转移异常或停滞在白屏/弹窗"} | {"✅ 通过" if is_success else "❌ 失败"} |
 
 ### 4️⃣ 复杂环境与弹窗抗扰 (Dialog & Robustness)
 - **开屏广告与引导**：{popup_status_str}
 - **系统级权限弹窗**：自动放行 Android 系统权限申请对话框，保障免人工干预静默测试
-- **人机协同接管**：本轮测试无需人工接管，全流程 100% 自动化流转达成
+- **人机协同接管**：{"本轮测试无需人工接管，全流程 100% 自动化流转达成" if is_success else "端侧流程异常阻断，建议人工排查或纠偏"}
 
 ### 5️⃣ 专项质量与稳定性 (Stability & Performance)
 - **应用闪退 (Crash)**：**0 次**（底座 Logcat 监控进程未捕获到致命异常）
@@ -143,11 +167,7 @@ class ReportGenerator:
 - **底层日志诊断**：`{fatal_stack_str}`
 
 ### 6️⃣ 自动化资产沉淀 (Asset Solidification)
-- **固化回归脚本**：`{solidified_path}`（提炼为零 Token 标准 Python 用例）
-- **本地零 Token 秒级重放命令**：
-  ```bash
-  python {solidified_path} --device {dev_state.get('device_id', 'default')}
-  ```
+{solidify_section}
 - **关键证据索引**：测试截屏与动作流已归档于 `data/reports/screenshots/`
 - **本地 Markdown 报告路径**：`data/reports/markdown/test_report_{session_id}.md`
 """

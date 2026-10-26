@@ -1820,38 +1820,57 @@ class TaskManager:
             self._save_session(session["session_id"])
             return
         dev_state["duration"] = f"{round(duration, 1)}s"
-        has_goal_achieved = any("🎉 目标完成" in l or "固化成功" in l for l in all_output)
-        is_success = (proc.returncode == 0) or has_goal_achieved
-        dev_state["success"] = is_success
-        dev_state["status"] = "PASS" if is_success else "FAIL"
-        # 🛡️ 事实核验：只有真正跑完全部步骤或明确目标达成，才算全链路完成；严禁中途退出暴力拉满步数！
         all_steps = session.get("plan_steps", [])
         is_all_steps_reached = (cur_idx >= len(all_steps) - 1) and (len(all_steps) > 0)
-        truly_success = has_goal_achieved or (proc.returncode == 0 and is_all_steps_reached)
-        
-        is_success = truly_success
+
+        # 🛡️ 事实核验 1：业务目标达成判定 (严禁将“固化成功”作为目标达成标记)
+        has_goal_achieved = any("🎉 目标完成" in l or "🎉 测试目标顺利达成" in l for l in all_output)
+
+        # 🛡️ 事实核验 2：检查是否有致命阻断、设备异常或报错退出
+        has_fatal_block = any(
+            ("❌ [设备自学习阻断]" in l) or 
+            ("❌ 测试受阻详情" in l) or 
+            ("❌ AI 自动化测试未能达成预期目标" in l) or
+            ("Traceback (most recent call last)" in l)
+            for l in all_output
+        )
+
+        # 🛡️ 事实核验 3：三位一体强判定：必须进程正常退出(0) + 无致命阻断 + (明确目标达成 或 全部规划步骤完整执行完毕)
+        is_success = (proc.returncode == 0) and (not has_fatal_block) and (has_goal_achieved or is_all_steps_reached)
         dev_state["success"] = is_success
         dev_state["status"] = "PASS" if is_success else "FAIL"
 
         if is_success:
             session["is_success"] = True
             session["error_message"] = ""
-            cur_idx = len(all_steps) - 1
+            # 真实进度收敛：若已提前达成目标，未执行的后续步骤由 _finish_pipeline 标记为 SKIPPED，杜绝暴力伪造全部 COMPLETED
         else:
             session["is_success"] = False
-
-        if not is_success:
-            session["is_success"] = False
             fail_reason = ""
-            for l in reversed(all_output):
-                if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
+            for idx, l in enumerate(all_output):
+                if "❌ [设备自学习阻断]" in l or "❌ 测试受阻详情" in l:
+                    next_detail = all_output[idx + 1] if idx + 1 < len(all_output) else ""
+                    if next_detail and not next_detail.startswith("2026-") and "=====" not in next_detail:
+                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                        fail_reason = f"{clean_line} {next_detail}".strip()
+                    else:
+                        fail_reason = l
+                    break
+                elif "❌ AI 自动化测试未能达成预期目标" in l:
                     fail_reason = l
                     break
+
+            if not fail_reason:
+                for l in reversed(all_output):
+                    if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
+                        fail_reason = l
+                        break
             session["error_message"] = fail_reason or last_error_line or "测试前置检查未通过或执行中断"
+            dev_state["action"] = f"测试执行受阻：{session['error_message'][:40]}"
 
             # 🛡️ 事实核查：检查整个执行过程中是否真正跨过了前置引导页
             all_thoughts = " ".join([l for l in all_output if "AI 决策:" in l])
-            ever_left_guide = any(k in all_thoughts for k in ["二手房", "搜索", "房源", "首页", "列表", "详情", "我的", "表单", "输入框"])
+            ever_left_guide = any(k in all_thoughts for k in ["二手房", "搜索", "房源", "首页", "列表", "详情", "我的", "表单", "输入框", "租房"])
             if not ever_left_guide:
                 # 连开屏/引导页都没跳过，实际通过阶段数严格为 0，卡点严格锁定在第 1 步！
                 cur_idx = 0
