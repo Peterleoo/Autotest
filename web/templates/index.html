@@ -1953,12 +1953,12 @@
             font-weight: 600;
         }
 
-        /* ================= 4. 右侧工作台 Canvas (Nodes / Logs / Deliverables) ================= */
+        /* ================= 4. 右侧工作台 Canvas (Codex-style 多页签沉浸式查看器) ================= */
         .gpt-canvas {
-            width: 480px;
+            width: 520px;
             background-color: var(--bg-sidebar);
-            border-left: none;
-            box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+            border-left: 1px solid var(--border-subtle);
+            box-shadow: -6px 0 24px rgba(0, 0, 0, 0.12);
             height: calc(100vh - 40px);
             min-height: 0;
             overflow: hidden;
@@ -1969,44 +1969,213 @@
             z-index: 40;
         }
         .gpt-canvas.collapsed {
-            margin-right: -480px;
+            margin-right: -520px;
             pointer-events: none;
         }
-        .canvas-header {
-            height: 40px;
-            padding: 0 16px;
+
+        /* 顶部 Codex 风格微页签栏 (Tab Bar) */
+        .codex-tab-bar {
+            height: 38px;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: var(--bg-surface);
-            border-bottom: none;
+            padding: 0 8px 0 4px;
             flex-shrink: 0;
+            user-select: none;
         }
-        .canvas-tabs-nav {
-            display: flex;
-            gap: 4px;
-        }
-        .canvas-tab-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-sub);
-            font-size: 12px;
-            font-weight: 500;
-            padding: 5px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s ease;
+        .codex-tabs-list {
             display: flex;
             align-items: center;
-            gap: 5px;
+            height: 100%;
+            overflow-x: auto;
+            scrollbar-width: none;
+            flex: 1;
+            gap: 2px;
         }
-        .canvas-tab-btn.active {
+        .codex-tabs-list::-webkit-scrollbar {
+            display: none;
+        }
+        .codex-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            height: 30px;
+            padding: 0 10px;
+            font-size: 11.5px;
+            font-family: var(--font-mono, monospace);
+            color: var(--text-sub);
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+            max-width: 180px;
+        }
+        .codex-tab:hover {
             color: var(--text-main);
-            background-color: var(--bg-surface);
-            font-weight: 600;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .codex-tab.active {
+            color: var(--text-main);
+            background: var(--bg-main);
+            border: 1px solid var(--border-subtle);
+            font-weight: 500;
+        }
+        .codex-tab .tab-title-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .codex-tab .tab-icon {
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        .codex-tab .tab-icon-md { color: #38bdf8; }
+        .codex-tab .tab-icon-log { color: #fbbf24; }
+        .codex-tab .tab-icon-code { color: #34d399; }
+
+        .codex-tab .tab-close-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-left: 2px;
+            padding: 0;
+            cursor: pointer;
+            transition: all 0.12s ease;
+            flex-shrink: 0;
+        }
+        .codex-tab .tab-close-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--text-main);
         }
 
-        /* Canvas 屏幕显示与真机实时投屏样式 */
+        .codex-tab-actions {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            flex-shrink: 0;
+            padding-left: 6px;
+        }
+        .codex-action-btn {
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            color: var(--text-sub);
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s ease;
+        }
+        .codex-action-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* 全文检视内容视口 (沉浸式阅读) */
+        .codex-viewport {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            background: var(--bg-main);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 1. Markdown 阅读排版 */
+        .codex-md-view {
+            padding: 20px 24px 60px;
+            font-size: 13.5px;
+            line-height: 1.65;
+            color: var(--text-main);
+        }
+        .codex-md-view h1 { font-size: 17px; font-weight: 700; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle); color: var(--text-main); }
+        .codex-md-view h2 { font-size: 14.5px; font-weight: 600; margin-top: 20px; margin-bottom: 10px; color: var(--text-main); }
+        .codex-md-view h3 { font-size: 13.5px; font-weight: 600; margin-top: 16px; margin-bottom: 8px; color: var(--text-main); }
+        .codex-md-view table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; font-family: var(--font-mono); }
+        .codex-md-view th, .codex-md-view td { border: 1px solid var(--border-subtle); padding: 7px 10px; text-align: left; }
+        .codex-md-view th { background: rgba(255, 255, 255, 0.03); font-weight: 600; }
+        .codex-md-view pre { background: var(--bg-surface); padding: 12px; border-radius: 6px; border: 1px solid var(--border-subtle); overflow-x: auto; font-family: var(--font-mono); font-size: 12px; margin: 12px 0; }
+        .codex-md-view code { font-family: var(--font-mono); font-size: 11.5px; background: rgba(255, 255, 255, 0.05); padding: 2px 5px; border-radius: 4px; }
+        .codex-md-view blockquote { border-left: 3px solid var(--status-blue); margin: 12px 0; padding: 4px 12px; color: var(--text-sub); background: rgba(59, 130, 246, 0.05); border-radius: 0 4px 4px 0; }
+
+        /* 2. 终端日志流排版 */
+        .codex-log-view {
+            padding: 12px 14px 60px;
+            font-family: var(--font-mono, monospace);
+            font-size: 11.5px;
+            line-height: 1.55;
+            color: #d1d5db;
+            background: #0b0f17;
+            min-height: 100%;
+            user-select: text;
+        }
+        .codex-log-line {
+            display: flex;
+            gap: 10px;
+            padding: 1px 0;
+        }
+        .codex-log-line:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .codex-log-line .line-num {
+            color: #4b5563;
+            user-select: none;
+            text-align: right;
+            width: 34px;
+            flex-shrink: 0;
+            font-size: 10.5px;
+        }
+        .codex-log-line .line-text {
+            flex: 1;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+        .codex-log-line.log-error { color: #f87171; }
+        .codex-log-line.log-warn { color: #fbbf24; }
+        .codex-log-line.log-step { color: #38bdf8; font-weight: 600; }
+        .codex-log-line.log-success { color: #34d399; }
+
+        /* 3. 代码源码排版 */
+        .codex-code-view {
+            padding: 14px 16px 60px;
+            font-family: var(--font-mono, monospace);
+            font-size: 12px;
+            line-height: 1.6;
+            color: #e2e8f0;
+            background: #0b0f17;
+            min-height: 100%;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        /* 4. 空状态 */
+        .codex-empty-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            gap: 8px;
+            padding: 40px;
+            text-align: center;
+            user-select: none;
+        }
+
         .phone-mockup-frame {
             width: 250px;
             height: 500px;
@@ -6722,93 +6891,30 @@
 
     <!-- ======================= 4. 右侧内容检视器 (专供生成的内容查看 如MD报告/断言明细) ======================= -->
     <aside class="gpt-canvas collapsed" id="gptCanvas">
-        <!-- 抽屉头部：文档名称 + 复制/下载/关闭 (1:1 原型规范) -->
-        <div class="inspector-header" id="inspectorHeader" style="height: 40px; padding: 0 16px; border-bottom: none; display: flex; align-items: center; justify-content: space-between; background: var(--bg-surface); flex-shrink: 0;">
-            <div class="inspector-title" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono);">
-                <i class="bi bi-file-earmark-medical" style="color: var(--status-blue); font-size: 14px;"></i>
-                <span id="inspectorDocTitle" class="text-truncate" style="max-width: 260px;">TEST_REPORT_20261021_HOUSING.md</span>
-            </div>
-            <div class="inspector-actions d-flex align-items-center gap-1.5">
-                <button class="btn-action-sm" onclick="saveCurrentDocAsCase()" id="btnSaveCaseRight" title="固化保存为本地用例资产">
-                    <i class="bi bi-bookmark-plus"></i>
-                    <span>保存本地用例</span>
+        <!-- 顶部微页签栏 (Codex-style Tab Bar) -->
+        <div class="codex-tab-bar" id="viewerTabBar">
+            <!-- 动态页签列表容器 (支持平滑横向滚动) -->
+            <div class="codex-tabs-list" id="viewerTabsList"></div>
+            <!-- 右侧操作工具栏: 复制全文、下载、收起窗口 -->
+            <div class="codex-tab-actions">
+                <button class="codex-action-btn" onclick="copyCurrentViewerContent()" id="btnViewerCopy" title="复制当前文档全文">
+                    <i class="bi bi-clipboard"></i>
                 </button>
-                <button class="btn-action-sm" onclick="copyMdContent()" id="btnCopyMdRight" title="复制 Markdown 源码">
-                    <i class="bi bi-clipboard"></i> 复制
+                <button class="codex-action-btn" onclick="downloadCurrentViewerContent()" id="btnViewerDownload" title="下载当前文件">
+                    <i class="bi bi-download"></i>
                 </button>
-                <button class="btn-action-sm" onclick="downloadMd()" title="下载 .md 文件">
-                    <i class="bi bi-download"></i> 下载
-                </button>
-                <button class="btn-action-sm" onclick="toggleCanvas()" title="收起右侧面板">
+                <button class="codex-action-btn" onclick="closeDocViewer()" title="收起检视窗口 (ESC)">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
         </div>
 
-        <!-- 抽屉纯粹内容检视区 (专供生成的内容查看：指标卡片 + 步骤断言 + Markdown 全景预览) -->
-        <div class="inspector-content-scroll" id="inspectorScrollArea" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px;">
-            <!-- 1. 结构化指标网格 -->
-            <div class="right-metrics-grid">
-                <div class="right-metric-card">
-                    <span class="right-metric-lbl">测试结果</span>
-                    <div class="d-flex align-items-center gap-1.5 mt-0.5" id="rightMetricResultBox">
-                        <span class="badge-mini-pass" id="rightMetricResultBadge">PASS</span>
-                        <span class="right-metric-val" id="rightMetricResultText" style="font-size: 12px; color: var(--status-green);">全链路通过</span>
-                    </div>
-                </div>
-                <div class="right-metric-card">
-                    <span class="right-metric-lbl">总执行耗时</span>
-                    <span class="right-metric-val" id="rightMetricDuration">5.14 秒</span>
-                </div>
-                <div class="right-metric-card">
-                    <span class="right-metric-lbl">步骤通过率</span>
-                    <span class="right-metric-val" id="rightMetricSteps" style="color: var(--status-green);">6 / 6 (100%)</span>
-                </div>
-                <div class="right-metric-card">
-                    <span class="right-metric-lbl">崩溃 / ANR</span>
-                    <span class="right-metric-val" id="rightMetricCrash">0 次</span>
-                </div>
-            </div>
-
-            <!-- 2. 步骤断言结构化实测明细表 -->
-            <div class="right-assert-card">
-                <div class="right-assert-header">
-                    <div class="d-flex align-items-center gap-1.5">
-                        <i class="bi bi-shield-check" style="color: var(--status-green);"></i>
-                        <span style="font-size: 12px; font-weight: 500; color: var(--text-main);">步骤断言实测对比</span>
-                    </div>
-                    <span class="mono-pill" id="rightAssertCountBadge" style="font-size: 9px;">全部通过</span>
-                </div>
-                <table class="right-assert-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">步骤</th>
-                            <th style="width: 105px;">检验节点</th>
-                            <th>实测结果</th>
-                            <th style="width: 45px; text-align: right;">状态</th>
-                        </tr>
-                    </thead>
-                    <tbody id="rightAssertTableBody">
-                        <tr>
-                            <td class="font-monospace">STEP 1</td>
-                            <td style="font-weight: 500; color: var(--text-main);">真机连通与冷启动</td>
-                            <td>通道通畅，自动化跳过开屏</td>
-                            <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- 3. 标准 Markdown 文档预览容器 -->
-            <div class="right-md-container">
-                <div class="right-md-header">
-                    <div class="d-flex align-items-center gap-1.5">
-                        <i class="bi bi-markdown" style="font-size: 13px;"></i>
-                        <span>Markdown 内容预览</span>
-                    </div>
-                    <span class="mono-pill" style="font-size: 9px;">GFM 渲染</span>
-                </div>
-                <div class="right-md-body" id="inspectorMdBox"></div>
+        <!-- 全文内容呈现视口 (100% 沉浸阅读) -->
+        <div class="codex-viewport" id="viewerContentArea">
+            <div class="codex-empty-view">
+                <i class="bi bi-file-earmark-text" style="font-size: 32px; opacity: 0.35;"></i>
+                <div style="font-weight: 500; font-size: 13px;">暂无打开的检视文件</div>
+                <div style="font-size: 11px; opacity: 0.6; max-width: 240px; line-height: 1.5;">在中间会话流中点击“查看报告”、“运行日志”或“代码”即可在此展开查阅</div>
             </div>
         </div>
     </aside>
@@ -7735,229 +7841,338 @@
             }
         }
 
-        function openReportInRightDrawer(sessionId) {
-            const sid = sessionId || activeSessionId;
-            let reportContent = "";
-            if (currentActiveSessionData && currentActiveSessionData.session_id === sid) {
-                if (currentActiveSessionData.markdown_report) {
-                    reportContent = currentActiveSessionData.markdown_report;
-                } else if (currentActiveSessionData.timeline_blocks) {
-                    const blk = currentActiveSessionData.timeline_blocks.find(b => b.type === "final_report");
-                    if (blk && blk.content) reportContent = blk.content;
-                }
-            }
-            if (!reportContent) {
-                const target = currentSessions.find(s => s.session_id === sid);
-                if (target && target.markdown_report) reportContent = target.markdown_report;
-            }
-            openRightDoc("report", `test_report_${sid}.md`, reportContent);
-            const scrollArea = document.getElementById("inspectorScrollArea");
-            if (scrollArea) scrollArea.scrollTop = 0;
-        }
+                // ================= 4. Codex-style 多页签沉浸式检视器引擎 (Tabbed Document Viewer) =================
+        window.docViewerTabs = []; // [{ id, title, type: 'md'|'log'|'code', content, filename }]
+        window.activeViewerTabId = null;
 
-        async function saveCurrentDocAsCase() {
-            const sid = activeSessionId;
-            if (!sid) {
-                alert("当前未选定测试会话，无法保存用例");
-                return;
-            }
-            await saveSessionToLocalCase(sid);
-        }
+        // 打开或激活指定页签并展开右侧检视窗口
+        function openViewerTab(tabConfig) {
+            if (!tabConfig) return;
+            const tabId = tabConfig.id || ('tab_' + (tabConfig.filename || tabConfig.title || 'doc').replace(/[^a-zA-Z0-9_]/g, '_'));
+            tabConfig.id = tabId;
 
-        function openRightDoc(type, customTitle, customContent) {
+            const existing = window.docViewerTabs.find(t => t.id === tabId);
+            if (existing) {
+                if (tabConfig.content !== undefined) existing.content = tabConfig.content;
+                if (tabConfig.title) existing.title = tabConfig.title;
+            } else {
+                window.docViewerTabs.push(tabConfig);
+            }
+
+            window.activeViewerTabId = tabId;
+            renderViewerTabsHeader();
+            renderViewerContent();
+
+            // 展开右侧抽屉
             const canvas = document.getElementById("gptCanvas");
             if (canvas && canvas.classList.contains("collapsed")) {
                 canvas.classList.remove("collapsed");
             }
-            switchCanvasTab("report");
+            const btnRight = document.getElementById("btnToggleRight");
+            if (btnRight) btnRight.classList.add("active");
+        }
 
-            const sData = currentActiveSessionData || {};
-            const steps = sData.plan_steps || [];
-            const isSuccess = (sData.is_success !== false && sData.status !== "FAILED");
+        // 切换当前激活的页签
+        function switchViewerTab(tabId) {
+            window.activeViewerTabId = tabId;
+            renderViewerTabsHeader();
+            renderViewerContent();
+        }
 
-            let docTitle = customTitle || (type === "case" ? `TEST_CASE_${sData.id || 'SUITE'}.md` : `TEST_REPORT_${sData.id || 'LATEST'}.md`);
-            currentRightDocTitle = docTitle;
-
-            const titleEl = document.getElementById("inspectorDocTitle");
-            if (titleEl) titleEl.innerText = docTitle;
-
-            // 1. 结构化指标网格填充
-            const durationEl = document.getElementById("rightMetricDuration");
-            if (durationEl) durationEl.innerText = sData.duration || "5.14 秒";
-
-            const stepsEl = document.getElementById("rightMetricSteps");
-            if (stepsEl) {
-                const passCount = steps.filter(s => s.status === "COMPLETED").length || (isSuccess ? steps.length : Math.max(1, steps.length - 1));
-                const totalCount = steps.length || 6;
-                const pct = totalCount > 0 ? Math.round((passCount / totalCount) * 100) : 100;
-                stepsEl.innerText = `${passCount} / ${totalCount} (${pct}%)`;
-                stepsEl.style.color = isSuccess ? "var(--status-green)" : "#ef4444";
+        // 关闭指定页签
+        function closeViewerTab(tabId, e) {
+            if (e) {
+                e.stopPropagation();
+                e.preventDefault();
             }
+            const idx = window.docViewerTabs.findIndex(t => t.id === tabId);
+            if (idx === -1) return;
 
-            const crashEl = document.getElementById("rightMetricCrash");
-            if (crashEl) crashEl.innerText = "0 次";
+            window.docViewerTabs.splice(idx, 1);
 
-            const resultBadge = document.getElementById("rightMetricResultBadge");
-            const resultText = document.getElementById("rightMetricResultText");
-            if (resultBadge && resultText) {
-                if (isSuccess) {
-                    resultBadge.className = "badge-mini-pass";
-                    resultBadge.innerText = "PASS";
-                    resultText.innerText = "全链路通过";
-                    resultText.style.color = "var(--status-green)";
+            if (window.docViewerTabs.length === 0) {
+                window.activeViewerTabId = null;
+                renderViewerTabsHeader();
+                renderViewerContent();
+                closeDocViewer();
+            } else {
+                if (window.activeViewerTabId === tabId) {
+                    const nextIdx = Math.max(0, idx - 1);
+                    window.activeViewerTabId = window.docViewerTabs[nextIdx].id;
+                }
+                renderViewerTabsHeader();
+                renderViewerContent();
+            }
+        }
+
+        // 收起右侧检视窗口
+        function closeDocViewer() {
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && !canvas.classList.contains("collapsed")) {
+                canvas.classList.add("collapsed");
+            }
+            const btnRight = document.getElementById("btnToggleRight");
+            if (btnRight) btnRight.classList.remove("active");
+        }
+
+        // 切换抽屉展开/收起 (绑定中间右上角 #btnToggleRight)
+        function toggleCanvas() {
+            const canvas = document.getElementById("gptCanvas");
+            if (!canvas) return;
+            const willOpen = canvas.classList.contains("collapsed");
+            if (willOpen) {
+                canvas.classList.remove("collapsed");
+                const btnRight = document.getElementById("btnToggleRight");
+                if (btnRight) btnRight.classList.add("active");
+                // 如果当前没有任何打开的 tab，自动尝试打开当前会话的报告
+                if (window.docViewerTabs.length === 0 && activeSessionId) {
+                    openReportInRightDrawer(activeSessionId);
                 } else {
-                    resultBadge.className = "badge-mini-fail";
-                    resultBadge.innerText = "FAIL";
-                    resultText.innerText = "步骤受阻未达预期";
-                    resultText.style.color = "#ef4444";
+                    renderViewerTabsHeader();
+                    renderViewerContent();
                 }
+            } else {
+                closeDocViewer();
+            }
+        }
+
+        // 渲染顶部微页签栏
+        function renderViewerTabsHeader() {
+            const listEl = document.getElementById("viewerTabsList");
+            if (!listEl) return;
+            if (window.docViewerTabs.length === 0) {
+                listEl.innerHTML = `<span style="font-size: 11px; color: var(--text-muted); padding-left: 8px;">无打开文档</span>`;
+                return;
             }
 
-            // 2. 步骤断言表格填充
-            const tableBody = document.getElementById("rightAssertTableBody");
-            const assertCountBadge = document.getElementById("rightAssertCountBadge");
-            if (tableBody) {
-                let rowsHtml = "";
-                if (steps.length > 0) {
-                    steps.forEach((st, idx) => {
-                        const stepNum = idx + 1;
-                        const isStepPass = st.status === "COMPLETED";
-                        const badgeClass = isStepPass ? "badge-mini-pass" : "badge-mini-fail";
-                        const badgeTxt = isStepPass ? "PASS" : "FAIL";
-                        const nodeTitle = st.title || `步骤 ${stepNum}`;
-                        const desc = st.desc || (isStepPass ? "端侧反馈匹配预期，断言通过" : "界面未出现目标元素");
-                        rowsHtml += `
-                            <tr>
-                                <td class="font-monospace">STEP ${stepNum}</td>
-                                <td style="font-weight: 500; color: var(--text-main);">${escapeHtml(nodeTitle)}</td>
-                                <td>${escapeHtml(desc)}</td>
-                                <td style="text-align: right;"><span class="${badgeClass}">${badgeTxt}</span></td>
-                            </tr>
-                        `;
-                    });
-                } else {
-                    rowsHtml = `
-                        <tr>
-                            <td class="font-monospace">STEP 1</td>
-                            <td style="font-weight: 500; color: var(--text-main);">检查 ADB 与真机握手</td>
-                            <td>Xiaomi MIX 2 设备通道畅通</td>
-                            <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
-                        </tr>
-                        <tr>
-                            <td class="font-monospace">STEP 2</td>
-                            <td style="font-weight: 500; color: var(--text-main);">冷启动待测应用</td>
-                            <td>成功跳过开屏广告</td>
-                            <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
-                        </tr>
-                        <tr>
-                            <td class="font-monospace">STEP 3</td>
-                            <td style="font-weight: 500; color: var(--text-main);">首屏视觉定位与触控</td>
-                            <td>命中目标组件并触发跳转</td>
-                            <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
-                        </tr>
-                        <tr>
-                            <td class="font-monospace">STEP 4</td>
-                            <td style="font-weight: 500; color: var(--text-main);">微聊与转场核验</td>
-                            <td>客服咨询窗口弹出正常</td>
-                            <td style="text-align: right;"><span class="badge-mini-pass">PASS</span></td>
-                        </tr>
-                    `;
-                }
-                tableBody.innerHTML = rowsHtml;
-                if (assertCountBadge) {
-                    assertCountBadge.innerText = isSuccess ? "全部断言通过" : "存在失败项";
-                }
+            let html = "";
+            window.docViewerTabs.forEach(t => {
+                const isActive = (t.id === window.activeViewerTabId);
+                let iconClass = "bi-file-earmark-medical tab-icon-md";
+                if (t.type === "log") iconClass = "bi-terminal tab-icon-log";
+                else if (t.type === "code") iconClass = "bi-filetype-py tab-icon-code";
+
+                html += `
+                    <div class="codex-tab ${isActive ? 'active' : ''}" onclick="switchViewerTab('${escapeHtml(t.id)}')" title="${escapeHtml(t.filename || t.title)}">
+                        <i class="bi ${iconClass} tab-icon"></i>
+                        <span class="tab-title-text">${escapeHtml(t.title)}</span>
+                        <button class="tab-close-btn" onclick="closeViewerTab('${escapeHtml(t.id)}', event)" title="关闭此页签">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        // 渲染检视视口正文
+        function renderViewerContent() {
+            const container = document.getElementById("viewerContentArea");
+            if (!container) return;
+
+            if (window.docViewerTabs.length === 0 || !window.activeViewerTabId) {
+                container.innerHTML = `
+                    <div class="codex-empty-view">
+                        <i class="bi bi-file-earmark-text" style="font-size: 32px; opacity: 0.35;"></i>
+                        <div style="font-weight: 500; font-size: 13px;">暂无打开的检视文件</div>
+                        <div style="font-size: 11px; opacity: 0.6; max-width: 240px; line-height: 1.5;">在中间会话流中点击“查看报告”、“运行日志”或“代码”即可在此展开查阅</div>
+                    </div>
+                `;
+                return;
             }
 
-            // 3. Markdown 正文填充与渲染
-            let mdContent = customContent;
-            if (!mdContent) {
-                if (sData.markdown_report) {
-                    mdContent = sData.markdown_report;
-                } else if (type === "case") {
-                    mdContent = `# 象盒找房自动化测试用例规范 (${docTitle})\n\n` +
-                        `> **创建时间**: ${new Date().toLocaleString()}\n` +
-                        `> **执行设备**: Xiaomi MIX 2 (MIUI 12 / Android 9.0)\n` +
-                        `> **测试模块**: 房源推荐与在线咨询链路\n\n` +
-                        `## 一、前置条件\n` +
-                        `- 待测应用已安装，且拥有存储及网络权限\n` +
-                        `- 手机处于竖屏状态，分辨率为 1080x2160\n\n` +
-                        `## 二、执行步骤\n` +
-                        `1. 冷启动象盒找房应用，自动跳过开屏广告与授权窗\n` +
-                        `2. OCR 视觉提取首屏‘第一套推荐房源’并计算中心坐标 (540, 960)\n` +
-                        `3. 执行 input tap 手势进入房源详情页，核验 VR 看房标识\n` +
-                        `4. 轻触底部‘微聊’浮动操作栏，断言聊天输入面板顺利唤起\n\n` +
-                        `## 三、断言判定门禁\n` +
-                        `- 界面无 ANR/Crash 崩溃异常\n` +
-                        `- 咨询会话窗加载耗时 <= 2000ms\n`;
-                } else {
-                    mdContent = `# 自动化测试全景交付物报告 (${docTitle})\n\n` +
-                        `> **测试时间**: ${new Date().toLocaleString()}\n` +
-                        `> **执行环境**: Xiaomi MIX 2 (MIUI 12 / Android 9.0)\n` +
-                        `> **测试目标**: ${sData.goal || '冷启动象盒找房，验证首页推荐房源进入与微聊激活'}\n` +
-                        `> **最终结论**: **${isSuccess ? 'PASS (全部验证通过)' : 'FAIL (流程未达预期)'}**\n\n` +
-                        `---\n\n` +
-                        `## 一、 测试执行摘要\n\n` +
-                        `| 指标项 | 测量值 | 状态 |\n` +
-                        `| :--- | :--- | :--- |\n` +
-                        `| 执行总耗时 | ${sData.duration || '5.14 秒'} | ${isSuccess ? 'PASS' : 'FAIL'} |\n` +
-                        `| 视觉识别定位次数 | 2 次 (OCR + 层次树匹配) | PASS |\n` +
-                        `| 端侧手势操作 | 1 次轻触 (坐标: 540, 960) | PASS |\n` +
-                        `| 异常与崩溃数 | 0 次 Crash / 0 次 ANR | PASS |\n\n` +
-                        `---\n\n` +
-                        `## 二、 步骤流水与断言证据\n\n` +
-                        `- [x] **STEP 1**: 检查物理真机连通性与 ADB 握手通道 (就绪)\n` +
-                        `- [x] **STEP 2**: 探测目标应用包名安装状态，免重复安装\n` +
-                        `- [x] **STEP 3**: 调起应用冷启动，自动化跳过开屏广告\n` +
-                        `- [x] **STEP 4**: OCR 提取首屏房源卡片锚点并执行轻触流转\n` +
-                        `- [x] **STEP 5**: 触发底部微聊按钮，确认客服咨询窗口弹出正常\n\n` +
-                        `---\n\n` +
-                        `## 三、 归档说明\n` +
-                        `本报告已自动固化并支持一键下载，供版本质量门禁归档与回归核验。`;
-                }
-            }
+            const curTab = window.docViewerTabs.find(t => t.id === window.activeViewerTabId);
+            if (!curTab) return;
 
-            currentRightDocContent = mdContent;
-            const mdBox = document.getElementById("inspectorMdBox");
-            if (mdBox) {
+            if (curTab.type === "md") {
+                let parsedHtml = "";
                 if (typeof marked !== "undefined" && marked.parse) {
-                    mdBox.innerHTML = marked.parse(mdContent);
+                    parsedHtml = marked.parse(curTab.content || "");
                 } else if (typeof renderMarkdownToHtml === "function") {
-                    mdBox.innerHTML = renderMarkdownToHtml(mdContent);
+                    parsedHtml = renderMarkdownToHtml(curTab.content || "");
                 } else {
-                    mdBox.innerText = mdContent;
+                    parsedHtml = `<pre>${escapeHtml(curTab.content || "")}</pre>`;
+                }
+                container.innerHTML = `<div class="codex-md-view">${parsedHtml}</div>`;
+                container.scrollTop = 0;
+            } else if (curTab.type === "log") {
+                const lines = (curTab.content || "").split("\n");
+                let logLinesHtml = "";
+                lines.forEach((l, idx) => {
+                    let levelClass = "";
+                    if (l.includes("[ERROR]") || l.includes("❌") || l.includes("Traceback") || l.includes("Error") || l.includes("Exception")) {
+                        levelClass = "log-error";
+                    } else if (l.includes("[WARNING]") || l.includes("⚠️")) {
+                        levelClass = "log-warn";
+                    } else if (l.includes("--- [Step") || l.includes("========== 开始") || l.includes("========== 测试结束")) {
+                        levelClass = "log-step";
+                    } else if (l.includes("✅") || l.includes("🎉") || l.includes("成功")) {
+                        levelClass = "log-success";
+                    }
+                    logLinesHtml += `
+                        <div class="codex-log-line ${levelClass}">
+                            <span class="line-num">${idx + 1}</span>
+                            <span class="line-text">${escapeHtml(l)}</span>
+                        </div>
+                    `;
+                });
+                container.innerHTML = `<div class="codex-log-view">${logLinesHtml || '<div class="text-muted p-3">暂无日志行</div>'}</div>`;
+            } else if (curTab.type === "code") {
+                container.innerHTML = `<pre class="codex-code-view"><code>${escapeHtml(curTab.content || "")}</code></pre>`;
+                container.scrollTop = 0;
+            }
+        }
+
+        // 快捷入口 1: 打开 Markdown 报告全文
+        function openReportInRightDrawer(sessionId) {
+            const sid = sessionId || activeSessionId;
+            let reportContent = "";
+            let sData = (currentActiveSessionData && currentActiveSessionData.session_id === sid) ? currentActiveSessionData : null;
+            if (!sData) {
+                sData = currentSessions.find(s => s.session_id === sid);
+            }
+            if (sData) {
+                if (sData.markdown_report) {
+                    reportContent = sData.markdown_report;
+                } else if (sData.timeline_blocks) {
+                    const blk = sData.timeline_blocks.find(b => b.type === "final_report");
+                    if (blk && blk.content) reportContent = blk.content;
+                }
+            }
+            if (!reportContent) {
+                reportContent = `# 测试会话报告 [${sid}]\n\n暂无持久化报告内容，可能测试仍在执行中或被提前终止。`;
+            }
+
+            openViewerTab({
+                id: 'report_' + sid,
+                title: `report_${sid.slice(-6)}.md`,
+                type: 'md',
+                content: reportContent,
+                filename: `test_report_${sid}.md`
+            });
+        }
+
+        // 快捷入口 2: 打开底层端侧与系统日志全文
+        function openLogViewer(sessionId) {
+            const sid = sessionId || activeSessionId;
+            let logsText = "";
+            let sData = (currentActiveSessionData && currentActiveSessionData.session_id === sid) ? currentActiveSessionData : null;
+            if (!sData) {
+                sData = currentSessions.find(s => s.session_id === sid);
+            }
+            if (sData && sData.devices) {
+                for (const devId in sData.devices) {
+                    const dev = sData.devices[devId];
+                    if (dev && Array.isArray(dev.logs) && dev.logs.length > 0) {
+                        logsText += `================================================================================\n`;
+                        logsText += `📱 目标真机 [${dev.model || devId}] · 原生底层执行与自学习日志流\n`;
+                        logsText += `================================================================================\n\n`;
+                        logsText += dev.logs.join("\n") + "\n\n";
+                    }
+                }
+            }
+            if (!logsText && sData && sData.timeline_blocks) {
+                const thoughts = sData.timeline_blocks.filter(b => b.type === "thought").map(b => (b.bullets || []).map(x => `[推演] ${x.tag}: ${x.content}`).join("\n"));
+                if (thoughts.length) logsText = thoughts.join("\n\n");
+            }
+            if (!logsText) {
+                logsText = `[${new Date().toLocaleTimeString()}] 会话 [${sid}] 暂无捕获到底层原始日志。`;
+            }
+
+            openViewerTab({
+                id: 'log_' + sid,
+                title: `execution_${sid.slice(-6)}.log`,
+                type: 'log',
+                content: logsText,
+                filename: `execution_${sid}.log`
+            });
+        }
+
+        // 快捷入口 3: 打开固化自动化测试脚本源码
+        async function openEmbeddedCode(filename, title) {
+            const fn = filename || "test_suite.py";
+            const tabId = 'code_' + fn.replace(/[^a-zA-Z0-9_]/g, '_');
+
+            openViewerTab({
+                id: tabId,
+                title: fn,
+                type: 'code',
+                content: `# 正在读取固化脚本 [${fn}] 源码...\n`,
+                filename: fn
+            });
+
+            try {
+                const res = await fetch(`/api/solidified_cases/content?filename=${encodeURIComponent(fn)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const code = data.content || `# 脚本 [${fn}] 内容为空`;
+                    const cur = window.docViewerTabs.find(t => t.id === tabId);
+                    if (cur) {
+                        cur.content = code;
+                        if (window.activeViewerTabId === tabId) renderViewerContent();
+                    }
+                } else {
+                    const cur = window.docViewerTabs.find(t => t.id === tabId);
+                    if (cur) {
+                        cur.content = `# 未能在本地固化库找到 ${fn} (HTTP ${res.status})\n# 本地执行验证命令: pytest tests/solidified/${fn} -v -s`;
+                        if (window.activeViewerTabId === tabId) renderViewerContent();
+                    }
+                }
+            } catch (e) {
+                const cur = window.docViewerTabs.find(t => t.id === tabId);
+                if (cur) {
+                    cur.content = `# 读取脚本异常: ${e.message}\n# 文件名: ${fn}`;
+                    if (window.activeViewerTabId === tabId) renderViewerContent();
                 }
             }
         }
 
-        function copyMdContent() {
-            if (!currentRightDocContent) return;
+        // 复制当前激活页签的纯文本内容
+        function copyCurrentViewerContent() {
+            if (!window.activeViewerTabId) return;
+            const curTab = window.docViewerTabs.find(t => t.id === window.activeViewerTabId);
+            if (!curTab || !curTab.content) return;
+
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(currentRightDocContent).then(() => {
-                    const btn = document.getElementById("btnCopyMdRight");
+                navigator.clipboard.writeText(curTab.content).then(() => {
+                    const btn = document.getElementById("btnViewerCopy");
                     if (btn) {
-                        const originalHtml = btn.innerHTML;
-                        btn.innerHTML = `<i class="bi bi-check2 text-success me-1"></i>已复制`;
-                        setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                        const orig = btn.innerHTML;
+                        btn.innerHTML = `<i class="bi bi-check2 text-success"></i>`;
+                        setTimeout(() => btn.innerHTML = orig, 1500);
                     }
                 });
             }
         }
 
-        function downloadMd() {
-            if (!currentRightDocContent) return;
-            const blob = new Blob([currentRightDocContent], { type: "text/markdown;charset=utf-8" });
+        // 下载当前激活页签的文件
+        function downloadCurrentViewerContent() {
+            if (!window.activeViewerTabId) return;
+            const curTab = window.docViewerTabs.find(t => t.id === window.activeViewerTabId);
+            if (!curTab || !curTab.content) return;
+
+            let mime = "text/plain;charset=utf-8";
+            if (curTab.type === "md") mime = "text/markdown;charset=utf-8";
+            else if (curTab.type === "code") mime = "text/x-python;charset=utf-8";
+
+            const blob = new Blob([curTab.content], { type: mime });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = currentRightDocTitle || "TEST_REPORT.md";
+            a.download = curTab.filename || curTab.title || "document.txt";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
 
-        // ================= 自由拖拽悬浮窗与主题初始化 =================
+        // 全局键盘监听: ESC 键收起检视窗口
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") {
+                closeDocViewer();
+            }
+        });
+
         function initFloatingDeviceDrag() {
             const floatingWin = document.getElementById('floatingDeviceWindow');
             const dragHandle = document.getElementById('deviceDragHandle');
@@ -10632,7 +10847,8 @@
                 const isSolidified = !!sessionData.is_solidified || !!blk.is_solidified;
                 const solidFile = blk.solidified_filename || sessionData.solidified_filename || `test_${sid}.py`;
                 const artifacts = blk.artifacts || [
-                    { name: "6 大测试维度全景交付物报告", file: `test_report_${sid}.md`, type: "report" },
+                    { name: "6 大测试维度全景交付物报告", file: `test_report_${sid.slice(-6)}.md`, type: "report" },
+                    { name: "端侧底层执行与诊断日志流", file: `execution_${sid.slice(-6)}.log`, type: "log" },
                     { name: "零 Token 本地自动化回归脚本", file: solidFile, type: "code" },
                     { name: "高保真端侧全链路截图证据链", file: "data/reports/screenshots/", type: "evidence" }
                 ];
@@ -10640,17 +10856,38 @@
                 let artifactsHtml = "";
                 artifacts.forEach(art => {
                     const isReport = art.type === "report" || (art.name && art.name.includes("报告"));
+                    const isLog = art.type === "log" || (art.name && art.name.includes("日志"));
                     const isCode = art.type === "code" || (art.filename && art.filename.endsWith(".py")) || (art.file && art.file.endsWith(".py"));
-                    const fName = art.filename || art.file || (isCode ? solidFile : `test_report_${sid}.md`);
-                    let clickAction = isReport 
-                        ? `onclick="openReportInRightDrawer('${sid}')"` 
-                        : (isCode ? `onclick="openEmbeddedCode('${escapeHtml(fName)}', '本地用例')"` : `onclick="alert('证据目录已归档至 data/reports/screenshots/')"` );
+                    const fName = art.filename || art.file || (isCode ? solidFile : (isLog ? `execution_${sid.slice(-6)}.log` : `test_report_${sid.slice(-6)}.md`));
                     
-                    const badgeDesc = isReport ? '质量报告' : (isCode ? '本地用例' : '证据链');
+                    let clickAction = "";
+                    if (isReport) {
+                        clickAction = `onclick="openReportInRightDrawer('${sid}')"`;
+                    } else if (isLog) {
+                        clickAction = `onclick="openLogViewer('${sid}')"`;
+                    } else if (isCode) {
+                        clickAction = `onclick="openEmbeddedCode('${escapeHtml(fName)}', '本地用例')"`;
+                    } else {
+                        clickAction = `onclick="alert('证据目录已归档至 data/reports/screenshots/')"`;
+                    }
+                    
+                    let badgeDesc = '证据链';
+                    let iconHtml = '<i class="bi bi-images text-secondary"></i>';
+                    if (isReport) {
+                        badgeDesc = '质量报告';
+                        iconHtml = '<i class="bi bi-file-earmark-medical text-primary"></i>';
+                    } else if (isLog) {
+                        badgeDesc = '运行日志';
+                        iconHtml = '<i class="bi bi-terminal text-warning"></i>';
+                    } else if (isCode) {
+                        badgeDesc = '本地用例';
+                        iconHtml = '<i class="bi bi-file-earmark-code text-success"></i>';
+                    }
+
                     artifactsHtml += `
                         <div class="summary-artifact-row" ${clickAction} title="点击展开查阅">
                             <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 85%;">
-                                <i class="bi ${isReport ? 'bi-file-earmark-medical text-primary' : (isCode ? 'bi-file-earmark-code text-secondary' : 'bi-images text-secondary')}"></i>
+                                ${iconHtml}
                                 <span class="artifact-label">${escapeHtml(art.name)}</span>
                                 <span class="artifact-mono-pill">${escapeHtml(fName)}</span>
                             </div>
@@ -10694,9 +10931,13 @@
                         <!-- 底部工具栏 (主路径优先 + Linear 风格工具坞) -->
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-0.5">
                             <div class="d-flex align-items-center gap-2">
-                                <button class="btn-linear-primary" onclick="openReportInRightDrawer('${sid}')" title="在右侧面板展开 Markdown 全景测试报告">
-                                    <i class="bi bi-layout-sidebar-reverse"></i>
+                                <button class="btn-linear-primary" onclick="openReportInRightDrawer('${sid}')" title="在右侧检视窗口展开 Markdown 全景测试报告">
+                                    <i class="bi bi-file-earmark-medical"></i>
                                     <span>查看报告</span>
+                                </button>
+                                <button class="btn-linear-secondary" onclick="openLogViewer('${sid}')" title="在右侧检视窗口展开底层运行日志流">
+                                    <i class="bi bi-terminal"></i>
+                                    <span>运行日志</span>
                                 </button>
                                 ${isSolidified ? `
                                     <button class="btn-linear-ghost text-success" onclick="switchMainWorkspaceMode('local')" title="该用例已沉淀为脱机本地脚本，点击在左侧筛选查看">
