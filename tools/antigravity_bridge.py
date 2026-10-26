@@ -141,7 +141,7 @@ async def chat_completions(req: Request):
 
     full_prompt = f"{sys_instruction}\n{prompt_text}".strip()
 
-    upstream_url = "https://cloudcode-pa.googleapis.com/v1internal:generateContent"
+    upstream_url = "https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent"
     envelope = {
         "model": model,
         "project": project,
@@ -197,8 +197,8 @@ async def chat_completions(req: Request):
         )
 
 def main():
-    logger.info("正在启动 Google Antigravity 本地桥接服务 @ 127.0.0.1:19387")
-    uvicorn.run(app, host="127.0.0.1", port=19387, log_level="warning")
+    logger.info("正在启动 Google Antigravity 本地桥接服务 @ 0.0.0.0:19387")
+    uvicorn.run(app, host="0.0.0.0", port=19387, log_level="warning")
 
 if __name__ == "__main__":
     main()
