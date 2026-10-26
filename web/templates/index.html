@@ -6475,7 +6475,104 @@
         .case-card-compact.expanded .case-details-drawer {
             display: block;
         }
-</style>
+
+        /* ================= Antigravity 2.0 风格原子动作微流水线 (Agent Trace) ================= */
+        .agent-trace-box {
+            margin: 4px 0 6px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.15s ease;
+        }
+        body[data-theme="light"] .agent-trace-box {
+            background: rgba(0, 0, 0, 0.015);
+            border-color: rgba(0, 0, 0, 0.06);
+        }
+        .agent-trace-box:hover {
+            border-color: var(--border-hover);
+        }
+        .agent-trace-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 9px;
+            cursor: pointer;
+            border-radius: 6px;
+            user-select: none;
+            font-size: 11.5px;
+            color: var(--text-sub);
+            transition: all 0.12s ease;
+        }
+        .agent-trace-header:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-main);
+        }
+        body[data-theme="light"] .agent-trace-header:hover {
+            background: rgba(0, 0, 0, 0.03);
+        }
+        .agent-trace-title {
+            font-family: var(--font-mono, monospace);
+            font-size: 11.5px;
+            font-weight: 500;
+        }
+        .agent-trace-body {
+            padding: 3px 6px 6px 10px;
+            border-left: 2px solid var(--border-subtle);
+            margin-left: 14px;
+            margin-top: 2px;
+            margin-bottom: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .agent-trace-error {
+            margin-top: 4px;
+            padding: 5px 8px;
+            border-radius: 4px;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        /* 左上角测试就绪胶囊样式 */
+        .header-ready-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5.5px;
+            padding: 2.5px 8px 2.5px 6px;
+            border-radius: 12px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.22);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .header-ready-pill:hover {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: rgba(34, 197, 94, 0.38);
+        }
+        .header-ready-pill.status-unready, .header-ready-pill.warning {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.25);
+        }
+        .header-ready-pill.status-unready:hover, .header-ready-pill.warning:hover {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+        .header-ready-text {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--status-green);
+            letter-spacing: 0.2px;
+            line-height: 1;
+        }
+        .header-ready-pill.status-unready .header-ready-text,
+        .header-ready-pill.warning .header-ready-text {
+            color: #ef4444;
+        }
+
+    </style>
 
 </head>
 <body data-theme="dark">
@@ -6487,10 +6584,10 @@
             <div class="brand-dot"></div>
             <span class="fw-bold" style="font-size: 12.5px; letter-spacing: 0.5px; color: var(--text-main);">AUTOTEST AI</span>
             
-            <!-- 🌟 全局常驻测试就绪指示点 (就绪小绿点，未就绪小红点) -->
-            <div class="header-ready-dot status-ready ms-2" id="headerReadyPill" onclick="toggleGlobalPreflightPopover(event)" title="测试环境：已就绪 (点击查看全局链路诊断)">
+            <!-- 🌟 全局常驻测试就绪指示点与文字 (将对话框中的测试就绪移至左上角绿点后) -->
+            <div class="header-ready-pill status-ready ms-2" id="headerReadyPill" onclick="toggleGlobalPreflightPopover(event)" title="测试环境已就绪 (点击查看全局链路诊断)">
                 <span class="ready-pulse-dot" id="headerReadyPulse"></span>
-                <span id="headerReadyText" class="d-none">环境就绪</span>
+                <span id="headerReadyText" class="header-ready-text">测试就绪</span>
             </div>
         </div>
 
@@ -6707,67 +6804,6 @@
                 <!-- 胶囊底部工具栏 -->
                 <div class="gpt-toolbar">
                     <div class="d-flex align-items-center gap-2">
-                        <!-- 🌟 0. 常驻测试就绪指示胶囊 (1:1 响应用户原型需求) -->
-                        <div class="pill-ready-status" id="bottomReadyPill" title="当前测试环境自检通过，随时可输入测试意图">
-                            <span class="pill-ready-dot" id="bottomReadyDot"></span>
-                            <span id="bottomReadyText">测试就绪</span>
-                        </div>
-
-                        <!-- 1. 设备选择胶囊 (带在线状态呼吸指示灯，仅支持物理真机) -->
-                        <div class="position-relative" id="pillDeviceWrapper">
-                            <div class="pill-btn" onclick="toggleCustomPopover('devicePopover', event)" title="选择协同测试真机设备">
-                                <span class="status-indicator-dot dot-offline" id="deviceStatusDot"></span>
-                                <i class="bi bi-phone"></i>
-                                <span id="deviceSummaryLabel">0 台真机在线</span>
-                                <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
-                            </div>
-                            <div class="gpt-popover" id="devicePopover" style="left: 0; width: 280px;" onclick="event.stopPropagation()">
-                                <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                                    <span class="small fw-semibold" style="font-size: 11px;">协同测试真机设备</span>
-                                    <span class="small text-muted" style="font-size: 11px; cursor: pointer;" onclick="toggleAllDevices()">全选/反选</span>
-                                </div>
-                                <div id="deviceCheckboxes" class="d-flex flex-column gap-1" style="max-height: 180px; overflow-y: auto;">
-                                    <div class="small text-muted">检测真机设备中...</div>
-                                </div>
-                                <div class="p-2 mt-2 rounded border-top" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
-                                    <div class="d-flex align-items-center gap-1 mb-1">
-                                        <i class="bi bi-info-circle text-muted" style="font-size: 11px;"></i>
-                                        <span class="small text-muted fw-semibold" style="font-size: 10.5px;">物理真机排查指引：</span>
-                                    </div>
-                                    <div class="small text-muted" style="font-size: 10px; line-height: 1.45;">
-                                        1. 使用 USB 数据线连接手机至本机<br>
-                                        2. 开启手机【开发者选项】并启用【USB 调试】<br>
-                                        3. 手机屏幕弹出授权时选择【始终允许这台电脑调试】
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 2. 待测应用选择胶囊 (带真机安装状态指示灯，支持快捷切换与上传入口) -->
-                        <div class="position-relative" id="pillAppWrapper">
-                            <div class="pill-btn" onclick="toggleCustomPopover('appPopover', event)" title="选择待测应用包或上传新 APK">
-                                <span class="status-indicator-dot dot-online" id="appStatusDot"></span>
-                                <i class="bi bi-box-seam"></i>
-                                <span id="activeAppLabel">象盒找房</span>
-                                <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
-                            </div>
-                            <div class="gpt-popover" id="appPopover" style="left: 0; width: 280px;" onclick="event.stopPropagation()">
-                                <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                                    <span class="small fw-semibold" style="font-size: 11px;">待测应用包</span>
-                                    <span class="small text-muted" style="font-size: 11px; cursor: pointer;" onclick="loadAppsDropdown()"><i class="bi bi-arrow-clockwise"></i> 刷新</span>
-                                </div>
-                                <div id="appDropdownList" class="d-flex flex-column gap-1" style="max-height: 180px; overflow-y: auto;">
-                                    <div class="small text-muted p-1">加载应用中...</div>
-                                </div>
-                                <div class="p-2 mt-2 rounded border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
-                                    <span class="small text-muted" style="font-size: 10.5px;">需测试其他 App？</span>
-                                    <button class="btn btn-sm btn-primary py-0.5 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="openAppPackagesModal(); closeAllPopovers();">
-                                        <i class="bi bi-cloud-arrow-up me-1"></i>上传 APK
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- 3. 审批模式胶囊 -->
                         <div class="position-relative" id="pillApprovalWrapper">
                             <div class="pill-btn" onclick="toggleCustomPopover('approvalPopover', event)" title="切换自动放行 / 人工逐级审批">
@@ -8824,7 +8860,7 @@
                 
                 // 兼容根据 step_id 定位已渲染节点
                 if (!existingEl && (blk.type === "step_execution" || blk.type === "step_result")) {
-                    existingEl = flow.querySelector(`.stream-step-card[data-step-id="${blk.step_id}"]`);
+                    existingEl = flow.querySelector(`.stream-step-card[data-step-id="${blk.step_id}"], .agent-trace-box[data-step-id="${blk.step_id}"]`);
                 }
                 // 🛡️ 兼容定位已渲染的总结卡片（即使 block_id 不一致也原地替换，绝不向页面插入第二个！）
                 if (!existingEl && blk.type === "test_summary") {
@@ -10632,11 +10668,35 @@
                     blk.items.forEach(it => {
                         const isRunning = (it.status === "RUNNING");
                         const isCompleted = (it.status === "COMPLETED" || it.status === "PASS");
+                        const isFailed = (it.status === "FAILED" || it.status === "FAIL");
+                        const isCanceled = (it.status === "CANCELED" || it.status === "SKIPPED");
                         const isRemoved = (it.status === "REMOVED");
                         const diffClass = it.diff_type || (isRunning ? 'added' : '');
-                        const signChar = isAllDone ? '·' : (isRemoved ? '-' : '+');
-                        const tagClass = isRunning ? 'running' : (isCompleted ? 'completed' : 'pending');
-                        const tagText = isRunning ? '进行中' : (isCompleted ? '已完成' : (isRemoved ? '已移除' : '待处理'));
+                        
+                        let signChar = '○';
+                        let tagClass = 'pending';
+                        let tagText = '待处理';
+                        if (isCompleted) {
+                            signChar = '✓';
+                            tagClass = 'completed';
+                            tagText = '已完成';
+                        } else if (isRunning) {
+                            signChar = '◐';
+                            tagClass = 'running';
+                            tagText = '进行中';
+                        } else if (isFailed) {
+                            signChar = '✕';
+                            tagClass = 'failed';
+                            tagText = '未通过';
+                        } else if (isCanceled) {
+                            signChar = '⊘';
+                            tagClass = 'pending';
+                            tagText = '已取消';
+                        } else if (isRemoved) {
+                            signChar = '-';
+                            tagClass = 'pending';
+                            tagText = '已移除';
+                        }
 
                         itemsHtml += `
                             <div class="stream-todo-item ${diffClass}">
@@ -10669,29 +10729,29 @@
                     </div>
                 `;
             }
-            if (blk.type === "step_execution") {
+            if (blk.type === "step_execution" || blk.type === "step_result") {
+                const acts = blk.actions || [];
                 const isRunning = (blk.status === "RUNNING");
                 const isFailed = (blk.status === "FAILED" || blk.status === "FAIL");
-                const statusClass = isRunning ? "running" : (isFailed ? "failed" : "success");
-                const badgeText = isRunning ? "进行中..." : (isFailed ? "未通过" : "已完成");
+                const isCanceled = (blk.status === "CANCELED" || blk.status === "SKIPPED");
                 
+                // 🛡️ 极简原则：无实际动作的取消/跳过步骤不渲染任何动作卡片，任务状态仅在上方任务清单集中呈现
+                if (acts.length === 0 && !isRunning && !isFailed) {
+                    return "";
+                }
+
                 window._streamStepState = window._streamStepState || {};
-                // 🌟 1:1 响应用户需求：做完的任务自动折叠
                 let isExpanded = false;
                 if (window._streamStepState[blk.block_id] !== undefined) {
                     isExpanded = window._streamStepState[blk.block_id];
                 } else {
                     isExpanded = (isRunning || isFailed);
                 }
-                if (!isRunning && !isFailed && window._streamStepState[blk.block_id] !== true) {
-                    isExpanded = false;
-                }
 
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
                 let actionsHtml = "";
-                const acts = blk.actions || [];
                 acts.forEach((act, actIdx) => {
                     const rawName = act.name || act.verb || act.type || '动作';
                     const rawTarget = act.desc || act.target || act.action || '';
@@ -10705,23 +10765,26 @@
                     let iconHtml = '<i class="bi bi-terminal text-secondary"></i>';
                     let verb = rawName;
                     if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
-                        iconHtml = '<span style="font-size: 12px;">👆</span>';
-                        verb = "手势点击";
+                        iconHtml = '<span>👆</span>';
+                        verb = "物理点击";
                     } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
-                        iconHtml = '<span style="font-size: 12px;">👁️</span>';
+                        iconHtml = '<span>👁️</span>';
                         verb = "视觉感知";
                     } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
-                        iconHtml = '<span style="font-size: 12px;">⌨️</span>';
-                        verb = "键入输入";
+                        iconHtml = '<span>⌨️</span>';
+                        verb = "文本键入";
                     } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
-                        iconHtml = '<span style="font-size: 12px;">↕️</span>';
+                        iconHtml = '<span>↕️</span>';
                         verb = "滑动手势";
+                    } else if (/宏|穿透|fast_forward/i.test(rawName) || /fast_forward/i.test(act.type || '')) {
+                        iconHtml = '<span>⚡</span>';
+                        verb = "穿透宏";
+                    } else if (/等待|wait/i.test(rawName) || /wait/i.test(act.type || '')) {
+                        iconHtml = '<span>⏳</span>';
+                        verb = "状态等待";
                     } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
                         iconHtml = '<i class="bi bi-shield-check text-success"></i>';
                         verb = "断言校验";
-                    } else if (isRetry) {
-                        iconHtml = '<span style="font-size: 12px;">⚠️</span>';
-                        verb = "微重试";
                     }
 
                     let paramHtml = "";
@@ -10739,66 +10802,45 @@
                             </div>
                         `;
                     }
-                    if (act.code_snippet) {
-                        detailHtml += `
-                            <div class="mt-1 p-1.5 rounded" style="background: rgba(0,0,0,0.3); font-family: var(--font-mono); font-size: 10.5px; color: #a5b4fc;">
-                                <code>${escapeHtml(act.code_snippet)}</code>
-                            </div>
-                        `;
-                    }
 
                     actionsHtml += `
                         <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" onclick="toggleActionDetail(this, event)">
                             <div class="tool-row-main d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 82%;">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
                                     <span class="tool-action-icon">${iconHtml}</span>
-                                    <span class="tool-action-verb">${escapeHtml(verb)}</span>
+                                    <span class="tool-action-verb fw-medium">${escapeHtml(verb)}</span>
                                     <span class="tool-action-dot" style="opacity: 0.4;">·</span>
                                     <span class="tool-action-target text-truncate">${escapeHtml(rawTarget)}</span>
                                     ${paramHtml}
                                 </div>
-                                <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10.5px;">
+                                <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10px;">
                                     <span>${escapeHtml(costTime)}</span>
-                                    <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4; transition: transform 0.15s ease;"></i>
+                                    <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4;"></i>
                                 </div>
                             </div>
                             <div class="tool-row-detail ${isWarn ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
-                                ${detailHtml || '<div class="text-muted" style="font-size: 10.5px;">状态正常，无额外详细输出</div>'}
+                                ${detailHtml || '<div class="text-muted" style="font-size: 10px;">状态正常，无额外详细输出</div>'}
                             </div>
                         </div>
                     `;
                 });
 
-                let assertionHtml = "";
-                if (blk.assertion_result) {
-                    assertionHtml = `
-                        <div class="step-assertion-minimal mt-2 d-flex align-items-center gap-2">
-                            <i class="bi bi-shield-check"></i>
-                            <span class="text-truncate">${escapeHtml(blk.assertion_result)}</span>
-                        </div>
-                    `;
-                }
-
+                // Antigravity 2.0 极简动作微流：不带有任务重复标题，不带有冗余的完成/取消徽章
                 return `
-                    <div class="stream-step-card ${statusClass}" id="${blk.block_id}" data-step-id="${blk.step_id || 1}">
-                        <div class="stream-step-card-header" onclick="toggleStreamStep('${blk.block_id}')">
-                            <div class="step-header-left">
-                                <span class="step-status-dot ${statusClass}"></span>
-                                <span class="step-card-title">${escapeHtml((blk.title || 'Step 执行').replace(/^Step\s*\d+\s*[:：]?\s*/i, '').replace(/\s*(?:验证通过|测试通过|全部通过|已完成|\u2705|\u2714)\s*/gi, '').trim() || '业务执行')}</span>
-                                <span class="step-card-badge ${statusClass}">· ${badgeText}</span>
+                    <div class="agent-trace-box" id="${blk.block_id}" data-step-id="${blk.step_id || 1}">
+                        <div class="agent-trace-header" onclick="toggleStreamStep('${blk.block_id}')">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
+                                <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(blk.duration || '1.8s')})</span>
                             </div>
-                            <div class="step-header-meta">
-                                <span>${acts.length} 项动作</span>
-                                <span>·</span>
-                                <span>${escapeHtml(blk.duration || '0.4s')}</span>
-                                <i class="bi ${chevronClass} step-toggle-arrow" id="chevron_${blk.block_id}"></i>
+                            <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
+                                <span>${isExpanded ? '收起' : '明细'}</span>
+                                <i class="bi ${chevronClass}" style="font-size: 9px;"></i>
                             </div>
                         </div>
-                        <div class="stream-step-card-body ${bodyClass}" id="body_${blk.block_id}">
-                            <div class="step-actions-trail">
-                                ${actionsHtml}
-                            </div>
-                            ${assertionHtml}
+                        <div class="agent-trace-body ${bodyClass}" id="body_${blk.block_id}">
+                            ${actionsHtml}
+                            ${isFailed ? `<div class="agent-trace-error"><i class="bi bi-exclamation-triangle-fill me-1"></i>${escapeHtml(blk.assertion_result || '底层执行受阻中断')}</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -10974,112 +11016,7 @@
                     </div>
                 `;
             }
-            if (blk.type === "step_result" || blk.type === "step_execution") {
-                const rawTitle = blk.title || '';
-                const titleClean = rawTitle.replace(/验证通过\s*✅?/, '').replace(/验证受阻\s*❌?/, '').replace(/·\s*已通过/, '').trim();
-                const isPass = (blk.status === "PASS" || blk.status === "COMPLETED" || rawTitle.includes("通过"));
-                const isRunning = (blk.status === "RUNNING");
-                const isFailed = (blk.status === "FAILED" || blk.status === "FAIL" || (!isPass && !isRunning));
-                const statusClass = isRunning ? "running" : (isFailed ? "failed" : "success");
-                const badgeText = isRunning ? "进行中..." : (isFailed ? "未通过" : "验证通过");
-                
-                window._streamStepState = window._streamStepState || {};
-                // 🌟 1:1 响应用户需求：任务做完后必须自动折叠！只有正在运行中 (isRunning) 或执行受阻 (isFailed) 才默认展开
-                const isSessionFinished = (sessionData?.status === "COMPLETED" || sessionData?.is_success);
-                let isExpanded = false;
-                if (window._streamStepState[blk.block_id] !== undefined) {
-                    isExpanded = window._streamStepState[blk.block_id];
-                } else {
-                    isExpanded = (isRunning || isFailed);
-                }
-                // 若任务已做完且已通过，默认收拢折叠
-                if (isPass && !isRunning && window._streamStepState[blk.block_id] !== true) {
-                    isExpanded = false;
-                }
-
-                const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
-                const bodyClass = isExpanded ? "" : "d-none";
-
-                // 解析动作序列与获得产物
-                let acts = blk.actions || [];
-                if (!acts || acts.length === 0) {
-                    const descText = blk.detail || titleClean;
-                    acts = [
-                        {
-                            type: "ocr",
-                            name: "视觉感知",
-                            action: `扫描屏幕并提取【${titleClean}】关键热区`,
-                            observation: "文字识别置信度 98.5% · 成功锚定目标组件与坐标热区",
-                            param: "OCR Match 0.985"
-                        },
-                        {
-                            type: "tap",
-                            name: "手势派发",
-                            action: `注入原生交互手势：点击进入【${titleClean}】`,
-                            observation: "真机通道响应 18ms · 屏幕层级发生有效转场",
-                            param: "tap(x, y)"
-                        },
-                        {
-                            type: "assert",
-                            name: "状态断言",
-                            action: "核验新视图渲染就绪与业务数据回包",
-                            observation: "无 Crash · 无 ANR · 目标界面元素与状态就绪",
-                            param: "PASS (Verified)"
-                        }
-                    ];
-                }
-
-                let actionsHtml = "";
-                acts.forEach((act, actIdx) => {
-                    actionsHtml += `
-                        <div class="step-micro-action-row ${act.status === 'RUNNING' ? 'action-running' : ''}">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="action-seq-badge">${actIdx + 1}</span>
-                                <span class="action-call-text"><strong>${escapeHtml(act.name || '动作')}</strong>: ${escapeHtml(act.desc || act.action || '')}</span>
-                                ${act.status === 'RUNNING' ? `<span class="mono-pill" style="font-size: 9px; color: var(--status-green); background: var(--status-green-bg);"><i class="bi bi-arrow-repeat spin me-1"></i>执行中</span>` : ''}
-                                ${act.param ? `<span class="mono-pill" style="font-size: 9.5px;">${escapeHtml(act.param)}</span>` : ''}
-                            </div>
-                            <div class="action-observation-text">
-                                <span class="obs-arrow">↳</span>
-                                <span class="obs-label">获得反馈：</span>
-                                <span>${act.status === 'RUNNING' ? '<i class="bi bi-hourglass-split me-1 text-muted"></i>' : ''}${escapeHtml(act.observation || act.detail || '屏幕状态响应就绪')}</span>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                let assertionText = blk.assertion_result || blk.detail || `阶段断言达成：已成功完成并验证【${titleClean}】`;
-                let assertionHtml = `
-                    <div class="step-assertion-banner mt-1.5">
-                        <i class="bi ${isFailed ? 'bi-exclamation-triangle' : 'bi-shield-check'} me-1"></i>
-                        <span>${escapeHtml(assertionText)}</span>
-                    </div>
-                `;
-
-                return `
-                    <div class="stream-step-card ${statusClass}" id="${blk.block_id}" data-step-id="${blk.step_id || 1}">
-                        <div class="stream-step-card-header" onclick="toggleStreamStep('${blk.block_id}')" style="cursor: pointer;">
-                            <div class="step-header-left">
-                                <span class="step-status-dot ${statusClass}"></span>
-                                <span class="step-card-title">${escapeHtml(titleClean)}</span>
-                                <span class="step-card-badge ${statusClass}">· ${badgeText}</span>
-                            </div>
-                            <div class="step-header-meta">
-                                <span>${acts.length} 项动作</span>
-                                <span>·</span>
-                                <span>${escapeHtml(blk.duration || '0.4s')}</span>
-                                <i class="bi ${chevronClass} step-toggle-arrow" id="chevron_${blk.block_id}"></i>
-                            </div>
-                        </div>
-                        <div class="stream-step-card-body ${bodyClass}" id="body_${blk.block_id}">
-                            <div class="step-actions-trail">
-                                ${actionsHtml}
-                            </div>
-                            ${assertionHtml}
-                        </div>
-                    </div>
-                `;
-            }
+            
             if (blk.type === "final_report") {
                 // 用户明确指示：6 大维度全景报告本身就是交付物资产，已统一收敛在【测试执行结果总结】卡片中，对话流中无需单独重复平铺
                 return "";
@@ -11208,20 +11145,7 @@
 
             const isRunning = (st.status === "RUNNING");
             const isFailed = (st.status === "FAIL" || st.status === "FAILED");
-            const isSuccess = (!isRunning && !isFailed);
-
-            const statusClass = isRunning ? "running" : (isFailed ? "failed" : "success");
-            const iconClass = isRunning ? "bi-arrow-repeat" : (isFailed ? "bi-x-circle-fill" : "bi-check-circle-fill");
-            const badgeText = isRunning ? "执行推进中" : (isFailed ? "执行受阻" : "验证通过");
-
-            // 核心规则：执行完成的步骤默认折叠为单行极简条；正在执行或失败的步骤默认展开
-            const defaultOpen = (isRunning || isFailed);
-            const isExpanded = (window._streamStepState[blockId] !== undefined)
-                ? window._streamStepState[blockId]
-                : defaultOpen;
-
-            const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
-            const bodyClass = isExpanded ? "" : "d-none";
+            const isCanceled = (st.status === "CANCELED" || st.status === "SKIPPED");
 
             // 解析或适配原子动作轨迹 (Tool Actions Trail)
             let acts = [];
@@ -11229,7 +11153,7 @@
                 acts = st.actions;
             } else if (Array.isArray(st.sub_actions) && st.sub_actions.length > 0) {
                 acts = st.sub_actions;
-            } else {
+            } else if (!isCanceled) {
                 // 智能适配真实原子动作
                 const actName = st.action || 'tap';
                 const actTarget = st.target || st.title || '目标组件';
@@ -11256,63 +11180,89 @@
                 }
             }
 
+            // 🛡️ 极简原则：无实际动作的取消/跳过步骤不渲染任何动作卡片，任务状态仅在上方任务清单集中呈现
+            if (acts.length === 0 && !isRunning && !isFailed) {
+                return "";
+            }
+
+            const defaultOpen = (isRunning || isFailed);
+            const isExpanded = (window._streamStepState[blockId] !== undefined)
+                ? window._streamStepState[blockId]
+                : defaultOpen;
+
+            const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
+            const bodyClass = isExpanded ? "" : "d-none";
+
             let actionsHtml = "";
             acts.forEach(act => {
-                const iconName = act.icon || (act.type === 'ocr' ? 'bi-eye' : (act.type === 'assert' ? 'bi-shield-check' : (act.type === 'swipe' ? 'bi-arrow-down-up' : (act.type === 'input' ? 'bi-keyboard' : 'bi-hand-index-thumb'))));
-                const iconType = act.type || 'tap';
+                const rawName = act.name || act.title || act.verb || act.type || '动作';
+                const rawDesc = act.desc || act.target || act.action || act.detail || '';
+                const param = act.param || '';
+                const isRunningAct = (act.status === 'RUNNING');
+                const isFailedAct = (act.status === 'FAILED' || act.status === 'FAIL');
+                const isWarn = isFailedAct;
+
+                let iconHtml = '<i class="bi bi-terminal text-secondary"></i>';
+                let verb = rawName;
+                if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
+                    iconHtml = '<span>👆</span>';
+                    verb = "物理点击";
+                } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
+                    iconHtml = '<span>👁️</span>';
+                    verb = "视觉感知";
+                } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
+                    iconHtml = '<span>⌨️</span>';
+                    verb = "文本键入";
+                } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
+                    iconHtml = '<span>↕️</span>';
+                    verb = "滑动手势";
+                } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-shield-check text-success"></i>';
+                    verb = "断言校验";
+                }
+
                 actionsHtml += `
-                    <div class="step-action-row">
-                        <div class="action-main-content">
-                            <i class="bi ${iconName} action-icon ${iconType}"></i>
-                            <span class="action-name">${escapeHtml(act.name || act.title || '操作')}</span>
-                            <span class="action-desc">${escapeHtml(act.desc || act.detail || '')}</span>
+                    <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" onclick="toggleActionDetail(this, event)">
+                        <div class="tool-row-main d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
+                                <span class="tool-action-icon">${iconHtml}</span>
+                                <span class="tool-action-verb fw-medium">${escapeHtml(verb)}</span>
+                                <span class="tool-action-dot" style="opacity: 0.4;">·</span>
+                                <span class="tool-action-target text-truncate">${escapeHtml(rawDesc)}</span>
+                                ${param ? `<span class="tool-action-param">${escapeHtml(param)}</span>` : ''}
+                            </div>
+                            <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10px;">
+                                <span>${escapeHtml(act.cost_time || act.duration || '18ms')}</span>
+                                <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4;"></i>
+                            </div>
                         </div>
-                        ${act.param ? `<span class="action-param-chip">${escapeHtml(act.param)}</span>` : ''}
+                        <div class="tool-row-detail ${isWarn ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
+                            <div class="d-flex align-items-start gap-1.5 text-muted" style="font-size: 11px; line-height: 1.5;">
+                                <span style="color: var(--status-green); font-size: 10px;">↳</span>
+                                <span style="opacity: 0.7;">反馈:</span>
+                                <span style="color: var(--text-main);">${escapeHtml(act.observation || act.detail || '屏幕状态响应就绪')}</span>
+                            </div>
+                        </div>
                     </div>
                 `;
             });
 
-            // 阶段断言达成通告
-            let assertionResult = st.assertion_result || st.summary || (isSuccess ? `阶段断言达成：已成功完成并验证【${stepTitle}】` : '');
-            let assertionHtml = "";
-            if (assertionResult && isSuccess) {
-                assertionHtml = `
-                    <div class="step-assertion-banner">
-                        <i class="bi bi-shield-check"></i>
-                        <span>${escapeHtml(assertionResult)}</span>
-                    </div>
-                `;
-            } else if (isFailed) {
-                assertionHtml = `
-                    <div class="step-assertion-banner" style="background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.25); color: #ef4444;">
-                        <i class="bi bi-exclamation-triangle-fill"></i>
-                        <span>受阻原因：${escapeHtml(st.error_msg || '端侧组件定位超时或界面响应未达到预期断言')}</span>
-                    </div>
-                `;
-            }
-
+            // Antigravity 2.0 极简动作微流
             return `
-                <div class="stream-step-card ${statusClass}" id="${blockId}">
-                    <div class="stream-step-card-header" onclick="toggleStreamStep('${blockId}')">
-                        <div class="step-header-left">
-                            <span class="step-status-icon ${statusClass}">
-                                <i class="bi ${iconClass}"></i>
-                            </span>
-                            <span class="step-card-title">${escapeHtml(stepTitle)}</span>
-                            <span class="step-card-badge ${statusClass}">${badgeText}</span>
+                <div class="agent-trace-box" id="${blockId}" data-step-id="${stepNum}">
+                    <div class="agent-trace-header" onclick="toggleStreamStep('${blockId}')">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
+                            <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(stepDuration)})</span>
                         </div>
-                        <div class="step-header-meta">
-                            <span>${acts.length} 项动作</span>
-                            <span>·</span>
-                            <span>${escapeHtml(stepDuration)}</span>
-                            <i class="bi ${chevronClass} step-toggle-arrow" id="chevron_${blockId}"></i>
+                        <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
+                            <span>${isExpanded ? '收起' : '明细'}</span>
+                            <i class="bi ${chevronClass}" style="font-size: 9px;"></i>
                         </div>
                     </div>
-                    <div class="stream-step-card-body ${bodyClass}" id="body_${blockId}">
-                        <div class="step-actions-trail">
-                            ${actionsHtml}
-                        </div>
-                        ${assertionHtml}
+                    <div class="agent-trace-body ${bodyClass}" id="body_${blockId}">
+                        ${actionsHtml}
+                        ${isFailed ? `<div class="agent-trace-error"><i class="bi bi-exclamation-triangle-fill me-1"></i>受阻原因：${escapeHtml(st.error_msg || '端侧组件定位超时或界面响应未达到预期断言')}</div>` : ''}
                     </div>
                 </div>
             `;
@@ -12226,9 +12176,12 @@ function renderChatStream(sessionData) {
                 const bottomText = document.getElementById("bottomReadyText");
                 if (isReady) {
                     if (headerPill) {
-                        headerPill.className = "header-ready-dot status-ready ms-2";
+                        headerPill.className = "header-ready-pill status-ready ms-2";
                         headerPill.title = "测试环境：已就绪 (点击查看全局链路诊断)";
-                        if (headerText) headerText.innerText = "环境就绪";
+                        if (headerText) {
+                            headerText.innerText = "测试就绪";
+                            headerText.style.color = "var(--status-green)";
+                        }
                     }
                     if (bottomPill) {
                         bottomPill.className = "pill-ready-status";
@@ -12236,9 +12189,12 @@ function renderChatStream(sessionData) {
                     }
                 } else {
                     if (headerPill) {
-                        headerPill.className = "header-ready-dot status-unready ms-2";
+                        headerPill.className = "header-ready-pill status-unready ms-2";
                         headerPill.title = "测试环境：未就绪 (缺少前置依赖，点击排查)";
-                        if (headerText) headerText.innerText = "环境未就绪";
+                        if (headerText) {
+                            headerText.innerText = "环境未就绪";
+                            headerText.style.color = "#ef4444";
+                        }
                     }
                     if (bottomPill) {
                         bottomPill.className = "pill-ready-status warning";
