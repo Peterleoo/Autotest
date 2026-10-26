@@ -13,14 +13,14 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
                 :root {
-            /* 现代工程级极简色彩系统 (统一 Accent: #007aff, 专色专用) */
-            --accent-primary: #007aff;
-            --accent-hover: #006ee6;
-            --accent-subtle: rgba(0, 122, 255, 0.08);
-            --accent-border: rgba(0, 122, 255, 0.35);
-            --accent-on-primary: #ffffff;
+            /* 方案 A: 纯粹中性黑白灰极简调色系统 (Pure Monochrome System) */
+            --accent-primary: #ffffff;
+            --accent-hover: #e4e4e7;
+            --accent-subtle: rgba(255, 255, 255, 0.06);
+            --accent-border: rgba(255, 255, 255, 0.20);
+            --accent-on-primary: #000000;
 
-            /* 纯粹状态色 (严格语义属性专用) */
+            /* 纯粹状态色 (严格仅用于业务裁定与就绪状态，绝不做装饰) */
             --status-green: #10b981;
             --status-green-bg: rgba(16, 185, 129, 0.12);
             --status-green-border: rgba(16, 185, 129, 0.3);
@@ -30,9 +30,9 @@
             --status-red: #ef4444;
             --status-red-bg: rgba(239, 68, 68, 0.12);
             --status-red-border: rgba(239, 68, 68, 0.3);
-            --status-blue: #38bdf8;
-            --status-blue-bg: rgba(56, 189, 248, 0.12);
-            --status-blue-border: rgba(56, 189, 248, 0.3);
+            --status-blue: #71717a;
+            --status-blue-bg: rgba(255, 255, 255, 0.06);
+            --status-blue-border: rgba(255, 255, 255, 0.18);
 
             /* 中性表面与画布层级 (深色基调) */
             --bg-base: #09090b;
@@ -60,8 +60,8 @@
             --text-faint: #52525b;
             --text-dim: #52525b;
 
-            --btn-send-bg: var(--accent-primary);
-            --btn-send-text: #ffffff;
+            --btn-send-bg: #ffffff;
+            --btn-send-text: #000000;
             --btn-disabled: #27272a;
             --btn-disabled-icon: #52525b;
 
@@ -74,14 +74,13 @@
         }
 
         body.theme-light, body[data-theme="light"] {
-            /* 统一 Accent: #007aff (高对比度工程级浅色) */
-            --accent-primary: #007aff;
-            --accent-hover: #006ee6;
-            --accent-subtle: rgba(0, 122, 255, 0.06);
-            --accent-border: rgba(0, 122, 255, 0.35);
+            /* 方案 A: 浅色纯粹中性黑白灰极简调色系统 */
+            --accent-primary: #09090b;
+            --accent-hover: #18181b;
+            --accent-subtle: rgba(0, 0, 0, 0.04);
+            --accent-border: rgba(0, 0, 0, 0.15);
             --accent-on-primary: #ffffff;
 
-            /* 浅色纯粹状态色 */
             --status-green: #059669;
             --status-green-bg: rgba(5, 150, 105, 0.08);
             --status-green-border: rgba(5, 150, 105, 0.25);
@@ -91,11 +90,10 @@
             --status-red: #dc2626;
             --status-red-bg: rgba(220, 38, 38, 0.08);
             --status-red-border: rgba(220, 38, 38, 0.25);
-            --status-blue: #0284c7;
-            --status-blue-bg: rgba(2, 132, 199, 0.08);
-            --status-blue-border: rgba(2, 132, 199, 0.25);
+            --status-blue: #64748b;
+            --status-blue-bg: rgba(0, 0, 0, 0.04);
+            --status-blue-border: rgba(0, 0, 0, 0.15);
 
-            /* 中性表面与画布层级 (浅色基调) */
             --bg-base: #f8fafc;
             --bg-sidebar: #f1f5f9;
             --bg-surface: #ffffff;
@@ -121,7 +119,7 @@
             --text-faint: #94a3b8;
             --text-dim: #94a3b8;
 
-            --btn-send-bg: var(--accent-primary);
+            --btn-send-bg: #09090b;
             --btn-send-text: #ffffff;
             --btn-disabled: #e2e8f0;
             --btn-disabled-icon: #94a3b8;
@@ -141,6 +139,36 @@
         *::-webkit-scrollbar-thumb { background-color: rgba(160, 160, 160, 0.2); border-radius: 9999px; }
 
         
+        /* ==========================================================================
+           【方案 A: 纯粹中性黑白灰极简调色 - 彻底收敛 Bootstrap 彩色实用类】
+           ========================================================================== */
+        .text-primary {
+            color: var(--text-primary) !important;
+        }
+        .bg-primary {
+            background-color: var(--accent-primary) !important;
+            color: var(--accent-on-primary) !important;
+        }
+        .btn-primary {
+            background-color: var(--accent-primary) !important;
+            border-color: var(--accent-primary) !important;
+            color: var(--accent-on-primary) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+            background-color: var(--accent-hover) !important;
+            border-color: var(--accent-hover) !important;
+            color: var(--accent-on-primary) !important;
+            opacity: 0.92;
+        }
+        .bg-primary-subtle {
+            background-color: var(--accent-subtle) !important;
+            color: var(--text-primary) !important;
+        }
+        .border-primary-subtle {
+            border-color: var(--accent-border) !important;
+        }
+
         code, .settings-modal-dialog code {
             font-family: var(--font-mono) !important;
             color: var(--text-primary) !important;
@@ -2158,13 +2186,13 @@
             color: var(--text-main) !important;
             font-weight: 600 !important;
             border-color: transparent !important;
-            border-left: 2.5px solid var(--status-blue, #007aff) !important;
+            border-left: 2.5px solid #ffffff !important;
         }
         body.theme-light .settings-nav-item.active,
         body[data-theme="light"] .settings-nav-item.active {
             background-color: rgba(0, 0, 0, 0.05) !important;
             color: #0f172a !important;
-            border-left: 2.5px solid #007aff !important;
+            border-left: 2.5px solid #09090b !important;
         }
         .settings-sidebar-footer {
             margin-top: auto !important;
@@ -2218,9 +2246,15 @@
             background-color: var(--bg-surface-hover) !important;
         }
         .provider-choice-card.active, .provider-choice-card.selected {
-            border-color: rgba(0, 122, 255, 0.45) !important;
-            background-color: rgba(0, 122, 255, 0.05) !important;
-            box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.3) !important;
+            border-color: rgba(255, 255, 255, 0.32) !important;
+            background-color: rgba(255, 255, 255, 0.06) !important;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22) !important;
+        }
+        body.theme-light .provider-choice-card.active, body[data-theme="light"] .provider-choice-card.active,
+        body.theme-light .provider-choice-card.selected, body[data-theme="light"] .provider-choice-card.selected {
+            border-color: rgba(0, 0, 0, 0.30) !important;
+            background-color: rgba(0, 0, 0, 0.03) !important;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18) !important;
         }
         .provider-choice-card span, .provider-choice-card div {
             color: inherit;
@@ -2378,7 +2412,7 @@
         /* 5. Google OAuth 专属高光授权卡片 */
         .fidelity-oauth-card {
             background-color: var(--bg-main) !important;
-            border: 1px solid rgba(66, 133, 244, 0.3) !important;
+            border: 1px solid var(--border-subtle) !important;
             border-radius: 10px !important;
             padding: 12px 15px !important;
             margin-bottom: 12px !important;
@@ -2391,12 +2425,13 @@
             width: 38px !important;
             height: 38px !important;
             border-radius: 9px !important;
-            background-color: rgba(66, 133, 244, 0.15) !important;
+            background-color: var(--bg-surface) !important;
+            border: 1px solid var(--border-subtle) !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            font-size: 20px !important;
-            color: #4285f4 !important;
+            font-size: 18px !important;
+            color: var(--text-primary) !important;
             flex-shrink: 0 !important;
         }
         .btn-fidelity-reauth {
@@ -2506,8 +2541,8 @@
             color: #0f172a !important;
         }
         body[data-theme="light"] .fidelity-oauth-card {
-            background-color: #eff6ff !important;
-            border-color: rgba(66, 133, 244, 0.35) !important;
+            background-color: #ffffff !important;
+            border-color: var(--border-subtle) !important;
         }
         body[data-theme="light"] .fidelity-models-manager {
             background-color: #ffffff !important;
@@ -2524,8 +2559,8 @@
         }
         body[data-theme="light"] .btn-fidelity-reauth {
             background-color: #ffffff !important;
-            border-color: rgba(66, 133, 244, 0.3) !important;
-            color: #1d4ed8 !important;
+            border-color: rgba(0, 0, 0, 0.15) !important;
+            color: #0f172a !important;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
         body[data-theme="light"] .theme-select-card {
@@ -3893,17 +3928,21 @@
             background: #ffffff;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
-        /* 激活指示条：左侧贴合 3px 柔和天蓝/青绿微光条 */
+        /* 激活指示条：左侧贴合 3px 纯粹中性高光条 */
         .session-item.active::before {
             content: "";
             position: absolute;
             left: 0;
             top: 5px;
             bottom: 5px;
-            width: 3px;
+            width: 2.5px;
             border-radius: 0 2px 2px 0;
-            background: var(--accent-primary);
-            box-shadow: 0 0 6px rgba(0, 122, 255, 0.45);
+            background: var(--text-primary);
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
+        }
+        body.theme-light .session-item.active::before, body[data-theme="light"] .session-item.active::before {
+            background: #09090b;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
         }
 
         /* 会话左侧状态微圆点 (运行中呼吸绿光，通过青绿，失败警示红，就绪柔灰) */
@@ -4254,7 +4293,8 @@
         }
         /* Linear 极简工程质感操作按钮 */
         .btn-linear-primary {
-            background: var(--status-blue, #007aff);
+            background: var(--btn-send-bg);
+            color: var(--btn-send-text) !important;
             color: #ffffff;
             border: none;
             padding: 4px 12px;
@@ -5499,15 +5539,16 @@
             border-radius: 9999px;
             z-index: 1;
             pointer-events: none;
-            background: #007aff;
-            border: none;
-            box-shadow: 0 3px 12px rgba(0, 122, 255, 0.42), 0 1px 3px rgba(0, 122, 255, 0.2);
+            background: #27272a;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
             transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
             transform: translateX(0);
         }
         body.theme-light .mode-slider-thumb, body[data-theme="light"] .mode-slider-thumb {
-            background: #007aff;
-            box-shadow: 0 3px 10px rgba(0, 122, 255, 0.32), 0 1px 3px rgba(0, 122, 255, 0.16);
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 2px 7px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
         }
         .sidebar-mode-switcher.is-local .mode-slider-thumb {
             transform: translateX(100%);
@@ -5548,7 +5589,7 @@
             font-weight: 600;
         }
         body.theme-light .sidebar-mode-btn.active, body[data-theme="light"] .sidebar-mode-btn.active {
-            color: #ffffff !important;
+            color: #09090b !important;
             font-weight: 600;
         }
 
@@ -5586,17 +5627,21 @@
             background: #ffffff;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
-        /* 激活指示条：左侧贴合 3px 柔和天蓝/青绿微光条 (与 AI 会话项完全一致) */
+        /* 激活指示条：左侧贴合 3px 纯粹中性高光条 (与 AI 会话项完全一致) */
         .app-project-item.active::before {
             content: "";
             position: absolute;
             left: 0;
             top: 5px;
             bottom: 5px;
-            width: 3px;
+            width: 2.5px;
             border-radius: 0 2px 2px 0;
-            background: var(--accent-primary);
-            box-shadow: 0 0 6px rgba(0, 122, 255, 0.45);
+            background: var(--text-primary);
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
+        }
+        body.theme-light .app-project-item.active::before, body[data-theme="light"] .app-project-item.active::before {
+            background: #09090b;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
         }
         .app-project-item .project-status-dot {
             width: 6.5px;
@@ -5730,7 +5775,7 @@
         body.theme-light .btn-action-sm.active, body[data-theme="light"] .btn-action-sm.active {
             background: #ffffff;
             color: #007aff;
-            border-color: rgba(0, 122, 255, 0.35);
+            border-color: var(--border-hover);
             box-shadow: 0 2px 5px rgba(0, 122, 255, 0.12);
         }
 
@@ -5825,8 +5870,8 @@
         }
         body.theme-light .suggest-card-item:hover, body[data-theme="light"] .suggest-card-item:hover {
             background: #ffffff;
-            border-color: rgba(0, 122, 255, 0.45);
-            box-shadow: 0 3px 8px rgba(0, 122, 255, 0.1);
+            border-color: rgba(0, 0, 0, 0.22);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
         }
         .suggest-card-title {
             font-size: 12px;
@@ -5956,26 +6001,26 @@
         body[data-theme="light"] .pill-btn:hover, body[data-theme="light"] .model-select-pill:hover {
             background: #f8fafc;
             color: #09090b;
-            border-color: rgba(0, 122, 255, 0.35);
+            border-color: var(--border-hover);
         }
         .btn-send-round {
             width: 30px;
             height: 30px;
             border-radius: 50%;
-            background: #007aff;
-            color: #ffffff;
-            border: none;
+            background: var(--btn-send-bg);
+            color: var(--btn-send-text);
+            border: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
         }
         .btn-send-round:hover {
             transform: scale(1.05);
-            background: #006ee6;
-            box-shadow: 0 3px 10px rgba(0, 122, 255, 0.45);
+            opacity: 0.92;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
         }
 
         /* 4. 模式 B (本地回归看板视图): 苹果电光蓝跑道分段条 + 紧凑型流线卡片 */
@@ -6064,7 +6109,7 @@
         }
         body.theme-light .case-card-compact:hover, body[data-theme="light"] .case-card-compact:hover {
             background: #ffffff;
-            border-color: rgba(0, 122, 255, 0.35);
+            border-color: var(--border-hover);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
         }
         /* 主行单行流线 */
@@ -6182,7 +6227,7 @@
         .btn-case-ai:hover {
             color: var(--text-main);
             background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(0, 122, 255, 0.35);
+            border-color: var(--border-hover);
         }
         .btn-case-replay {
             height: 24px;
