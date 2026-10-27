@@ -162,7 +162,7 @@ class TaskManager:
 
         # 2. 强力兜底扫描：彻底杀绝所有关联或可能残留的 run_ai_test.py 进程树，绝无孤儿进程逃逸
         try:
-            cmd = 'powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*run_ai_test.py*' } | Select-Object -ExpandProperty ProcessId"'
+            cmd = f'powershell -Command "Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like \'*run_ai_test.py*\' -and $_.CommandLine -like \'*{session_id}*\' }} | Select-Object -ExpandProperty ProcessId"'
             res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
             for line in res.stdout.strip().split():
                 if line.isdigit():
@@ -543,6 +543,15 @@ class TaskManager:
                 device_ids = [conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id", "auto_device")]
             else:
                 raise ValueError("未检测到任何在线可用的物理真机！当前已杜绝免机仿真，请使用 USB 数据线连接手机并开启开发者选项中的【USB 调试】。")
+
+        # 🚀 目标真机独占调度：若目标设备存在未完成旧任务（如 WAITING_USER_INPUT、RUNNING 等），自动抢占并安全终止旧任务
+        for dev_id in device_ids:
+            for old_sid, old_sess in list(self.sessions.items()):
+                if dev_id in old_sess.get("target_devices", []):
+                    old_status = old_sess.get("status")
+                    if old_status in ["RUNNING", "WAITING_USER_INPUT", "PAUSED", "QUEUED", "AWAITING_APPROVAL"]:
+                        logger.info(f"⚡ [设备抢占] 目标真机 [{dev_id}] 存在未完成旧任务 [{old_sid}] (状态: {old_status})，自动接管抢占")
+                        self.stop_session(old_sid)
 
         session_id = f"sess_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
         title = goal[:20] + ("..." if len(goal) > 20 else "")
@@ -1586,9 +1595,26 @@ class TaskManager:
         dev_state = session["devices"][device_id]
         lock = self._get_device_lock(device_id)
 
-        # 1. 尝试获取该设备排它锁
+        # 1. 尝试获取该设备排它锁（带超时与自愈探测）
         dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 正在请求锁定目标设备...")
-        with lock:
+        acquired = False
+        wait_cycles = 0
+        while not acquired:
+            if session.get("status") == "STOPPED":
+                return
+            acquired = lock.acquire(timeout=1.5)
+            if not acquired:
+                wait_cycles += 1
+                if wait_cycles >= 4:
+                    for s_id, s_data in list(self.sessions.items()):
+                        if s_id != session_id and s_data.get("status") in ["WAITING_USER_INPUT", "PAUSED"]:
+                            if device_id in s_data.get("target_devices", []):
+                                logger.warning(f"⚡ [设备锁自愈] 检测到挂起会话 [{s_id}] 霸占设备锁，自动释放接管...")
+                                self.stop_session(s_id)
+                                break
+                    wait_cycles = 0
+
+        try:
             dev_state["status"] = "RUNNING"
             dev_state["action"] = "成功获取设备执行锁，启动测试"
             dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 成功锁定设备 [{dev_state['model']}]，开始推进测试流")
@@ -1644,6 +1670,12 @@ class TaskManager:
 
             # 实时持久化存盘，保证前端刷新或服务重启数据 100% 完整
             self._save_session(session_id)
+        finally:
+            if acquired:
+                try:
+                    lock.release()
+                except RuntimeError:
+                    pass
 
     def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float, turn_id: int = 1):
         cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
