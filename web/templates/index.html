@@ -6635,58 +6635,7 @@
             color: #ef4444;
         }
 
-    
-        /* ================= 🌟 现代工程级阶梯错峰流式动效 (Linear / Apple 范式) ================= */
-        @keyframes streamBlockFadeUp {
-            0% {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
 
-        @keyframes streamItemCascade {
-            0% {
-                opacity: 0;
-                transform: translateY(6px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes thinkingGlowPulse {
-            0%, 100% { opacity: 0.7; }
-            50% { opacity: 1; }
-        }
-
-        /* 用户意图气泡首拍入场 */
-        .stream-user-row.stream-animated {
-            animation: streamBlockFadeUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-
-        /* 意图与策略推演折叠条次拍错峰浮现 */
-        .stream-thought-box.stream-animated {
-            animation: streamBlockFadeUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
-        }
-        .stream-thought-row .thought-shimmer {
-            animation: thinkingGlowPulse 2s ease-in-out infinite;
-        }
-
-        /* 待办清单卡片三拍优雅承接 */
-        .stream-todo-card.stream-animated {
-            animation: streamBlockFadeUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both;
-        }
-
-        /* 待办任务条目错峰级联涌现 (按索引间隔 55ms 顺滑铺开) */
-        .stream-animated .stream-todo-item {
-            animation: streamItemCascade 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
-            animation-delay: calc(var(--item-idx, 0) * 55ms + 0.18s);
-        }
 
     </style>
 
@@ -10896,9 +10845,8 @@
 
         function buildBlockHtml(blk, sessionData) {
             if (blk.type === "user_message") {
-                const animClass = window._renderedBlockIds && window._renderedBlockIds.has(blk.block_id) ? "" : "stream-animated";
-                return `
-                    <div class="stream-user-row ${animClass}" id="${blk.block_id}">
+                                return `
+                    <div class="stream-user-row" id="${blk.block_id}">
                         <div class="stream-user-bubble">
                             ${escapeHtml(blk.content || '')}
                         </div>
@@ -10921,12 +10869,11 @@
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
-                const animClass = window._renderedBlockIds && window._renderedBlockIds.has(blk.block_id) ? "" : "stream-animated";
-                return `
-                    <div class="stream-thought-box ${animClass}" id="${blk.block_id}">
+                                return `
+                    <div class="stream-thought-box" id="${blk.block_id}">
                         <div class="stream-thought-row" onclick="toggleStreamThought('${blk.block_id}')">
                             <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 10px;"></i>
-                            <span class="thought-shimmer">用时 ${escapeHtml(blk.duration || '0.8s')} · 业务意图与端侧策略推演</span>
+                            <span>用时 ${escapeHtml(blk.duration || '0.8s')} · 业务意图与端侧策略推演</span>
                         </div>
                         <div class="stream-thought-body ${bodyClass}" id="body_${blk.block_id}">
                             ${bulletsHtml}
@@ -10972,7 +10919,7 @@
                         }
 
                         itemsHtml += `
-                            <div class="stream-todo-item ${diffClass}" style="--item-idx: ${idx};">
+                            <div class="stream-todo-item ${diffClass}">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
                                     <span class="item-sign" style="font-family: var(--font-mono); opacity: 0.7;">${signChar}</span>
                                     <span class="item-title text-truncate"><strong>${escapeHtml(it.title)}</strong>: ${escapeHtml(it.desc || '')}</span>
@@ -10986,9 +10933,8 @@
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
-                const animClass = window._renderedBlockIds && window._renderedBlockIds.has(blk.block_id) ? "" : "stream-animated";
-                return `
-                    <div class="stream-todo-card ${animClass}" id="${blk.block_id}">
+                                return `
+                    <div class="stream-todo-card" id="${blk.block_id}">
                         <div class="stream-todo-header" onclick="toggleStreamTodo('${blk.block_id}')">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 10px;"></i>
