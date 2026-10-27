@@ -5257,6 +5257,19 @@
             padding: 16px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
         }
+        .hitl-decision-card {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.03));
+            border: 1px solid rgba(245, 158, 11, 0.38);
+            border-radius: 12px;
+            margin: 16px 0;
+            padding: 16px;
+            box-shadow: 0 6px 24px rgba(245, 158, 11, 0.08);
+            animation: hitlFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes hitlFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         .token-pressure-bar {
             display: flex;
             align-items: center;
@@ -9149,6 +9162,83 @@
                 gateEl.remove();
             }
 
+            // 🛡️ 人机协同登录决策卡片（挂起时呈现）
+            const hitl = sessionData.hitl_decision;
+            const isWaitingHitl = (sessionData.status === "WAITING_USER_INPUT" || Boolean(hitl));
+            let hitlEl = flow.querySelector(".hitl-decision-card");
+            if (isWaitingHitl && hitl) {
+                const sid = sessionData.session_id || activeSessionId;
+                const hitlHtml = `
+                    <div class="hitl-decision-card mt-3" id="hitlDecisionCard_${sid}">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-exclamation text-warning fs-5"></i>
+                                <span class="fw-semibold text-main" style="font-size: 13.5px;">${hitl.title || '人机协同 · 需要登录鉴权介入'}</span>
+                            </div>
+                            <span class="badge border border-warning-subtle text-warning" style="background: rgba(245, 158, 11, 0.12); font-size: 11px;">
+                                <i class="bi bi-hourglass-split me-1"></i>自动化已安全挂起
+                            </span>
+                        </div>
+                        <div class="text-sub small mb-3" style="line-height: 1.5; font-size: 12px;">
+                            ${hitl.desc || '检测到端侧进入账号登录或鉴权拦截界面，自动化已安全挂起。请提供测试账号密码/验证码，或在右侧真机投屏手动完成登录：'}
+                        </div>
+                        
+                        <div class="p-2.5 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); padding: 10px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-medium text-main" style="font-size: 12px;"><i class="bi bi-key me-1 text-primary"></i> 方式一：输入测试凭证（自动代填账号/密码或短信验证码）</span>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="手机号 / 账号" value="${hitl.preset_account || ''}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlPasswordInput_${sid}" placeholder="密码 或 短信验证码" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="form-check m-0">
+                                    <input class="form-check-input" type="checkbox" id="hitlRemember_${sid}" checked style="cursor: pointer;">
+                                    <label class="form-check-label text-muted" for="hitlRemember_${sid}" style="font-size: 11px; cursor: pointer;">
+                                        记住该 App 凭证 (存入 credentials.json 后续免打扰)
+                                    </label>
+                                </div>
+                                <button class="btn btn-sm btn-primary px-3 py-1 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'inject')">
+                                    <i class="bi bi-lightning-charge-fill me-1"></i> 立即自动注入并提交
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
+                            <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px;">
+                                <i class="bi bi-display text-info"></i>
+                                <span>若需滑块拼图或物理机接码：可直接在右侧真机镜像手动操作</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary py-1" style="font-size: 11.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'skip')">
+                                    <i class="bi bi-skip-forward me-1"></i> 尝试跳过
+                                </button>
+                                <button class="btn btn-sm btn-success py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
+                                    <i class="bi bi-check2-circle me-1"></i> 我已在手机上完成登录，继续
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                if (!hitlEl) {
+                    flow.insertAdjacentHTML("beforeend", hitlHtml);
+                } else {
+                    const curAcc = document.getElementById(`hitlAccountInput_${sid}`)?.value;
+                    const curPwd = document.getElementById(`hitlPasswordInput_${sid}`)?.value;
+                    if (!curAcc && !curPwd) {
+                        const tempDiv = document.createElement("div");
+                        tempDiv.innerHTML = hitlHtml;
+                        hitlEl.replaceWith(tempDiv.firstElementChild);
+                    }
+                }
+            } else if (hitlEl) {
+                hitlEl.remove();
+            }
+
             // 悬浮画中画或步骤微胶囊保持同步
             renderStepsDrawerBody(sessionData, sessionData.plan_steps || []);
         }
@@ -10381,6 +10471,63 @@
                 alert("打回返工请求异常: " + e);
             }
         }
+
+        window.submitHitlDecision = async function(sessionId, decisionType) {
+            sessionId = sessionId || activeSessionId;
+            if (!sessionId) return;
+            
+            const accountInput = document.getElementById(`hitlAccountInput_${sessionId}`);
+            const passwordInput = document.getElementById(`hitlPasswordInput_${sessionId}`);
+            const rememberInput = document.getElementById(`hitlRemember_${sessionId}`);
+            
+            const account = accountInput ? accountInput.value.trim() : "";
+            const password = passwordInput ? passwordInput.value.trim() : "";
+            const remember = rememberInput ? rememberInput.checked : true;
+            
+            if (decisionType === "inject" && !account) {
+                if (typeof showToast === "function") showToast("请输入账号/手机号后再提交", "warning");
+                return;
+            }
+            
+            const cardEl = document.getElementById(`hitlDecisionCard_${sessionId}`);
+            if (cardEl) {
+                cardEl.style.opacity = "0.6";
+                cardEl.style.pointerEvents = "none";
+            }
+            
+            try {
+                const resp = await fetch(`/api/sessions/${sessionId}/resolve_decision`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        decision_type: decisionType,
+                        account: account,
+                        password: password,
+                        remember: remember,
+                        app_key: (currentSession && (currentSession.app_filename || currentSession.app_package)) || "demo_app"
+                    })
+                });
+                const res = await resp.json();
+                if (res.success) {
+                    if (typeof showToast === "function") showToast(decisionType === "inject" ? "凭证已注入，端侧继续执行！" : "已下达人工决策，恢复自动化测试", "success");
+                    if (currentSession) currentSession.hitl_decision = null;
+                    if (cardEl) cardEl.remove();
+                } else {
+                    if (typeof showToast === "function") showToast("提交决策失败，请重试", "error");
+                    if (cardEl) {
+                        cardEl.style.opacity = "1";
+                        cardEl.style.pointerEvents = "auto";
+                    }
+                }
+            } catch (e) {
+                console.error("提交人机协同决策出错:", e);
+                if (typeof showToast === "function") showToast("网络错误，提交决策失败", "error");
+                if (cardEl) {
+                    cardEl.style.opacity = "1";
+                    cardEl.style.pointerEvents = "auto";
+                }
+            }
+        };
 
         async function acceptSession(sessionId) {
             if (!confirm("确认正式验收通过本次自动化测试交付物并封板归档？")) return;
