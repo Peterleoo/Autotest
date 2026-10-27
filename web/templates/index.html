@@ -11626,6 +11626,57 @@
                     `;
                 }
 
+                // 🌟 方案一：区分成功态与受阻态 (测试未达预期时坚决不出伪交付物，亦不保留底部沉重按钮坞)
+                if (!isPass) {
+                    let failReason = sessionData.error_message || blk.error_message || "";
+                    if (!failReason) {
+                        const steps = sessionData.plan_steps || [];
+                        const failedStep = steps.find(s => s.status === "FAIL" || s.status === "FAILED");
+                        if (failedStep) {
+                            failReason = `受阻于 [${failedStep.title}] · ${failedStep.desc || '未能达成预期状态'}`;
+                        } else {
+                            failReason = "业务全链路未能在步数预算内达成最终断言";
+                        }
+                    }
+
+                    return `
+                        <div class="test-result-summary-card ${verdictClass} failure-compact-card" id="${blk.block_id}" style="padding: 10px 14px;">
+                            <!-- 顶层单行裁定抬头与轻量排障入口 (高度压缩至极简) -->
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="mono-pill ${isBlocked ? 'blocked-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isBlocked ? 'BLOCKED' : 'FAIL'}</span>
+                                    <span class="summary-verdict-title">${isBlocked ? '业务前置受阻' : '业务验证受阻'}</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
+                                    <span>${escapeHtml(blk.steps_summary || '测试未达成预期')}</span>
+                                    <span>·</span>
+                                    <span>${escapeHtml(blk.duration || '0s')}</span>
+                                    ${blk.timestamp ? `<span>·</span><span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp)}</span>` : ''}
+                                    <span>·</span>
+                                    <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="openLogViewer('${sid}')" style="font-size: 11px; color: var(--text-sub);" title="在右侧抽屉展开底层运行日志流">
+                                        <i class="bi bi-terminal me-1"></i>运行日志 <i class="bi bi-chevron-right" style="font-size: 9px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            ${modelErrorBannerHtml}
+
+                            ${(!isModelErr && failReason) ? `
+                                <div class="mt-2 p-2 rounded d-flex align-items-center justify-content-between flex-wrap gap-2" style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.14); font-size: 11.5px;">
+                                    <div class="d-flex align-items-center gap-1.5 text-truncate" style="color: var(--text-sub); max-width: 85%;">
+                                        <i class="bi bi-exclamation-circle text-danger" style="font-size: 12px;"></i>
+                                        <span class="text-truncate">${escapeHtml(failReason)}</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-link p-0 text-decoration-none text-nowrap" onclick="retryGoalAfterSatisfied(sessionData?.goal || '')" style="font-size: 11px; color: #3b82f6;" title="以相同目标重新发起测试">
+                                        <i class="bi bi-arrow-repeat me-0.5"></i>重新测试
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                // 仅在 isPass === true 时构建交付物资产
                 const artifacts = blk.artifacts || [
                     { name: "6 大测试维度全景交付物报告", file: `test_report_${sid.slice(-6)}.md`, type: "report" },
                     { name: "端侧底层执行与诊断日志流", file: `execution_${sid.slice(-6)}.log`, type: "log" },
