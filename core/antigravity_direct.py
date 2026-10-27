@@ -13,9 +13,11 @@ CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleuserconte
 CLIENT_SECRET = "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"
 
 TOKEN_FILES = [
-    Path(__file__).resolve().parent.parent / "config" / "antigravity_oauth.json",
-    Path(r"F:\PM-product\data\desktop-home\gemini-oauth-bridge.json")
+    Path(__file__).resolve().parent.parent / "config" / "antigravity_oauth.json"
 ]
+_ext_oauth = os.getenv("ANTIGRAVITY_CONFIG_PATH")
+if _ext_oauth and Path(_ext_oauth).exists():
+    TOKEN_FILES.insert(0, Path(_ext_oauth))
 
 class AntigravityDirectClient:
     """

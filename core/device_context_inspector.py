@@ -15,7 +15,8 @@ class DeviceContextInspector:
     """
 
     @classmethod
-    def inspect(cls, adb_bin: str, device_id: str, target_package: str = "com.apicloud.A6995433058179") -> Dict[str, Any]:
+    def inspect(cls, adb_bin: str, device_id: str, target_package: Optional[str] = None) -> Dict[str, Any]:
+        target_package = target_package or ""
         result = {
             "device_id": device_id,
             "target_package": target_package,
@@ -51,7 +52,11 @@ class DeviceContextInspector:
                 if match:
                     result["current_package"] = match.group(1)
                     result["current_activity"] = match.group(2)
-                    result["is_foreground"] = (result["current_package"] == target_package)
+                    if not target_package and "launcher" not in result["current_package"].lower():
+                        target_package = result["current_package"]
+                        result["target_package"] = target_package
+                        result["is_installed"] = True
+                    result["is_foreground"] = bool(target_package and result["current_package"] == target_package)
 
             # 3. 超轻量截屏感知与语义定性 (优先使用显存 RAW 直读 + PC 端硬件加速)
             screen_bytes = None

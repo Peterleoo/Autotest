@@ -26,7 +26,7 @@ class AIConfig:
 
     @property
     def HERMES_BASE_URL(self) -> str:
-        return os.getenv("HERMES_BASE_URL", "https://labela.xhj.com/hermes")
+        return os.getenv("HERMES_BASE_URL", "https://api.example.com/hermes")
 
     @property
     def HERMES_MODEL(self) -> str:
@@ -35,7 +35,7 @@ class AIConfig:
     # 2. Google Antigravity OAuth 配置
     @property
     def ANTIGRAVITY_CONFIG_PATH(self) -> str:
-        return os.getenv("ANTIGRAVITY_CONFIG_PATH", r"F:\PM-product\data\desktop-home\gemini-oauth-bridge.json")
+        return os.getenv("ANTIGRAVITY_CONFIG_PATH", str(Path(__file__).resolve().parent / "antigravity_oauth.json"))
 
     @property
     def ANTIGRAVITY_MODEL(self) -> str:

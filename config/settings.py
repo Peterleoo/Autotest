@@ -6,16 +6,26 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-# 自动检测并注入 Android SDK 环境变量（确保 Appium 和子进程正常驱动真机）
-default_sdk = Path(r"C:\Users\Administrator\AppData\Local\Android\Sdk")
-if default_sdk.exists():
-    if "ANDROID_HOME" not in os.environ:
-        os.environ["ANDROID_HOME"] = str(default_sdk)
-    if "ANDROID_SDK_ROOT" not in os.environ:
-        os.environ["ANDROID_SDK_ROOT"] = str(default_sdk)
-    pt_dir = str(default_sdk / "platform-tools")
-    if pt_dir not in os.environ.get("PATH", ""):
-        os.environ["PATH"] = pt_dir + os.pathsep + os.environ.get("PATH", "")
+# 自动检测并注入 Android SDK 环境变量（跨平台用户目录与多路径自适应寻址）
+home = Path.home()
+candidate_sdks = [
+    Path(os.environ.get("ANDROID_HOME", "")),
+    Path(os.environ.get("ANDROID_SDK_ROOT", "")),
+    home / "AppData/Local/Android/Sdk",
+    home / "Android/Sdk",
+    Path("/usr/local/share/android-sdk"),
+    Path("/opt/android-sdk")
+]
+for sdk in candidate_sdks:
+    if str(sdk) and sdk.exists():
+        if "ANDROID_HOME" not in os.environ:
+            os.environ["ANDROID_HOME"] = str(sdk)
+        if "ANDROID_SDK_ROOT" not in os.environ:
+            os.environ["ANDROID_SDK_ROOT"] = str(sdk)
+        pt_dir = str(sdk / "platform-tools")
+        if pt_dir not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = pt_dir + os.pathsep + os.environ.get("PATH", "")
+        break
 
 class Settings:
     # 基础目录
@@ -38,8 +48,8 @@ class Settings:
     ANDROID_AUTOMATION_NAME: str = "UiAutomator2"
     # 待测应用信息
     ANDROID_APP_NAME: str = os.getenv("ANDROID_APP_NAME", "demo_app.apk")
-    ANDROID_APP_PACKAGE: str = os.getenv("ANDROID_APP_PACKAGE", "com.apicloud.A6995433058179")
-    ANDROID_APP_ACTIVITY: str = os.getenv("ANDROID_APP_ACTIVITY", "com.apicloud.A6995433058179.MainActivity")
+    ANDROID_APP_PACKAGE: str = os.getenv("ANDROID_APP_PACKAGE", "")
+    ANDROID_APP_ACTIVITY: str = os.getenv("ANDROID_APP_ACTIVITY", "")
 
     # iOS 配置（指向局域网 Mac 机器上的 WebDriverAgent 节点）
     IOS_DEVICE_NAME: str = os.getenv("IOS_DEVICE_NAME", "iPhone 15")

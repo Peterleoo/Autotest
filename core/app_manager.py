@@ -24,7 +24,10 @@ class AppManager:
         if adb_in_path:
             return adb_in_path
         
-        fallback = Path(r"C:\Users\Administrator\AppData\Local\Android\Sdk\platform-tools\adb.exe")
+        home = Path.home()
+        sdk_env = os.getenv("ANDROID_HOME") or os.getenv("ANDROID_SDK_ROOT")
+        sdk_root = Path(sdk_env) if sdk_env and Path(sdk_env).exists() else (home / "AppData/Local/Android/Sdk")
+        fallback = sdk_root / "platform-tools" / ("adb.exe" if os.name == "nt" else "adb")
         if fallback.exists():
             return str(fallback)
         return "adb"
@@ -32,12 +35,15 @@ class AppManager:
     def get_apk_info(self, apk_path: Path) -> Dict[str, str]:
         """使用 aapt 提取 APK 包名、版本与启动 Activity"""
         info = {"package": "", "activity": "", "label": "", "version": "", "path": str(apk_path)}
-        aapt_path = Path(r"C:\Users\Administrator\AppData\Local\Android\Sdk\build-tools\36.1.0\aapt.exe")
-        if not aapt_path.exists():
-            # 搜索任意 aapt
-            found = list(Path(r"C:\Users\Administrator\AppData\Local\Android\Sdk\build-tools").glob("*/aapt.exe"))
-            if found:
-                aapt_path = found[0]
+        home = Path.home()
+        sdk_env = os.getenv("ANDROID_HOME") or os.getenv("ANDROID_SDK_ROOT")
+        sdk_root = Path(sdk_env) if sdk_env and Path(sdk_env).exists() else (home / "AppData/Local/Android/Sdk")
+        aapt_in_path = shutil.which("aapt")
+        if aapt_in_path:
+            aapt_path = Path(aapt_in_path)
+        else:
+            found = list((sdk_root / "build-tools").glob("*/aapt*"))
+            aapt_path = found[0] if found else (sdk_root / "build-tools" / "36.1.0" / ("aapt.exe" if os.name == "nt" else "aapt"))
 
         if aapt_path.exists() and apk_path.exists():
             try:
@@ -188,7 +194,8 @@ class AppManager:
         if self.is_uiautomator2_ready():
             return True
         import time
-        u2_dir = Path(r"C:\Users\Administrator\.appium\node_modules\appium-uiautomator2-driver\node_modules\appium-uiautomator2-server\apks")
+        home = Path.home()
+        u2_dir = home / ".appium" / "node_modules" / "appium-uiautomator2-driver" / "node_modules" / "appium-uiautomator2-server" / "apks"
         if not u2_dir.exists():
             return False
         server_apk = u2_dir / "appium-uiautomator2-server-v10.6.6.apk"
@@ -203,9 +210,19 @@ class AppManager:
                     time.sleep(1)
                     if p.poll() is not None:
                         break
-                    subprocess.run([self.adb_bin, "shell", "input", "tap", "540", "2200"], capture_output=True)
+                    # 动态适配任意分辨率物理底栏居中确认按钮 (如 1080x2400 / 1080x2160 / 720x1600 等)
+                    btn_x, btn_y = 540, 2200
+                    try:
+                        wm_res = subprocess.run([self.adb_bin, "shell", "wm", "size"], capture_output=True, text=True, timeout=2)
+                        m_sz = re.findall(r"(\d+)x(\d+)", wm_res.stdout)
+                        if m_sz:
+                            w_sz, h_sz = map(int, m_sz[-1])
+                            btn_x, btn_y = w_sz // 2, int(h_sz * 0.92)
+                    except Exception:
+                        pass
+                    subprocess.run([self.adb_bin, "shell", "input", "tap", str(btn_x), str(btn_y)], capture_output=True)
                 p.wait()
-                subprocess.run([self.adb_bin, "shell", "input", "tap", "540", "2200"], capture_output=True)
+                subprocess.run([self.adb_bin, "shell", "input", "tap", str(btn_x), str(btn_y)], capture_output=True)
         return self.is_uiautomator2_ready()
 
     def get_current_foreground_app(self, device_id: str = None) -> dict:

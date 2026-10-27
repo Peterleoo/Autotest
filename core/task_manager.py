@@ -556,7 +556,7 @@ class TaskManager:
             if conn_devs:
                 primary_dev = conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id")
         from core.device_context_inspector import DeviceContextInspector
-        dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package or "com.apicloud.A6995433058179")
+        dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package) if primary_dev else None
         
         plan_steps = self._decompose_plan_steps(goal, is_auto, device_context=dev_ctx)
         decomp_dur = round(time.time() - t_decomp_start + 0.35, 2)
@@ -2135,7 +2135,8 @@ class TaskManager:
             time.sleep(1.0)
             if idx == 0:
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 连接 iOS 节点: {settings.APPIUM_SERVER_URL}")
-                dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 启动 BundleID: com.apicloud.A6995433058179")
+                target_pkg = session.get("app_package") or getattr(settings, "IOS_BUNDLE_ID", "") or "com.example.app"
+                dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 启动 BundleID: {target_pkg}")
             elif idx == 1:
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 视觉 OCR 扫描 iOS 视窗: 成功提取 42 个交互元素")
             elif idx == 2:

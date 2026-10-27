@@ -362,9 +362,10 @@ async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
         adb = NativeADBDriver(device_id=device_id)
         current_app = adb.get_current_app()
         if "launcher" in current_app.lower() or not current_app:
-            default_pkg = "com.apicloud.A6995433058179"
-            adb.execute_shell(f"monkey -p {default_pkg} -c android.intent.category.LAUNCHER 1")
-            time.sleep(1.2)
+            default_pkg = payload.get("app_package") or getattr(settings, "ANDROID_APP_PACKAGE", "")
+            if default_pkg:
+                adb.execute_shell(f"monkey -p {default_pkg} -c android.intent.category.LAUNCHER 1")
+                time.sleep(1.2)
     except Exception as e:
         logger.warning(f"回放前置检查调起应用异常 (非致命): {e}")
 
@@ -2101,7 +2102,7 @@ def _execute_plan_pipeline(session_id: str, test_mode: str):
             goal=goal,
             test_mode=test_mode,
             app_name="待测应用",
-            package="com.apicloud.A6995433058179",
+            package=getattr(settings, "ANDROID_APP_PACKAGE", "") or "com.example.app",
             model_name=ai_config.PROVIDER.upper(),
             status="PASS",
             steps=executed_steps_data,
@@ -2359,7 +2360,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             goal=goal,
             test_mode="real",
             app_name="待测应用",
-            package="com.apicloud.A6995433058179",
+            package=getattr(settings, "ANDROID_APP_PACKAGE", "") or "com.example.app",
             model_name=ai_config.PROVIDER.upper(),
             status=status,
             steps=steps,
@@ -2477,7 +2478,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 goal=goal,
                 test_mode="local",
                 app_name="待测应用",
-                package="com.apicloud.A6995433058179",
+                package=getattr(settings, "ANDROID_APP_PACKAGE", "") or "com.example.app",
                 model_name=actual_model,
                 status="PASS",
                 steps=steps,
