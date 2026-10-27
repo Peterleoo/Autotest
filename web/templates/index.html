@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -6908,6 +6908,14 @@
                 <!-- 胶囊底部工具栏 -->
                 <div class="gpt-toolbar">
                     <div class="d-flex align-items-center gap-2">
+                        <!-- 待测应用选择胶囊 -->
+                        <div class="position-relative" id="pillAppWrapper">
+                            <div class="pill-btn" onclick="openSettingsModal('apps')" title="点击切换待测应用">
+                                <span class="status-indicator-dot dot-warning" id="toolbarAppDot"></span>
+                                <i class="bi bi-box-seam" style="font-size: 11px;"></i>
+                                <span id="toolbarAppLabel">待测应用</span>
+                            </div>
+                        </div>
                         <!-- 3. 审批模式胶囊 -->
                         <div class="position-relative" id="pillApprovalWrapper">
                             <div class="pill-btn" onclick="toggleCustomPopover('approvalPopover', event)" title="切换自动放行 / 人工逐级审批">
@@ -7204,6 +7212,12 @@
                         <div class="settings-nav-item" id="tabNavGeneral" onclick="switchSettingsTab('general')">
                             <i class="bi bi-sliders" style="font-size: 13.5px;"></i>
                             <span>执行与环境</span>
+                        </div>
+
+                        <!-- 新手向导入口 -->
+                        <div class="settings-nav-item" id="tabNavGuide" onclick="switchSettingsTab('guide')">
+                            <i class="bi bi-signpost-2" style="font-size: 13.5px;"></i>
+                            <span>新手引导</span>
                         </div>
 
                         <div class="settings-sidebar-footer">
@@ -7535,6 +7549,42 @@
                                 <i class="bi bi-box-arrow-up-right"></i>
                                 <span>查看路径</span>
                             </button>
+                        </div>
+                    </div>
+                    <!-- Guide panel end -->
+
+                    <!-- 右侧内容面板 5: 新手引导 -->
+                    <div class="settings-content-area d-none" id="panelSettingsGuide">
+                        <div class="settings-section-title">新手引导</div>
+                        <div class="settings-section-desc">通过交互式聚光灯向导，快速了解系统核心操作流程。</div>
+
+                        <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
+                            <!-- 步骤预览 -->
+                            <div style="background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
+                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">1</span>
+                                    确认物理真机已通过 USB 连接并开启调试模式
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
+                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">2</span>
+                                    在此设置页选定目标待测应用（APK / 包名）
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
+                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">3</span>
+                                    在底部工具栏选择 AI 推理模型
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
+                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">4</span>
+                                    在输入框输入业务意图，按 Enter 启动自动化测试
+                                </div>
+                            </div>
+
+                            <!-- 启动按钮 -->
+                            <button class="btn-fidelity-action" style="align-self: flex-start; padding: 8px 18px;" onclick="launchTourFromSettings()">
+                                <i class="bi bi-play-fill"></i>
+                                <span>启动交互式向导</span>
+                            </button>
+                            <div style="font-size: 11px; color: var(--text-muted);">向导将高亮显示各操作区域，点击"下一步"逐步引导。</div>
                         </div>
                     </div>
                 </div>
@@ -9328,7 +9378,6 @@
         ];
 
         function startTourGuide() {
-            return; // 彻底禁用自动弹窗遮挡
             currentTourStep = 1;
             const overlay = document.getElementById("onboardingTourOverlay");
             const doneDialog = document.getElementById("tourDoneDialog");
@@ -9417,6 +9466,18 @@
         function finishTourGuide() {
             localStorage.setItem("autotest_tour_completed", "true");
             closeTourGuide();
+        }
+
+        // 从 Settings 面板手动触发向导（关闭弹窗后启动）
+        function launchTourFromSettings() {
+            const modalEl = document.getElementById("harnessSettingsModal");
+            if (modalEl) {
+                const bsModal = bootstrap.Modal.getInstance(modalEl);
+                if (bsModal) bsModal.hide();
+                setTimeout(startTourGuide, 400);
+            } else {
+                startTourGuide();
+            }
         }
 
         function closeTourGuide() {
@@ -13401,26 +13462,31 @@ function renderChatStream(sessionData) {
             const isGoogle = (tabName === "google");
             const isModels = (tabName === "models");
             const isGeneral = (tabName === "general");
+            const isGuide = (tabName === "guide");
 
             const navApps = document.getElementById("tabNavApps");
             const navGoogle = document.getElementById("tabNavGoogle");
             const navModels = document.getElementById("tabNavModels");
             const navGeneral = document.getElementById("tabNavGeneral");
+            const navGuide = document.getElementById("tabNavGuide");
 
             const panelApps = document.getElementById("panelSettingsApps");
             const panelGoogle = document.getElementById("panelSettingsGoogle");
             const panelModels = document.getElementById("panelSettingsModels");
             const panelGeneral = document.getElementById("panelSettingsGeneral");
+            const panelGuide = document.getElementById("panelSettingsGuide");
 
             if (navApps) navApps.classList.toggle("active", isApps);
             if (navGoogle) navGoogle.classList.toggle("active", isGoogle);
             if (navModels) navModels.classList.toggle("active", isModels);
             if (navGeneral) navGeneral.classList.toggle("active", isGeneral);
+            if (navGuide) navGuide.classList.toggle("active", isGuide);
 
             if (panelApps) panelApps.classList.toggle("d-none", !isApps);
             if (panelGoogle) panelGoogle.classList.toggle("d-none", !isGoogle);
             if (panelModels) panelModels.classList.toggle("d-none", !isModels);
             if (panelGeneral) panelGeneral.classList.toggle("d-none", !isGeneral);
+            if (panelGuide) panelGuide.classList.toggle("d-none", !isGuide);
 
             if (isApps) loadApps();
             if (isGoogle) loadAntigravityStatus();
@@ -14047,6 +14113,9 @@ function renderChatStream(sessionData) {
             const displayName = currentActiveApp.label || currentActiveApp.filename || "待测应用";
             if (appLabelEl) appLabelEl.innerText = displayName;
             if (topBarLabelEl) topBarLabelEl.innerText = `待测应用: ${displayName}`;
+            // 同步工具栏应用胶囊标签
+            const toolbarAppLabelEl = document.getElementById("toolbarAppLabel");
+            if (toolbarAppLabelEl) toolbarAppLabelEl.innerText = displayName;
 
             // 异步探测当前真机是否安装此应用
             const devId = getActiveTargetDeviceId();
@@ -14061,6 +14130,9 @@ function renderChatStream(sessionData) {
             const dotCls = currentActiveApp.isInstalled ? "status-indicator-dot dot-online" : "status-indicator-dot dot-warning";
             if (appDot) appDot.className = dotCls;
             if (topBarDot) topBarDot.className = dotCls;
+            // 同步工具栏应用胶囊安装状态点
+            const toolbarAppDotEl = document.getElementById("toolbarAppDot");
+            if (toolbarAppDotEl) toolbarAppDotEl.className = dotCls;
         }
 
         // 切换当前激活应用
