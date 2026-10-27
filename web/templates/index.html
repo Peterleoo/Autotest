@@ -121,8 +121,8 @@
 
             --btn-send-bg: #09090b;
             --btn-send-text: #ffffff;
-            --btn-disabled: #e2e8f0;
-            --btn-disabled-icon: #94a3b8;
+            --btn-disabled: #f1f5f9;
+            --btn-disabled-icon: #475569;
 
             --console-bg: #f8fafc;
             --console-text: #0f172a;
@@ -1449,53 +1449,98 @@
             border-color: var(--border-hover);
         }
 
-        .gpt-send-btn {
-            width: 30px;
-            height: 30px;
+        /* 🚀 现代工程级极简发送按钮 (统一高对比度设计范式，完美自适应白天/黑夜模式) */
+        .gpt-send-btn, .btn-send-round {
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background-color: var(--btn-disabled);
             color: var(--btn-disabled-icon);
-            border: none;
+            border: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: not-allowed;
-            transition: all 0.15s ease;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
             flex-shrink: 0;
+            padding: 0;
+            outline: none;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         }
-        .gpt-send-btn.active {
-            background-color: var(--btn-send-bg);
-            color: var(--btn-send-text);
+        .gpt-send-btn i, .btn-send-round i {
+            font-size: 14.5px;
+            font-weight: 700;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s ease;
+        }
+        .gpt-send-btn.active, .btn-send-round.active {
+            background-color: var(--btn-send-bg) !important;
+            color: var(--btn-send-text) !important;
+            border-color: var(--btn-send-bg) !important;
             cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
         }
-        .gpt-send-btn.active:hover {
-            transform: scale(1.04);
+        .gpt-send-btn.active:hover, .btn-send-round.active:hover {
+            transform: scale(1.06);
+            opacity: 0.92;
+        }
+        .gpt-send-btn.active:active, .btn-send-round.active:active {
+            transform: scale(0.96);
         }
         .gpt-send-btn.btn-send-disabled {
-            opacity: 0.3 !important;
+            opacity: 0.35 !important;
             cursor: not-allowed !important;
-            background-color: var(--btn-disabled) !important;
-            color: var(--btn-disabled-icon) !important;
         }
 
-        /* 终止任务按钮：黑色圆底 + 实心小方块，与发送按钮完全相同尺寸与位置 */
+        /* 🌟 白天模式专属高对比度加固 (消除浅灰融边看不清问题) */
+        body.theme-light .gpt-send-btn,
+        body[data-theme="light"] .gpt-send-btn,
+        body.theme-light .btn-send-round,
+        body[data-theme="light"] .btn-send-round {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1.5px solid rgba(0, 0, 0, 0.14);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        }
+        body.theme-light .gpt-send-btn.active,
+        body[data-theme="light"] .gpt-send-btn.active,
+        body.theme-light .btn-send-round.active,
+        body[data-theme="light"] .btn-send-round.active {
+            background-color: #09090b !important;
+            color: #ffffff !important;
+            border-color: #09090b !important;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+        }
+        body.theme-light .gpt-send-btn.active:hover,
+        body[data-theme="light"] .gpt-send-btn.active:hover,
+        body.theme-light .btn-send-round.active:hover,
+        body[data-theme="light"] .btn-send-round.active:hover {
+            background-color: #18181b !important;
+            opacity: 0.96;
+        }
+
+        /* 终止任务按钮：同等 32px 规格，高对比度 */
         .gpt-stop-btn {
-            width: 30px;
-            height: 30px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background-color: var(--btn-send-bg);
-            border: none;
+            border: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: all 0.18s ease;
             flex-shrink: 0;
             padding: 0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         }
         .gpt-stop-btn:hover {
-            transform: scale(1.05);
-            opacity: 0.9;
+            transform: scale(1.06);
+            opacity: 0.92;
         }
         .stop-square-black {
             width: 10px;
@@ -1503,6 +1548,15 @@
             background-color: var(--btn-send-text);
             border-radius: 2px;
             display: inline-block;
+        }
+        body.theme-light .gpt-stop-btn,
+        body[data-theme="light"] .gpt-stop-btn {
+            background-color: #09090b;
+            border-color: #09090b;
+        }
+        body.theme-light .gpt-stop-btn .stop-square-black,
+        body[data-theme="light"] .gpt-stop-btn .stop-square-black {
+            background-color: #ffffff;
         }
 
         /* 浮动选单浮层 (Popovers - 统一高层级与边界防裁切) */
@@ -4679,32 +4733,7 @@
             color: var(--text-main);
             border-color: var(--border-hover);
         }
-        .btn-send-round {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: #ffffff;
-            color: #000000;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-        body.theme-light .btn-send-round, body[data-theme="light"] .btn-send-round {
-            background: #000000;
-            color: #ffffff;
-        }
-        .btn-send-round:hover {
-            transform: scale(1.05);
-            opacity: 0.9;
-        }
-        .btn-send-round.disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            transform: none;
-        }
+/* 旧 .btn-send-round 已统一归拢至 .gpt-send-btn */
 
         /* 自由拖拽悬浮窗修复：严格锁定 240px 宽、486px 高现代机身比例，彻底消除底部黑色拉伸大空白 */
         .floating-device-window {
@@ -6230,25 +6259,7 @@
             color: #09090b;
             border-color: var(--border-hover);
         }
-        .btn-send-round {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: var(--btn-send-bg);
-            color: var(--btn-send-text);
-            border: 1px solid var(--border-subtle);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-        }
-        .btn-send-round:hover {
-            transform: scale(1.05);
-            opacity: 0.92;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-        }
+/* 旧 .btn-send-round 已统一归拢至 .gpt-send-btn */
 
         /* 4. 模式 B (本地回归看板视图): 苹果电光蓝跑道分段条 + 紧凑型流线卡片 */
         .local-workspace-container {
