@@ -550,7 +550,11 @@ class TaskManager:
 
         # 🚀 毫秒级端侧情境探针：先看真机真实物理状态（安装/前台/具体页面），再因地制宜规划！
         t_decomp_start = time.time()
-        primary_dev = device_ids[0] if device_ids else "2145189e"
+        primary_dev = device_ids[0] if device_ids else None
+        if not primary_dev:
+            conn_devs = app_mgr.get_connected_devices()
+            if conn_devs:
+                primary_dev = conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id")
         from core.device_context_inspector import DeviceContextInspector
         dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package or "com.apicloud.A6995433058179")
         

@@ -7101,7 +7101,7 @@
                         <div class="device-window-header" id="deviceDragHandle">
                             <div class="device-window-title">
                                 <span class="status-dot-sm" style="width: 5px; height: 5px; border-radius: 50%; background: var(--status-green); display: inline-block;"></span>
-                                <span id="floatingDeviceTitle">Xiaomi MIX 2 · 实时端侧</span>
+                                <span id="floatingDeviceTitle">端侧真机 · 实时投屏</span>
                             </div>
                             <div class="device-window-actions">
                                 <button class="device-btn-icon" onmousedown="event.stopPropagation()" onclick="resetDevicePos(event)" title="复位悬浮窗位置">
@@ -13043,12 +13043,28 @@ function renderChatStream(sessionData) {
         // 🌟 原生 ADB 极速低延迟投屏循环 (带真机断开自适应空状态感知)
         let _pipErrorStreak = 0;
 
+        function getPipTargetDeviceId() {
+            if (typeof getActiveTargetDeviceId === "function") {
+                const id = getActiveTargetDeviceId();
+                if (id) return id;
+            }
+            const checked = document.querySelectorAll(".device-checkbox:checked");
+            if (checked && checked.length > 0) return checked[0].value;
+            if (typeof currentScreenDeviceId !== "undefined" && currentScreenDeviceId) return currentScreenDeviceId;
+            if (typeof activeConsoleDeviceId !== "undefined" && activeConsoleDeviceId && activeConsoleDeviceId !== "mock-device") return activeConsoleDeviceId;
+            if (typeof availableDevices !== "undefined" && availableDevices && availableDevices.length > 0) return availableDevices[0].id;
+            return null;
+        }
+
         function updateDeviceFloatingEmptyState(devices) {
             const empty = document.getElementById("pipScreenEmpty");
             const img = document.getElementById("pipScreenImg");
             const title = document.getElementById("floatingDeviceTitle");
             const status = document.getElementById("floatingDeviceStatus");
-            if (!devices || devices.length === 0) {
+            const activeDevId = getPipTargetDeviceId();
+            const devObj = (devices || []).find(d => d.id === activeDevId) || ((devices && devices.length > 0) ? devices[0] : null);
+
+            if (!devObj) {
                 if (empty) empty.style.display = "block";
                 if (img) img.style.display = "none";
                 if (title) title.innerText = "未连接真机 · 排查指引";
@@ -13056,7 +13072,7 @@ function renderChatStream(sessionData) {
             } else {
                 if (empty) empty.style.display = "none";
                 if (img) img.style.display = "block";
-                if (title) title.innerText = `${devices[0].model || devices[0].id} · 实时端侧`;
+                if (title) title.innerText = `${devObj.model || devObj.id} · 实时端侧`;
                 if (status) status.innerText = "触控注入就绪";
             }
         }
@@ -13067,7 +13083,13 @@ function renderChatStream(sessionData) {
                 return;
             }
             isPipLoopActive = true;
-            const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) {
+                updateDeviceFloatingEmptyState(availableDevices || []);
+                if (isPipScreenOpen) setTimeout(runPipStreamLoop, 1500);
+                else isPipLoopActive = false;
+                return;
+            }
             const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
             const preloader = new Image();
             preloader.onload = () => {
@@ -13105,7 +13127,8 @@ function renderChatStream(sessionData) {
 
         function triggerPipImmediateRefresh() {
             if (!isPipScreenOpen) return;
-            const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) return;
             const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
             const preloader = new Image();
             preloader.onload = () => {
@@ -13166,7 +13189,8 @@ function renderChatStream(sessionData) {
         // 📱 虚拟按键发送 (返回 / 桌面 / 多任务)
         async function sendDeviceNavKey(key, e) {
             if (e) e.stopPropagation();
-            const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) return;
             const status = document.getElementById("floatingDeviceStatus");
             const keyLabels = { back: "返回键 (Back)", home: "主屏幕 (Home)", app_switch: "多任务" };
             if (status) status.innerText = `下发: ${keyLabels[key] || key}`;
@@ -13277,36 +13301,37 @@ function renderChatStream(sessionData) {
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 const dt = Date.now() - startTime;
 
-                const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
+                const targetDev = getPipTargetDeviceId();
+                if (!targetDev) return;
                 const status = document.getElementById("floatingDeviceStatus");
 
-                // 物理 ADB 坐标转换 (小米 MIX 2: 1080 x 2160)
-                const realX1 = Math.round((startX / rect.width) * 1080);
-                const realY1 = Math.round((startY / rect.height) * 2160);
-                const realX2 = Math.round((endX / rect.width) * 1080);
-                const realY2 = Math.round((endY / rect.height) * 2160);
+                // 归一化相对比例 (0.0 ~ 1.0)，由后端动态根据真机物理分辨率映射，告别单机型硬编码
+                const normX1 = Math.max(0, Math.min(1, startX / rect.width));
+                const normY1 = Math.max(0, Math.min(1, startY / rect.height));
+                const normX2 = Math.max(0, Math.min(1, endX / rect.width));
+                const normY2 = Math.max(0, Math.min(1, endY / rect.height));
 
                 if (dist < 12) {
                     if (dt >= 450) {
                         // 长按 (Long Press)
-                        if (status) status.innerText = `长按手势 (${realX1}, ${realY1})`;
+                        if (status) status.innerText = `长按手势 (${Math.round(normX1 * 100)}%, ${Math.round(normY1 * 100)}%)`;
                         triggerActionRipple((startX / rect.width) * 100, (startY / rect.height) * 100);
                         try {
                             await fetch('/api/device/swipe', {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ device_id: targetDev, x1: realX1, y1: realY1, x2: realX1, y2: realY1, duration: 800 })
+                                body: JSON.stringify({ device_id: targetDev, norm_x1: normX1, norm_y1: normY1, norm_x2: normX1, norm_y2: normY1, duration: 800 })
                             });
                         } catch (err) {}
                     } else {
                         // 单击 (Tap)
-                        if (status) status.innerText = `单击 (${realX1}, ${realY1})`;
+                        if (status) status.innerText = `单击 (${Math.round(normX1 * 100)}%, ${Math.round(normY1 * 100)}%)`;
                         triggerActionRipple((startX / rect.width) * 100, (startY / rect.height) * 100);
                         try {
                             await fetch('/api/device/tap', {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ device_id: targetDev, x: realX1, y: realY1 })
+                                body: JSON.stringify({ device_id: targetDev, norm_x: normX1, norm_y: normY1 })
                             });
                         } catch (err) {}
                     }
@@ -13320,10 +13345,10 @@ function renderChatStream(sessionData) {
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({
                                 device_id: targetDev,
-                                x1: realX1,
-                                y1: realY1,
-                                x2: realX2,
-                                y2: realY2,
+                                norm_x1: normX1,
+                                norm_y1: normY1,
+                                norm_x2: normX2,
+                                norm_y2: normY2,
                                 duration: swipeDuration
                             })
                         });
@@ -13360,7 +13385,8 @@ function renderChatStream(sessionData) {
             const empty = document.getElementById("pipScreenEmpty");
             if (!img) return;
             try {
-                const targetDev = (typeof selectedDeviceIds !== "undefined" && selectedDeviceIds[0]) ? selectedDeviceIds[0] : '2145189e';
+                const targetDev = getPipTargetDeviceId();
+                if (!targetDev) return;
                 const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
                 const testImg = new Image();
                 testImg.onload = () => {
@@ -14933,7 +14959,7 @@ async function replaySolidifiedCase(safeRef, btnEl) {
         const res = await fetch('/api/deliverables/replay', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ safeRef: safeRef, device_id: '2145189e' })
+            body: JSON.stringify({ safeRef: safeRef, device_id: (typeof getPipTargetDeviceId === 'function' ? getPipTargetDeviceId() : null) || 'auto' })
         });
         const data = await res.json();
         if (btnEl) {

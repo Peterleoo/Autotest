@@ -118,25 +118,60 @@ async def get_devices(probe: bool = False, force: bool = False):
     _DEVICE_CACHE["data"] = result
     return result
 
-@app.get("/api/devices/{device_id}/screenshot")
-@app.get("/api/device/screenshot")
-async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70):
-    """获取指定真机设备的实时屏幕截图 (依托显存 RAW 直读与 PC 端 SIMD 硬件级转码，耗时压缩至 0.6s，内存 0ms 秒回)"""
-    # 🌟 第一性原理：先核查真机真实连接状态，无真机在线时坚决返回 404，杜绝伪造假象
+_DEVICE_DIMENSIONS_CACHE: Dict[str, Tuple[int, int]] = {}
+
+def resolve_target_device_id(preferred_id: Optional[str] = None) -> Optional[str]:
+    """动态解析当前真实在线的目标真机 ID (杜绝硬编码设备序列号导致的脱靶)"""
     try:
         connected = app_mgr.get_connected_devices()
-        conn_ids = [d if isinstance(d, str) else d.get("id") for d in connected if d]
+        conn_ids = [d.get("id") if isinstance(d, dict) else d for d in connected if d]
     except Exception:
         conn_ids = []
 
     if not conn_ids:
-        return Response(status_code=404, content=b"No device connected", media_type="text/plain")
+        return None
 
-    target_dev = device_id
-    if not target_dev or target_dev in ["mock-device", "local-simulator", "default", "auto"]:
-        target_dev = conn_ids[0]
-    elif target_dev not in conn_ids:
-        return Response(status_code=404, content=b"Device offline", media_type="text/plain")
+    # 若指定了有效在线设备且在当前在线列表中，直接使用
+    if preferred_id and preferred_id not in ["mock-device", "local-simulator", "default", "auto", "2145189e"]:
+        if preferred_id in conn_ids:
+            return preferred_id
+
+    # 否则自动平滑对齐至当前首选在线真机
+    return conn_ids[0]
+
+def _get_device_screen_dimensions(device_id: str) -> Tuple[int, int]:
+    """获取目标真机的真实物理分辨率 (带内存缓存，优先从 Frame 获取，降级使用 wm size)"""
+    if device_id in _DEVICE_DIMENSIONS_CACHE:
+        return _DEVICE_DIMENSIONS_CACHE[device_id]
+
+    # 1. 尝试从 screen_stream_hub 内存缓存中获取真实帧的宽高
+    cached = screen_stream_hub._cache.get(device_id)
+    if cached and cached.get("w") and cached.get("h"):
+        dim = (int(cached["w"]), int(cached["h"]))
+        _DEVICE_DIMENSIONS_CACHE[device_id] = dim
+        return dim
+
+    # 2. 降级通过 adb shell wm size 快速探查
+    try:
+        res = subprocess.run([app_mgr.adb_bin, "-s", device_id, "shell", "wm", "size"], capture_output=True, text=True, timeout=2)
+        match = re.findall(r"(\d+)x(\d+)", res.stdout)
+        if match:
+            w, h = map(int, match[-1])
+            _DEVICE_DIMENSIONS_CACHE[device_id] = (w, h)
+            return (w, h)
+    except Exception:
+        pass
+
+    return (1080, 2400)
+
+
+@app.get("/api/devices/{device_id}/screenshot")
+@app.get("/api/device/screenshot")
+async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70):
+    """获取指定真机设备的实时屏幕截图 (依托显存 RAW 直读与 PC 端 SIMD 硬件级转码，耗时压缩至 0.6s，内存 0ms 秒回)"""
+    target_dev = resolve_target_device_id(device_id)
+    if not target_dev:
+        return Response(status_code=404, content=b"No device connected", media_type="text/plain")
 
     try:
         # 1. 优先通过极速屏幕采集分发中枢获取 (内存缓存命中仅 0.01ms，过期自动极速采集)
@@ -152,7 +187,6 @@ async def get_device_screenshot(device_id: Optional[str] = None, format: str = "
         logger.warning(f"获取设备 [{target_dev}] 极速屏幕截图异常: {e}")
 
     # 🌟 杜绝伪造历史截屏：当物理真机断开时坚决返回 404，由前端平滑呈现未连接排查指引
-
     return Response(status_code=404, content=b"Device screenshot unavailable", media_type="text/plain")
 
 
@@ -166,17 +200,9 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
     """原生 ADB 极速 MJPEG 实时帧流发生器 (依托显存 RAW 直读 + OpenCV SIMD，端到端延迟低至 600ms)"""
     import asyncio
 
-    target_dev = device_id
-    if not target_dev or target_dev in ["default", "auto"]:
-        try:
-            connected = app_mgr.get_connected_devices()
-            if connected:
-                target_dev = connected[0].get("id")
-        except Exception:
-            pass
-
+    target_dev = resolve_target_device_id(device_id)
     if not target_dev:
-        target_dev = "2145189e"
+        return Response(status_code=404, content=b"No online device connected", media_type="text/plain")
 
     async def frame_generator():
         while True:
@@ -202,10 +228,20 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
 
 @app.post("/api/device/tap")
 async def tap_device(payload: Dict[str, Any] = Body(...)):
-    """鼠标穿透控制：接收网页点击相对坐标，转化为真机 ADB 物理手势"""
-    dev_id = payload.get("device_id") or "2145189e"
-    x = int(payload.get("x", 0))
-    y = int(payload.get("y", 0))
+    """鼠标穿透控制：接收网页点击相对坐标或归一化比例，转化为真机 ADB 物理手势"""
+    dev_id = resolve_target_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No online device available"})
+
+    norm_x = payload.get("norm_x")
+    norm_y = payload.get("norm_y")
+    if norm_x is not None and norm_y is not None:
+        dim = _get_device_screen_dimensions(dev_id)
+        x = int(float(norm_x) * dim[0])
+        y = int(float(norm_y) * dim[1])
+    else:
+        x = int(payload.get("x", 0))
+        y = int(payload.get("y", 0))
     if x <= 0 or y <= 0:
         return JSONResponse({"success": False, "error": "Invalid coordinates"})
 
@@ -219,12 +255,27 @@ async def tap_device(payload: Dict[str, Any] = Body(...)):
 
 @app.post("/api/device/swipe")
 async def swipe_device(payload: Dict[str, Any] = Body(...)):
-    """真机拖拽/滑动穿透控制：接收滑动起点与终点物理坐标及持续时间"""
-    dev_id = payload.get("device_id") or "2145189e"
-    x1 = int(payload.get("x1", 0))
-    y1 = int(payload.get("y1", 0))
-    x2 = int(payload.get("x2", 0))
-    y2 = int(payload.get("y2", 0))
+    """真机拖拽/滑动穿透控制：接收滑动起点与终点物理坐标或归一化比例及持续时间"""
+    dev_id = resolve_target_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No online device available"})
+
+    norm_x1 = payload.get("norm_x1")
+    norm_y1 = payload.get("norm_y1")
+    norm_x2 = payload.get("norm_x2")
+    norm_y2 = payload.get("norm_y2")
+    if None not in (norm_x1, norm_y1, norm_x2, norm_y2):
+        dim = _get_device_screen_dimensions(dev_id)
+        x1 = int(float(norm_x1) * dim[0])
+        y1 = int(float(norm_y1) * dim[1])
+        x2 = int(float(norm_x2) * dim[0])
+        y2 = int(float(norm_y2) * dim[1])
+    else:
+        x1 = int(payload.get("x1", 0))
+        y1 = int(payload.get("y1", 0))
+        x2 = int(payload.get("x2", 0))
+        y2 = int(payload.get("y2", 0))
+
     duration = int(payload.get("duration", 300))
     if x1 <= 0 or y1 <= 0 or x2 <= 0 or y2 <= 0:
         return JSONResponse({"success": False, "error": "Invalid coordinates"})
@@ -243,7 +294,9 @@ async def swipe_device(payload: Dict[str, Any] = Body(...)):
 @app.post("/api/device/key")
 async def send_device_key(payload: Dict[str, Any] = Body(...)):
     """真机按键控制：支持返回、桌面、多任务等虚拟导航键"""
-    dev_id = payload.get("device_id") or "2145189e"
+    dev_id = resolve_target_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No online device available"})
     key = str(payload.get("key", "")).lower()
     key_map = {"back": "4", "home": "3", "app_switch": "187", "menu": "82", "volume_up": "24", "volume_down": "25"}
     keycode = key_map.get(key, key)
@@ -271,7 +324,7 @@ async def get_deliverables_list():
 async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
     """⚡ 0 Token 毫秒级原生用例回放：多级智能寻址并直接通过 Pytest 执行固化脚本"""
     safe_ref = payload.get("safeRef") or payload.get("script_path", "")
-    device_id = payload.get("device_id") or "2145189e"
+    device_id = resolve_target_device_id(payload.get("device_id"))
     if not safe_ref:
         return JSONResponse({"success": False, "passed": False, "duration": 0, "error": "缺少测试脚本路径 (safeRef 为空)"})
 

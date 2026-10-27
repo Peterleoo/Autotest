@@ -16,7 +16,9 @@ async def run_latency_benchmark():
     app_mgr = AppManager()
     screen_stream_hub.set_adb_bin(app_mgr.adb_bin)
     
-    device_id = "2145189e"
+    from core.app_manager import AppManager
+    conn = AppManager().get_connected_devices()
+    device_id = (conn[0].get("id") if isinstance(conn[0], dict) else conn[0]) if conn else "auto"
     print("=== 开始真机屏幕极速采集性能基准评测 ===")
     
     # 1. 首次采集耗时
