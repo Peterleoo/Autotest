@@ -17,7 +17,8 @@ class DriverFactory:
         app_path: Optional[str] = None,
         package_name: Optional[str] = None,
         activity_name: Optional[str] = None,
-        device_id: Optional[str] = None
+        device_id: Optional[str] = None,
+        auto_launch: bool = True
     ) -> webdriver.Remote:
         plat = (platform or settings.PLATFORM).lower()
         server_url = settings.APPIUM_SERVER_URL
@@ -34,8 +35,10 @@ class DriverFactory:
                 native_driver = NativeADBDriver(device_id=device_id)
                 if native_driver.device_id:
                     logger.info(f"✨ 成功激活原生 ADB 极速真机驱动 [设备: {native_driver.device_id}]，免驱动安装，彻底免疫弹窗！")
-                    if pkg and act:
+                    if auto_launch and pkg and act and activity_name:
                         native_driver.launch_app(pkg, act)
+                    else:
+                        logger.info(f"⚡ [就地接管] 保持目标应用 [{pkg}] 当前真机界面，跳过重复冷启动！")
                     return native_driver
             except Exception as e:
                 logger.warning(f"原生 ADB 驱动不可用 ({e})，降级尝试 Appium...")

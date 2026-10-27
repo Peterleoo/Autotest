@@ -775,6 +775,27 @@ class TaskManager:
         session["is_success"] = None
         session["error_message"] = None
 
+        # 🚀 对标 DeepSeek 连续对话机制：即时向对话流注入新轮次用户提问、思考态与任务清单
+        if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+            session["timeline_blocks"] = []
+        session["timeline_blocks"].append(
+            TimelineManager.create_user_block(message, turn_id=new_turn_id)
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_thought_block(
+                duration="1.2s",
+                bullets=[
+                    {"tag": "意图深度解析", "content": f"深入理解本轮追加测试诉求【{message[:24]}】"},
+                    {"tag": "现场就地继承", "content": "继承前序端侧已达成状态，原地规划增量执行路径，跳过重复冷启动"}
+                ],
+                turn_id=new_turn_id,
+                is_done=False
+            )
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_todo_block(turn_steps, turn_id=new_turn_id)
+        )
+
         # 为各设备记录日志
         for dev_id, dev in session.get("devices", {}).items():
             dev["logs"].append(f"[{now_str}] 💬 [多轮对话追加 Turn {new_turn_id}]: {message}")
@@ -841,6 +862,27 @@ class TaskManager:
         session["status"] = "RUNNING"
         session["is_success"] = None
         session["error_message"] = None
+
+        # 🚀 对标 DeepSeek 连续对话机制：即时向对话流注入返工纠偏提问与新规划
+        if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+            session["timeline_blocks"] = []
+        session["timeline_blocks"].append(
+            TimelineManager.create_user_block(f"打回返工要求: {rework_note}", turn_id=new_turn_id)
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_thought_block(
+                duration="1.2s",
+                bullets=[
+                    {"tag": "返工诉求拆解", "content": f"分析人工返工要求【{rework_note[:24]}】"},
+                    {"tag": "原地纠偏策略", "content": "针对未达标项原地微调手势并执行二次断言"}
+                ],
+                turn_id=new_turn_id,
+                is_done=False
+            )
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_todo_block(turn_steps, turn_id=new_turn_id)
+        )
 
         target_devs = session.get("target_devices", [])
         if not target_devs and "devices" in session:
@@ -1552,7 +1594,7 @@ class TaskManager:
                 elif "ios" in device_id.lower():
                     self._run_ios_pipeline(session, dev_state, goal, case_name, start_t)
                 else:
-                    self._run_real_android_pipeline(session, dev_state, device_id, goal, case_name, start_t)
+                    self._run_real_android_pipeline(session, dev_state, device_id, goal, case_name, start_t, turn_id=turn_id)
             except Exception as e:
                 dev_state["status"] = "FAIL"
                 dev_state["success"] = False
@@ -1597,8 +1639,8 @@ class TaskManager:
             # 实时持久化存盘，保证前端刷新或服务重启数据 100% 完整
             self._save_session(session_id)
 
-    def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float):
-        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id]
+    def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float, turn_id: int = 1):
+        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
         if session.get("app_filename"):
             cmd.extend(["--app", session["app_filename"]])
         if session.get("provider"):
