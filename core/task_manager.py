@@ -1665,8 +1665,11 @@ class TaskManager:
                     if not has_fail:
                         curr_turn["conclusion"] = f"第 {curr_turn.get('turn_id', 1)} 轮规划动作已全部验证达成，等待人工验收通过或打回返工。"
 
-                # 自动注册全景交付物
-                self.register_deliverables(session_id)
+                # 自动注册全景交付物 (仅在全链路验证达成时注册交付资产，失败态坚决不出伪交付物)
+                if not has_fail:
+                    self.register_deliverables(session_id)
+                else:
+                    session["deliverables"] = []
 
             # 实时持久化存盘，保证前端刷新或服务重启数据 100% 完整
             self._save_session(session_id)
