@@ -512,7 +512,8 @@ class TaskManager:
             "model": s.get("model", "deepseek-flash"),
             "devices": devices_data,
             "report_url": s.get("report_url", ""),
-            "timeline_blocks": s.get("timeline_blocks", [])
+            "timeline_blocks": s.get("timeline_blocks", []),
+            "hitl_decision": s.get("hitl_decision")
         }
 
     def create_session(

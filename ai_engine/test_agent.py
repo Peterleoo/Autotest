@@ -189,7 +189,9 @@ class AITestAgent:
             if cred and cred.get("account"):
                 logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
                 injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info)
-                return injected
+                if injected:
+                    return True
+                logger.warning(f"⚠️ [自动注入未能成功跳出] 界面可能需要短信验证码、滑块拼图或人工确认，无缝转入人机协同决策卡片！")
 
             session_id = self.session_id or "default_session"
             logger.info("🛡️ [人机协同介入] 检测到应用进入登录界面且未预置凭证，挂起测试并等待人工决策...")
