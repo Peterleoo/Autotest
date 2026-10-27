@@ -115,13 +115,13 @@ class AITestAgent:
         phone_el, pwd_el, agree_el, login_btn = None, None, None, None
         for el in screen_info.get("elements", []):
             t = (el.get("text") or el.get("content_desc") or "").strip()
-            if not phone_el and any(k in t for k in ["手机号", "账号", "请输入手机", "请输入账号"]):
+            if not phone_el and any(k in t for k in ["手机号", "账号", "请输入手机", "请输入账号", "登录码", "合伙人"]):
                 phone_el = el
             elif not pwd_el and any(k in t for k in ["密码", "请输入密码"]):
                 pwd_el = el
             elif not agree_el and any(k in t for k in ["协议", "同意", "已阅读"]):
                 agree_el = el
-            elif not login_btn and any(k in t for k in ["登录", "进入"]):
+            elif not login_btn and any(k in t for k in ["登录", "进入", "下一步", "同意隐私并下一步"]):
                 # 排除"密码登录"等切换按钮
                 if not any(k in t for k in ["密码登录", "切换", "验证码登录"]):
                     login_btn = el
@@ -178,7 +178,7 @@ class AITestAgent:
     def _check_and_prompt_hitl_credential(self, screen_info: Dict[str, Any], goal: str) -> bool:
         """
         人机协同登录决策拦截门禁 (Human-in-the-Loop Credential Gate)
-        若真机界面进入账号密码/验证码登录页面：
+        若真机界面进入账号密码/验证码/登录码登录页面：
         1. 优先检索当前 App 是否已在设置中心配置预设真实凭证，若有则自动静默注入，保持 100% 无人值守；
         2. 若未配置凭证，立即挂起任务流，向前端发出协同信号唤出【人机协同决策卡片】，等待用户输入或投屏手动接管。
         """
@@ -188,41 +188,60 @@ class AITestAgent:
         texts = [e.get("text", "") or e.get("content_desc", "") for e in screen_info.get("elements", [])]
         combined = " ".join(texts)
 
-        # 识别登录页特征
-        is_login_screen = any(kw in combined for kw in ["手机号登录", "密码登录", "账号密码登录", "获取验证码", "请输入手机号码", "请输入手机号", "验证码登录", "立即登录", "快捷登录"])
-        if not is_login_screen and not any(kw in goal for kw in ["登录", "账号", "密码", "鉴权"]):
+        # 识别登录页特征 (多维融合：常见登录关键词 + 合伙人/企业工作台登录码 + 鉴权要素)
+        login_keywords = [
+            "手机号登录", "密码登录", "账号密码登录", "获取验证码", "请输入手机号码", "请输入手机号", 
+            "验证码登录", "立即登录", "快捷登录", "登录码", "合伙人登录", "工号登录", "请選擇您所在的公司", 
+            "请选择您所在的公司", "请输入您的合伙人登录码", "同意隐私并下一步", "登录遇到问题"
+        ]
+        is_login_screen = any(kw in combined for kw in login_keywords)
+
+        # 辅助特征判断：
+        if not is_login_screen:
+            has_credential_input = any(any(k in (el.get("text") or el.get("content_desc") or "") for k in ["登录码", "账号", "手机号", "工号", "密码"]) for el in screen_info.get("elements", []))
+            if has_credential_input and ("登录" in combined or "下一步" in combined or "隐私" in combined or "Sign in" in combined or "Log in" in combined):
+                is_login_screen = True
+            elif any(kw in goal for kw in ["登录", "账号", "密码", "鉴权"]) and ("登录" in combined or "下一步" in combined or "合伙人" in combined):
+                is_login_screen = True
+
+        if not is_login_screen:
             return False
 
-        if is_login_screen:
-            from core.credential_manager import CredentialManager
-            app_key = self.app_identifier or "demo_app"
-            cred = CredentialManager.get_credential(app_key)
-            if cred and cred.get("account"):
-                logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
-                injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info)
-                if injected:
-                    return True
-                logger.warning(f"⚠️ [自动注入未能成功跳出] 界面可能需要短信验证码、滑块拼图或人工确认，无缝转入人机协同决策卡片！")
+        from core.credential_manager import CredentialManager
+        app_key = self.app_identifier or getattr(self.driver, "package_name", None) or "demo_app"
+        cred = CredentialManager.get_credential(app_key)
+        if not cred and "/" in app_key:
+            cred = CredentialManager.get_credential(app_key.split("/")[0])
+        if not cred and "." in app_key:
+            cred = CredentialManager.get_credential(app_key.split(".")[-1])
 
-            session_id = self.session_id or "default_session"
-            logger.info("🛡️ [人机协同介入] 检测到应用进入登录界面且未预置凭证，挂起测试并等待人工决策...")
-            print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}\n", flush=True)
+        if cred and cred.get("account"):
+            logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
+            injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info)
+            if injected:
+                return True
+            logger.warning(f"⚠️ [自动注入未能成功跳出] 界面可能需要短信验证码、滑块拼图或人工确认，无缝转入人机协同决策卡片！")
 
-            self._notify_status({
-                "step": 0,
-                "action": "人机协同介入",
-                "log": "⏸️ 检测到目标应用进入账号密码登录页，已唤起人机协同决策卡片，等待用户输入凭证或在投屏手动登录..."
-            })
+        session_id = self.session_id or "default_session"
+        logger.info(f"🛡️ [人机协同介入] 检测到应用进入登录界面 [{app_key}] 且未预置凭证，挂起测试并等待人工决策...")
+        print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}\n", flush=True)
 
-            from pathlib import Path
-            import json
-            decision_file = Path(__file__).resolve().parent.parent / "scratch" / f"decision_{session_id}.json"
+        self._notify_status({
+            "step": getattr(self, "step_count", 0),
+            "action": "人机协同介入",
+            "log": "⏸️ 检测到目标应用进入账号密码/登录码登录页，已唤起人机协同决策卡片，等待用户输入凭证或在投屏手动登录..."
+        })
+
+        from pathlib import Path
+        import json
+        decision_file = Path(__file__).resolve().parent.parent / "scratch" / f"decision_{session_id}.json"
+        if decision_file.exists():
+            try: decision_file.unlink()
+            except Exception: pass
+
+        wait_start = time.time()
+        while time.time() - wait_start < 300:
             if decision_file.exists():
-                try: decision_file.unlink()
-                except Exception: pass
-
-            wait_start = time.time()
-            while time.time() - wait_start < 300:
                 if decision_file.exists():
                     try:
                         data = json.loads(decision_file.read_text(encoding="utf-8"))
@@ -238,13 +257,13 @@ class AITestAgent:
                                     phone_el, pwd_el, agree_el, login_btn = None, None, None, None
                                     for el in screen_info.get("elements", []):
                                         t = (el.get("text") or el.get("content_desc") or "").strip()
-                                        if any(k in t for k in ["手机号", "账号", "请输入手机"]):
+                                        if any(k in t for k in ["手机号", "账号", "请输入手机", "登录码", "合伙人"]):
                                             phone_el = el
                                         elif any(k in t for k in ["密码", "请输入密码"]):
                                             pwd_el = el
-                                        elif any(k in t for k in ["协议", "同意"]):
+                                        elif any(k in t for k in ["协议", "同意", "隐私"]):
                                             agree_el = el
-                                        elif any(k in t for k in ["登录", "进入"]):
+                                        elif any(k in t for k in ["登录", "进入", "下一步", "同意隐私并下一步"]):
                                             login_btn = el
                                     
                                     if agree_el:

@@ -219,22 +219,51 @@ class NativeADBDriver:
         logger.info("原生 ADB 模拟按返回键")
         self.execute_adb(["shell", "input", "keyevent", "4"])
 
-    def launch_app(self, package: str, activity: str):
-        """直接调起真机目标应用前台，零重装零弹窗（支持前台智能就地接管）"""
+    def is_app_foreground(self, package: str) -> bool:
+        """精准检测目标包是否真正处于当前屏幕前台焦点"""
+        if not package:
+            return False
         try:
             res_focus = self.execute_adb(["shell", "dumpsys", "window"])
-            if package in res_focus.stdout and "mCurrentFocus" in res_focus.stdout:
-                logger.info(f"⚡ [就地接管] 目标应用 [{package}] 已经处于前台活跃状态，保留当前页面现场，无需重复冷启动！")
-                return
+            for line in res_focus.stdout.splitlines():
+                if ("mCurrentFocus" in line or "mFocusedApp" in line) and f"{package}/" in line:
+                    return True
         except Exception:
             pass
+        return False
 
-        logger.info(f"原生 ADB 秒级调起应用: {package}/{activity}")
-        res = self.execute_adb(["shell", "am", "start", "-n", f"{package}/{activity}"])
-        output = (res.stdout + " " + res.stderr).strip()
-        if "Error" in output or "does not exist" in output or "not found" in output:
-            logger.error(f"调起应用失败: {output}")
-            raise RuntimeError(f"调起应用失败: {output}")
+    def launch_app(self, package: str, activity: Optional[str] = None):
+        """直接调起真机目标应用前台，零重装零弹窗（支持前台智能就地接管）"""
+        if not package:
+            return
+
+        if self.is_app_foreground(package):
+            logger.info(f"⚡ [就地接管] 目标应用 [{package}] 真正处于前台活跃状态，保留当前页面现场，无需重复冷启动！")
+            return
+
+        # 若未指定 activity，尝试极速解析主启动 Activity
+        if not activity:
+            try:
+                res_act = self.execute_adb(["shell", "cmd", "package", "resolve-activity", "--brief", package])
+                for line in res_act.stdout.splitlines():
+                    if "/" in line and package in line:
+                        activity = line.strip().split("/", 1)[1]
+                        break
+            except Exception:
+                pass
+
+        if activity:
+            act_target = activity if "/" in activity else f"{package}/{activity}"
+            logger.info(f"原生 ADB 秒级调起应用: {act_target}")
+            res = self.execute_adb(["shell", "am", "start", "-n", act_target])
+            output = (res.stdout + " " + res.stderr).strip()
+            if "Error" in output or "does not exist" in output or "not found" in output:
+                logger.warning(f"am start 调起应用异常: {output}，尝试降级 monkey 唤起...")
+                self.execute_adb(["shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1"])
+        else:
+            logger.info(f"原生 ADB Monkey 唤起应用: {package}")
+            self.execute_adb(["shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1"])
+
         time.sleep(1.5)
 
     def get_window_size(self) -> Dict[str, int]:
