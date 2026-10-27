@@ -2824,7 +2824,7 @@
             border: 1.5px dashed var(--border-subtle);
             border-radius: 12px;
             background-color: var(--bg-main);
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
             cursor: pointer;
         }
         .upload-dropzone:hover, .upload-dropzone.dragover {
@@ -5314,25 +5314,7 @@
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .token-pressure-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 4px 10px;
-            font-size: 11px;
-            color: var(--text-sub);
-            border-bottom: 1px dashed var(--border-subtle);
-            margin-bottom: 6px;
-        }
-        .token-pressure-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-        .token-pressure-dot.normal { background: #10b981; box-shadow: 0 0 5px #10b981; }
-        .token-pressure-dot.warning { background: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
-        .token-pressure-dot.critical { background: #ef4444; box-shadow: 0 0 5px #ef4444; }
+
         
         .deliverable-item-card {
             background: rgba(255, 255, 255, 0.02);
@@ -6918,16 +6900,7 @@
             <!-- 输入框上方常驻任务卡 (Pinned Bottom Task Capsule，参考主流 Agent 架构) -->
             <div class="gpt-input-box">
                 <!-- 自适应多行文本输入框 -->
-                                <!-- Token 实时水位与上下文压缩条 (对标 PM-product Token 治理规范) -->
-                <div class="token-pressure-bar">
-                    <div class="d-flex align-items-center gap-1.5" id="tokenPressureBadge">
-                        <span class="token-pressure-dot normal" id="tokenPressureDot"></span>
-                        <span id="tokenPressureText">上下文容量良好 · 1.8%</span>
-                    </div>
-                    <button class="btn btn-sm btn-link p-0 text-decoration-none text-muted" style="font-size: 11px;" onclick="triggerSessionCompact()" title="一键压缩前序历史冗余日志，释放上下文">
-                        <i class="bi bi-arrows-collapse me-0.5"></i> 压缩上下文
-                    </button>
-                </div>
+
 
                 <textarea id="taskInputText" class="gpt-textarea" rows="1" placeholder="描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）..." oninput="onInputTextChange()"></textarea>
 
@@ -9082,15 +9055,18 @@
             let offlineDeviceList = [];
             const isLocalTask = (data.test_mode === "local" || (data.goal && (data.goal.includes("本地") || data.goal.includes("固化"))));
             if (isReal && !isLocalTask && boundDeviceIds.length > 0) {
-                boundDeviceIds.forEach(devId => {
-                    if (devId !== "default" && devId !== "local-simulator" && devId !== "mock-device") {
-                        const isOnline = availableDevices.some(d => d.id === devId);
-                        if (!isOnline) {
-                            hasOfflineDevice = true;
-                            offlineDeviceList.push(devId);
+                // 仅当真机列表已经完成首次检索时才做脱机断言，避免并发时序竞争误报
+                if (window._isDevicesInitialLoaded) {
+                    boundDeviceIds.forEach(devId => {
+                        if (devId !== "default" && devId !== "local-simulator" && devId !== "mock-device") {
+                            const isOnline = availableDevices.some(d => d.id === devId);
+                            if (!isOnline) {
+                                hasOfflineDevice = true;
+                                offlineDeviceList.push(devId);
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
 
             let chipsHtml = `
@@ -9412,14 +9388,6 @@
                 `;
                 if (!hitlEl) {
                     flow.insertAdjacentHTML("beforeend", hitlHtml);
-                } else {
-                    const curAcc = document.getElementById(`hitlAccountInput_${sid}`)?.value;
-                    const curPwd = document.getElementById(`hitlPasswordInput_${sid}`)?.value;
-                    if (!curAcc && !curPwd) {
-                        const tempDiv = document.createElement("div");
-                        tempDiv.innerHTML = hitlHtml;
-                        hitlEl.replaceWith(tempDiv.firstElementChild);
-                    }
                 }
             } else if (hitlEl) {
                 hitlEl.remove();
@@ -9937,7 +9905,11 @@
                 if (container) container.innerHTML = htmlCheckboxes;
                 if (modalBox) modalBox.innerHTML = modalHtml;
 
+                window._isDevicesInitialLoaded = true;
                 updateDeviceSummary();
+                if (currentActiveSessionData) {
+                    renderSessionEnvStatus(currentActiveSessionData);
+                }
             } catch (e) {}
         }
 
@@ -10738,17 +10710,22 @@
             const remember = rememberInput ? rememberInput.checked : true;
             
             if (decisionType === "inject" && !account) {
-                if (typeof showToast === "function") showToast("请输入账号/手机号后再提交", "warning");
+                alert("请输入测试手机号/账号后再提交！");
+                if (accountInput) accountInput.focus();
                 return;
             }
             
             const cardEl = document.getElementById(`hitlDecisionCard_${sessionId}`);
+            const allBtns = cardEl ? cardEl.querySelectorAll("button") : [];
+            allBtns.forEach(b => b.disabled = true);
             if (cardEl) {
-                cardEl.style.opacity = "0.6";
-                cardEl.style.pointerEvents = "none";
+                cardEl.style.opacity = "0.7";
             }
             
             try {
+                const curSess = (currentSessions || []).find(s => s.session_id === sessionId) || currentActiveSessionData || {};
+                const appKey = curSess.app_package || curSess.app_label || curSess.app_filename || "demo_app";
+
                 const resp = await fetch(`/api/sessions/${sessionId}/resolve_decision`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -10757,27 +10734,30 @@
                         account: account,
                         password: password,
                         remember: remember,
-                        app_key: (currentSession && (currentSession.app_filename || currentSession.app_package)) || "demo_app"
+                        app_key: appKey
                     })
                 });
                 const res = await resp.json();
                 if (res.success) {
-                    if (typeof showToast === "function") showToast(decisionType === "inject" ? "凭证已注入，端侧继续执行！" : "已下达人工决策，恢复自动化测试", "success");
-                    if (currentSession) currentSession.hitl_decision = null;
                     if (cardEl) cardEl.remove();
+                    if (currentActiveSessionData) currentActiveSessionData.hitl_decision = null;
+                    await pollCurrentSession();
+                    if (!sessionPollTimer) {
+                        sessionPollTimer = setInterval(pollCurrentSession, 1200);
+                    }
                 } else {
-                    if (typeof showToast === "function") showToast("提交决策失败，请重试", "error");
+                    alert("提交人机协同决策未生效，请重试！");
                     if (cardEl) {
                         cardEl.style.opacity = "1";
-                        cardEl.style.pointerEvents = "auto";
+                        allBtns.forEach(b => b.disabled = false);
                     }
                 }
             } catch (e) {
                 console.error("提交人机协同决策出错:", e);
-                if (typeof showToast === "function") showToast("网络错误，提交决策失败", "error");
+                alert("提交决策网络异常: " + e);
                 if (cardEl) {
                     cardEl.style.opacity = "1";
-                    cardEl.style.pointerEvents = "auto";
+                    allBtns.forEach(b => b.disabled = false);
                 }
             }
         };
@@ -10861,38 +10841,6 @@
                 container.innerHTML = `<div class="text-danger small p-3 text-center">加载交付物失败: ${e}</div>`;
             }
         }
-
-        async function triggerSessionCompact() {
-            if (!activeSessionId) return;
-            try {
-                const res = await fetch(`/api/sessions/${activeSessionId}/compact`, { method: "POST" });
-                const data = await res.json();
-                if (data.success && data.result?.compacted) {
-                    alert(`上下文压缩成功！已浓缩释放前序 ${data.result.turns_compacted} 轮冗余日志。`);
-                    await pollCurrentSession();
-                    updateTokenPressureBar(activeSessionId);
-                } else {
-                    alert(data.result?.reason || "当前上下文处于精炼状态，无需压缩。");
-                }
-            } catch (e) {
-                alert("压缩请求异常: " + e);
-            }
-        }
-
-        async function updateTokenPressureBar(sessionId) {
-            if (!sessionId) return;
-            try {
-                const res = await fetch(`/api/sessions/${sessionId}/token_pressure`);
-                const data = await res.json();
-                const p = data.token_pressure;
-                if (!p) return;
-                const dot = document.getElementById("tokenPressureDot");
-                const text = document.getElementById("tokenPressureText");
-                if (dot) dot.className = `token-pressure-dot ${p.level}`;
-                if (text) text.innerText = `上下文${p.level_text} · ${p.percentage}% (${p.total_tokens} Tokens)`;
-            } catch (e) {}
-        }
-
 
         function renderStepsDrawerBody(sessionData, steps) {
             const drawerBody = document.getElementById("stepsDrawerBody");
@@ -12410,7 +12358,6 @@ function renderChatStream(sessionData) {
             }
             updateConsoleLogs();
             updateCurrentStepCapsule(sessionData);
-            updateTokenPressureBar(sessionData.session_id);
         }
 
         function triggerTypewriterConclusion(sessionId, fullText, shouldAnimate) {
