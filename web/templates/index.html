@@ -4416,6 +4416,9 @@
         .test-result-summary-card.verdict-pass {
             border-left: 3.5px solid var(--status-green, #10b981) !important;
         }
+                .test-result-summary-card.verdict-blocked {
+            border-left: 3.5px solid #f59e0b !important;
+        }
         .test-result-summary-card.verdict-fail {
             border-left: 3.5px solid #ef4444 !important;
         }
@@ -11219,7 +11222,11 @@
                     return "";
                 }
                 const sid = blk.session_id || sessionData.session_id || activeSessionId;
-                const isPass = (blk.status === "PASS");
+                const isBlocked = (blk.status === "BLOCKED" || sessionData.status === "BLOCKED");
+                const isPass = (blk.status === "PASS" && !isBlocked);
+                const verdictClass = isPass ? "verdict-pass" : (isBlocked ? "verdict-blocked" : "verdict-fail");
+                const verdictBadgeText = isPass ? "全链路达成" : (isBlocked ? "业务受阻 / 待补前置" : "未达成");
+                const verdictBadgeColor = isPass ? "var(--status-green)" : (isBlocked ? "#f59e0b" : "#ef4444");
                 const isSolidified = !!sessionData.is_solidified || !!blk.is_solidified;
                 const solidFile = blk.solidified_filename || sessionData.solidified_filename || `test_${sid}.py`;
                 const artifacts = blk.artifacts || [
@@ -11276,7 +11283,7 @@
                 });
 
                 return `
-                    <div class="test-result-summary-card ${isPass ? 'verdict-pass' : 'verdict-fail'}" id="${blk.block_id}">
+                    <div class="test-result-summary-card ${verdictClass}" id="${blk.block_id}">
                         <!-- 顶层单行裁定抬头与聚合指标 -->
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-2">

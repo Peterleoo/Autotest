@@ -467,7 +467,7 @@ class TaskManager:
         devices_data = {}
         platforms = set()
         has_fail = False
-        for dev_id, dev_info in s["devices"].items():
+        for dev_id, dev_info in s.get("devices", {}).items():
             offset = offsets.get(dev_id, 0)
             logs = dev_info["logs"]
             new_logs = logs[offset:] if offset < len(logs) else []
@@ -490,7 +490,7 @@ class TaskManager:
                 "success": dev_info.get("success")
             }
 
-        is_success = s.get("is_success", not has_fail if s["status"] in ["COMPLETED", "FINISHED"] else None)
+        is_success = s.get("is_success", not has_fail if s.get("status") in ["COMPLETED", "FINISHED"] else None)
 
         return {
             "session_id": s["session_id"],
@@ -507,7 +507,7 @@ class TaskManager:
             "clarification": s.get("clarification"),
             "platforms": list(platforms) if platforms else ["Android"],
             "created_at": s["created_at"],
-            "test_mode": s["test_mode"],
+            "test_mode": s.get("test_mode", "real"),
             "provider": s.get("provider", "hermes"),
             "model": s.get("model", "deepseek-flash"),
             "devices": devices_data,
@@ -1199,6 +1199,56 @@ class TaskManager:
             })
         return res
 
+
+    def mutate_plan_insert_step(
+        self,
+        session_id: str,
+        after_step_index: int,
+        new_title: str,
+        new_desc: str,
+        status: str = "RUNNING"
+    ) -> dict:
+        """
+        🚀 借鉴 DeepSeek Harness (DSH) Plan Mutation: 遇到鉴权拦截时动态插桩自愈任务
+        让任务清单真实反映“使用工具/技能完成登录自愈”的过程，保持全景透明
+        """
+        session = self.get_session(session_id)
+        if not session:
+            return {}
+
+        steps = session.get("plan_steps", [])
+        new_id = f"step_heal_{len(steps) + 1}"
+        new_step = {
+            "id": new_id,
+            "title": new_title,
+            "desc": new_desc,
+            "status": status,
+            "is_dynamic": True,
+            "diff_type": "added"
+        }
+
+        insert_idx = min(after_step_index + 1, len(steps))
+        steps.insert(insert_idx, new_step)
+
+        # 同步更新 Timeline Blocks 中的 TodoList
+        if "timeline_blocks" in session and isinstance(session["timeline_blocks"], list):
+            for b in session["timeline_blocks"]:
+                if b.get("type") == "todo_list":
+                    items = b.setdefault("items", [])
+                    new_item = {
+                        "title": new_title,
+                        "desc": new_desc,
+                        "status": status,
+                        "diff_type": "added"
+                    }
+                    items.insert(insert_idx, new_item)
+                    b["total_count"] = len(items)
+                    break
+
+        self._save_session(session_id)
+        logger.info(f"✨ [DSH Plan Mutation] 成功在会话 [{session_id}] 动态插桩自愈任务: {new_title}")
+        return new_step
+
     def _append_dynamic_step(self, session: dict, step_id: int, title: str, desc: str, status: str = "RUNNING") -> dict:
         """端侧自适应扩展：当实际执行超出原规划步数时，动态自增新步骤"""
         steps = session.setdefault("plan_steps", [])
@@ -1393,6 +1443,21 @@ class TaskManager:
         """
         steps = session.get("plan_steps", [])
         total = len(steps)
+
+        # 🚀 借鉴 DeepSeek Harness (DSH) 核心断言守卫 (Assertion Guard)
+        # 核查若原定终态关键断言被跳过(SKIPPED)，严禁草率判定为通过！
+        if is_success:
+            # 检查是否有包含'验证/断言/核验/成功弹出'的核心断言步骤位于未执行队列中
+            unmet_assert_steps = [
+                steps[i] for i in range(current_step_index + 1, total)
+                if any(kw in steps[i].get("title", "") for kw in ["断言", "验证", "核验", "成功弹出", "回执"])
+            ]
+            if unmet_assert_steps:
+                logger.warning(f"🛡️ [DSH 断言守卫拦截]: 终态核心断言【{unmet_assert_steps[0].get('title')}】尚未被端侧执行验证即提前结束，严禁判定为全链路 PASS！")
+                is_success = False
+                session["is_success"] = False
+                session["status"] = "BLOCKED"
+                session["error_message"] = f"核心断言【{unmet_assert_steps[0].get('title')}】未被执行，测试未完全闭环"
 
         if is_success:
             # 成功：当前步及之前全部完成

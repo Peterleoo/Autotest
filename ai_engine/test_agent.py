@@ -27,7 +27,12 @@ SYSTEM_PROMPT = """
 8. assert_text: 文本断言。例如 {"action": "assert_text", "expected": "首页", "reason": "断言是否成功跳转"}。
 9. finish: 当测试目标已经全部达成且验证通过时返回。例如 {"action": "finish", "reason": "已完整走通登录流程并断言成功"}。
 
+
 🔥 核心决策守则（严格遵守，严禁在 App 内盲目乱跳）：
+0. 【DSH 反伪造达成铁律】：
+    - 严禁掩耳盗铃！若用户的测试目标要求验证具体业务界面（如：进入房源详情、查看VR、点击咨询弹出咨询窗口、进入个人中心等），而当前真机屏幕仍停留在【登录/注册页、密码输入页、验证码拦截弹窗或网络报错页】，严禁将“拉起了登录拦截/权限控制正常”诡辩为“目标已达成”并调用 finish！
+    - 系统配备了独立的 DSH 核验门禁（TaskVerifier），任何在拦截页面擅自调用 finish 的企图都会被一票否决！
+    - 若当前处于登录页，优先识别输入框调用 type 注入预设账号密码登录，或点击一键登录放行；只有真正进入目标业务窗口后方可调用 finish！
 1. 【界面定性】：在 thought 中第一句必须明确输出：“【当前界面判断】：xxx界面（如：象盒找房手机号登录页/首页推荐/隐私协议弹窗）”。
 2. 【目标驱动，严禁乱跳】：
     - 紧扣用户的【测试目标】！不要点击与目标无关的广告或偏门入口。
@@ -72,6 +77,93 @@ class AITestAgent:
             except Exception as e:
                 logger.warning(f"状态回调异常: {e}")
 
+
+    def _execute_credential_injection(self, acc: str, pwd: str, screen_info: Dict[str, Any]) -> bool:
+        """
+        确定性端侧凭证自动注入流水线 (DSH Credential Injection Pipeline)
+        真实模拟用户物理操作：切换密码登录 -> 勾选协议 -> 填手机号 -> 填密码 -> 提交登录
+        """
+        logger.info(f"🔑 [DSH 凭证自动注入] 开始对真机执行账号 [{acc}] 真实登录注入流水线...")
+        self._notify_status({
+            "step": 0,
+            "action": "自动登录注入",
+            "log": f"🔑 正在自动填入测试凭证 [{acc}] 并执行物理登录..."
+        })
+
+        # 1. 检查是否在验证码登录模式，若有'密码登录'/'账号密码登录'切换按钮，先切换
+        for el in screen_info.get("elements", []):
+            t = (el.get("text") or el.get("content_desc") or "").strip()
+            if any(k in t for k in ["用密码登录", "密码登录", "账号密码登录"]):
+                logger.info(f"点击切换到密码登录模式: {t}")
+                self.executor._locate_and_click(el, None)
+                time.sleep(0.6)
+                screen_info = ScreenParser.get_screen_summary(self.driver)
+                break
+
+        # 2. 扫描定位关键组件：手机号框、密码框、协议框、登录按钮
+        phone_el, pwd_el, agree_el, login_btn = None, None, None, None
+        for el in screen_info.get("elements", []):
+            t = (el.get("text") or el.get("content_desc") or "").strip()
+            if not phone_el and any(k in t for k in ["手机号", "账号", "请输入手机", "请输入账号"]):
+                phone_el = el
+            elif not pwd_el and any(k in t for k in ["密码", "请输入密码"]):
+                pwd_el = el
+            elif not agree_el and any(k in t for k in ["协议", "同意", "已阅读"]):
+                agree_el = el
+            elif not login_btn and any(k in t for k in ["登录", "进入"]):
+                # 排除"密码登录"等切换按钮
+                if not any(k in t for k in ["密码登录", "切换", "验证码登录"]):
+                    login_btn = el
+
+        # 3. 执行物理点击协议
+        if agree_el:
+            logger.info("勾选服务与隐私协议")
+            self.executor._locate_and_click(agree_el, None)
+            time.sleep(0.3)
+
+        # 4. 执行填入账号
+        if phone_el and acc:
+            logger.info(f"填入账号: {acc}")
+            self.executor._locate_and_type(phone_el, acc)
+            time.sleep(0.4)
+
+        # 5. 执行填入密码
+        if pwd_el and pwd:
+            logger.info("填入密码: ******")
+            self.executor._locate_and_type(pwd_el, pwd)
+            time.sleep(0.4)
+
+        # 6. 点击登录提交按钮
+        if login_btn:
+            logger.info("点击登录提交按钮")
+            self.executor._locate_and_click(login_btn, None)
+            time.sleep(2.0)
+        else:
+            # 兜底：尝试按回车或根据坐标点击
+            logger.info("未明确检出登录按钮，尝试发送回车键提交")
+            try:
+                self.driver.press_keycode(66) # KEYCODE_ENTER
+                time.sleep(1.5)
+            except Exception:
+                pass
+
+        # 7. 复核是否已成功跳出登录界面
+        after_screen = ScreenParser.get_screen_summary(self.driver)
+        after_texts = [e.get("text", "") for e in after_screen.get("elements", [])]
+        is_still_login = any(any(kw in t for kw in ["手机号登录", "密码登录", "请输入密码"]) for t in after_texts)
+
+        if not is_still_login:
+            logger.info("🎉 [DSH 凭证自动注入] 验证通过：已成功完成登录并跳出鉴权拦截页！")
+            self._notify_status({
+                "step": 0,
+                "action": "登录完成",
+                "log": "✅ 测试凭证自动注入完成，真机已成功跨过登录拦截，业务链路恢复流转！"
+            })
+            return True
+        else:
+            logger.warning("⚠️ [DSH 凭证自动注入] 尝试注入后真机仍停留在登录页，可能存在图形滑块验证码或密码校验失败")
+            return False
+
     def _check_and_prompt_hitl_credential(self, screen_info: Dict[str, Any], goal: str) -> bool:
         """
         人机协同登录决策拦截门禁 (Human-in-the-Loop Credential Gate)
@@ -95,8 +187,9 @@ class AITestAgent:
             app_key = self.app_identifier or "xianghe_zhaofang"
             cred = CredentialManager.get_credential(app_key)
             if cred and cred.get("account"):
-                logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，将自动注入登录！")
-                return False
+                logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
+                injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info)
+                return injected
 
             session_id = self.session_id or "default_session"
             logger.info("🛡️ [人机协同介入] 检测到应用进入登录界面且未预置凭证，挂起测试并等待人工决策...")
@@ -389,13 +482,37 @@ class AITestAgent:
                 })
                 break
 
-            # 4. 判断是否完成
+            # 4. 🚀 借鉴 DeepSeek Harness (DSH)：通过独立 TaskVerifier 门禁审查 finish 请求
             if decision.get("action") == "finish":
-                logger.info(f"🎉 目标完成: {decision.get('reason')}")
+                is_valid, verifier_msg, barrier_info = TaskVerifier.verify_finish_claim(
+                    goal=goal,
+                    screen_info=screen_info,
+                    model_thought=thought,
+                    model_reason=decision.get("reason", "")
+                )
+                if not is_valid:
+                    logger.warning(f"🛡️ [DSH 核验门禁一票否决]: {verifier_msg}")
+                    self._notify_status({
+                        "step": step_count,
+                        "action": "门禁驳回",
+                        "log": f"🛡️ [DSH Verifier 门禁驳回]: {verifier_msg}"
+                    })
+                    # 强力纠偏：将否决原因作为不可辩驳的事实注入下一轮模型推理上下文
+                    self.memory_context.append(f"【系统严格核验门禁一票否决】：你发起的 finish 已被驳回！原因：{verifier_msg}。当前未达成最终目标，严禁擅自宣布成功！请根据界面真实情况继续推进业务或排除阻断！")
+                    
+                    # 若属于登录阻断，立即触发自动登录注入门禁
+                    if barrier_info and barrier_info.get("type") == "LOGIN_BARRIER":
+                        resolved = self._check_and_prompt_hitl_credential(screen_info, goal)
+                        if resolved:
+                            screen_info = ScreenParser.get_screen_summary(self.driver)
+                    continue
+
+                # 仅当独立 Verifier 审核通过，才批准完成
+                logger.info(f"🎉 目标完成并通过 DSH 独立核验门禁: {decision.get('reason')}")
                 self._notify_status({
                     "step": step_count,
                     "action": "完成",
-                    "log": f"🎉 测试目标顺利达成: {decision.get('reason')}"
+                    "log": f"🎉 测试目标顺利达成 (DSH Verifier 批准通过): {decision.get('reason')}"
                 })
                 execution_success = True
                 break
