@@ -186,7 +186,7 @@ class AntigravityDirectClient:
                 else:
                     logger.info(f"正在通过 Google Antigravity 官方授权调用 [{self.model_name}]...")
 
-                resp = session.post(url, headers=headers, json=body, timeout=25)
+                resp = session.post(url, headers=headers, json=body, timeout=40)
                 if resp.status_code == 200:
                     data = resp.json()
                     cands = data.get("response", {}).get("candidates", [])
@@ -221,7 +221,7 @@ class AntigravityDirectClient:
                     logger.warning(f"模型 [{body['model']}] 响应超时，自动切换至高可用模型 gemini-2.5-flash 重试...")
                     body["model"] = "gemini-2.5-flash"
                 if attempt < max_retries - 1:
-                    wait_sec = 1.0 * (attempt + 1)
+                    wait_sec = 1.5 * (attempt + 1)
                     logger.warning(f"Antigravity 官方直连网络抖动 ({e})，正在等待 {wait_sec}s 自动重试 ({attempt+1}/{max_retries})...")
                     time.sleep(wait_sec)
                 else:
