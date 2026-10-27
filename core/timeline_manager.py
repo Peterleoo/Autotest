@@ -215,29 +215,32 @@ class TimelineManager:
         生成测试结果全景总结卡片：
         包含测试结论、核心指标总结、结构化交付资产清单（报告、Python脚本、截图证据链、接口）以及保存本地用例操作
         """
-        artifacts = deliverables or [
-            {
-                "type": "report",
-                "name": "6大维度全景交付物报告",
-                "filename": f"test_report_{session_id}.md",
-                "desc": "包含功能闭环、UI感知、断言判定与性能稳定性全景分析",
-                "action": "view_report"
-            },
-            {
-                "type": "code",
-                "name": "零 Token 标准 Python 回归脚本",
-                "filename": solidified_filename or f"test_{session_id}.py",
-                "desc": "确定性执行脚本，支持秒级免 Token 本地/真机回放",
-                "action": "run_local"
-            },
-            {
-                "type": "evidence",
-                "name": "端侧全链路关键截图与动作链",
-                "filename": "data/reports/screenshots/",
-                "desc": "高保真全链路视觉证据链归档",
-                "action": "view_evidence"
-            }
-        ]
+        if not is_success:
+            artifacts = []
+        else:
+            artifacts = deliverables or [
+                {
+                    "type": "report",
+                    "name": "6大维度全景交付物报告",
+                    "filename": f"test_report_{session_id}.md",
+                    "desc": "包含功能闭环、UI感知、断言判定与性能稳定性全景分析",
+                    "action": "view_report"
+                },
+                {
+                    "type": "code",
+                    "name": "零 Token 标准 Python 回归脚本",
+                    "filename": solidified_filename or f"test_{session_id}.py",
+                    "desc": "确定性执行脚本，支持秒级免 Token 本地/真机回放",
+                    "action": "run_local"
+                },
+                {
+                    "type": "evidence",
+                    "name": "端侧全链路关键截图与动作链",
+                    "filename": "data/reports/screenshots/",
+                    "desc": "高保真全链路视觉证据链归档",
+                    "action": "view_evidence"
+                }
+            ]
         return {
             "block_id": f"blk_summary_{turn_id}",
             "type": "test_summary",
