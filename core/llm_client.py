@@ -14,6 +14,8 @@ class LLMClient:
     def __init__(self, provider: Optional[str] = None, model: Optional[str] = None):
         self.provider = (provider or ai_config.PROVIDER).lower()
         self.override_model = model
+        self.model_name = model or "default"
+        self.init_error = None
         self._init_client()
 
     def _init_client(self):
@@ -30,6 +32,8 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"初始化 Hermes 客户端失败: {e}")
                 self.client = None
+                self.init_error = str(e)
+                self.model_name = self.override_model or getattr(ai_config, "DEEPSEEK_MODEL", "deepseek-chat")
 
         elif self.provider == "claude" or self.provider == "anthropic":
             try:
@@ -42,6 +46,8 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"初始化 Claude 客户端失败: {e}")
                 self.client = None
+                self.init_error = str(e)
+                self.model_name = self.override_model or getattr(ai_config, "DEEPSEEK_MODEL", "deepseek-chat")
 
         elif self.provider == "deepseek":
             try:
@@ -55,6 +61,8 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"初始化 DeepSeek 客户端失败: {e}")
                 self.client = None
+                self.init_error = str(e)
+                self.model_name = self.override_model or getattr(ai_config, "DEEPSEEK_MODEL", "deepseek-chat")
 
         elif self.provider == "antigravity" or self.provider == "gemini":
             try:
@@ -70,6 +78,8 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"初始化 Antigravity 客户端失败: {e}")
                 self.client = None
+                self.init_error = str(e)
+                self.model_name = self.override_model or getattr(ai_config, "DEEPSEEK_MODEL", "deepseek-chat")
 
         else: # 默认 fallback 为 openai 兼容协议
             try:
@@ -84,6 +94,8 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"初始化 OpenAI 客户端失败: {e}")
                 self.client = None
+                self.init_error = str(e)
+                self.model_name = self.override_model or getattr(ai_config, "DEEPSEEK_MODEL", "deepseek-chat")
 
         self.last_fallback_info: Optional[Dict[str, Any]] = None
 

@@ -1,4 +1,4 @@
-﻿import time
+import time
 import json
 import logging
 import subprocess
@@ -313,13 +313,25 @@ class AITestAgent:
         if app_lessons:
             lessons_context = "\n\n【专家寻路与避坑先验知识 (Lessons)】:\n" + "\n".join(f"- {l}" for l in app_lessons)
             logger.info(f"📚 成功注入 {len(app_lessons)} 条应用寻路与自愈先验经验")
-        logger.info(f"使用模型提供商: {self.llm.provider} ({self.llm.model_name})")
+        model_display = getattr(self.llm, "model_name", "default")
+        logger.info(f"使用模型提供商: {self.llm.provider} ({model_display})")
+        if not getattr(self.llm, "client", None):
+            err_msg = f"AI 模型服务未连通: 提供商 [{self.llm.provider}] 客户端初始化失败 ({getattr(self.llm, 'init_error', '') or '未配置有效 API 密钥'})。请在【系统设置 ➔ AI 模型服务】中配置有效的 API Key。"
+            logger.error(err_msg)
+            self._notify_status({
+                "step": 0,
+                "max_steps": max_steps,
+                "goal": goal,
+                "action": "模型未连通",
+                "log": err_msg
+            })
+            return {"success": False, "message": err_msg, "error": err_msg}
         self._notify_status({
             "step": 0,
             "max_steps": max_steps,
             "goal": goal,
             "action": "初始化",
-            "log": f"启动测试智能体，模型: {self.llm.provider} ({self.llm.model_name})"
+            "log": f"启动测试智能体，模型: {self.llm.provider} ({model_display})"
         })
 
         step_count = 0

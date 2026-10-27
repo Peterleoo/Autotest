@@ -1591,6 +1591,21 @@
             color: var(--text-main);
         }
 
+        .app-tab-pill {
+            color: var(--text-muted);
+            background: transparent;
+            transition: all 0.15s ease;
+        }
+        .app-tab-pill:hover {
+            color: var(--text-main);
+        }
+        .app-tab-pill.active {
+            color: var(--text-main) !important;
+            background: var(--bg-card, #2d3748) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+        }
+
+
         /* ================= 全屏聚光灯遮罩向导 (Tour Overlay) ================= */
         .tour-overlay {
             position: fixed;
@@ -6921,24 +6936,61 @@
                     <div class="d-flex align-items-center gap-2">
                         <!-- 待测应用选择胶囊 (带真机安装状态指示灯，点击呼出轻量切换小弹窗) -->
                         <div class="position-relative" id="pillAppWrapper">
-                            <div class="pill-btn" onclick="toggleCustomPopover('appPopover', event)" title="选择待测应用包或上传新 APK">
+                            <div class="pill-btn" onclick="toggleCustomPopover('appPopover', event)" title="选择真机已安装应用或本地 APK">
                                 <span class="status-indicator-dot dot-online" id="appStatusDot"></span>
-                                <i class="bi bi-box-seam" style="font-size: 11px;"></i>
+                                <i class="bi bi-phone" style="font-size: 11px;"></i>
                                 <span id="activeAppLabel">待测应用</span>
                                 <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
                             </div>
-                            <div class="gpt-popover" id="appPopover" style="left: 0; width: 280px;" onclick="event.stopPropagation()">
-                                <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                                    <span class="small fw-semibold" style="font-size: 11px;">待测应用包</span>
-                                    <span class="small text-muted" style="font-size: 11px; cursor: pointer;" onclick="loadAppsDropdown()"><i class="bi bi-arrow-clockwise"></i> 刷新</span>
+                            <div class="gpt-popover" id="appPopover" style="left: 0; width: 320px; padding: 10px;" onclick="event.stopPropagation()">
+                                <!-- 顶部：真机前台联动快捷条 -->
+                                <div class="p-1.5 mb-2 rounded border d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.22) !important;">
+                                    <div class="d-flex align-items-center gap-1.5 text-truncate me-1" style="font-size: 11px;">
+                                        <i class="bi bi-lightning-charge-fill text-success" style="font-size: 12px;"></i>
+                                        <span class="text-truncate" id="popoverForegroundAppHint">真机前台 App 联动</span>
+                                    </div>
+                                    <button class="btn btn-xs btn-success py-0.5 px-2 fw-medium text-nowrap" style="font-size: 10.5px; border-radius: 9999px;" onclick="syncForegroundAppAsActive();" title="一键同步真机屏幕正打开的应用">
+                                        ⚡ 设为当前
+                                    </button>
                                 </div>
-                                <div id="appDropdownList" class="d-flex flex-column gap-1" style="max-height: 180px; overflow-y: auto;">
-                                    <div class="small text-muted p-1">加载应用中...</div>
+
+                                <!-- 分段控制器：真机已安装 vs 本地 APK 库 -->
+                                <div class="d-flex p-0.5 mb-2 rounded" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+                                    <button type="button" class="btn btn-sm flex-fill py-1 px-1 border-0 fw-medium app-tab-pill active" id="tabBtnDeviceApps" onclick="switchAppPopoverTab('device')" style="font-size: 11px; border-radius: 4px;">
+                                        <i class="bi bi-phone me-1"></i>真机已安装
+                                    </button>
+                                    <button type="button" class="btn btn-sm flex-fill py-1 px-1 border-0 fw-medium app-tab-pill" id="tabBtnLocalApks" onclick="switchAppPopoverTab('local')" style="font-size: 11px; border-radius: 4px;">
+                                        <i class="bi bi-box-seam me-1"></i>本地 APK 库
+                                    </button>
                                 </div>
-                                <div class="p-2 mt-2 rounded border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
-                                    <span class="small text-muted" style="font-size: 10.5px;">需测试其他 App？</span>
-                                    <button class="btn btn-sm btn-primary py-0.5 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="openAppPackagesModal(); closeAllPopovers();">
-                                        <i class="bi bi-cloud-arrow-up me-1"></i>管理/上传
+
+                                <!-- 列表区 1: 真机已安装应用 -->
+                                <div id="panelDeviceAppsDropdown">
+                                    <div class="d-flex justify-content-between align-items-center mb-1 pb-1">
+                                        <span class="small text-muted" style="font-size: 10.5px;" id="deviceAppsCountHint">检测真机应用...</span>
+                                        <span class="small text-muted" style="font-size: 10.5px; cursor: pointer;" onclick="loadDeviceAppsDropdown(true)"><i class="bi bi-arrow-clockwise"></i> 刷新真机</span>
+                                    </div>
+                                    <div id="deviceAppsDropdownList" class="d-flex flex-column gap-1" style="max-height: 185px; overflow-y: auto;">
+                                        <div class="small text-muted p-2 text-center">读取真机应用中...</div>
+                                    </div>
+                                </div>
+
+                                <!-- 列表区 2: 本地 APK 库 -->
+                                <div id="panelLocalApksDropdown" class="d-none">
+                                    <div class="d-flex justify-content-between align-items-center mb-1 pb-1">
+                                        <span class="small text-muted" style="font-size: 10.5px;" id="localApksCountHint">本地应用包</span>
+                                        <span class="small text-muted" style="font-size: 10.5px; cursor: pointer;" onclick="loadAppsDropdown(true)"><i class="bi bi-arrow-clockwise"></i> 刷新</span>
+                                    </div>
+                                    <div id="localAppsDropdownList" class="d-flex flex-column gap-1" style="max-height: 185px; overflow-y: auto;">
+                                        <div class="small text-muted p-2 text-center">读取 APK 库中...</div>
+                                    </div>
+                                </div>
+
+                                <!-- 底部操作条 -->
+                                <div class="p-1.5 mt-2 rounded border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
+                                    <span class="small text-muted" style="font-size: 10.5px;">管理更多应用？</span>
+                                    <button class="btn btn-sm btn-outline-secondary py-0.5 px-2" style="font-size: 10.5px; border-radius: 9999px;" onclick="openAppPackagesModal(); closeAllPopovers();">
+                                        <i class="bi bi-gear me-1"></i>应用设置
                                     </button>
                                 </div>
                             </div>
@@ -7254,52 +7306,93 @@
                     </div>
 
                     <!-- 右侧内容面板 1: 待测应用与 APK 安装包管理 (高频第一位) -->
+                                        <!-- 右侧内容面板 1: 待测应用与 APK 安装包管理 (高频第一位) -->
                     <div class="settings-content-area" id="panelSettingsApps">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
                                 <div class="settings-section-title">待测应用与 APK 管理</div>
-                                <div class="settings-section-desc">管理端侧自动化目标应用，支持直接拖拽安装包解析与一键安装到手机。</div>
+                                <div class="settings-section-desc">管理端侧自动化目标应用，支持真机已安装应用直调（免传 APK）与本地 APK 库管理。</div>
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <span class="badge rounded-pill bg-secondary-subtle text-secondary" id="appListCountBadge" style="font-size: 11px;">0 个安装包</span>
-                                <button class="btn-fidelity-action" onclick="loadApps()" title="刷新应用列表">
+                                <span class="badge rounded-pill bg-secondary-subtle text-secondary" id="appListCountBadge" style="font-size: 11px;">0 个应用</span>
+                                <button class="btn-fidelity-action" onclick="refreshAllAppsPanels()" title="刷新应用列表">
                                     <i class="bi bi-arrow-clockwise"></i>
                                     <span>刷新</span>
                                 </button>
                             </div>
                         </div>
 
-                        <!-- 上传区域：支持拖拽与点击选择 -->
-                        <div class="upload-dropzone p-3 mb-3 text-center position-relative" id="apkDropZone" onclick="triggerFileInput()">
-                            <input type="file" id="appFileInput" class="d-none" accept=".apk,.ipa" onchange="handleAppFileInput(event)">
-                            <div id="dropZonePrompt" class="py-2">
-                                <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 26px;"></i>
-                                <div class="fw-semibold mt-1" style="font-size: 13px; color: var(--text-main);">点击或将待测 APK / IPA 拖拽至此处上传</div>
-                                <div class="text-muted mt-0.5" style="font-size: 11px;">系统将自动使用 aapt 深度解析包名、版本及启动 Activity</div>
+                        <!-- 选项卡切换：📱 真机已安装应用 vs 📦 本地 APK 库与上传 -->
+                        <div class="d-flex p-0.5 mb-3 rounded" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); max-width: 320px;">
+                            <button type="button" class="btn btn-sm flex-fill py-1 px-2 border-0 fw-medium app-tab-pill active" id="modalTabDeviceApps" onclick="switchSettingsAppTab('device')" style="font-size: 11.5px; border-radius: 4px;">
+                                <i class="bi bi-phone me-1"></i>真机已安装
+                            </button>
+                            <button type="button" class="btn btn-sm flex-fill py-1 px-2 border-0 fw-medium app-tab-pill" id="modalTabLocalApks" onclick="switchSettingsAppTab('local')" style="font-size: 11.5px; border-radius: 4px;">
+                                <i class="bi bi-box-seam me-1"></i>本地 APK 库
+                            </button>
+                        </div>
+
+                        <!-- 视图 1: 真机已安装应用管理 -->
+                        <div id="settingsViewDeviceApps">
+                            <!-- 前台 App 快速捕获联动高光卡片 -->
+                            <div class="p-2.5 mb-3 rounded border d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.25) !important;">
+                                <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #10b981;">
+                                        <i class="bi bi-lightning-charge-fill" style="font-size: 16px;"></i>
+                                    </div>
+                                    <div class="text-truncate">
+                                        <div class="fw-semibold" style="font-size: 12px; color: var(--text-main);" id="settingsFgAppTitle">真机前台应用联动</div>
+                                        <div class="small text-muted text-truncate" style="font-size: 10.5px;" id="settingsFgAppDesc">点击右侧按钮，0.05 秒捕获手机屏幕正处于前台的 App 并设为待测</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-success py-1 px-2.5 text-nowrap" style="font-size: 11.5px; border-radius: 6px;" onclick="syncForegroundAppAsActive(true)">
+                                    ⚡ 捕获前台并设为待测
+                                </button>
                             </div>
-                            <!-- 实时进度条 -->
-                            <div id="dropZoneProgress" class="d-none py-2">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="small fw-semibold text-primary" id="uploadStatusText" style="font-size: 11.5px;">正在上传应用包...</span>
-                                    <span class="small fw-bold text-primary" id="uploadPercentBadge" style="font-size: 11.5px;">0%</span>
-                                </div>
-                                <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.08); border-radius: 9999px;">
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="uploadProgressBar" style="width: 0%;"></div>
-                                </div>
+
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                                <span class="small fw-bold" style="font-size: 12px; color: var(--text-main);">真机桌面已安装应用 (免上传 APK 直调)</span>
+                                <div class="small text-muted" id="modalDeviceTargetHint" style="font-size: 11px;">目标真机：检测中...</div>
+                            </div>
+                            <div id="settingsDeviceAppsList" class="d-flex flex-column gap-2" style="max-height: 290px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>正在读取真机应用...</div>
                             </div>
                         </div>
 
-                        <!-- 待测应用卡片列表 -->
-                        <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                            <span class="small fw-bold" style="font-size: 12px; color: var(--text-main);">已就绪待测包列表</span>
-                            <div class="small text-muted" id="modalTargetDeviceHint" style="font-size: 11px;">目标设备：检测中...</div>
-                        </div>
-                        <div id="appsList" class="d-flex flex-column gap-2" style="max-height: 290px; overflow-y: auto;">
-                            <div class="p-3 text-center text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>正在读取待测应用库...</div>
+                        <!-- 视图 2: 本地 APK 库与上传 (保留现有完整逻辑) -->
+                        <div id="settingsViewLocalApks" class="d-none">
+                            <!-- 上传区域：支持拖拽与点击选择 -->
+                            <div class="upload-dropzone p-3 mb-3 text-center position-relative" id="apkDropZone" onclick="triggerFileInput()">
+                                <input type="file" id="appFileInput" class="d-none" accept=".apk,.ipa" onchange="handleAppFileInput(event)">
+                                <div id="dropZonePrompt" class="py-2">
+                                    <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 26px;"></i>
+                                    <div class="fw-semibold mt-1" style="font-size: 13px; color: var(--text-main);">点击或将待测 APK / IPA 拖拽至此处上传</div>
+                                    <div class="text-muted mt-0.5" style="font-size: 11px;">系统将自动使用 aapt 深度解析包名、版本及启动 Activity</div>
+                                </div>
+                                <!-- 实时进度条 -->
+                                <div id="dropZoneProgress" class="d-none py-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small fw-semibold text-primary" id="uploadStatusText" style="font-size: 11.5px;">正在上传应用包...</span>
+                                        <span class="small fw-bold text-primary" id="uploadPercentBadge" style="font-size: 11.5px;">0%</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.08); border-radius: 9999px;">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" id="uploadProgressBar" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 待测应用卡片列表 -->
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                                <span class="small fw-bold" style="font-size: 12px; color: var(--text-main);">已就绪待测包列表</span>
+                                <div class="small text-muted" id="modalTargetDeviceHint" style="font-size: 11px;">目标设备：检测中...</div>
+                            </div>
+                            <div id="appsList" class="d-flex flex-column gap-2" style="max-height: 290px; overflow-y: auto;">
+                                <div class="p-3 text-center text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>正在读取待测应用库...</div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- 右侧内容面板 2: AI 模型服务 -->
+<!-- 右侧内容面板 2: AI 模型服务 -->
                                         <!-- 右侧内容面板: Google 官方授权中心 (独立顶级菜单) -->
                     <div class="settings-content-area d-none" id="panelSettingsGoogle">
                         <div class="d-flex justify-content-between align-items-start mb-3">
@@ -13471,36 +13564,42 @@ function renderChatStream(sessionData) {
             const activeDevId = getActiveTargetDeviceId();
             if (activeDevId && currentActiveApp && currentActiveApp.package) {
                 try {
-                    const chkRes = await fetch(`/api/apps/check_installed?device_id=${encodeURIComponent(activeDevId)}&package=${encodeURIComponent(currentActiveApp.package)}`);
-                    const chkData = await chkRes.json();
-                    if (chkData && chkData.installed === false) {
-                        btn.disabled = true;
-                        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span>智能静默推送到手机...`;
-                        const insForm = new FormData();
-                        insForm.append("device_id", activeDevId);
-                        insForm.append("filename", currentActiveApp.filename);
-                        const insRes = await fetch("/api/install", { method: "POST", body: insForm });
-                        const insData = await insRes.json();
-                        if (!insData.success) {
-                            btn.disabled = false;
-                            btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
-                            const flow = document.getElementById("messagesFlow");
-                            if (flow) {
-                                flow.innerHTML += `
-                                    <div class="preflight-bubble border-danger-subtle mt-2">
-                                        <div class="d-flex align-items-center gap-2 text-danger fw-semibold" style="font-size: 12px;">
-                                            <i class="bi bi-x-circle-fill"></i> 真机待测包自动安装受阻
+                    const isDeviceDirect = (currentActiveApp.source === 'device' || !currentActiveApp.filename);
+                    if (!isDeviceDirect && currentActiveApp.filename) {
+                        const chkRes = await fetch(`/api/apps/check_installed?device_id=${encodeURIComponent(activeDevId)}&package=${encodeURIComponent(currentActiveApp.package)}`);
+                        const chkData = await chkRes.json();
+                        if (chkData && chkData.installed === false) {
+                            btn.disabled = true;
+                            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span>智能静默推送到手机...`;
+                            const insForm = new FormData();
+                            insForm.append("device_id", activeDevId);
+                            insForm.append("filename", currentActiveApp.filename);
+                            const insRes = await fetch("/api/install", { method: "POST", body: insForm });
+                            const insData = await insRes.json();
+                            if (!insData.success) {
+                                btn.disabled = false;
+                                btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
+                                const flow = document.getElementById("messagesFlow");
+                                if (flow) {
+                                    flow.innerHTML += `
+                                        <div class="preflight-bubble border-danger-subtle mt-2">
+                                            <div class="d-flex align-items-center gap-2 text-danger fw-semibold" style="font-size: 12px;">
+                                                <i class="bi bi-x-circle-fill"></i> 真机待测包自动安装受阻
+                                            </div>
+                                            <div class="small text-muted mt-1" style="font-size: 11px;">
+                                                ${escapeHtml(insData.message || '安装超时')}。请点亮手机屏幕，若弹出【允许通过 USB 安装】请点击【允许】。
+                                            </div>
                                         </div>
-                                        <div class="small text-muted mt-1" style="font-size: 11px;">
-                                            ${escapeHtml(insData.message || '安装超时')}。请点亮手机屏幕，若弹出【允许通过 USB 安装】请点击【允许】。
-                                        </div>
-                                    </div>
-                                `;
+                                    `;
+                                }
+                                return;
                             }
-                            return;
+                            currentActiveApp.isInstalled = true;
+                            updateAppPillUI();
                         }
+                    } else {
+                        // 真机已安装直调：免推包安装，直接放行
                         currentActiveApp.isInstalled = true;
-                        updateAppPillUI();
                     }
                 } catch (e) {
                     console.warn("前置包核验跳过", e);
@@ -13586,6 +13685,7 @@ function renderChatStream(sessionData) {
                 formData.append("app_filename", currentActiveApp.filename || "");
                 formData.append("app_package", currentActiveApp.package || "");
                 formData.append("app_label", currentActiveApp.label || "");
+                formData.append("app_activity", currentActiveApp.activity || "");
 
                 const res = await fetch("/api/sessions/create", { method: "POST", body: formData });
                 const data = await res.json();
@@ -13698,7 +13798,7 @@ function renderChatStream(sessionData) {
             if (panelGeneral) panelGeneral.classList.toggle("d-none", !isGeneral);
             if (panelGuide) panelGuide.classList.toggle("d-none", !isGuide);
 
-            if (isApps) loadApps();
+            if (isApps) { if (currentSettingsAppTab === 'device') loadSettingsDeviceApps(); else loadApps(); }
             if (isGoogle) loadAntigravityStatus();
             if (isModels) loadModelConfig();
             if (isGuide) updateTourStatusBadge();
@@ -14244,16 +14344,21 @@ function renderChatStream(sessionData) {
             bootstrap.Modal.getInstance(document.getElementById("suggestedCasesModal")).hide();
         }
 
-        // ================= 12. 待测应用库、真机安装管理与状态联动 =================
+        // ================= 12. 待测应用库、真机直调与状态联动 =================
         let currentActiveApp = {
-            filename: "demo_app.apk",
-            label: "示例待测应用",
-            package: "com.example.app",
-            version: "1.0.0",
-            size: "0 MB",
-            isInstalled: false
+            source: "device",
+            filename: "",
+            label: "待测应用",
+            package: "",
+            activity: "",
+            version: "真机就绪",
+            size: "",
+            isInstalled: true
         };
         let cachedAppList = [];
+        let cachedDeviceApps = [];
+        let currentAppPopoverTab = 'device';
+        let currentSettingsAppTab = 'device';
 
         // 初始化待测应用与拖拽监听
         function initAppManagement() {
@@ -14288,6 +14393,7 @@ function renderChatStream(sessionData) {
             }
 
             updateAppPillUI();
+            loadDeviceAppsDropdown();
             loadAppsDropdown();
         }
 
@@ -14321,10 +14427,12 @@ function renderChatStream(sessionData) {
             const appDot = document.getElementById("appStatusDot");
             const topBarDot = document.getElementById("topBarAppDot");
 
-            const displayName = currentActiveApp.label || currentActiveApp.filename || "待测应用";
+            const isDeviceDirect = (currentActiveApp.source === 'device' || !currentActiveApp.filename);
+            const rawName = currentActiveApp.label || currentActiveApp.package || currentActiveApp.filename || "待测应用";
+            const displayName = isDeviceDirect ? `${rawName} (真机)` : rawName;
+
             if (appLabelEl) appLabelEl.innerText = displayName;
             if (topBarLabelEl) topBarLabelEl.innerText = `待测应用: ${displayName}`;
-            // 同步工具栏应用胶囊标签
             const toolbarAppLabelEl = document.getElementById("toolbarAppLabel");
             if (toolbarAppLabelEl) toolbarAppLabelEl.innerText = displayName;
 
@@ -14336,6 +14444,8 @@ function renderChatStream(sessionData) {
                     const data = await res.json();
                     currentActiveApp.isInstalled = !!data.installed;
                 } catch (e) {}
+            } else if (isDeviceDirect && currentActiveApp.package) {
+                currentActiveApp.isInstalled = true;
             }
 
             const dotCls = currentActiveApp.isInstalled ? "status-indicator-dot dot-online" : "status-indicator-dot dot-warning";
@@ -14345,52 +14455,197 @@ function renderChatStream(sessionData) {
             // 动态响应输入框 placeholder，确保用户输入时心智高度明确当前待测对象
             const taskInputTa = document.getElementById("taskInputText");
             if (taskInputTa && (!taskInputTa.value || taskInputTa.value.trim() === "")) {
-                taskInputTa.placeholder = `针对「${displayName}」描述自动化测试目标，如：冷启动应用，测试登录并断言进入首页（Enter 发送，Shift+Enter 换行）...`;
+                taskInputTa.placeholder = `针对「${rawName}」描述自动化测试目标，如：冷启动应用，测试登录并断言进入首页（Enter 发送，Shift+Enter 换行）...`;
             }
         }
 
         // 切换当前激活应用
         function switchActiveApp(appObj) {
             currentActiveApp = {
-                filename: appObj.filename,
-                label: appObj.label || appObj.filename,
-                package: appObj.package,
-                version: appObj.version || "1.0",
+                source: appObj.source || (appObj.filename ? 'local' : 'device'),
+                filename: appObj.filename || "",
+                label: appObj.label || appObj.package || appObj.filename || "真机应用",
+                package: appObj.package || "",
+                activity: appObj.activity || "",
+                version: appObj.version || (appObj.source === 'device' ? '真机已安装' : "1.0"),
                 size: appObj.size || "",
-                isInstalled: false
+                isInstalled: true
             };
             try {
                 localStorage.setItem("autotest_active_app", JSON.stringify(currentActiveApp));
             } catch (e) {}
 
             updateAppPillUI();
+            loadDeviceAppsDropdown();
             loadAppsDropdown();
             refreshAppSuggestedCases(`${currentActiveApp.label} (已就绪)`);
+            loadSettingsDeviceApps();
             loadApps();
         }
 
-        // 加载底栏 Popover 下拉选单
-        async function loadAppsDropdown() {
-            const container = document.getElementById("appDropdownList");
+        // 底栏 Popover 选项卡切换
+        function switchAppPopoverTab(tab) {
+            currentAppPopoverTab = tab;
+            const btnDev = document.getElementById("tabBtnDeviceApps");
+            const btnLoc = document.getElementById("tabBtnLocalApks");
+            const panelDev = document.getElementById("panelDeviceAppsDropdown");
+            const panelLoc = document.getElementById("panelLocalApksDropdown");
+
+            if (tab === 'device') {
+                if (btnDev) btnDev.classList.add("active");
+                if (btnLoc) btnLoc.classList.remove("active");
+                if (panelDev) panelDev.classList.remove("d-none");
+                if (panelLoc) panelLoc.classList.add("d-none");
+                loadDeviceAppsDropdown();
+            } else {
+                if (btnDev) btnDev.classList.remove("active");
+                if (btnLoc) btnLoc.classList.add("active");
+                if (panelDev) panelDev.classList.add("d-none");
+                if (panelLoc) panelLoc.classList.remove("d-none");
+                loadAppsDropdown();
+            }
+        }
+
+        // 0.08s 极速读取真机已安装桌面应用
+        async function loadDeviceAppsDropdown(force = false) {
+            const container = document.getElementById("deviceAppsDropdownList");
+            const countHint = document.getElementById("deviceAppsCountHint");
+            const fgHint = document.getElementById("popoverForegroundAppHint");
+            if (!container) return;
+
+            const devId = getActiveTargetDeviceId();
+
+            try {
+                if (force || cachedDeviceApps.length === 0) {
+                    const url = devId ? `/api/device/installed_apps?device_id=${encodeURIComponent(devId)}` : `/api/device/installed_apps`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.success && data.apps) {
+                        cachedDeviceApps = data.apps;
+                    } else if (!data.success) {
+                        container.innerHTML = `
+                            <div class="p-3 text-center text-muted small">
+                                <i class="bi bi-phone-vibrate mb-1 d-block" style="font-size: 18px;"></i>
+                                未检测到在线真机<br><span style="font-size: 10.5px;">请连接手机并开启 USB 调试</span>
+                            </div>
+                        `;
+                        if (countHint) countHint.innerText = "真机未连接";
+                        return;
+                    }
+                }
+
+                // 异步探查前台
+                const fgUrl = devId ? `/api/device/foreground_app?device_id=${encodeURIComponent(devId)}` : `/api/device/foreground_app`;
+                fetch(fgUrl)
+                    .then(r => r.json())
+                    .then(fgData => {
+                        if (fgData && fgData.success && fgData.app && fgHint) {
+                            fgHint.innerHTML = `前台: <strong class="text-success">${escapeHtml(fgData.app.label)}</strong>`;
+                        }
+                    }).catch(() => {});
+
+                if (countHint) countHint.innerText = `真机应用: ${cachedDeviceApps.length} 款`;
+
+                if (cachedDeviceApps.length === 0) {
+                    container.innerHTML = `<div class="p-3 text-center text-muted small">真机上暂未检索到第三方桌面应用</div>`;
+                    return;
+                }
+
+                let html = "";
+                cachedDeviceApps.forEach(a => {
+                    const isSelected = (currentActiveApp && currentActiveApp.package === a.package && (currentActiveApp.source === 'device' || !currentActiveApp.filename));
+                    const safeA = JSON.stringify({
+                        source: "device",
+                        label: a.label,
+                        package: a.package,
+                        activity: a.activity || "",
+                        version: "真机已安装",
+                        isInstalled: true
+                    }).replace(/'/g, "&apos;");
+
+                    html += `
+                        <div class="popover-item ${isSelected ? 'active' : ''}" style="cursor: pointer;" onclick='switchActiveApp(${safeA}); closeAllPopovers();'>
+                            <div class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-phone ${isSelected ? 'text-success' : 'text-muted'}" style="font-size: 13px;"></i>
+                                <div class="d-flex flex-column text-truncate" style="line-height: 1.25;">
+                                    <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                        <span class="text-truncate fw-medium" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(a.label)}</span>
+                                        <span class="badge bg-success-subtle text-success py-0 px-1" style="font-size: 9px; line-height: 1.2;">直调</span>
+                                    </div>
+                                    <span class="text-muted text-truncate" style="font-size: 10px;">${escapeHtml(a.package)}</span>
+                                </div>
+                            </div>
+                            ${isSelected ? '<i class="bi bi-check2 text-success" style="font-size: 14px;"></i>' : ''}
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<div class="p-2 text-muted small">读取真机应用失败: ${e}</div>`;
+            }
+        }
+
+        // ⚡ 一键捕获真机当前屏幕正打开的应用设为当前待测
+        async function syncForegroundAppAsActive(isFromSettings = false) {
+            const devId = getActiveTargetDeviceId();
+
+            try {
+                const url = devId ? `/api/device/foreground_app?device_id=${encodeURIComponent(devId)}` : `/api/device/foreground_app`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.success && data.app) {
+                    const app = data.app;
+                    switchActiveApp({
+                        source: "device",
+                        label: app.label,
+                        package: app.package,
+                        activity: app.activity || "",
+                        version: "真机前台",
+                        isInstalled: true
+                    });
+                    if (!isFromSettings) {
+                        closeAllPopovers();
+                    }
+                    const fgHint = document.getElementById("popoverForegroundAppHint");
+                    if (fgHint) fgHint.innerHTML = `已绑定前台: <strong class="text-success">${escapeHtml(app.label)}</strong>`;
+                    if (isFromSettings) {
+                        const setFg = document.getElementById("settingsFgAppDesc");
+                        if (setFg) setFg.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>已成功绑定前台应用：<strong>${escapeHtml(app.label)}</strong> (${escapeHtml(app.package)})</span>`;
+                    }
+                } else {
+                    alert("未能获取到前台运行的应用，请点亮手机屏幕并打开待测 App！");
+                }
+            } catch (e) {
+                alert("获取真机前台应用出错: " + e);
+            }
+        }
+
+        // 加载底栏 Popover 下拉选单 (本地 APK 库)
+        async function loadAppsDropdown(force = false) {
+            const container = document.getElementById("localAppsDropdownList") || document.getElementById("appDropdownList");
             if (!container) return;
 
             try {
-                if (cachedAppList.length === 0) {
+                if (force || cachedAppList.length === 0) {
                     const res = await fetch("/api/apps");
                     const data = await res.json();
                     cachedAppList = data.apps || [];
                 }
 
+                const countHint = document.getElementById("localApksCountHint");
+                if (countHint) countHint.innerText = `本地库: ${cachedAppList.length} 个 APK`;
+
                 if (cachedAppList.length === 0) {
-                    container.innerHTML = `<div class="p-2 text-center text-muted small">应用库暂无应用，点击下方上传</div>`;
+                    container.innerHTML = `<div class="p-3 text-center text-muted small">应用库暂无 APK，点击下方上传</div>`;
                     return;
                 }
 
                 let html = "";
                 cachedAppList.forEach(a => {
-                    const isSelected = (currentActiveApp && currentActiveApp.filename === a.filename);
+                    const isSelected = (currentActiveApp && currentActiveApp.filename === a.filename && currentActiveApp.source !== 'device');
+                    const safeA = JSON.stringify(a).replace(/'/g, "&apos;");
                     html += `
-                        <div class="popover-item ${isSelected ? 'active' : ''}" style="cursor: pointer;" onclick='switchActiveApp(${JSON.stringify(a)}); closeAllPopovers();'>
+                        <div class="popover-item ${isSelected ? 'active' : ''}" style="cursor: pointer;" onclick='switchActiveApp(${safeA}); closeAllPopovers();'>
                             <div class="d-flex align-items-center gap-2 text-truncate">
                                 <i class="bi bi-box-seam ${isSelected ? 'text-primary' : 'text-muted'}" style="font-size: 13px;"></i>
                                 <div class="d-flex flex-column text-truncate" style="line-height: 1.25;">
@@ -14406,6 +14661,179 @@ function renderChatStream(sessionData) {
             } catch (e) {
                 container.innerHTML = `<div class="p-2 text-muted small">加载异常: ${e}</div>`;
             }
+        }
+
+        // 设置面板：真机应用列表加载
+        async function loadSettingsDeviceApps(force = false) {
+            const listEl = document.getElementById("settingsDeviceAppsList");
+            const devHint = document.getElementById("modalDeviceTargetHint");
+            const countBadge = document.getElementById("appListCountBadge");
+            const fgTitle = document.getElementById("settingsFgAppTitle");
+            const fgDesc = document.getElementById("settingsFgAppDesc");
+            if (!listEl) return;
+
+            const targetDevId = getActiveTargetDeviceId();
+
+            try {
+                if (force || cachedDeviceApps.length === 0) {
+                    const url = targetDevId ? `/api/device/installed_apps?device_id=${encodeURIComponent(targetDevId)}` : `/api/device/installed_apps`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.success && data.apps) {
+                        cachedDeviceApps = data.apps;
+                        if (devHint) {
+                            devHint.innerHTML = `<span class="text-success"><i class="bi bi-phone me-1"></i>目标真机: <strong>${escapeHtml(data.device_id || targetDevId || '已连接真机')}</strong></span>`;
+                        }
+                    } else if (!data.success) {
+                        listEl.innerHTML = `
+                            <div class="text-center py-4 text-muted">
+                                <i class="bi bi-phone-vibrate" style="font-size: 28px;"></i>
+                                <div class="small mt-2">未检测到已连接的 Android 真机设备</div>
+                                <div class="text-muted mt-1" style="font-size: 11px;">请通过 USB 数据线连接手机，并在开发者选项中打开【USB 调试】。</div>
+                            </div>
+                        `;
+                        if (devHint) devHint.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>未连接真机 (请连接 USB 并开启调试)</span>`;
+                        return;
+                    }
+                }
+
+
+                if (countBadge && currentSettingsAppTab === 'device') {
+                    countBadge.innerText = `${cachedDeviceApps.length} 个真机应用`;
+                }
+
+                // 异步探查前台
+                fetch(`/api/device/foreground_app?device_id=${encodeURIComponent(targetDevId)}`)
+                    .then(r => r.json())
+                    .then(fgData => {
+                        if (fgData && fgData.success && fgData.app && fgTitle && fgDesc) {
+                            fgTitle.innerHTML = `真机当前前台：<span class="text-success">${escapeHtml(fgData.app.label)}</span>`;
+                            fgDesc.innerText = `包名: ${fgData.app.package} · 点击右侧按钮立即设为待测目标`;
+                        }
+                    }).catch(() => {});
+
+                if (cachedDeviceApps.length === 0) {
+                    listEl.innerHTML = `
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox" style="font-size: 28px;"></i>
+                            <div class="small mt-1">真机上未检索到第三方桌面应用</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = "";
+                cachedDeviceApps.forEach((a, idx) => {
+                    const isSelected = (currentActiveApp && currentActiveApp.package === a.package && (currentActiveApp.source === 'device' || !currentActiveApp.filename));
+                    const safeLabel = escapeHtml(a.label);
+                    const safePkg = escapeHtml(a.package);
+                    const safeAct = escapeHtml(a.activity || "");
+                    const safeA = JSON.stringify({
+                        source: "device",
+                        label: a.label,
+                        package: a.package,
+                        activity: a.activity || "",
+                        version: "真机已安装",
+                        isInstalled: true
+                    }).replace(/'/g, "&apos;");
+
+                    html += `
+                        <div class="app-card-item ${isSelected ? 'active' : ''}" id="deviceAppCard_${idx}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                                    <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(16, 185, 129, 0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #10b981;">
+                                        <i class="bi bi-phone" style="font-size: 20px;"></i>
+                                    </div>
+                                    <div class="text-truncate">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="fw-bold" style="font-size: 13px; color: var(--text-main);">${safeLabel}</span>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px;">真机直调免传包</span>
+                                            ${isSelected ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 10px;">当前待测</span>' : ''}
+                                            <span class="cursor-pointer text-muted small" onclick="editAppCustomLabel('${safePkg}', '${safeLabel}')" title="自定义应用显示名称" style="font-size: 11px;">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 text-muted mt-0.5" style="font-size: 11px;">
+                                            <span class="text-truncate" style="max-width: 240px;" title="${safePkg}">${safePkg}</span>
+                                            ${safeAct ? `<span>·</span><span class="text-truncate" style="max-width: 200px;" title="${safeAct}">${safeAct.split('.').pop()}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                    ${!isSelected ? `
+                                        <button class="btn btn-sm btn-outline-success py-1 px-2.5" style="font-size: 11.5px; border-radius: 6px;" onclick='switchActiveApp(${safeA})'>
+                                            设为待测
+                                        </button>
+                                    ` : `
+                                        <button class="btn btn-sm btn-outline-success py-1 px-2.5 disabled" style="font-size: 11.5px; border-radius: 6px;">
+                                            <i class="bi bi-check-lg me-1"></i>已就绪
+                                        </button>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                listEl.innerHTML = html;
+            } catch (e) {
+                listEl.innerHTML = `<div class="p-3 text-center text-danger small">读取真机应用失败: ${e}</div>`;
+            }
+        }
+
+        // 修改真机应用自定义友好名称
+        async function editAppCustomLabel(pkg, currentLabel) {
+            const newLabel = prompt(`请为应用 [${pkg}] 输入友好名称:`, currentLabel || "");
+            if (newLabel && newLabel.trim() && newLabel.trim() !== currentLabel) {
+                try {
+                    const res = await fetch("/api/device/app_label", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ package: pkg, label: newLabel.trim() })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (currentActiveApp && currentActiveApp.package === pkg) {
+                            currentActiveApp.label = newLabel.trim();
+                            localStorage.setItem("autotest_active_app", JSON.stringify(currentActiveApp));
+                            updateAppPillUI();
+                        }
+                        loadDeviceAppsDropdown(true);
+                        loadSettingsDeviceApps(true);
+                    }
+                } catch (e) {
+                    alert("保存名称失败: " + e);
+                }
+            }
+        }
+
+        // 设置面板：真机已安装 vs 本地 APK 库 选项卡切换
+        function switchSettingsAppTab(tab) {
+            currentSettingsAppTab = tab;
+            const btnDev = document.getElementById("modalTabDeviceApps");
+            const btnLoc = document.getElementById("modalTabLocalApks");
+            const viewDev = document.getElementById("settingsViewDeviceApps");
+            const viewLoc = document.getElementById("settingsViewLocalApks");
+
+            if (tab === 'device') {
+                if (btnDev) btnDev.classList.add("active");
+                if (btnLoc) btnLoc.classList.remove("active");
+                if (viewDev) viewDev.classList.remove("d-none");
+                if (viewLoc) viewLoc.classList.add("d-none");
+                loadSettingsDeviceApps();
+            } else {
+                if (btnDev) btnDev.classList.remove("active");
+                if (btnLoc) btnLoc.classList.add("active");
+                if (viewDev) viewDev.classList.add("d-none");
+                if (viewLoc) viewLoc.classList.remove("d-none");
+                loadApps();
+            }
+        }
+
+        function refreshAllAppsPanels() {
+            loadDeviceAppsDropdown(true);
+            loadSettingsDeviceApps(true);
+            loadApps();
         }
 
         // 加载模态框已归档应用列表 (支持实时真机核验与一键安装)
@@ -14426,7 +14854,9 @@ function renderChatStream(sessionData) {
                 const data = await res.json();
                 cachedAppList = data.apps || [];
 
-                if (countBadge) countBadge.innerText = `${cachedAppList.length} 个安装包`;
+                if (countBadge && currentSettingsAppTab === 'local') {
+                    countBadge.innerText = `${cachedAppList.length} 个安装包`;
+                }
 
                 if (cachedAppList.length === 0) {
                     if (listEl) listEl.innerHTML = `
@@ -14441,17 +14871,17 @@ function renderChatStream(sessionData) {
                 let html = "";
                 for (let i = 0; i < cachedAppList.length; i++) {
                     const a = cachedAppList[i];
-                    const isSelected = (currentActiveApp && currentActiveApp.filename === a.filename);
+                    const isSelected = (currentActiveApp && currentActiveApp.filename === a.filename && currentActiveApp.source !== 'device');
                     const safeFn = escapeHtml(a.filename);
                     const safeLabel = escapeHtml(a.label || a.filename);
                     const safePkg = escapeHtml(a.package || "");
                     const safeVer = escapeHtml(a.version || "最新版");
                     const safeSize = escapeHtml(a.size || "");
+                    const safeA = JSON.stringify(a).replace(/'/g, "&apos;");
 
                     html += `
                         <div class="app-card-item ${isSelected ? 'active' : ''}" id="appCard_${i}">
                             <div class="d-flex justify-content-between align-items-center">
-                                <!-- 左侧信息 -->
                                 <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
                                     <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(59, 130, 246, 0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #3b82f6;">
                                         <i class="bi bi-android2" style="font-size: 20px;"></i>
@@ -14470,18 +14900,15 @@ function renderChatStream(sessionData) {
                                     </div>
                                 </div>
 
-                                <!-- 右侧操作区：真机安装状态 + 设为待测 + 一键安装 -->
                                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                    <!-- 真机状态插槽 -->
                                     <div id="devInstallBadge_${i}" class="small">
                                         <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">
                                             <span class="spinner-border spinner-border-sm me-1" style="width: 9px; height: 9px;"></span>核验真机...
                                         </span>
                                     </div>
 
-                                    <!-- 设为当前测试 -->
                                     ${!isSelected ? `
-                                        <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" style="font-size: 11.5px; border-radius: 6px;" onclick='switchActiveApp(${JSON.stringify(a)})'>
+                                        <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" style="font-size: 11.5px; border-radius: 6px;" onclick='switchActiveApp(${safeA})'>
                                             选择应用
                                         </button>
                                     ` : `
@@ -14490,12 +14917,10 @@ function renderChatStream(sessionData) {
                                         </button>
                                     `}
 
-                                    <!-- 🚀 一键安装到真机 -->
                                     <button class="btn btn-sm btn-primary py-1 px-2.5" id="btnInstall_${i}" style="font-size: 11.5px; border-radius: 6px;" onclick="installAppToDevice('${safeFn}', '${safePkg}', 'btnInstall_${i}', 'devInstallBadge_${i}')" title="通过 ADB 推送安装该 APK 到在线手机">
                                         <i class="bi bi-phone me-1"></i>安装到手机
                                     </button>
 
-                                    <!-- 移除安装包 -->
                                     <button class="btn btn-sm btn-link text-muted p-1" onclick="deleteAppPackage('${safeFn}')" title="从应用库删除该安装包">
                                         <i class="bi bi-trash" style="font-size: 13px;"></i>
                                     </button>
@@ -14507,7 +14932,6 @@ function renderChatStream(sessionData) {
 
                 if (listEl) listEl.innerHTML = html;
 
-                // 异步更新每张卡片的真机安装状态
                 if (targetDevId) {
                     cachedAppList.forEach(async (a, idx) => {
                         const badgeEl = document.getElementById(`devInstallBadge_${idx}`);
@@ -14534,12 +14958,11 @@ function renderChatStream(sessionData) {
                         }
                     });
                 }
-
             } catch (e) {
                 if (listEl) listEl.innerHTML = `<div class="p-3 text-center text-danger small">读取应用库失败: ${e}</div>`;
             }
         }
-
+        
         // 拖拽与文件上传核心逻辑 (带真实上传进度条与自动设为当前测试应用)
         function uploadAppFile(file) {
             if (!file) return;

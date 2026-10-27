@@ -18,7 +18,7 @@ from ai_engine.solidifier import Solidifier
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MainRunner")
 
-def run_test(goal: str, case_name: str, app_file: str = None, provider: str = None, auto_solidify: bool = True, device_id: str = None, session_id: str = None, turn_id: int = 1):
+def run_test(goal: str, case_name: str, app_file: str = None, provider: str = None, auto_solidify: bool = True, device_id: str = None, session_id: str = None, turn_id: int = 1, package: str = None, activity: str = None):
     print("=" * 60)
     print(f"🤖 AI 移动端全自动测试与固化引擎")
     print(f"🎯 测试目标: {goal}")
@@ -27,20 +27,20 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
     print(f"🧠 模型服务: {(provider or ai_config.PROVIDER).upper()}")
     print("=" * 60)
 
-    # 1. 检查并安装应用（避免重复安装）
+    # 1. 检查并调起应用 (支持真机已安装直调，免上传 APK)
     app_mgr = AppManager()
-    target_app = app_mgr.find_target_app(app_file)
+    target_app = app_mgr.find_target_app(app_file) if app_file else None
     apk_info = app_mgr.get_apk_info(target_app) if target_app else {}
-    pkg = apk_info.get("package") or settings.ANDROID_APP_PACKAGE
-    act = apk_info.get("activity") or settings.ANDROID_APP_ACTIVITY
+    pkg = package or apk_info.get("package") or settings.ANDROID_APP_PACKAGE
+    act = activity or apk_info.get("activity") or settings.ANDROID_APP_ACTIVITY
 
     is_installed = app_mgr.is_app_installed(pkg, device_id=device_id)
     if is_installed:
-        print(f"\n📱 [状态核实] 真机已安装应用 [{pkg}]，直接调起运行，无需重复安装！")
+        print(f"\n📱 [真机直调] 目标应用 [{pkg}] 在设备 [{device_id or 'default'}] 状态正常，直接调起运行，免上传安装包！")
     else:
         if not target_app:
-            logger.error(f"❌ 真机未安装应用 [{pkg}]，且未在 apps 目录下找到可供安装的安装包！测试终止。")
-            print(f"\n💡 提示: 请将待测 APK 安装包放入 apps/ 目录，或提前在真机上手动安装该应用。")
+            logger.error(f"❌ 真机未安装应用 [{pkg}]，且未指定安装包文件！测试终止。")
+            print(f"\n💡 提示: 请在手机上手动安装该应用，或将 APK 放入 apps/ 目录后重试。")
             sys.exit(1)
 
         if settings.PLATFORM == "android":
@@ -132,6 +132,8 @@ if __name__ == "__main__":
     parser.add_argument("--no-solidify", action="store_true", help="不自动生成固化脚本")
     parser.add_argument("--session-id", type=str, default=None, help="关联的 Web 会话 ID")
     parser.add_argument("--turn-id", type=int, default=1, help="当前执行的交互轮次 (Turn)")
+    parser.add_argument("--package", type=str, default=None, help="真机已安装的目标应用包名 (免上传直测)")
+    parser.add_argument("--activity", type=str, default=None, help="目标应用启动入口 Activity")
 
     args = parser.parse_args()
     run_test(
@@ -142,5 +144,7 @@ if __name__ == "__main__":
         provider=args.provider,
         auto_solidify=not args.no_solidify,
         session_id=args.session_id,
-        turn_id=args.turn_id
+        turn_id=args.turn_id,
+        package=args.package,
+        activity=args.activity
     )

@@ -1,9 +1,11 @@
 import os
 import re
 import subprocess
+import shutil
 import logging
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Any
+BASE_DIR = Path(__file__).resolve().parent.parent
 from config.settings import settings
 
 logger = logging.getLogger("AppManager")
@@ -226,18 +228,150 @@ class AppManager:
         return self.is_uiautomator2_ready()
 
     def get_current_foreground_app(self, device_id: str = None) -> dict:
-        """获取指定设备当前前台运行的应用包名与 Activity"""
+        """获取指定设备当前前台运行的应用包名、Activity 与识别名称"""
         cmd = [self.adb_bin]
         if device_id:
             cmd.extend(["-s", device_id])
         cmd.extend(["shell", "dumpsys", "window"])
+        pkg, act, label = "", "", ""
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=4)
             for line in res.stdout.splitlines():
                 if "mCurrentFocus" in line or "mFocusedApp" in line:
                     m = re.search(r"([a-zA-Z0-9_\.]+)\/([a-zA-Z0-9_\.]+)", line)
                     if m:
-                        return {"package": m.group(1), "activity": m.group(2)}
+                        pkg = m.group(1)
+                        act = m.group(2)
+                        if act.startswith("."):
+                            act = pkg + act
+                        break
         except Exception:
             pass
-        return {"package": "", "activity": ""}
+
+        if pkg:
+            labels_map = self._get_app_labels_store()
+            label = labels_map.get(pkg, pkg.split(".")[-1].capitalize())
+
+        return {"package": pkg, "activity": act, "label": label, "source": "device"}
+
+    def _get_app_labels_store(self) -> Dict[str, str]:
+        """获取应用包名与中文名称的持久化映射字典 (优先本地缓存 + apps 目录解析)"""
+        labels_file = BASE_DIR / "data" / "app_labels.json"
+        labels = {
+            "com.apicloud.A6995433058179": "象盒找房",
+            "org.autojs.autoxjs.v6": "AutoX.js",
+            "com.github.metacubex.clash.meta": "Clash Meta",
+            "com.topjohnwu.magisk": "Magisk",
+            "com.termux": "Termux",
+            "com.termux.api": "Termux API",
+            "com.google.android.gm": "Gmail",
+            "com.google.android.inputmethod.latin": "Gboard 键盘",
+            "com.android.settings": "系统设置",
+            "com.android.calculator2": "计算器",
+            "com.android.deskclock": "时钟",
+            "com.android.dialer": "电话",
+            "com.android.contacts": "通讯录",
+            "com.android.messaging": "信息",
+            "org.lineageos.jelly": "浏览器",
+            "org.lineageos.aperture": "相机"
+        }
+        if labels_file.exists():
+            try:
+                custom_labels = json.loads(labels_file.read_text(encoding="utf-8"))
+                if isinstance(custom_labels, dict):
+                    labels.update(custom_labels)
+            except Exception:
+                pass
+
+        # 扫描本地 apps/ 目录，将已有 APK 的解析名称补充进映射
+        try:
+            for apk_p in self.apps_dir.glob("*.apk"):
+                info = self.get_apk_info(apk_p)
+                if info.get("package") and info.get("label"):
+                    labels[info["package"]] = info["label"]
+        except Exception:
+            pass
+
+        return labels
+
+    def save_custom_app_label(self, package: str, label: str):
+        """保存用户为某个包名自定义的中文名称"""
+        if not package or not label:
+            return
+        labels_file = BASE_DIR / "data" / "app_labels.json"
+        labels_file.parent.mkdir(parents=True, exist_ok=True)
+        cur = {}
+        if labels_file.exists():
+            try:
+                cur = json.loads(labels_file.read_text(encoding="utf-8"))
+            except Exception:
+                cur = {}
+        cur[package.strip()] = label.strip()
+        labels_file.write_text(json.dumps(cur, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def get_device_installed_apps(self, device_id: Optional[str] = None, include_system: bool = False) -> List[Dict[str, Any]]:
+        """
+        🚀 0.08s 极速读取已连接真机上已安装的桌面应用列表 (无需上传 APK)
+        """
+        cmd_prefix = [self.adb_bin]
+        if device_id and device_id not in ["mock-device", "local-simulator", "default"]:
+            cmd_prefix.extend(["-s", device_id])
+
+        # 1. 抓取第三方包名集合 (User Installed Apps)
+        third_party_pkgs = set()
+        try:
+            res_3 = subprocess.run(cmd_prefix + ["shell", "pm", "list", "packages", "-3"], capture_output=True, text=True, timeout=5)
+            for l in res_3.stdout.splitlines():
+                if l.startswith("package:"):
+                    third_party_pkgs.add(l.replace("package:", "").strip())
+        except Exception as e:
+            logger.warning(f"获取第三方包列表异常: {e}")
+
+        # 2. 抓取拥有桌面 Launcher 入口的活动列表 (0.08s)
+        apps = []
+        labels_map = self._get_app_labels_store()
+        fg_app = self.get_current_foreground_app(device_id=device_id)
+
+        try:
+            res_act = subprocess.run(
+                cmd_prefix + ["shell", "cmd", "package", "query-activities", "--brief", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            for line in res_act.stdout.splitlines():
+                line = line.strip()
+                if "/" in line and not any(line.startswith(k) for k in ["priority=", "match=", "Action:", "Category:"]):
+                    parts = line.split("/", 1)
+                    pkg = parts[0].strip()
+                    act = parts[1].strip()
+                    if act.startswith("."):
+                        act = pkg + act
+
+                    is_third = pkg in third_party_pkgs
+                    if not include_system and not is_third:
+                        continue
+
+                    # 智能生成可读 Label
+                    label = labels_map.get(pkg)
+                    if not label:
+                        # 从包名推导友好显示名 (如 com.example.mytest -> Mytest)
+                        tail = pkg.split(".")[-1]
+                        label = tail.capitalize() if len(tail) > 2 else pkg
+
+                    is_fg = (pkg == fg_app.get("package"))
+                    apps.append({
+                        "package": pkg,
+                        "activity": act,
+                        "label": label,
+                        "is_third_party": is_third,
+                        "is_foreground": is_fg,
+                        "source": "device"
+                    })
+        except Exception as e:
+            logger.warning(f"获取桌面活动列表异常: {e}")
+
+        # 排序：当前前台运行的排首位，其余按第三方优先 + 中文名称排序
+        apps.sort(key=lambda a: (not a.get("is_foreground", False), not a.get("is_third_party", False), a.get("label", "")))
+        return apps
+

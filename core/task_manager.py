@@ -527,7 +527,8 @@ class TaskManager:
         model: Optional[str] = None,
         app_filename: Optional[str] = None,
         app_package: Optional[str] = None,
-        app_label: Optional[str] = None
+        app_label: Optional[str] = None,
+        app_activity: Optional[str] = None
     ) -> str:
         """
         创建一个新任务会话并分发给一个或多个目标设备并发执行，支持自动放行与人工审批确认
@@ -619,6 +620,7 @@ class TaskManager:
             "app_filename": app_filename,
             "app_package": app_package,
             "app_label": app_label,
+            "app_activity": app_activity,
             "created_at": datetime.now().strftime("%H:%M:%S"),
             "timestamp": time.time(),
             "status": init_status,
@@ -1647,6 +1649,10 @@ class TaskManager:
         cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
         if session.get("app_filename"):
             cmd.extend(["--app", session["app_filename"]])
+        if session.get("app_package"):
+            cmd.extend(["--package", session["app_package"]])
+        if session.get("app_activity"):
+            cmd.extend(["--activity", session["app_activity"]])
         if session.get("provider"):
             cmd.extend(["--provider", session["provider"]])
         if session.get("session_id"):

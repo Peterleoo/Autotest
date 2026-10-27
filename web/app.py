@@ -547,6 +547,41 @@ async def resolve_session_decision(session_id: str, payload: Dict[str, Any] = Bo
     success = task_mgr.resolve_decision(session_id, payload)
     return {"success": success}
 
+
+@app.get("/api/device/installed_apps")
+async def get_device_installed_apps(device_id: Optional[str] = None, include_system: bool = False):
+    """🚀 0.08s 极速读取已连接真机上已安装的桌面应用列表 (无需上传 APK)"""
+    dev = device_id
+    if not dev:
+        connected = app_mgr.get_connected_devices()
+        dev = connected[0] if connected else None
+    if not dev:
+        return {"success": False, "apps": [], "message": "未连接任何物理真机设备"}
+    apps = app_mgr.get_device_installed_apps(device_id=dev, include_system=include_system)
+    return {"success": True, "device_id": dev, "apps": apps, "total": len(apps)}
+
+@app.get("/api/device/foreground_app")
+async def get_device_foreground_app(device_id: Optional[str] = None):
+    """0.05s 极速捕获真机当前屏幕前台正在运行的应用包名、Activity 与识别名称"""
+    dev = device_id
+    if not dev:
+        connected = app_mgr.get_connected_devices()
+        dev = connected[0] if connected else None
+    if not dev:
+        return {"success": False, "app": None, "message": "未连接任何物理真机设备"}
+    fg = app_mgr.get_current_foreground_app(device_id=dev)
+    return {"success": True, "device_id": dev, "app": fg}
+
+@app.post("/api/device/app_label")
+async def save_device_app_label(payload: Dict[str, str] = Body(...)):
+    """保存用户自定义的应用中文名称 (持久化记忆)"""
+    pkg = payload.get("package", "").strip()
+    lbl = payload.get("label", "").strip()
+    if not pkg or not lbl:
+        return JSONResponse(status_code=400, content={"success": False, "message": "包名和名称不能为空"})
+    app_mgr.save_custom_app_label(pkg, lbl)
+    return {"success": True, "package": pkg, "label": lbl}
+
 @app.get("/api/apps/check_installed")
 async def check_app_installed(package: str, device_id: Optional[str] = None):
     """检测指定包名的应用是否已安装在目标真机设备上"""
@@ -1288,6 +1323,7 @@ async def update_config(
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
     app_label: Optional[str] = Form(None),
+    app_activity: Optional[str] = Form(None),
     api_key: Optional[str] = Form(None),
     base_url: Optional[str] = Form(None)
 ):
@@ -1609,7 +1645,8 @@ async def create_task_session(
     model: Optional[str] = Form(None),
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
-    app_label: Optional[str] = Form(None)
+    app_label: Optional[str] = Form(None),
+    app_activity: Optional[str] = Form(None)
 ):
     """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型"""
     device_ids = []
@@ -1625,7 +1662,8 @@ async def create_task_session(
         model=model,
         app_filename=app_filename,
         app_package=app_package,
-        app_label=app_label
+        app_label=app_label,
+        app_activity=app_activity
     )
     return {"success": True, "session_id": session_id, "message": "测试会话已创建"}
 
@@ -1703,7 +1741,8 @@ async def append_session_message(
     model: Optional[str] = Form(None),
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
-    app_label: Optional[str] = Form(None)
+    app_label: Optional[str] = Form(None),
+    app_activity: Optional[str] = Form(None)
 ):
     """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，支持动态切换模型"""
     try:
