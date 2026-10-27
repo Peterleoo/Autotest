@@ -807,7 +807,7 @@
             max-width: 820px;
             margin: 0 auto;
             width: 100%;
-            padding: 16px 20px 140px;
+            padding: 16px 20px 220px;
         }
 
         /* 空状态与智能用例推荐卡片 (Empty State) */
@@ -5439,6 +5439,11 @@
             color: var(--text-muted);
             background: rgba(255, 255, 255, 0.02);
         }
+        .stream-todo-tag.skipped {
+            color: var(--text-muted);
+            opacity: 0.65;
+            background: transparent !important;
+        }
         .stream-todo-tag.failed {
             color: #ef4444;
             background: rgba(239, 68, 68, 0.1);
@@ -9082,6 +9087,52 @@
                 }
             }
 
+            // 🛡️ 待验收门禁卡片（仅在 READY_FOR_REVIEW 时呈现，保障测试达成后直观验收）
+            const isReadyForReview = (sessionData.status === "READY_FOR_REVIEW");
+            let gateEl = flow.querySelector(".review-gate-card");
+            if (isReadyForReview) {
+                const sid = sessionData.session_id || activeSessionId;
+                const delivCount = Array.isArray(sessionData.deliverables) ? sessionData.deliverables.length : 4;
+                const gateHtml = `
+                    <div class="review-gate-card mt-3" id="reviewGateCard_${sid}">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-check text-success fs-5"></i>
+                                <span class="fw-semibold">测试验证达成，等待人工验收封板</span>
+                            </div>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">待验收 (Ready for Review)</span>
+                        </div>
+                        <div class="text-muted small mb-3">
+                            AI 智能体已执行完成本轮端侧规划与断言校验。请核验证据与交付物，满意后可验收通过并归档；若有不满意处，点击要求返工输入修改项，智能体将原地继承现场继续修正。
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="openDeliverablesModal('${sid}')">
+                                <i class="bi bi-box-seam me-1"></i> 查看交付物清单 (${delivCount})
+                            </button>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-warning px-3" onclick="openReworkDialog('${sid}')">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> 要求返工 (Rework)
+                                </button>
+                                <button class="btn btn-sm btn-success px-4 fw-semibold" onclick="acceptSession('${sid}')">
+                                    <i class="bi bi-check-lg me-1"></i> 验收通过并归档
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                if (!gateEl) {
+                    flow.insertAdjacentHTML("beforeend", gateHtml);
+                } else {
+                    if (gateEl.innerHTML !== gateHtml) {
+                        const tempDiv = document.createElement("div");
+                        tempDiv.innerHTML = gateHtml;
+                        gateEl.replaceWith(tempDiv.firstElementChild);
+                    }
+                }
+            } else if (gateEl) {
+                gateEl.remove();
+            }
+
             // 悬浮画中画或步骤微胶囊保持同步
             renderStepsDrawerBody(sessionData, sessionData.plan_steps || []);
         }
@@ -10882,21 +10933,28 @@
                 `;
             }
             if (blk.type === "todo_list") {
-                const isAllDone = (blk.total_count > 0 && blk.completed_count === blk.total_count);
+                const isFinishedSession = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW");
                 let itemsHtml = "";
+                let completedCount = 0;
+                let skippedCount = 0;
+                let totalItems = Array.isArray(blk.items) ? blk.items.length : (blk.total_count || 0);
+
                 if (Array.isArray(blk.items)) {
                     blk.items.forEach((it, idx) => {
                         const isRunning = (it.status === "RUNNING");
                         const isCompleted = (it.status === "COMPLETED" || it.status === "PASS");
                         const isFailed = (it.status === "FAILED" || it.status === "FAIL");
-                        const isCanceled = (it.status === "CANCELED" || it.status === "SKIPPED");
+                        const isSkipped = (it.status === "SKIPPED");
+                        const isCanceled = (it.status === "CANCELED");
                         const isRemoved = (it.status === "REMOVED");
                         const diffClass = it.diff_type || (isRunning ? 'added' : '');
                         
                         let signChar = '○';
                         let tagClass = 'pending';
                         let tagText = '待处理';
+                        let titleHint = '';
                         if (isCompleted) {
+                            completedCount++;
                             signChar = '✓';
                             tagClass = 'completed';
                             tagText = '已完成';
@@ -10908,6 +10966,12 @@
                             signChar = '✕';
                             tagClass = 'failed';
                             tagText = '未通过';
+                        } else if (isSkipped) {
+                            skippedCount++;
+                            signChar = '↷';
+                            tagClass = 'skipped';
+                            tagText = '已略过';
+                            titleHint = 'title="测试目标已提前达成，此规划步骤免除执行"';
                         } else if (isCanceled) {
                             signChar = '⊘';
                             tagClass = 'pending';
@@ -10919,7 +10983,7 @@
                         }
 
                         itemsHtml += `
-                            <div class="stream-todo-item ${diffClass}">
+                            <div class="stream-todo-item ${diffClass}" ${titleHint}>
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
                                     <span class="item-sign" style="font-family: var(--font-mono); opacity: 0.7;">${signChar}</span>
                                     <span class="item-title text-truncate"><strong>${escapeHtml(it.title)}</strong>: ${escapeHtml(it.desc || '')}</span>
@@ -10929,19 +10993,32 @@
                         `;
                     });
                 }
+
+                // 动态自愈完成度与达成文案：坚决杜绝因旧数据写着 0/5 已完成而误导用户
+                const effCompleted = (completedCount > 0) ? completedCount : (blk.completed_count || 0);
+                const isAllDone = (totalItems > 0 && effCompleted === totalItems);
+                const isGoalAchieved = isFinishedSession || isAllDone || (totalItems > 0 && effCompleted > 0 && (completedCount + skippedCount === totalItems));
+
+                let titleText = blk.title || '任务清单';
+                if (isGoalAchieved) {
+                    titleText = `任务清单 · 全部目标达成 (${effCompleted}/${totalItems} 步骤)`;
+                } else if (effCompleted > 0) {
+                    titleText = `更新任务清单 · ${effCompleted}/${totalItems} 已完成`;
+                }
+
                 const isExpanded = (window._streamTodoState[blk.block_id] !== false); // 默认展开
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
-                                return `
+                return `
                     <div class="stream-todo-card" id="${blk.block_id}">
                         <div class="stream-todo-header" onclick="toggleStreamTodo('${blk.block_id}')">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 10px;"></i>
-                                <span>${escapeHtml(blk.title || '任务清单')}</span>
-                                ${isAllDone ? '<span class="mono-pill" style="font-size: 9.5px; color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border); padding: 1px 6px;">100% 达成</span>' : ''}
+                                <span>${escapeHtml(titleText)}</span>
+                                ${isGoalAchieved ? '<span class="mono-pill" style="font-size: 9.5px; color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border); padding: 1px 6px;">100% 达成</span>' : ''}
                             </div>
-                            <span class="mono-tag" style="font-size: 10px;">${blk.completed_count || 0}/${blk.total_count || 0} 步骤</span>
+                            <span class="mono-tag" style="font-size: 10px;">${effCompleted}/${totalItems} 步骤</span>
                         </div>
                         <div class="stream-todo-body ${bodyClass}" id="body_todo_${blk.block_id}">
                             ${itemsHtml}
@@ -11068,12 +11145,17 @@
                 });
 
                 // Antigravity 2.0 极简动作微流：不带有任务重复标题，不带有冗余的完成/取消徽章
+                let displayDuration = blk.duration || '0.8s';
+                if (!isRunning && (displayDuration === '推进中' || !displayDuration)) {
+                    displayDuration = '0.8s';
+                }
+
                 return `
                     <div class="agent-trace-box" id="${blk.block_id}" data-step-id="${blk.step_id || 1}">
                         <div class="agent-trace-header" onclick="toggleStreamStep('${blk.block_id}', '${blk.step_id || 1}')">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
-                                <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(blk.duration || '1.8s')})</span>
+                                <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(displayDuration)})</span>
                             </div>
                             <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
                                 <span class="step-toggle-label">${isExpanded ? '收起' : '明细'}</span>
@@ -11106,24 +11188,9 @@
             }
 
             if (blk.type === "test_summary") {
-                // 核心门禁：只有全流程彻底完成，且任务清单所有步骤 100% 达成，且非 RUNNING 状态，才展示总结果！
+                // 核心门禁：只要全流程收敛（COMPLETED / READY_FOR_REVIEW / FAILED），且非 RUNNING 状态，即刻展现测试总结！
                 const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || sessionData.status === "FAILED");
-                const steps = sessionData.plan_steps || [];
-                const total = steps.length;
-                const completed = steps.filter(s => s.status === "COMPLETED" || s.status === "PASS").length;
-                const isAllStepsDone = (total > 0 && completed === total);
-                
-                // 🛡️ 绝对防线：强行校验用户界面上看到的任务清单 (TodoList) 是否 100% 达成！
-                const todoBlk = (sessionData.timeline_blocks || []).find(b => b.type === "todo_list");
-                let isTodoAllDone = true;
-                if (todoBlk && Array.isArray(todoBlk.items) && todoBlk.items.length > 0) {
-                    const uncompletedItems = todoBlk.items.filter(it => it.status !== "COMPLETED" && it.status !== "PASS");
-                    if (uncompletedItems.length > 0) {
-                        isTodoAllDone = false;
-                    }
-                }
-
-                if (!isFinished || sessionData.status === "RUNNING" || !isAllStepsDone || !isTodoAllDone) {
+                if (!isFinished || sessionData.status === "RUNNING") {
                     return "";
                 }
                 const sid = blk.session_id || sessionData.session_id || activeSessionId;
@@ -11260,8 +11327,11 @@
             }
             
             if (blk.type === "final_report") {
-                // 用户明确指示：6 大维度全景报告本身就是交付物资产，已统一收敛在【测试执行结果总结】卡片中，对话流中无需单独重复平铺
-                return "";
+                // 若 timeline 中已经存在 test_summary 总结卡片，由 test_summary 统一收敛；否则作为报告卡片兜底展现！
+                const hasSummaryBlk = (sessionData.timeline_blocks || []).some(b => b.type === "test_summary");
+                if (hasSummaryBlk) {
+                    return "";
+                }
                 const sid = blk.session_id || sessionData.session_id || activeSessionId;
                 const isSolidified = !!sessionData.is_solidified;
                 

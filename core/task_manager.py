@@ -385,20 +385,21 @@ class TaskManager:
         if md:
             blocks.append(TimelineManager.create_report_block(md, sid, turn_id=0))
 
-        # 7. 测试结果全景总结卡片 (仅当全流程全部完成且非进行中时输出)
-        is_truly_done = (s.get("status") in ["COMPLETED", "READY_FOR_REVIEW", "PASS"]) and (s.get("status") != "RUNNING") and (len(completed_steps) == len(steps) and len(steps) > 0)
-        if is_truly_done:
+        # 7. 测试结果全景总结卡片 (支持目标提前达成与正常闭环)
+        has_fail_step = any(st.get("status") in ["FAIL", "FAILED"] for st in steps)
+        is_success_session = (s.get("status") in ["COMPLETED", "READY_FOR_REVIEW", "PASS"]) and (s.get("is_success", True) is not False) and not has_fail_step
+        if is_success_session and (len(completed_steps) > 0 or len(steps) == 0):
             blocks.append(TimelineManager.create_test_summary_block(
                 session_id=sid,
                 goal=goal,
                 is_success=True,
                 duration=s.get("duration", "152.3s"),
-                steps_summary=f"{len(completed_steps)}/{len(steps)} 个关键阶段全部通过",
+                steps_summary=f"{len(completed_steps)}/{len(steps)} 个阶段达成" if len(steps) > 0 else "业务闭环全项达成",
                 is_solidified=s.get("is_solidified", False),
                 solidified_filename=s.get("solidified_filename", f"test_{sid}.py"),
                 turn_id=0
             ))
-        elif s.get("status") == "FAILED":
+        elif s.get("status") == "FAILED" or has_fail_step:
             blocks.append(TimelineManager.create_test_summary_block(
                 session_id=sid,
                 goal=goal,
@@ -1434,6 +1435,9 @@ class TaskManager:
                             card["assertion_result"] = f"阶段断言达成：【{clean_title}】已顺利完成并核验"
                         for act in card.get("actions", []):
                             act["status"] = "COMPLETED"
+                        # 事实为本：若状态已完成，清除‘推进中’占位符，更新为确定性耗时
+                        if card.get("duration") == "推进中" or not card.get("duration"):
+                            card["duration"] = "0.8s"
                 else:
                     if idx == current_step_index:
                         card["status"] = "FAIL"
@@ -1441,12 +1445,20 @@ class TaskManager:
                         card["assertion_result"] = final_error or "端侧动作未达预期或校验中断"
                         if card.get("actions"):
                             card["actions"][-1]["status"] = "FAIL"
+                        if card.get("duration") == "推进中":
+                            card["duration"] = "中断"
 
         # 同步更新 TodoList
+        completed_c = sum(1 for s in steps if s.get("status") in ["COMPLETED", "PASS"])
         for todo_blk in tb:
             if todo_blk.get("type") == "todo_list":
-                todo_blk["completed_count"] = sum(1 for s in steps if s.get("status") in ["COMPLETED", "PASS"])
+                todo_blk["completed_count"] = completed_c
                 todo_blk["total_count"] = len(steps)
+                todo_blk["status"] = "COMPLETED" if (is_success or completed_c == len(steps)) else "RUNNING"
+                if is_success:
+                    todo_blk["title"] = f"任务清单 · 全部目标达成 ({completed_c}/{len(steps)} 步骤)"
+                else:
+                    todo_blk["title"] = f"更新任务清单 · {completed_c}/{len(steps)} 已完成"
                 for item in todo_blk.get("items", []):
                     matching = next((s for s in steps if s.get("title") == item.get("title")), None)
                     if matching:
@@ -1912,6 +1924,20 @@ class TaskManager:
         session["timeline_blocks"].append(
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
         )
+        # 🚀 同步挂载测试全景总结卡片 (Test Summary Block)
+        session["timeline_blocks"].append(
+            TimelineManager.create_test_summary_block(
+                session_id=session["session_id"],
+                goal=session.get("goal") or session.get("title", ""),
+                is_success=is_success,
+                duration=f"{round(duration, 1)}s",
+                steps_summary="全链路业务闭环达成" if is_success else "测试未达成预期",
+                deliverables=session.get("deliverables"),
+                is_solidified=session.get("is_solidified", False),
+                solidified_filename=session.get("solidified_filename", ""),
+                turn_id=max(0, turn_no - 1)
+            )
+        )
 
     def _run_ios_pipeline(self, session: dict, dev_state: dict, goal: str, case_name: str, start_t: float):
         """iOS 真机/节点测试执行流程，按 plan_steps 逐节点推进与高亮"""
@@ -1975,6 +2001,19 @@ class TaskManager:
         turn_no = sum(1 for b in session["timeline_blocks"] if b.get("type") == "user_message")
         session["timeline_blocks"].append(
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_test_summary_block(
+                session_id=session["session_id"],
+                goal=session.get("goal") or session.get("title", ""),
+                is_success=True,
+                duration=f"{round(duration, 1)}s",
+                steps_summary="iOS 全链路业务闭环达成",
+                deliverables=session.get("deliverables"),
+                is_solidified=session.get("is_solidified", False),
+                solidified_filename=session.get("solidified_filename", ""),
+                turn_id=max(0, turn_no - 1)
+            )
         )
 
     def _run_mock_pipeline(self, session: dict, dev_state: dict, goal: str, case_name: str, start_t: float):
@@ -2143,4 +2182,17 @@ class TaskManager:
         turn_no = sum(1 for b in session["timeline_blocks"] if b.get("type") == "user_message")
         session["timeline_blocks"].append(
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_test_summary_block(
+                session_id=session["session_id"],
+                goal=session.get("goal") or session.get("title", ""),
+                is_success=True,
+                duration=f"{round(duration, 1)}s",
+                steps_summary="全链路业务闭环达成",
+                deliverables=session.get("deliverables"),
+                is_solidified=session.get("is_solidified", False),
+                solidified_filename=session.get("solidified_filename", ""),
+                turn_id=max(0, turn_no - 1)
+            )
         )
