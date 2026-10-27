@@ -60,11 +60,14 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
     # 2. 检查是否有已连接的设备或正在运行的 Appium Server
     driver = None
     try:
+        # 🛡️ 对标 DeepSeek 机制：连续对话 (turn_id > 1) 原地继承真机当前屏幕，严禁退回桌面重复冷启动！
+        should_cold_launch = (turn_id <= 1)
         driver = DriverFactory.create_driver(
             app_path=str(target_app) if not is_installed and target_app else None,
             package_name=pkg,
-            activity_name=act,
-            device_id=device_id
+            activity_name=act if should_cold_launch else None,
+            device_id=device_id,
+            auto_launch=should_cold_launch
         )
     except Exception as e:
         logger.error(f"连接驱动失败: {e}")
@@ -77,7 +80,9 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
         if session_id:
             from pathlib import Path
             import json
-            sess_file = Path("outputs/sessions") / f"{session_id}.json"
+            sess_file = Path("data/sessions") / f"{session_id}.json"
+            if not sess_file.exists():
+                sess_file = Path("outputs/sessions") / f"{session_id}.json"
             if sess_file.exists():
                 try:
                     sess_data = json.loads(sess_file.read_text(encoding="utf-8"))

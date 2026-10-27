@@ -152,5 +152,57 @@ class TestDSHMechanisms(unittest.TestCase):
         print("✅ 测试 4 通过: Plan Mutation 成功动态插桩自愈任务并同步 TodoList！")
 
 
+
+    def test_05_hitl_decision_resolution(self):
+        """测试 5: 人机协同决策卡片下发与 resolve_decision 解除挂起"""
+        mgr = TaskManager()
+        session_id = "sess_test_hitl"
+        mock_session = {
+            "session_id": session_id,
+            "title": "测试人机协同登录卡片",
+            "goal": "进入微聊咨询",
+            "created_at": "11:20:00",
+            "test_mode": "real",
+            "status": "WAITING_USER_INPUT",
+            "devices": {
+                "test_dev": {
+                    "logs": [],
+                    "model": "Test Phone",
+                    "status": "RUNNING",
+                    "current_step": 1,
+                    "total_steps": 3,
+                    "platform": "Android"
+                }
+            },
+            "hitl_decision": {
+                "type": "credential",
+                "app_key": "test_app",
+                "title": "人机协同 · 需要登录凭证",
+                "desc": "检测到目标应用进入账号密码登录页",
+                "preset_account": "13800000000"
+            }
+        }
+        mgr.sessions[session_id] = mock_session
+
+        # 1. 验证 get_session 能够向下游和前端暴露 hitl_decision 字段
+        s_data = mgr.get_session(session_id)
+        self.assertIsNotNone(s_data.get("hitl_decision"))
+        self.assertEqual(s_data["hitl_decision"]["preset_account"], "13800000000")
+
+        # 2. 模拟前端调用 resolve_decision 提交验证码/密码
+        resolved = mgr.resolve_decision(session_id, {
+            "decision_type": "inject",
+            "account": "13800000000",
+            "password": "Password123",
+            "remember": False
+        })
+        self.assertTrue(resolved)
+
+        # 3. 验证 session 状态已恢复为 RUNNING，且 hitl_decision 挂起状态已消除
+        updated_s = mgr.get_session(session_id)
+        self.assertEqual(updated_s["status"], "RUNNING")
+        self.assertIsNone(updated_s.get("hitl_decision"))
+        print("✅ 测试 5 通过: HITL 人机协同卡片下发与 resolve_decision 解除全链路顺畅闭环！")
+
 if __name__ == "__main__":
     unittest.main()

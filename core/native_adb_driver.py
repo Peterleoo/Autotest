@@ -155,7 +155,10 @@ class NativeADBDriver:
         try:
             from core.screen_stream_hub import _capture_raw_and_encode_sync, HAS_OPENCV
             import cv2
-            target_dev = self.device_id or "2145189e"
+            target_dev = self.device_id
+            if not target_dev:
+                self._detect_device()
+                target_dev = self.device_id
             frame_data = _capture_raw_and_encode_sync(self.adb_bin, target_dev)
             if frame_data:
                 bgr = frame_data.get("bgr")

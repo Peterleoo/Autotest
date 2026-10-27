@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -121,8 +121,8 @@
 
             --btn-send-bg: #09090b;
             --btn-send-text: #ffffff;
-            --btn-disabled: #e2e8f0;
-            --btn-disabled-icon: #94a3b8;
+            --btn-disabled: #f1f5f9;
+            --btn-disabled-icon: #475569;
 
             --console-bg: #f8fafc;
             --console-text: #0f172a;
@@ -1449,53 +1449,98 @@
             border-color: var(--border-hover);
         }
 
-        .gpt-send-btn {
-            width: 30px;
-            height: 30px;
+        /* 🚀 现代工程级极简发送按钮 (统一高对比度设计范式，完美自适应白天/黑夜模式) */
+        .gpt-send-btn, .btn-send-round {
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background-color: var(--btn-disabled);
             color: var(--btn-disabled-icon);
-            border: none;
+            border: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: not-allowed;
-            transition: all 0.15s ease;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
             flex-shrink: 0;
+            padding: 0;
+            outline: none;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         }
-        .gpt-send-btn.active {
-            background-color: var(--btn-send-bg);
-            color: var(--btn-send-text);
+        .gpt-send-btn i, .btn-send-round i {
+            font-size: 14.5px;
+            font-weight: 700;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s ease;
+        }
+        .gpt-send-btn.active, .btn-send-round.active {
+            background-color: var(--btn-send-bg) !important;
+            color: var(--btn-send-text) !important;
+            border-color: var(--btn-send-bg) !important;
             cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
         }
-        .gpt-send-btn.active:hover {
-            transform: scale(1.04);
+        .gpt-send-btn.active:hover, .btn-send-round.active:hover {
+            transform: scale(1.06);
+            opacity: 0.92;
+        }
+        .gpt-send-btn.active:active, .btn-send-round.active:active {
+            transform: scale(0.96);
         }
         .gpt-send-btn.btn-send-disabled {
-            opacity: 0.3 !important;
+            opacity: 0.35 !important;
             cursor: not-allowed !important;
-            background-color: var(--btn-disabled) !important;
-            color: var(--btn-disabled-icon) !important;
         }
 
-        /* 终止任务按钮：黑色圆底 + 实心小方块，与发送按钮完全相同尺寸与位置 */
+        /* 🌟 白天模式专属高对比度加固 (消除浅灰融边看不清问题) */
+        body.theme-light .gpt-send-btn,
+        body[data-theme="light"] .gpt-send-btn,
+        body.theme-light .btn-send-round,
+        body[data-theme="light"] .btn-send-round {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1.5px solid rgba(0, 0, 0, 0.14);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        }
+        body.theme-light .gpt-send-btn.active,
+        body[data-theme="light"] .gpt-send-btn.active,
+        body.theme-light .btn-send-round.active,
+        body[data-theme="light"] .btn-send-round.active {
+            background-color: #09090b !important;
+            color: #ffffff !important;
+            border-color: #09090b !important;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+        }
+        body.theme-light .gpt-send-btn.active:hover,
+        body[data-theme="light"] .gpt-send-btn.active:hover,
+        body.theme-light .btn-send-round.active:hover,
+        body[data-theme="light"] .btn-send-round.active:hover {
+            background-color: #18181b !important;
+            opacity: 0.96;
+        }
+
+        /* 终止任务按钮：同等 32px 规格，高对比度 */
         .gpt-stop-btn {
-            width: 30px;
-            height: 30px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background-color: var(--btn-send-bg);
-            border: none;
+            border: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: all 0.18s ease;
             flex-shrink: 0;
             padding: 0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         }
         .gpt-stop-btn:hover {
-            transform: scale(1.05);
-            opacity: 0.9;
+            transform: scale(1.06);
+            opacity: 0.92;
         }
         .stop-square-black {
             width: 10px;
@@ -1503,6 +1548,15 @@
             background-color: var(--btn-send-text);
             border-radius: 2px;
             display: inline-block;
+        }
+        body.theme-light .gpt-stop-btn,
+        body[data-theme="light"] .gpt-stop-btn {
+            background-color: #09090b;
+            border-color: #09090b;
+        }
+        body.theme-light .gpt-stop-btn .stop-square-black,
+        body[data-theme="light"] .gpt-stop-btn .stop-square-black {
+            background-color: #ffffff;
         }
 
         /* 浮动选单浮层 (Popovers - 统一高层级与边界防裁切) */
@@ -4679,32 +4733,7 @@
             color: var(--text-main);
             border-color: var(--border-hover);
         }
-        .btn-send-round {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: #ffffff;
-            color: #000000;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-        body.theme-light .btn-send-round, body[data-theme="light"] .btn-send-round {
-            background: #000000;
-            color: #ffffff;
-        }
-        .btn-send-round:hover {
-            transform: scale(1.05);
-            opacity: 0.9;
-        }
-        .btn-send-round.disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            transform: none;
-        }
+/* 旧 .btn-send-round 已统一归拢至 .gpt-send-btn */
 
         /* 自由拖拽悬浮窗修复：严格锁定 240px 宽、486px 高现代机身比例，彻底消除底部黑色拉伸大空白 */
         .floating-device-window {
@@ -5256,6 +5285,19 @@
             margin: 16px 0;
             padding: 16px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        .hitl-decision-card {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.03));
+            border: 1px solid rgba(245, 158, 11, 0.38);
+            border-radius: 12px;
+            margin: 16px 0;
+            padding: 16px;
+            box-shadow: 0 6px 24px rgba(245, 158, 11, 0.08);
+            animation: hitlFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes hitlFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .token-pressure-bar {
             display: flex;
@@ -6217,25 +6259,7 @@
             color: #09090b;
             border-color: var(--border-hover);
         }
-        .btn-send-round {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: var(--btn-send-bg);
-            color: var(--btn-send-text);
-            border: 1px solid var(--border-subtle);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-        }
-        .btn-send-round:hover {
-            transform: scale(1.05);
-            opacity: 0.92;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-        }
+/* 旧 .btn-send-round 已统一归拢至 .gpt-send-btn */
 
         /* 4. 模式 B (本地回归看板视图): 苹果电光蓝跑道分段条 + 紧凑型流线卡片 */
         .local-workspace-container {
@@ -6895,6 +6919,30 @@
                 <!-- 胶囊底部工具栏 -->
                 <div class="gpt-toolbar">
                     <div class="d-flex align-items-center gap-2">
+                        <!-- 待测应用选择胶囊 (带真机安装状态指示灯，点击呼出轻量切换小弹窗) -->
+                        <div class="position-relative" id="pillAppWrapper">
+                            <div class="pill-btn" onclick="toggleCustomPopover('appPopover', event)" title="选择待测应用包或上传新 APK">
+                                <span class="status-indicator-dot dot-online" id="appStatusDot"></span>
+                                <i class="bi bi-box-seam" style="font-size: 11px;"></i>
+                                <span id="activeAppLabel">待测应用</span>
+                                <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
+                            </div>
+                            <div class="gpt-popover" id="appPopover" style="left: 0; width: 280px;" onclick="event.stopPropagation()">
+                                <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                                    <span class="small fw-semibold" style="font-size: 11px;">待测应用包</span>
+                                    <span class="small text-muted" style="font-size: 11px; cursor: pointer;" onclick="loadAppsDropdown()"><i class="bi bi-arrow-clockwise"></i> 刷新</span>
+                                </div>
+                                <div id="appDropdownList" class="d-flex flex-column gap-1" style="max-height: 180px; overflow-y: auto;">
+                                    <div class="small text-muted p-1">加载应用中...</div>
+                                </div>
+                                <div class="p-2 mt-2 rounded border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
+                                    <span class="small text-muted" style="font-size: 10.5px;">需测试其他 App？</span>
+                                    <button class="btn btn-sm btn-primary py-0.5 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="openAppPackagesModal(); closeAllPopovers();">
+                                        <i class="bi bi-cloud-arrow-up me-1"></i>管理/上传
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         <!-- 3. 审批模式胶囊 -->
                         <div class="position-relative" id="pillApprovalWrapper">
                             <div class="pill-btn" onclick="toggleCustomPopover('approvalPopover', event)" title="切换自动放行 / 人工逐级审批">
@@ -7053,7 +7101,7 @@
                         <div class="device-window-header" id="deviceDragHandle">
                             <div class="device-window-title">
                                 <span class="status-dot-sm" style="width: 5px; height: 5px; border-radius: 50%; background: var(--status-green); display: inline-block;"></span>
-                                <span id="floatingDeviceTitle">Xiaomi MIX 2 · 实时端侧</span>
+                                <span id="floatingDeviceTitle">端侧真机 · 实时投屏</span>
                             </div>
                             <div class="device-window-actions">
                                 <button class="device-btn-icon" onmousedown="event.stopPropagation()" onclick="resetDevicePos(event)" title="复位悬浮窗位置">
@@ -7191,6 +7239,12 @@
                         <div class="settings-nav-item" id="tabNavGeneral" onclick="switchSettingsTab('general')">
                             <i class="bi bi-sliders" style="font-size: 13.5px;"></i>
                             <span>执行与环境</span>
+                        </div>
+
+                        <!-- 新手向导入口 -->
+                        <div class="settings-nav-item" id="tabNavGuide" onclick="switchSettingsTab('guide')">
+                            <i class="bi bi-signpost-2" style="font-size: 13.5px;"></i>
+                            <span>新手引导</span>
                         </div>
 
                         <div class="settings-sidebar-footer">
@@ -7522,6 +7576,58 @@
                                 <i class="bi bi-box-arrow-up-right"></i>
                                 <span>查看路径</span>
                             </button>
+                        </div>
+                    </div>
+                    <!-- Guide panel end -->
+
+                    <!-- 右侧内容面板 5: 新手引导 -->
+                    <div class="settings-content-area d-none" id="panelSettingsGuide">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <div class="settings-section-title">新手引导与交互向导</div>
+                                <div class="settings-section-desc">通过交互式聚光灯向导，快速了解系统核心操作流程与人机协同。</div>
+                            </div>
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary" id="tourStatusBadge" style="font-size: 11px;">检测状态中...</span>
+                        </div>
+
+                        <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+                            <!-- 步骤流程卡片 -->
+                            <div style="background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">1</span>
+                                    <span><strong>真机状态确认：</strong>物理真机 USB 连接并开启开发者调试，杜绝仿真；</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">2</span>
+                                    <span><strong>待测应用选定：</strong>点击工具栏胶囊呼出小弹窗快速切换待测包，或进入管理上传；</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">3</span>
+                                    <span><strong>推理模型选择：</strong>支持 DeepSeek、Hermes 本地模型或 Google Antigravity；</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">4</span>
+                                    <span><strong>意图下发与规划：</strong>自然语言输入测试目标，实时推演与多轮对话执行；</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">5</span>
+                                    <span><strong>投屏与人机协同：</strong>遇登录鉴权自动弹出决策卡，支持凭证注入与手动接管。</span>
+                                </div>
+                            </div>
+
+                            <!-- 调试与启动操作区 -->
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn-fidelity-action" onclick="launchTourFromSettings()">
+                                    <i class="bi bi-play-circle-fill"></i>
+                                    <span>启动聚光灯新手向导</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" onclick="resetTourGuideStatus()" style="font-size: 11.5px; border-radius: 6px;">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>重置引导状态 (调试)
+                                </button>
+                            </div>
+                            <div class="text-muted" style="font-size: 11px;">
+                                💡 提示：重置引导后，下次打开或点击启动即可重新体验完整聚光灯流程；向导过程中支持随时点击“跳过”或按 ESC 退出。
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -9149,6 +9255,83 @@
                 gateEl.remove();
             }
 
+            // 🛡️ 人机协同登录决策卡片（挂起时呈现）
+            const hitl = sessionData.hitl_decision;
+            const isWaitingHitl = (sessionData.status === "WAITING_USER_INPUT" || Boolean(hitl));
+            let hitlEl = flow.querySelector(".hitl-decision-card");
+            if (isWaitingHitl && hitl) {
+                const sid = sessionData.session_id || activeSessionId;
+                const hitlHtml = `
+                    <div class="hitl-decision-card mt-3" id="hitlDecisionCard_${sid}">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-exclamation text-warning fs-5"></i>
+                                <span class="fw-semibold text-main" style="font-size: 13.5px;">${hitl.title || '人机协同 · 需要登录鉴权介入'}</span>
+                            </div>
+                            <span class="badge border border-warning-subtle text-warning" style="background: rgba(245, 158, 11, 0.12); font-size: 11px;">
+                                <i class="bi bi-hourglass-split me-1"></i>自动化已安全挂起
+                            </span>
+                        </div>
+                        <div class="text-sub small mb-3" style="line-height: 1.5; font-size: 12px;">
+                            ${hitl.desc || '检测到端侧进入账号登录或鉴权拦截界面，自动化已安全挂起。请提供测试账号密码/验证码，或在右侧真机投屏手动完成登录：'}
+                        </div>
+                        
+                        <div class="p-2.5 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); padding: 10px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-medium text-main" style="font-size: 12px;"><i class="bi bi-key me-1 text-primary"></i> 方式一：输入测试凭证（自动代填账号/密码或短信验证码）</span>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="手机号 / 账号" value="${hitl.preset_account || ''}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlPasswordInput_${sid}" placeholder="密码 或 短信验证码" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="form-check m-0">
+                                    <input class="form-check-input" type="checkbox" id="hitlRemember_${sid}" checked style="cursor: pointer;">
+                                    <label class="form-check-label text-muted" for="hitlRemember_${sid}" style="font-size: 11px; cursor: pointer;">
+                                        记住该 App 凭证 (存入 credentials.json 后续免打扰)
+                                    </label>
+                                </div>
+                                <button class="btn btn-sm btn-primary px-3 py-1 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'inject')">
+                                    <i class="bi bi-lightning-charge-fill me-1"></i> 立即自动注入并提交
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
+                            <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px;">
+                                <i class="bi bi-display text-info"></i>
+                                <span>若需滑块拼图或物理机接码：可直接在右侧真机镜像手动操作</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary py-1" style="font-size: 11.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'skip')">
+                                    <i class="bi bi-skip-forward me-1"></i> 尝试跳过
+                                </button>
+                                <button class="btn btn-sm btn-success py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
+                                    <i class="bi bi-check2-circle me-1"></i> 我已在手机上完成登录，继续
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                if (!hitlEl) {
+                    flow.insertAdjacentHTML("beforeend", hitlHtml);
+                } else {
+                    const curAcc = document.getElementById(`hitlAccountInput_${sid}`)?.value;
+                    const curPwd = document.getElementById(`hitlPasswordInput_${sid}`)?.value;
+                    if (!curAcc && !curPwd) {
+                        const tempDiv = document.createElement("div");
+                        tempDiv.innerHTML = hitlHtml;
+                        hitlEl.replaceWith(tempDiv.firstElementChild);
+                    }
+                }
+            } else if (hitlEl) {
+                hitlEl.remove();
+            }
+
             // 悬浮画中画或步骤微胶囊保持同步
             renderStepsDrawerBody(sessionData, sessionData.plan_steps || []);
         }
@@ -9208,37 +9391,42 @@
             closeAllPopovers();
         }
 
-        // ================= 全屏聚光灯新手 4 步向导控制器 =================
+        // ================= 全屏聚光灯新手 5 步向导控制器 =================
         let currentTourStep = 1;
         const TOUR_STEPS = [
             {
-                targetId: "pillDeviceWrapper",
-                badge: "第 1 步 / 共 4 步",
-                title: "第 1 步：确认物理真机在线（杜绝仿真）",
-                desc: "系统已全面杜绝免机仿真，只支持物理真机实测。请使用 USB 数据线连接手机并开启【USB 调试】。当胶囊显示绿色【真机在线】后方可开始测试。"
+                targetId: "brandStatusTrigger",
+                badge: "第 1 步 / 共 5 步",
+                title: "第 1 步：确认物理真机在线（拒绝免机仿真）",
+                desc: "系统仅支持物理真机实测，拒绝免机仿真。请使用 USB 连接手机并开启【USB 调试】。当顶部显示绿色【测试就绪 / 真机在线】后方可开展测试。"
             },
             {
                 targetId: "pillAppWrapper",
-                badge: "第 2 步 / 共 4 步",
-                title: "第 2 步：选定待测应用 (APK / 包名)",
-                desc: "系统已自动扫描 apps/ 目录下的安装包。点击可直接切换待测应用或手动刷新，未安装时系统将自动在真机完成部署并复核就绪状态。"
+                badge: "第 2 步 / 共 5 步",
+                title: "第 2 步：选定待测应用 (呼出小弹窗)",
+                desc: "点击底栏应用胶囊即可唤出应用小弹窗，快捷切换待测包或上传新 APK。系统将自动校验安装并把目标包名同步给 AI 决策模型！"
             },
             {
                 targetId: "pillModelWrapper",
-                badge: "第 3 步 / 共 4 步",
+                badge: "第 3 步 / 共 5 步",
                 title: "第 3 步：选择 AI 推理与编排模型",
                 desc: "支持 Hermes (DeepSeek 本地加速)、Google Antigravity 官方授权、DeepSeek 官方 API 等。点击胶囊即可随时一键无缝切换。"
             },
             {
                 targetId: "taskInputText",
-                badge: "第 4 步 / 共 4 步",
+                badge: "第 4 步 / 共 5 步",
                 title: "第 4 步：输入业务意图并发送",
                 desc: "以自然语言输入测试目标（如：冷启动应用并测试登录），或直接点击上方推荐用例。按 Enter 键系统将自动分解前置检查、驱动真机并实时输出打字机结论！"
+            },
+            {
+                targetId: "btnTogglePipScreen",
+                badge: "第 5 步 / 共 5 步",
+                title: "第 5 步：端侧实时投屏与人机协同 (HITL)",
+                desc: "测试过程中可点击右上角图标随时唤起真机实时画面；若遇到登录拦截或验证码，系统将下发人机协同决策卡，支持账号代填、验证码透传或投屏接管！"
             }
         ];
 
         function startTourGuide() {
-            return; // 彻底禁用自动弹窗遮挡
             currentTourStep = 1;
             const overlay = document.getElementById("onboardingTourOverlay");
             const doneDialog = document.getElementById("tourDoneDialog");
@@ -9259,7 +9447,10 @@
             const stepConfig = TOUR_STEPS[stepNum - 1];
             if (!stepConfig) return;
 
-            const targetEl = document.getElementById(stepConfig.targetId);
+            let targetEl = document.getElementById(stepConfig.targetId);
+            if (!targetEl && stepConfig.targetId === "pillAppWrapper") {
+                targetEl = document.getElementById("taskInputText");
+            }
             const spotlight = document.getElementById("tourSpotlight");
             const tooltip = document.getElementById("tourTooltipCard");
             const badge = document.getElementById("tourBadge");
@@ -9326,7 +9517,40 @@
 
         function finishTourGuide() {
             localStorage.setItem("autotest_tour_completed", "true");
+            updateTourStatusBadge();
             closeTourGuide();
+        }
+
+        // 新手向导状态同步与调试管理
+        function updateTourStatusBadge() {
+            const badge = document.getElementById("tourStatusBadge");
+            if (!badge) return;
+            const completed = localStorage.getItem("autotest_tour_completed") === "true";
+            if (completed) {
+                badge.innerHTML = `<span class="status-indicator-dot dot-online me-1"></span>已完成首次引导`;
+                badge.className = "badge rounded-pill bg-success-subtle text-success border border-success-subtle";
+            } else {
+                badge.innerHTML = `<span class="status-indicator-dot dot-warning me-1"></span>未完成 / 待调试`;
+                badge.className = "badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle";
+            }
+        }
+
+        function resetTourGuideStatus() {
+            localStorage.removeItem("autotest_tour_completed");
+            updateTourStatusBadge();
+            alert("已成功重置首次使用引导标记！可点击【启动聚光灯新手向导】随时重新体验与调试。");
+        }
+
+        // 从 Settings 面板手动触发向导（关闭弹窗后启动）
+        function launchTourFromSettings() {
+            const modalEl = document.getElementById("harnessSettingsModal");
+            if (modalEl) {
+                const bsModal = bootstrap.Modal.getInstance(modalEl);
+                if (bsModal) bsModal.hide();
+                setTimeout(startTourGuide, 400);
+            } else {
+                startTourGuide();
+            }
         }
 
         function closeTourGuide() {
@@ -9570,7 +9794,7 @@
 
                 const androids = data.android_devices || [];
                 androids.forEach((d) => {
-                    availableDevices.push({ id: d.id, model: d.model, platform: "Android", width: d.width, height: d.height });
+                    availableDevices.push({ id: d.id, model: d.model, platform: "Android" });
                     htmlCheckboxes += `
                         <div class="form-check m-0 py-1" onclick="event.stopPropagation()">
                             <input class="form-check-input device-checkbox" type="checkbox" id="dev_${d.id}" value="${d.id}" checked onchange="updateDeviceSummary()">
@@ -10199,6 +10423,23 @@
             const raw = String(errorMsg || "").trim();
             let situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
             let suggestion = "请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查待测应用是否在前台。";
+            let isModelError = false;
+
+            if (/模型决策异常|Google 授权端点|备用网关|502 Bad Gateway|504 Gateway|550 EdgeOne|WinError 10054|ConnectionReset|API key not valid|RESOURCE_EXHAUSTED|ConnectTimeout|ReadTimeout|大模型决策调用异常|LLM_CONNECTION_ERROR/i.test(raw)) {
+                isModelError = true;
+                if (/502|550|EdgeOne|Bad Gateway/i.test(raw)) {
+                    situation = "主通道 Google 授权端点网络超时/重置，且备用中转网关 (Hermes) 响应 502/550 宕机异常，导致大模型双通道均未能连通。";
+                } else if (/Timeout|超时/i.test(raw)) {
+                    situation = "大模型推理端点请求超时（超过 40s 未收到首包响应），网络可能存在高延迟或阻断。";
+                } else if (/10054|ConnectionReset/i.test(raw)) {
+                    situation = "底层 TCP 连接被对端重置 (ConnectionResetError / WinError 10054)，网络连接被防火墙或代理中断。";
+                } else if (/API key|UNAUTHENTICATED|PERMISSION_DENIED/i.test(raw)) {
+                    situation = "大模型 API Key 鉴权失败或已失效，上游大模型服务拒绝访问。";
+                } else {
+                    situation = `大模型推理通道调用异常：${raw.replace(/^.*[ERROR]\s*/, '')}`;
+                }
+                suggestion = "1. 检查外网或网络代理连通性；2. 点击【设置】切换为 DeepSeek 或其他大模型；3. 配置可用中转 API Key 后重试。";
+            }
 
             if (!raw || raw === "undefined") {
                 situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
@@ -10231,6 +10472,7 @@
                 stepTitle: failedStepTitle || "业务交互执行",
                 situation: situation,
                 suggestion: suggestion,
+                isModelError: isModelError,
                 raw: raw
             };
         }
@@ -10294,8 +10536,13 @@
                         } else {
                             fCapsule.className = "floating-step-capsule status-failed";
                             if (fIcon) fIcon.className = "bi bi-exclamation-octagon text-danger";
-                            const errTitle = failedStep ? (failedStep.title || `第 ${failedIdx} 步`) : '执行中断';
-                            fText.innerText = `在第 ${failedIdx || activeIdx} 步受阻: ${errTitle} ↗`;
+                            const isModelFailed = (sessionData.error_type === "LLM_CONNECTION_ERROR") || /模型决策异常|Google 授权|备用网关|502|550|未连通/i.test(sessionData.error_message || "");
+                            if (isModelFailed) {
+                                fText.innerText = `AI 推理通道未连通 · 决策受阻 ↗`;
+                            } else {
+                                const errTitle = failedStep ? (failedStep.title || `第 ${failedIdx} 步`) : '执行中断';
+                                fText.innerText = `在第 ${failedIdx || activeIdx} 步受阻: ${errTitle} ↗`;
+                            }
                         }
                     } else {
                         // 执行中
@@ -10372,6 +10619,9 @@
                 const data = await res.json();
                 if (data.success) {
                     liveRunningSessions.add(currentReworkSessionId);
+                    if (!sessionPollTimer) {
+                        sessionPollTimer = setInterval(pollCurrentSession, 1200);
+                    }
                     await pollCurrentSession();
                     loadSessions();
                 } else {
@@ -10381,6 +10631,63 @@
                 alert("打回返工请求异常: " + e);
             }
         }
+
+        window.submitHitlDecision = async function(sessionId, decisionType) {
+            sessionId = sessionId || activeSessionId;
+            if (!sessionId) return;
+            
+            const accountInput = document.getElementById(`hitlAccountInput_${sessionId}`);
+            const passwordInput = document.getElementById(`hitlPasswordInput_${sessionId}`);
+            const rememberInput = document.getElementById(`hitlRemember_${sessionId}`);
+            
+            const account = accountInput ? accountInput.value.trim() : "";
+            const password = passwordInput ? passwordInput.value.trim() : "";
+            const remember = rememberInput ? rememberInput.checked : true;
+            
+            if (decisionType === "inject" && !account) {
+                if (typeof showToast === "function") showToast("请输入账号/手机号后再提交", "warning");
+                return;
+            }
+            
+            const cardEl = document.getElementById(`hitlDecisionCard_${sessionId}`);
+            if (cardEl) {
+                cardEl.style.opacity = "0.6";
+                cardEl.style.pointerEvents = "none";
+            }
+            
+            try {
+                const resp = await fetch(`/api/sessions/${sessionId}/resolve_decision`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        decision_type: decisionType,
+                        account: account,
+                        password: password,
+                        remember: remember,
+                        app_key: (currentSession && (currentSession.app_filename || currentSession.app_package)) || "demo_app"
+                    })
+                });
+                const res = await resp.json();
+                if (res.success) {
+                    if (typeof showToast === "function") showToast(decisionType === "inject" ? "凭证已注入，端侧继续执行！" : "已下达人工决策，恢复自动化测试", "success");
+                    if (currentSession) currentSession.hitl_decision = null;
+                    if (cardEl) cardEl.remove();
+                } else {
+                    if (typeof showToast === "function") showToast("提交决策失败，请重试", "error");
+                    if (cardEl) {
+                        cardEl.style.opacity = "1";
+                        cardEl.style.pointerEvents = "auto";
+                    }
+                }
+            } catch (e) {
+                console.error("提交人机协同决策出错:", e);
+                if (typeof showToast === "function") showToast("网络错误，提交决策失败", "error");
+                if (cardEl) {
+                    cardEl.style.opacity = "1";
+                    cardEl.style.pointerEvents = "auto";
+                }
+            }
+        };
 
         async function acceptSession(sessionId) {
             if (!confirm("确认正式验收通过本次自动化测试交付物并封板归档？")) return;
@@ -10572,6 +10879,21 @@
                     `;
                 } else if (isFailed) {
                     const trans = translateDiagnostic(st.error_msg || sessionData.error_message, stepNum, stepTitle);
+                    const modelActionDock = trans.isModelError ? `
+                        <div class="mt-2 pt-2 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top" style="border-color: rgba(239, 68, 68, 0.2) !important;">
+                            <span class="mono-pill" style="font-size: 9.5px; color: #f87171; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3);">
+                                <i class="bi bi-wifi-off me-1"></i>推理通道未连通
+                            </span>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <button class="btn btn-sm" onclick="openSettingsModal('models')" style="background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 500;">
+                                    <i class="bi bi-sliders2 me-1"></i>配置/切换模型
+                                </button>
+                                <button class="btn btn-sm" onclick="retryGoalAfterSatisfied(currentActiveSessionData?.goal || '')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; font-size: 11px; padding: 2px 8px; border-radius: 5px;">
+                                    <i class="bi bi-arrow-repeat me-1"></i>重试
+                                </button>
+                            </div>
+                        </div>
+                    ` : '';
                     statusDetailCardHtml = `
                         <div class="p-2 rounded" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; font-size: 11px;">
                             <div class="fw-semibold d-flex align-items-center gap-1 mb-1" style="color: #f87171;">
@@ -10579,6 +10901,7 @@
                             </div>
                             <div class="mb-1" style="color: #fecaca; line-height: 1.4;"><strong>现状：</strong>${escapeHtml(trans.situation)}</div>
                             <div style="color: #cbd5e1; line-height: 1.4;"><strong>建议：</strong>${escapeHtml(trans.suggestion)}</div>
+                            ${modelActionDock}
                         </div>
                     `;
                 } else if (isRunning) {
@@ -11229,6 +11552,38 @@
                 const verdictBadgeColor = isPass ? "var(--status-green)" : (isBlocked ? "#f59e0b" : "#ef4444");
                 const isSolidified = !!sessionData.is_solidified || !!blk.is_solidified;
                 const solidFile = blk.solidified_filename || sessionData.solidified_filename || `test_${sid}.py`;
+                const isModelErr = (sessionData.error_type === "LLM_CONNECTION_ERROR") || 
+                                   /模型决策异常|Google 授权端点|备用网关|502 Bad Gateway|550 EdgeOne|WinError 10054|ConnectionReset|ConnectTimeout|大模型决策调用异常/i.test(sessionData.error_message || blk.error_message || "");
+                let modelErrorBannerHtml = "";
+                if (!isPass && isModelErr) {
+                    const trans = translateDiagnostic(sessionData.error_message || blk.error_message || "模型无法连通");
+                    modelErrorBannerHtml = `
+                        <div class="summary-model-error-banner mb-2.5 p-2.5 rounded" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.28); border-radius: 8px;">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="d-flex align-items-center gap-1.5" style="color: #f87171; font-weight: 600; font-size: 12px;">
+                                    <i class="bi bi-wifi-off"></i>
+                                    <span>AI 推理通道连接受阻 · 模型未响应</span>
+                                </div>
+                                <span class="mono-pill" style="font-size: 9px; color: #f87171; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3); padding: 1px 6px;">双通道未连通</span>
+                            </div>
+                            <div class="mb-2" style="font-size: 11.5px; color: #fca5a5; line-height: 1.45;">
+                                ${escapeHtml(trans.situation)}
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1.5 border-top" style="border-color: rgba(239, 68, 68, 0.15) !important;">
+                                <div class="text-sub" style="font-size: 11px; color: #cbd5e1;"><strong style="color: #f87171;">排查：</strong>${escapeHtml(trans.suggestion)}</div>
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <button class="btn btn-sm" onclick="openSettingsModal('models')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fff; font-size: 11px; padding: 2px 10px; border-radius: 6px; font-weight: 500;">
+                                        <i class="bi bi-sliders2 me-1"></i>切换模型 / 配置 Key
+                                    </button>
+                                    <button class="btn btn-sm" onclick="retryGoalAfterSatisfied(sessionData?.goal || '')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; font-size: 11px; padding: 2px 10px; border-radius: 6px;">
+                                        <i class="bi bi-arrow-repeat me-1"></i>立即重试
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 const artifacts = blk.artifacts || [
                     { name: "6 大测试维度全景交付物报告", file: `test_report_${sid.slice(-6)}.md`, type: "report" },
                     { name: "端侧底层执行与诊断日志流", file: `execution_${sid.slice(-6)}.log`, type: "log" },
@@ -11302,6 +11657,8 @@
 
                         <!-- 极简细线留白 -->
                         <div class="summary-divider"></div>
+
+                        ${modelErrorBannerHtml}
 
                         <!-- 交付物与自动化资产列表 (单层无嵌套框) -->
                         <div class="d-flex flex-column gap-1">
@@ -12686,12 +13043,28 @@ function renderChatStream(sessionData) {
         // 🌟 原生 ADB 极速低延迟投屏循环 (带真机断开自适应空状态感知)
         let _pipErrorStreak = 0;
 
+        function getPipTargetDeviceId() {
+            if (typeof getActiveTargetDeviceId === "function") {
+                const id = getActiveTargetDeviceId();
+                if (id) return id;
+            }
+            const checked = document.querySelectorAll(".device-checkbox:checked");
+            if (checked && checked.length > 0) return checked[0].value;
+            if (typeof currentScreenDeviceId !== "undefined" && currentScreenDeviceId) return currentScreenDeviceId;
+            if (typeof activeConsoleDeviceId !== "undefined" && activeConsoleDeviceId && activeConsoleDeviceId !== "mock-device") return activeConsoleDeviceId;
+            if (typeof availableDevices !== "undefined" && availableDevices && availableDevices.length > 0) return availableDevices[0].id;
+            return null;
+        }
+
         function updateDeviceFloatingEmptyState(devices) {
             const empty = document.getElementById("pipScreenEmpty");
             const img = document.getElementById("pipScreenImg");
             const title = document.getElementById("floatingDeviceTitle");
             const status = document.getElementById("floatingDeviceStatus");
-            if (!devices || devices.length === 0) {
+            const activeDevId = getPipTargetDeviceId();
+            const devObj = (devices || []).find(d => d.id === activeDevId) || ((devices && devices.length > 0) ? devices[0] : null);
+
+            if (!devObj) {
                 if (empty) empty.style.display = "block";
                 if (img) img.style.display = "none";
                 if (title) title.innerText = "未连接真机 · 排查指引";
@@ -12699,7 +13072,7 @@ function renderChatStream(sessionData) {
             } else {
                 if (empty) empty.style.display = "none";
                 if (img) img.style.display = "block";
-                if (title) title.innerText = `${devices[0].model || devices[0].id} · 实时端侧`;
+                if (title) title.innerText = `${devObj.model || devObj.id} · 实时端侧`;
                 if (status) status.innerText = "触控注入就绪";
             }
         }
@@ -12710,7 +13083,13 @@ function renderChatStream(sessionData) {
                 return;
             }
             isPipLoopActive = true;
-            const targetDev = getActiveTargetDeviceId() || 'auto';
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) {
+                updateDeviceFloatingEmptyState(availableDevices || []);
+                if (isPipScreenOpen) setTimeout(runPipStreamLoop, 1500);
+                else isPipLoopActive = false;
+                return;
+            }
             const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
             const preloader = new Image();
             preloader.onload = () => {
@@ -12748,7 +13127,8 @@ function renderChatStream(sessionData) {
 
         function triggerPipImmediateRefresh() {
             if (!isPipScreenOpen) return;
-            const targetDev = getActiveTargetDeviceId() || 'auto';
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) return;
             const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
             const preloader = new Image();
             preloader.onload = () => {
@@ -12791,9 +13171,6 @@ function renderChatStream(sessionData) {
                 if (container) {
                     bindPipGestureControl(container);
                 }
-                if (typeof updateDeviceFloatingEmptyState === "function") {
-                    updateDeviceFloatingEmptyState(availableDevices || []);
-                }
                 // 每次打开默认归位至右侧停靠点 (与复位悬浮窗位置按钮行为严格一致)
                 if (typeof resetDevicePos === "function") {
                     resetDevicePos();
@@ -12812,7 +13189,8 @@ function renderChatStream(sessionData) {
         // 📱 虚拟按键发送 (返回 / 桌面 / 多任务)
         async function sendDeviceNavKey(key, e) {
             if (e) e.stopPropagation();
-            const targetDev = getActiveTargetDeviceId() || 'auto';
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) return;
             const status = document.getElementById("floatingDeviceStatus");
             const keyLabels = { back: "返回键 (Back)", home: "主屏幕 (Home)", app_switch: "多任务" };
             if (status) status.innerText = `下发: ${keyLabels[key] || key}`;
@@ -12923,37 +13301,37 @@ function renderChatStream(sessionData) {
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 const dt = Date.now() - startTime;
 
-                const activeDev = getActiveDeviceMetrics();
-                const targetDev = activeDev.id;
+                const targetDev = getPipTargetDeviceId();
+                if (!targetDev) return;
                 const status = document.getElementById("floatingDeviceStatus");
 
-                // 物理 ADB 坐标转换：按当前真机实际分辨率映射 (如 1084 x 2412)
-                const realX1 = Math.round((startX / rect.width) * activeDev.width);
-                const realY1 = Math.round((startY / rect.height) * activeDev.height);
-                const realX2 = Math.round((endX / rect.width) * activeDev.width);
-                const realY2 = Math.round((endY / rect.height) * activeDev.height);
+                // 归一化相对比例 (0.0 ~ 1.0)，由后端动态根据真机物理分辨率映射，告别单机型硬编码
+                const normX1 = Math.max(0, Math.min(1, startX / rect.width));
+                const normY1 = Math.max(0, Math.min(1, startY / rect.height));
+                const normX2 = Math.max(0, Math.min(1, endX / rect.width));
+                const normY2 = Math.max(0, Math.min(1, endY / rect.height));
 
                 if (dist < 12) {
                     if (dt >= 450) {
                         // 长按 (Long Press)
-                        if (status) status.innerText = `长按手势 (${realX1}, ${realY1})`;
+                        if (status) status.innerText = `长按手势 (${Math.round(normX1 * 100)}%, ${Math.round(normY1 * 100)}%)`;
                         triggerActionRipple((startX / rect.width) * 100, (startY / rect.height) * 100);
                         try {
                             await fetch('/api/device/swipe', {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ device_id: targetDev, x1: realX1, y1: realY1, x2: realX1, y2: realY1, duration: 800 })
+                                body: JSON.stringify({ device_id: targetDev, norm_x1: normX1, norm_y1: normY1, norm_x2: normX1, norm_y2: normY1, duration: 800 })
                             });
                         } catch (err) {}
                     } else {
                         // 单击 (Tap)
-                        if (status) status.innerText = `单击 (${realX1}, ${realY1})`;
+                        if (status) status.innerText = `单击 (${Math.round(normX1 * 100)}%, ${Math.round(normY1 * 100)}%)`;
                         triggerActionRipple((startX / rect.width) * 100, (startY / rect.height) * 100);
                         try {
                             await fetch('/api/device/tap', {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ device_id: targetDev, x: realX1, y: realY1 })
+                                body: JSON.stringify({ device_id: targetDev, norm_x: normX1, norm_y: normY1 })
                             });
                         } catch (err) {}
                     }
@@ -12967,10 +13345,10 @@ function renderChatStream(sessionData) {
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({
                                 device_id: targetDev,
-                                x1: realX1,
-                                y1: realY1,
-                                x2: realX2,
-                                y2: realY2,
+                                norm_x1: normX1,
+                                norm_y1: normY1,
+                                norm_x2: normX2,
+                                norm_y2: normY2,
                                 duration: swipeDuration
                             })
                         });
@@ -13007,7 +13385,8 @@ function renderChatStream(sessionData) {
             const empty = document.getElementById("pipScreenEmpty");
             if (!img) return;
             try {
-                const targetDev = getActiveTargetDeviceId() || 'auto';
+                const targetDev = getPipTargetDeviceId();
+                if (!targetDev) return;
                 const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
                 const testImg = new Image();
                 testImg.onload = () => {
@@ -13138,21 +13517,55 @@ function renderChatStream(sessionData) {
                     formData.append("message", goal);
                     formData.append("provider", currentActiveProvider);
                     formData.append("model", currentActiveModel);
+
+                    // 🚀 对标 DeepSeek 交互机制：即时乐观上屏 (Optimistic UI)
+                    const flow = document.getElementById("messagesFlow");
+                    const tempBlockId = "temp_user_" + Date.now();
+                    if (flow) {
+                        const emptyBox = document.getElementById("emptyStateBox");
+                        if (emptyBox) emptyBox.classList.add("d-none");
+                        const userRowHtml = `
+                            <div class="stream-user-row" id="${tempBlockId}">
+                                <div class="stream-user-bubble">
+                                    ${escapeHtml(goal)}
+                                </div>
+                            </div>
+                            <div class="stream-thought-box" id="temp_th_${tempBlockId}">
+                                <div class="stream-thought-row">
+                                    <span class="spinner-grow spinner-grow-sm text-primary" style="width: 8px; height: 8px;"></span>
+                                    <span>AI 推理引擎正在深度推演增量测试链路 (原地接续)...</span>
+                                </div>
+                            </div>
+                        `;
+                        flow.insertAdjacentHTML("beforeend", userRowHtml);
+                        const scrollArea = document.getElementById("chatScrollArea");
+                        if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
+                    }
+
+                    input.value = "";
+                    onInputTextChange();
+
                     const res = await fetch(`/api/sessions/${activeSessionId}/message`, { method: "POST", body: formData });
                     const data = await res.json();
                     if (data.success) {
-                        input.value = "";
-                        onInputTextChange();
                         // 标记该会话重新进入实时执行，清除旧结论状态
                         liveRunningSessions.add(activeSessionId);
                         localStorage.removeItem("conclusion_shown_" + activeSessionId);
                         delete window._conclusionTypewriterState[activeSessionId];
-                        // 立即刷新当前会话详情并重载左侧状态
+
+                        // 🚀 核心自愈：重新激活轮询定时器，杜绝因旧状态导致轮询停止！
+                        if (!sessionPollTimer) {
+                            sessionPollTimer = setInterval(pollCurrentSession, 1200);
+                        }
                         await pollCurrentSession();
                         loadSessions();
                         // 🚀 执行任务时自动唤起端侧投屏并靠右停靠
                         ensurePipScreenOpen();
                     } else {
+                        const tempEl = document.getElementById(tempBlockId);
+                        if (tempEl) tempEl.remove();
+                        const tempTh = document.getElementById(`temp_th_${tempBlockId}`);
+                        if (tempTh) tempTh.remove();
                         alert(data.message || "追加测试指令失败");
                     }
                     return;
@@ -13239,6 +13652,7 @@ function renderChatStream(sessionData) {
             loadAntigravityStatus();
             loadEnvStatus();
             loadApps();
+            updateTourStatusBadge();
             
             // 同步当前主题卡片高亮
             const savedTheme = localStorage.getItem("autotest_theme") || "dark";
@@ -13258,30 +13672,36 @@ function renderChatStream(sessionData) {
             const isGoogle = (tabName === "google");
             const isModels = (tabName === "models");
             const isGeneral = (tabName === "general");
+            const isGuide = (tabName === "guide");
 
             const navApps = document.getElementById("tabNavApps");
             const navGoogle = document.getElementById("tabNavGoogle");
             const navModels = document.getElementById("tabNavModels");
             const navGeneral = document.getElementById("tabNavGeneral");
+            const navGuide = document.getElementById("tabNavGuide");
 
             const panelApps = document.getElementById("panelSettingsApps");
             const panelGoogle = document.getElementById("panelSettingsGoogle");
             const panelModels = document.getElementById("panelSettingsModels");
             const panelGeneral = document.getElementById("panelSettingsGeneral");
+            const panelGuide = document.getElementById("panelSettingsGuide");
 
             if (navApps) navApps.classList.toggle("active", isApps);
             if (navGoogle) navGoogle.classList.toggle("active", isGoogle);
             if (navModels) navModels.classList.toggle("active", isModels);
             if (navGeneral) navGeneral.classList.toggle("active", isGeneral);
+            if (navGuide) navGuide.classList.toggle("active", isGuide);
 
             if (panelApps) panelApps.classList.toggle("d-none", !isApps);
             if (panelGoogle) panelGoogle.classList.toggle("d-none", !isGoogle);
             if (panelModels) panelModels.classList.toggle("d-none", !isModels);
             if (panelGeneral) panelGeneral.classList.toggle("d-none", !isGeneral);
+            if (panelGuide) panelGuide.classList.toggle("d-none", !isGuide);
 
             if (isApps) loadApps();
             if (isGoogle) loadAntigravityStatus();
             if (isModels) loadModelConfig();
+            if (isGuide) updateTourStatusBadge();
         }
 
         // 统一入驻：openAppPackagesModal 直接平滑切换至设置中的应用管理选项卡
@@ -13894,17 +14314,6 @@ function renderChatStream(sessionData) {
             return null;
         }
 
-        // 投屏触控使用当前真机真实分辨率，避免写死旧机型尺寸导致点击偏移
-        function getActiveDeviceMetrics() {
-            const id = getActiveTargetDeviceId() || "auto";
-            const dev = (availableDevices || []).find(d => d.id === id);
-            return {
-                id: id,
-                width: (dev && dev.width) || 1080,
-                height: (dev && dev.height) || 2160
-            };
-        }
-
         // 刷新底栏胶囊与顶栏 App 信息
         async function updateAppPillUI() {
             const appLabelEl = document.getElementById("activeAppLabel");
@@ -13915,6 +14324,9 @@ function renderChatStream(sessionData) {
             const displayName = currentActiveApp.label || currentActiveApp.filename || "待测应用";
             if (appLabelEl) appLabelEl.innerText = displayName;
             if (topBarLabelEl) topBarLabelEl.innerText = `待测应用: ${displayName}`;
+            // 同步工具栏应用胶囊标签
+            const toolbarAppLabelEl = document.getElementById("toolbarAppLabel");
+            if (toolbarAppLabelEl) toolbarAppLabelEl.innerText = displayName;
 
             // 异步探测当前真机是否安装此应用
             const devId = getActiveTargetDeviceId();
@@ -13929,6 +14341,12 @@ function renderChatStream(sessionData) {
             const dotCls = currentActiveApp.isInstalled ? "status-indicator-dot dot-online" : "status-indicator-dot dot-warning";
             if (appDot) appDot.className = dotCls;
             if (topBarDot) topBarDot.className = dotCls;
+
+            // 动态响应输入框 placeholder，确保用户输入时心智高度明确当前待测对象
+            const taskInputTa = document.getElementById("taskInputText");
+            if (taskInputTa && (!taskInputTa.value || taskInputTa.value.trim() === "")) {
+                taskInputTa.placeholder = `针对「${displayName}」描述自动化测试目标，如：冷启动应用，测试登录并断言进入首页（Enter 发送，Shift+Enter 换行）...`;
+            }
         }
 
         // 切换当前激活应用
@@ -14541,7 +14959,7 @@ async function replaySolidifiedCase(safeRef, btnEl) {
         const res = await fetch('/api/deliverables/replay', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ safeRef: safeRef, device_id: (typeof getActiveTargetDeviceId === "function" && getActiveTargetDeviceId()) || 'auto' })
+            body: JSON.stringify({ safeRef: safeRef, device_id: (typeof getPipTargetDeviceId === 'function' ? getPipTargetDeviceId() : null) || 'auto' })
         });
         const data = await res.json();
         if (btnEl) {

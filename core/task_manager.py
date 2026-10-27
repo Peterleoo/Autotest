@@ -550,7 +550,11 @@ class TaskManager:
 
         # 🚀 毫秒级端侧情境探针：先看真机真实物理状态（安装/前台/具体页面），再因地制宜规划！
         t_decomp_start = time.time()
-        primary_dev = device_ids[0] if device_ids else "2145189e"
+        primary_dev = device_ids[0] if device_ids else None
+        if not primary_dev:
+            conn_devs = app_mgr.get_connected_devices()
+            if conn_devs:
+                primary_dev = conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id")
         from core.device_context_inspector import DeviceContextInspector
         dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package or "com.apicloud.A6995433058179")
         
@@ -775,6 +779,27 @@ class TaskManager:
         session["is_success"] = None
         session["error_message"] = None
 
+        # 🚀 对标 DeepSeek 连续对话机制：即时向对话流注入新轮次用户提问、思考态与任务清单
+        if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+            session["timeline_blocks"] = []
+        session["timeline_blocks"].append(
+            TimelineManager.create_user_block(message, turn_id=new_turn_id)
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_thought_block(
+                duration="1.2s",
+                bullets=[
+                    {"tag": "意图深度解析", "content": f"深入理解本轮追加测试诉求【{message[:24]}】"},
+                    {"tag": "现场就地继承", "content": "继承前序端侧已达成状态，原地规划增量执行路径，跳过重复冷启动"}
+                ],
+                turn_id=new_turn_id,
+                is_done=False
+            )
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_todo_block(turn_steps, turn_id=new_turn_id)
+        )
+
         # 为各设备记录日志
         for dev_id, dev in session.get("devices", {}).items():
             dev["logs"].append(f"[{now_str}] 💬 [多轮对话追加 Turn {new_turn_id}]: {message}")
@@ -841,6 +866,27 @@ class TaskManager:
         session["status"] = "RUNNING"
         session["is_success"] = None
         session["error_message"] = None
+
+        # 🚀 对标 DeepSeek 连续对话机制：即时向对话流注入返工纠偏提问与新规划
+        if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+            session["timeline_blocks"] = []
+        session["timeline_blocks"].append(
+            TimelineManager.create_user_block(f"打回返工要求: {rework_note}", turn_id=new_turn_id)
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_thought_block(
+                duration="1.2s",
+                bullets=[
+                    {"tag": "返工诉求拆解", "content": f"分析人工返工要求【{rework_note[:24]}】"},
+                    {"tag": "原地纠偏策略", "content": "针对未达标项原地微调手势并执行二次断言"}
+                ],
+                turn_id=new_turn_id,
+                is_done=False
+            )
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_todo_block(turn_steps, turn_id=new_turn_id)
+        )
 
         target_devs = session.get("target_devices", [])
         if not target_devs and "devices" in session:
@@ -1552,7 +1598,7 @@ class TaskManager:
                 elif "ios" in device_id.lower():
                     self._run_ios_pipeline(session, dev_state, goal, case_name, start_t)
                 else:
-                    self._run_real_android_pipeline(session, dev_state, device_id, goal, case_name, start_t)
+                    self._run_real_android_pipeline(session, dev_state, device_id, goal, case_name, start_t, turn_id=turn_id)
             except Exception as e:
                 dev_state["status"] = "FAIL"
                 dev_state["success"] = False
@@ -1597,12 +1643,14 @@ class TaskManager:
             # 实时持久化存盘，保证前端刷新或服务重启数据 100% 完整
             self._save_session(session_id)
 
-    def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float):
-        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id]
+    def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float, turn_id: int = 1):
+        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
         if session.get("app_filename"):
             cmd.extend(["--app", session["app_filename"]])
         if session.get("provider"):
             cmd.extend(["--provider", session["provider"]])
+        if session.get("session_id"):
+            cmd.extend(["--session-id", session["session_id"]])
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -1937,26 +1985,70 @@ class TaskManager:
         else:
             session["is_success"] = False
             fail_reason = ""
+            error_type = "GENERAL_ERROR"
+
+            # 🛡️ 事实核验优先级 1：模型决策与网络通道/网关异常 (最高优先级，直接提取真实原因)
+            llm_patterns = [
+                "模型决策异常", "Google 授权端点异常", "备用网关异常", "502 Bad Gateway",
+                "504 Gateway Time-out", "550 EdgeOne", "ConnectionResetError", "WinError 10054",
+                "API key not valid", "PERMISSION_DENIED", "UNAUTHENTICATED", "RESOURCE_EXHAUSTED",
+                "ReadTimeout", "ConnectTimeout", "大模型决策调用异常"
+            ]
             for idx, l in enumerate(all_output):
-                if "❌ [设备自学习阻断]" in l or "❌ 测试受阻详情" in l:
+                if any(k in l for k in llm_patterns):
+                    clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
                     next_detail = all_output[idx + 1] if idx + 1 < len(all_output) else ""
                     if next_detail and not next_detail.startswith("2026-") and "=====" not in next_detail:
-                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
                         fail_reason = f"{clean_line} {next_detail}".strip()
                     else:
-                        fail_reason = l
-                    break
-                elif "❌ AI 自动化测试未能达成预期目标" in l:
-                    fail_reason = l
+                        fail_reason = clean_line
+                    error_type = "LLM_CONNECTION_ERROR"
                     break
 
+            # 🛡️ 事实核验优先级 2：设备自学习阻断 / 测试受阻详情
+            if not fail_reason:
+                for idx, l in enumerate(all_output):
+                    if "❌ [设备自学习阻断]" in l or "❌ 测试受阻详情" in l:
+                        next_detail = all_output[idx + 1] if idx + 1 < len(all_output) else ""
+                        if next_detail and not next_detail.startswith("2026-") and "=====" not in next_detail:
+                            clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                            fail_reason = f"{clean_line} {next_detail}".strip()
+                        else:
+                            fail_reason = l
+                        error_type = "DEVICE_LEARNING_BLOCKED"
+                        break
+
+            # 🛡️ 事实核验优先级 3：设备脱机/安装失败/底层通信异常
             if not fail_reason:
                 for l in reversed(all_output):
-                    if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
-                        fail_reason = l
+                    if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "device unauthorized", "adb server killed"]):
+                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                        fail_reason = clean_line
+                        error_type = "DEVICE_ENVIRONMENT_ERROR"
                         break
+
+            # 🛡️ 事实核验优先级 4：DSH 核验门禁一票否决
+            if not fail_reason:
+                for l in reversed(all_output):
+                    if any(k in l for k in ["[DSH 核验门禁一票否决]", "DSH Verifier 门禁驳回"]):
+                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                        fail_reason = clean_line
+                        error_type = "VERIFIER_REJECTED"
+                        break
+
+            # 🛡️ 事实核验优先级 5：其他底层异常或堆栈
+            if not fail_reason:
+                for l in reversed(all_output):
+                    if any(k in l for k in ["ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
+                        if "❌ AI 自动化测试未能达成预期目标" not in l:
+                            clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                            fail_reason = clean_line
+                            break
+
+            session["error_type"] = error_type
             session["error_message"] = fail_reason or last_error_line or "测试前置检查未通过或执行中断"
-            dev_state["action"] = f"测试执行受阻：{session['error_message'][:40]}"
+            dev_state["error_type"] = error_type
+            dev_state["action"] = f"测试执行受阻：{session['error_message'][:50]}" 
 
             # 🛡️ 事实核查：检查整个执行过程中是否真正跨过了前置引导页
             all_thoughts = " ".join([l for l in all_output if "AI 决策:" in l])
@@ -2000,6 +2092,17 @@ class TaskManager:
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
         )
         # 🚀 同步挂载测试全景总结卡片 (Test Summary Block)
+        # 若发生致命模型连通异常，先注入结构化故障诊断卡片
+        if not is_success and session.get("error_type") == "LLM_CONNECTION_ERROR":
+            session["timeline_blocks"].append(
+                TimelineManager.create_fault_diagnosis_block(
+                    fail_step_title="AI 模型决策推演",
+                    current_situation=f"大模型推理通道无法连通：{session.get('error_message', '')}",
+                    suggestion="建议检查外网代理，或在【设置】中切换为 DeepSeek 或其他模型，配置有效 Key 后重试",
+                    turn_id=max(0, turn_no - 1)
+                )
+            )
+
         session["timeline_blocks"].append(
             TimelineManager.create_test_summary_block(
                 session_id=session["session_id"],
@@ -2010,7 +2113,9 @@ class TaskManager:
                 deliverables=session.get("deliverables"),
                 is_solidified=session.get("is_solidified", False),
                 solidified_filename=session.get("solidified_filename", ""),
-                turn_id=max(0, turn_no - 1)
+                turn_id=max(0, turn_no - 1),
+                error_message=session.get("error_message", ""),
+                error_type=session.get("error_type", "")
             )
         )
 
