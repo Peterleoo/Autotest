@@ -132,7 +132,7 @@ def resolve_target_device_id(preferred_id: Optional[str] = None) -> Optional[str
         return None
 
     # 若指定了有效在线设备且在当前在线列表中，直接使用
-    if preferred_id and preferred_id not in ["mock-device", "local-simulator", "default", "auto", "2145189e"]:
+    if preferred_id and preferred_id not in ["mock-device", "local-simulator", "default", "auto"]:
         if preferred_id in conn_ids:
             return preferred_id
 

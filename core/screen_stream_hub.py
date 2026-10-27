@@ -131,6 +131,7 @@ class ScreenStreamHub:
         self._adb_bin = adb_bin
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
+        self._failure_timestamps: Dict[str, float] = {}
 
     def set_adb_bin(self, adb_bin: str):
         self._adb_bin = adb_bin
@@ -153,6 +154,7 @@ class ScreenStreamHub:
         """立即将指定设备的缓存置为过期（手势点击/滑动后调用，强制下一次拉取真实转场新帧）"""
         if device_id in self._cache:
             self._cache[device_id]["time"] = 0
+        self._failure_timestamps.pop(device_id, None)
 
     async def get_frame(self, device_id: str, max_age: float = 0.45) -> Optional[Dict[str, Any]]:
         """
@@ -160,8 +162,11 @@ class ScreenStreamHub:
         若缓存时间在 max_age 内，则直接从内存返回 (0ms 延迟)；
         否则加锁由当前协程在线程池发起抓取，排队协程共享该次抓取产物。
         """
-        cached = self._cache.get(device_id)
         now = time.time()
+        if (now - self._failure_timestamps.get(device_id, 0.0)) < 2.0:
+            return None
+
+        cached = self._cache.get(device_id)
         if cached and (now - cached.get("time", 0) < max_age):
             return cached
 
@@ -176,10 +181,12 @@ class ScreenStreamHub:
             adb_bin = self._get_adb_bin()
             frame_data = await asyncio.to_thread(_capture_raw_and_encode_sync, adb_bin, device_id)
             if frame_data:
+                self._failure_timestamps.pop(device_id, None)
                 self._cache[device_id] = frame_data
                 return frame_data
             else:
-                # 🌟 真机采集失败（已离线或断开），清除旧缓存帧，杜绝假装连接
+                # 🌟 真机采集失败（已离线或断开），记入失败时间戳启动 2s 熔断，清除旧缓存帧
+                self._failure_timestamps[device_id] = time.time()
                 self._cache.pop(device_id, None)
                 return None
 
