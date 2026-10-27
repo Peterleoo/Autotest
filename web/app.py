@@ -269,30 +269,116 @@ async def get_deliverables_list():
 
 @app.post("/api/deliverables/replay")
 async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
-    """⚡ 0 Token 毫秒级原生用例回放：直接通过 Pytest 执行固化脚本"""
+    """⚡ 0 Token 毫秒级原生用例回放：多级智能寻址并直接通过 Pytest 执行固化脚本"""
     safe_ref = payload.get("safeRef") or payload.get("script_path", "")
+    device_id = payload.get("device_id") or "2145189e"
     if not safe_ref:
-        return JSONResponse({"success": False, "error": "缺少脚本路径 safeRef"})
+        return JSONResponse({"success": False, "passed": False, "duration": 0, "error": "缺少测试脚本路径 (safeRef 为空)"})
 
-    file_path = BASE_DIR / safe_ref
-    if not file_path.exists():
-        return JSONResponse({"success": False, "error": f"测试脚本不存在: {safe_ref}"})
+    # 多级鲁棒寻址
+    file_path = None
+    ref_name = Path(safe_ref).name
+    candidates = [
+        BASE_DIR / safe_ref,
+        BASE_DIR / "tests" / "solidified" / safe_ref,
+        BASE_DIR / "tests" / "solidified" / ref_name
+    ]
+    for c in candidates:
+        if c.exists() and c.is_file():
+            file_path = c
+            break
+
+    if not file_path:
+        solid_dir = BASE_DIR / "tests" / "solidified"
+        if solid_dir.exists():
+            matched = list(solid_dir.rglob(ref_name))
+            if matched and matched[0].is_file():
+                file_path = matched[0]
+
+    if not file_path or not file_path.exists():
+        return JSONResponse({
+            "success": False,
+            "passed": False,
+            "duration": 0,
+            "error": f"测试脚本未找到: 在用例库中未检索到【{ref_name}】"
+        })
+
+    # 尝试确保真机前台目标应用就绪
+    try:
+        from core.native_adb_driver import NativeADBDriver
+        adb = NativeADBDriver(device_id=device_id)
+        current_app = adb.get_current_app()
+        if "launcher" in current_app.lower() or not current_app:
+            default_pkg = "com.apicloud.A6995433058179"
+            adb.execute_shell(f"monkey -p {default_pkg} -c android.intent.category.LAUNCHER 1")
+            time.sleep(1.2)
+    except Exception as e:
+        logger.warning(f"回放前置检查调起应用异常 (非致命): {e}")
 
     cmd = [sys.executable, "-m", "pytest", str(file_path), "-v", "-s", "--color=no"]
     start_t = time.time()
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(BASE_DIR))
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=90, cwd=str(BASE_DIR))
         duration = round(time.time() - start_t, 2)
         passed = (res.returncode == 0)
+        raw_output = res.stdout or res.stderr or ""
+        
+        # 提炼关键错误摘要 (优先提炼最底层 AssertionError/异常明细)
+        error_summary = ""
+        if not passed:
+            for line in raw_output.splitlines():
+                line_str = line.strip()
+                if "AssertionError:" in line_str:
+                    parts = line_str.split("AssertionError:", 1)
+                    if len(parts) > 1 and parts[1].strip():
+                        error_summary = parts[1].strip()
+                    else:
+                        error_summary = line_str
+                    break
+            
+            if not error_summary:
+                for line in raw_output.splitlines():
+                    line_str = line.strip()
+                    if (line_str.startswith("E   ") or line_str.startswith("E ")) and ("Error" in line_str or "Exception" in line_str):
+                        error_summary = line_str.lstrip("E ").strip()
+                        break
+
+            if not error_summary:
+                for line in raw_output.splitlines():
+                    line_str = line.strip()
+                    if any(k in line_str for k in ["FAILED", "Error:"]) and len(line_str) < 150:
+                        error_summary = line_str
+                        break
+
+            if not error_summary:
+                error_summary = "用例断言未通过，界面未出现预期元素或转场超时"
         return JSONResponse({
             "success": True,
             "passed": passed,
             "duration": duration,
-            "output": res.stdout or res.stderr,
+            "error": error_summary if not passed else "",
+            "summary": error_summary,
+            "output": raw_output[:3000],
             "returncode": res.returncode
         })
+    except subprocess.TimeoutExpired:
+        duration = round(time.time() - start_t, 2)
+        return JSONResponse({
+            "success": False,
+            "passed": False,
+            "duration": duration,
+            "error": "执行超时：用例在 90 秒内未完成执行",
+            "summary": "执行超时 (90s)"
+        })
     except Exception as e:
-        return JSONResponse({"success": False, "error": str(e), "duration": round(time.time() - start_t, 2)})
+        duration = round(time.time() - start_t, 2)
+        return JSONResponse({
+            "success": False,
+            "passed": False,
+            "duration": duration,
+            "error": f"用例执行抛出异常: {str(e)}",
+            "summary": str(e)
+        })
 
 @app.get("/api/system/preflight")
 async def system_preflight():
@@ -897,20 +983,65 @@ async def save_session_to_local_case(
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     case_name = f"{prefix}_{ts}"
 
-    # 3. 构造 Pytest 动作轨迹代码并固化落盘
+    # 3. 构造 Pytest 动作轨迹代码并固化落盘 (优先萃取真机真实执行的动作轨迹)
     action_trace = []
-    for idx, s in enumerate(plan_steps, 1):
-        action_trace.append({
-            "action": "wait" if idx == 1 else "assert_text",
-            "reason": f"步骤 {idx}: {s.get('title', '')} - {s.get('desc', '')}",
-            "expected": s.get("title", ""),
-            "seconds": 1
-        })
+    blocks = session.get("timeline_blocks", [])
+    step_blocks = [b for b in blocks if b.get("type") == "step_execution"]
+
+    for sb in step_blocks:
+        for act in sb.get("actions", []):
+            atype = act.get("type", "")
+            if atype == "ocr":
+                continue
+            elif atype == "tap":
+                param = act.get("param", "")
+                target_name = act.get("target") or "目标元素"
+                m = re.search(r"\((\d+),\s*(\d+)\)", param)
+                if m:
+                    action_trace.append({
+                        "action": "tap",
+                        "reason": f"点击【{target_name}】",
+                        "locator": {"by": "coordinates", "value": f"{m.group(1)},{m.group(2)}"}
+                    })
+            elif atype in ["fast_forward_guide", "skip_guide"]:
+                action_trace.append({
+                    "action": "fast_forward_guide",
+                    "reason": "新用户引导页穿透"
+                })
+            elif atype == "swipe":
+                action_trace.append({
+                    "action": "swipe",
+                    "reason": act.get("desc") or "滑动浏览列表",
+                    "direction": "up"
+                })
+            elif atype == "type":
+                action_trace.append({
+                    "action": "type",
+                    "reason": f"输入内容: {act.get('text', '')}",
+                    "text": act.get("text", "")
+                })
+
+    # 若未从执行流水中提取到动作，则降级为规划步骤与业务断言
     if not action_trace:
-        action_trace = [
-            {"action": "wait", "reason": "应用冷启动与上下文感知", "seconds": 2},
-            {"action": "assert_text", "reason": "业务目标校验", "expected": goal[:10]}
-        ]
+        action_trace.append({"action": "wait", "reason": "应用冷启动与上下文感知", "seconds": 2})
+        for idx, s in enumerate(plan_steps, 1):
+            action_trace.append({
+                "action": "wait",
+                "reason": f"步骤 {idx}: {s.get('title', '')} - {s.get('desc', '')}",
+                "seconds": 1
+            })
+        action_trace.append({
+            "action": "assert_text",
+            "reason": "业务目标端侧断言",
+            "expected": goal[:12] if goal else "首页"
+        })
+    else:
+        # 补充终态校验
+        action_trace.append({
+            "action": "assert_text",
+            "reason": "端侧业务闭环与界面渲染断言",
+            "expected": goal[:8] if goal else "首页"
+        })
 
     # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 xianghe_zhaofang)
     app_id = session.get("app_id")

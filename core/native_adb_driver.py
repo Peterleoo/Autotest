@@ -253,5 +253,38 @@ class NativeADBDriver:
     def implicitly_wait(self, timeout: int):
         pass
 
+    def tap(self, positions: List[Any], duration: Optional[int] = None):
+        """兼容 Appium 标准 driver.tap([(x, y)]) 物理坐标点击"""
+        if not positions:
+            return
+        pos = positions[0]
+        if isinstance(pos, (tuple, list)) and len(pos) >= 2:
+            x, y = int(pos[0]), int(pos[1])
+        else:
+            return
+        logger.info(f"原生 ADB 物理触控点击: ({x}, {y})")
+        if duration and duration > 100:
+            self.execute_adb(["shell", "input", "swipe", str(x), str(y), str(x), str(y), str(duration)])
+        else:
+            self.execute_adb(["shell", "input", "tap", str(x), str(y)])
+        time.sleep(0.5)
+
+    def get_current_app(self) -> str:
+        """获取当前前台应用包名/窗口名"""
+        try:
+            res = self.execute_adb(["shell", "dumpsys", "window"])
+            for line in res.stdout.splitlines():
+                if "mCurrentFocus" in line or "mFocusedApp" in line:
+                    return line.strip()
+        except Exception:
+            pass
+        return ""
+
+    def execute_shell(self, command: str) -> str:
+        """执行原生 adb shell 指令"""
+        cmd_args = ["shell"] + command.split()
+        res = self.execute_adb(cmd_args)
+        return (res.stdout or res.stderr or "").strip()
+
     def quit(self):
         logger.info("原生 ADB 会话结束")

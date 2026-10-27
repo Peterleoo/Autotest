@@ -14527,10 +14527,12 @@ async function replaySolidifiedCase(safeRef, btnEl) {
             btnEl.innerHTML = origHtml;
         }
 
+        const durText = (data.duration !== undefined && data.duration !== null) ? `${data.duration}s` : '0s';
         if (data.success && data.passed) {
-            alert(`🎉 [0 Token 回放成功！]\n耗时: ${data.duration} 秒\n全链路断言 100% 通过！`);
+            alert(`🎉 [0 Token 秒级回测成功！]\n耗时: ${durText}\n状态: PASS\n全链路断言 100% 达标通过！`);
         } else {
-            alert(`⚠️ [回放完成]\n耗时: ${data.duration} 秒\n状态: ${data.passed ? 'PASS' : 'FAIL'}\n输出: ` + (data.output || '').slice(0, 300));
+            const failReason = data.error || data.summary || (data.output ? data.output.slice(0, 300) : "用例执行受阻或断言未达成");
+            alert(`⚠️ [回测未通过 / 异常诊断]\n耗时: ${durText}\n状态: FAIL\n诊断原因: ${failReason}`);
         }
     } catch (e) {
         if (btnEl) {
