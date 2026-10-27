@@ -9037,6 +9037,22 @@
                                 if (blk.step_id) window._streamStepState["step_" + blk.step_id] = true;
                                 if (existingEl.id) window._streamStepState[existingEl.id] = true;
                             }
+                            // 🚀 单项操作详情展开状态保护（点击行查看参数与反馈详情不被重置）
+                            existingEl.querySelectorAll(".agent-tool-row").forEach(row => {
+                                const detail = row.querySelector(".tool-row-detail");
+                                if (detail && !detail.classList.contains("d-none") && row.dataset.actIdx !== undefined) {
+                                    window._actionDetailState = window._actionDetailState || {};
+                                    window._actionDetailState[`${blk.block_id}_act_${row.dataset.actIdx}`] = true;
+                                    if (existingEl.id) window._actionDetailState[`${existingEl.id}_act_${row.dataset.actIdx}`] = true;
+                                }
+                            });
+                        }
+                        if (blk.type === "todo_list") {
+                            const curTodoBody = existingEl.querySelector(".stream-todo-body");
+                            if (curTodoBody && !curTodoBody.classList.contains("d-none")) {
+                                window._streamTodoState = window._streamTodoState || {};
+                                window._streamTodoState[blk.block_id] = true;
+                            }
                         }
                         const newHtml = buildBlockHtml(blk, sessionData);
                         if (newHtml) {
@@ -11499,7 +11515,7 @@ function renderChatStream(sessionData) {
             if (emptyBox) emptyBox.classList.add("d-none");
             flow.classList.remove("d-none");
 
-            // 🛡️ 状态守卫：在全量重构 innerHTML 之前，先扫描当前 DOM 中所有展开的 step 盒子，把展开状态固化到 _streamStepState
+            // 🛡️ 状态守卫：在全量重构 innerHTML 之前，先扫描当前 DOM 中所有展开的容器与单项操作，把展开状态固化，严禁轮询重置
             flow.querySelectorAll(".agent-trace-box").forEach(box => {
                 const bId = box.id;
                 const sId = box.dataset.stepId;
@@ -11508,6 +11524,35 @@ function renderChatStream(sessionData) {
                     window._streamStepState = window._streamStepState || {};
                     if (bId) window._streamStepState[bId] = true;
                     if (sId) window._streamStepState["step_" + sId] = true;
+                }
+                // 动作内单项操作详情展开保护
+                box.querySelectorAll(".agent-tool-row").forEach(row => {
+                    const detail = row.querySelector(".tool-row-detail");
+                    if (detail && !detail.classList.contains("d-none") && row.dataset.actIdx !== undefined) {
+                        window._actionDetailState = window._actionDetailState || {};
+                        if (bId) window._actionDetailState[`${bId}_act_${row.dataset.actIdx}`] = true;
+                    }
+                });
+            });
+
+            // 任务清单与推演展开状态保护
+            flow.querySelectorAll(".stream-todo-card").forEach(todo => {
+                const tBody = todo.querySelector(".stream-todo-body");
+                if (tBody && !tBody.classList.contains("d-none")) {
+                    const tId = todo.id.replace("todo_card_", "");
+                    window._streamTodoState = window._streamTodoState || {};
+                    window._streamTodoState[tId] = true;
+                    window._streamTodoState[todo.id] = true;
+                }
+            });
+
+            flow.querySelectorAll(".stream-thought-box").forEach(th => {
+                const thBody = th.querySelector(".stream-thought-body");
+                if (thBody && !thBody.classList.contains("d-none")) {
+                    const thId = th.id.replace("thought_box_", "");
+                    window._streamThoughtState = window._streamThoughtState || {};
+                    window._streamThoughtState[thId] = true;
+                    window._streamThoughtState[th.id] = true;
                 }
             });
 
