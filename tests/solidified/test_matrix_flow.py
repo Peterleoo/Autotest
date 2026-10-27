@@ -31,7 +31,7 @@ def test_test_matrix_flow(driver, api_client):
     自动化用例: test_matrix_flow
     在首页点击第一套推荐房源，进入房源详情页查看总价、户型与VR看房标识，点击'微聊/咨询'按钮，验证咨询窗口正确弹出
     """
-    # 步骤 1: 点击启动象盒找房App (坐标点击)
+    # 步骤 1: 点击启动待测应用App (坐标点击)
     driver.tap([(324, 1640)])
     time.sleep(1)
 

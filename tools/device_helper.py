@@ -52,20 +52,25 @@ def inspect_devices():
 
     return devices
 
-def install_and_launch_xianghe(device_id: str = None):
+def install_and_launch_demo_app(device_id: str = None):
     app_mgr = AppManager()
     adb = app_mgr.adb_bin
-    apk_path = BASE_DIR / "apps" / "xianghe_zhaofang.apk"
+    apks = list((BASE_DIR / "apps").glob("*.apk"))
 
-    if not apk_path.exists():
-        print(f"❌ APK 不存在: {apk_path}")
+    if not apks:
+        print("❌ apps 目录下未找到任何 APK 安装包")
         return
+
+    apk_path = apks[0]
+    info = app_mgr.get_apk_info(apk_path)
+    pkg = info.get("package") or "com.example.app"
+    act = info.get("activity") or "com.example.app.MainActivity"
 
     cmd = [adb]
     if device_id:
         cmd.extend(["-s", device_id])
     
-    print(f"\n🚀 正在向真机推送安装【象盒找房】(96.9 MB)...")
+    print(f"\n🚀 正在向真机推送安装待测应用 [{apk_path.name}]...")
     cmd.extend(["install", "-r", "-g", str(apk_path)])
     res = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
     print("安装结果:", res.stdout.strip())
@@ -75,14 +80,14 @@ def install_and_launch_xianghe(device_id: str = None):
         launch_cmd = [adb]
         if device_id:
             launch_cmd.extend(["-s", device_id])
-        launch_cmd.extend(["shell", "am", "start", "-n", "com.apicloud.A6995433058179/com.apicloud.A6995433058179.MainActivity"])
+        launch_cmd.extend(["shell", "am", "start", "-n", f"{pkg}/{act}"])
         launch_res = subprocess.run(launch_cmd, capture_output=True, text=True)
         print("启动输出:", launch_res.stdout.strip())
-        print("✅ 象盒找房已成功在真机前台运行，可以随时开始 AI 自动化测试！")
+        print(f"✅ 待测应用 [{pkg}] 已成功在真机前台运行，可以随时开始 AI 自动化测试！")
 
 if __name__ == "__main__":
     devs = inspect_devices()
     if devs:
-        choice = input("\n是否立即安装并启动【象盒找房】到第 1 台设备? (y/n): ").strip().lower()
+        choice = input("\n是否立即安装并启动待测应用到第 1 台设备? (y/n): ").strip().lower()
         if choice == "y":
-            install_and_launch_xianghe(devs[0])
+            install_and_launch_demo_app(devs[0])

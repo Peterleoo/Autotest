@@ -966,7 +966,7 @@ class TaskManager:
         account = payload.get("account", "").strip()
         password = payload.get("password", "").strip()
         remember = payload.get("remember", False)
-        app_key = payload.get("app_key") or session.get("app_filename") or "xianghe_zhaofang"
+        app_key = payload.get("app_key") or session.get("app_filename") or "demo_app"
 
         if remember and account and password:
             try:
@@ -1633,7 +1633,7 @@ class TaskManager:
             # 实时捕获人机协同决策事件
             if "⏸️ [WAIT_HITL_DECISION]" in line:
                 session["status"] = "WAITING_USER_INPUT"
-                app_key = session.get("app_filename") or "xianghe_zhaofang"
+                app_key = session.get("app_filename") or "demo_app"
                 m_app = re.search(r"app=([^&\s]+)", line)
                 if m_app:
                     app_key = m_app.group(1)

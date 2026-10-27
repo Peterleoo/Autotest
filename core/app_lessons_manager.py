@@ -53,7 +53,7 @@ class AppLessonsManager:
         matched = []
         apps = self._data.get("apps", {})
         
-        # 兼容模糊匹配包名或 App 名称（如 com.xianghe.app 或 象盒找房）
+        # 兼容模糊匹配包名或 App 名称（如 com.example.app 或 待测应用）
         app_entry = None
         for key, val in apps.items():
             if key in app_id or app_id in key or val.get("app_name", "") in app_id or val.get("app_name", "") in goal:
@@ -61,9 +61,8 @@ class AppLessonsManager:
                 break
         
         if not app_entry:
-            # 默认兜底尝试匹配象盒找房（系统默认主测应用）
-            if "xianghe" in app_id or "委托" in goal or "找房" in goal:
-                app_entry = apps.get("com.xianghe.app")
+            # 默认兜底：若未精确匹配，取通用示例规则组
+            app_entry = apps.get("demo_app") or (next(iter(apps.values())) if apps else None)
 
         if app_entry:
             for item in app_entry.get("lessons", []):

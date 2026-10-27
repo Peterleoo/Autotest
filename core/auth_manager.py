@@ -40,7 +40,7 @@ class AuthManager:
         return {
             "is_activated": True,
             "invite_code": "PM-AUTOTEST-VIP2026",
-            "team_name": "象盒移动质效架构团队",
+            "team_name": "移动质效架构团队",
             "role": "VIP Enterprise",
             "activated_at": "2026-10-19",
             "expires_at": "2027-10-19",
@@ -93,7 +93,7 @@ class AuthManager:
             valid_prefixes = ["PM-", "AUTOTEST-", "VIP-", "XH-"]
             if any(code.startswith(p) for p in valid_prefixes) and len(code) >= 8:
                 verified = True
-                team = "象盒找房研发中心" if code.startswith("XH-") else "PM Harness 授权团队"
+                team = "移动研发中心" if code.startswith("XH-") else "PM Harness 授权团队"
             elif code == "ADMIN888" or "VIP" in code:
                 verified = True
                 team = "企业核心测试架构组"

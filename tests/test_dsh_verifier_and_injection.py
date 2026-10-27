@@ -24,7 +24,7 @@ class TestDSHMechanisms(unittest.TestCase):
         # 模拟真实的现场登录拦截屏幕
         mock_login_screen = {
             "elements": [
-                {"text": "象盒找房", "content_desc": ""},
+                {"text": "待测应用", "content_desc": ""},
                 {"text": "手机号登录", "content_desc": ""},
                 {"text": "用密码登录", "content_desc": ""},
                 {"text": "请输入手机号码", "content_desc": ""}
@@ -98,7 +98,7 @@ class TestDSHMechanisms(unittest.TestCase):
             "session_id": session_id,
             "title": "测试房源微聊与登录拦截",
             "goal": "在首页点击第一套推荐房源，进入房源详情页查看总价、户型与VR看房标识，点击'微聊/咨询'按钮，验证咨询窗口正确弹出",
-            "app_label": "象盒找房",
+            "app_label": "待测应用",
             "app_package": "com.apicloud.A6995433058179",
             "created_at": "11:00:00",
             "test_mode": "real",

@@ -89,7 +89,7 @@ def get_apk(shortcut: str = "9JQn"):
 
         if direct_url:
             print(f"[+] 获取到真实 APK 下载直链！\n{direct_url}")
-            output_file = Path(r"f:\Autotest\apps\xianghe_zhaofang.apk")
+            output_file = Path(__file__).resolve().parent.parent / "apps" / "downloaded_app.apk"
             print(f"[*] 开始流式下载到: {output_file} ...")
             r_download = requests.get(direct_url, stream=True, timeout=120)
             total = int(r_download.headers.get("content-length", 0))

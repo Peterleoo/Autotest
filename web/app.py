@@ -658,7 +658,7 @@ async def suggest_cases(request: Request, app_name: Optional[str] = None):
     """AI 测试用例助手：针对当前应用生成完善的多样化测试用例矩阵"""
     import random
     if not app_name:
-        app_name = request.query_params.get("app_name") or "象盒找房"
+        app_name = request.query_params.get("app_name") or "待测应用"
     # 随机抽取 4 个不重复的业务用例
     sampled = random.sample(ALL_SUGGESTED_CASES, min(4, len(ALL_SUGGESTED_CASES)))
     return {"app_name": app_name, "cases": sampled}
@@ -822,7 +822,7 @@ async def get_app_projects():
                 "filename": apk_file.name,
                 "case_count": len(py_files),
                 "folder": f"tests/solidified/{app_id}",
-                "is_current": (app_id == "xianghe_zhaofang" or len(projects) == 0)
+                "is_current": (app_id == "demo_app" or len(projects) == 0)
             })
 
     if settings.SOLIDIFIED_DIR.exists():
@@ -855,7 +855,7 @@ async def get_app_projects():
             "is_current": True
         })
 
-    return {"projects": projects, "current_project_id": projects[0]["id"] if projects else "xianghe_zhaofang"}
+    return {"projects": projects, "current_project_id": projects[0]["id"] if projects else "demo_app"}
 
 def parse_case_timestamp(file_path: Path, meta: dict) -> tuple:
     """提取用例的高精度时间戳与可读时间字符串，确保绝对时间倒序"""
@@ -889,7 +889,7 @@ async def get_solidified_cases(app_id: Optional[str] = None):
         if not target_dir.exists():
             target_dir = settings.SOLIDIFIED_DIR
     else:
-        target_dir = settings.SOLIDIFIED_DIR / "xianghe_zhaofang"
+        target_dir = settings.SOLIDIFIED_DIR / "demo_app"
         if not target_dir.exists() or not list(target_dir.glob("*.py")):
             target_dir = settings.SOLIDIFIED_DIR
 
@@ -1043,12 +1043,12 @@ async def save_session_to_local_case(
             "expected": goal[:8] if goal else "首页"
         })
 
-    # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 xianghe_zhaofang)
+    # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 demo_app)
     app_id = session.get("app_id")
     if not app_id and session.get("target_app"):
         app_id = Path(session["target_app"]).stem
     if not app_id:
-        app_id = "xianghe_zhaofang"
+        app_id = "demo_app"
 
     target_app_dir = settings.SOLIDIFIED_DIR / app_id
     target_app_dir.mkdir(parents=True, exist_ok=True)
@@ -1118,7 +1118,7 @@ async def batch_run_solidified_cases(payload: Dict[str, Any] = Body(default={}))
     """
     category = payload.get("category", "ALL")
     app_id = payload.get("app_id")
-    target_dir = settings.SOLIDIFIED_DIR / app_id if app_id else settings.SOLIDIFIED_DIR / "xianghe_zhaofang"
+    target_dir = settings.SOLIDIFIED_DIR / app_id if app_id else settings.SOLIDIFIED_DIR / "demo_app"
     if not target_dir.exists() or not list(target_dir.glob("*.py")):
         target_dir = settings.SOLIDIFIED_DIR
 
@@ -1741,7 +1741,7 @@ CURRENT_PLAN_SESSION = {
 plan_input_event = threading.Event()
 plan_interrupt_flag = threading.Event()
 
-def judge_plan_need(goal: str, app_name: str = "象盒找房") -> dict:
+def judge_plan_need(goal: str, app_name: str = "待测应用") -> dict:
     """AI 智能体研判用户测试需求是否需要规划节点"""
     goal_clean = goal.strip()
     atomic_keywords = ["返回", "按返回", "截屏", "截图", "home", "查看当前", "版本号", "按键", "滑动一下", "下滑", "上滑"]
@@ -1781,7 +1781,7 @@ def judge_plan_need(goal: str, app_name: str = "象盒找房") -> dict:
         "reason": "根据目标复杂度评估，自动匹配最优执行策略。" if need else "单一目标即时执行。"
     }
 
-def generate_test_plan_ai(goal: str, app_name: str = "象盒找房") -> dict:
+def generate_test_plan_ai(goal: str, app_name: str = "待测应用") -> dict:
     """使用 AI 大模型针对宏观测试目标自动规划结构化节点与合理性评估"""
     from core.llm_client import LLMClient
     llm = LLMClient()
@@ -1825,7 +1825,7 @@ def generate_test_plan_ai(goal: str, app_name: str = "象盒找房") -> dict:
 2. 涉及登录、验证码等需要人工补充信息的节点，将 requires_input 设为 true，type 设为 interactive。
 3. 必须包含 evaluation 评估对象，给出 0-100 的合理性评分和风险等级。"""
 
-    user_p = f"待测应用：{app_name}（包名 com.apicloud.A6995433058179）。测试目标：{goal}。请规划测试节点与评估。"
+    user_p = f"待测应用：{app_name}（包名 com.example.app）。测试目标：{goal}。请规划测试节点与评估。"
     try:
         raw_res = llm.chat_decision(system_prompt=system_p, user_prompt=user_p)
         if isinstance(raw_res, dict):
@@ -2047,7 +2047,7 @@ def _execute_plan_pipeline(session_id: str, test_mode: str):
             title=f"【计划测试】{CURRENT_PLAN_SESSION['plan_title'][:30]}",
             goal=goal,
             test_mode=test_mode,
-            app_name="象盒找房",
+            app_name="待测应用",
             package="com.apicloud.A6995433058179",
             model_name=ai_config.PROVIDER.upper(),
             status="PASS",
@@ -2062,7 +2062,7 @@ def _execute_plan_pipeline(session_id: str, test_mode: str):
         log(f"\n测试计划未能通过所有节点。")
 
 @app.post("/api/plan/judge")
-async def plan_judge(goal: str = Form(...), app_name: str = Form("象盒找房")):
+async def plan_judge(goal: str = Form(...), app_name: str = Form("待测应用")):
     """AI 智能研判用户测试目标是否需要规划节点"""
     try:
         judgement = judge_plan_need(goal=goal, app_name=app_name)
@@ -2071,7 +2071,7 @@ async def plan_judge(goal: str = Form(...), app_name: str = Form("象盒找房")
         return {"success": True, "need_plan": len(goal.strip()) > 15, "reason": f"智能研判兜底: {e}"}
 
 @app.post("/api/plan/generate")
-async def plan_generate(goal: str = Form(...), app_name: str = Form("象盒找房")):
+async def plan_generate(goal: str = Form(...), app_name: str = Form("待测应用")):
     """调用大模型规划结构化测试计划用例清单与合理性自检评估"""
     try:
         plan_data = generate_test_plan_ai(goal=goal, app_name=app_name)
@@ -2280,7 +2280,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 fail_summary = "华为手机安全拦截：Appium 底层驱动 (androidTest) 尚未在手机上允许安装。请点亮手机屏幕解锁，在手机弹窗中点击【已了解风险】并【仍然安装】；或在上方切换至【本地极速自测模式】直接体验完整测试报告与脚本固化。"
                 steps = [
                     {"action": "Device Check", "reason": "在线真机检测", "detail": f"已识别真机: {dev_id}", "status": "PASS"},
-                    {"action": "App Launch", "reason": "拉起象盒找房", "detail": "MainActivity (免重装)", "status": "PASS"},
+                    {"action": "App Launch", "reason": "拉起待测应用", "detail": "MainActivity (免重装)", "status": "PASS"},
                     {"action": "Driver Connect", "reason": "初始化 UiAutomator2 测试运行器", "detail": fail_summary, "status": "FAIL"}
                 ]
             elif "连接 Appium 驱动失败" in combined_output or "UnknownError" in combined_output:
@@ -2291,12 +2291,12 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 ]
             else:
                 steps = [
-                    {"action": "App Launch", "reason": "调起象盒找房", "detail": "MainActivity", "status": "PASS"},
+                    {"action": "App Launch", "reason": "调起待测应用", "detail": "MainActivity", "status": "PASS"},
                     {"action": "AI Execution", "reason": "执行测试目标流转", "detail": "执行未能完全达成目标断言", "status": "FAIL"}
                 ]
         else:
             steps = [
-                {"action": "App Launch", "reason": "调起象盒找房主界面", "detail": "MainActivity", "status": "PASS"},
+                {"action": "App Launch", "reason": "调起待测应用主界面", "detail": "MainActivity", "status": "PASS"},
                 {"action": "AI Perception & Touch", "reason": "视觉截屏感知与手势交互流转", "detail": "多模态意图识别并成功操作", "status": "PASS"},
                 {"action": "Touch & Verify", "reason": "屏幕交互手势与断言验证", "detail": goal, "status": "PASS"}
             ]
@@ -2305,7 +2305,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             title=f"【真机实测】{goal[:25]}",
             goal=goal,
             test_mode="real",
-            app_name="象盒找房",
+            app_name="待测应用",
             package="com.apicloud.A6995433058179",
             model_name=ai_config.PROVIDER.upper(),
             status=status,
@@ -2337,7 +2337,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
         
         # 针对目标进行 AI 决策演练
         system_p = "你是一个自动化测试决策引擎，请针对用户测试目标，输出结构化的测试动作流 JSON。包含 action(tap/type/call_api/assert_text), target_index, text, expected 等字段。"
-        prompt = f"针对【象盒找房】应用执行本地测试：{goal}。包名 com.apicloud.A6995433058179，主界面 MainActivity。请规划至少 4 个完整的测试动作（含接口验证与UI断言）。"
+        prompt = f"针对【待测应用】执行本地测试：{goal}。包名 com.example.app，主界面 MainActivity。请规划至少 4 个完整的测试动作（含接口验证与UI断言）。"
         
         try:
             fallback_note = ""
@@ -2347,7 +2347,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 if getattr(llm, "last_fallback_info", None):
                     fb = llm.last_fallback_info
                     actual_model = f"{fb['fallback_provider'].upper()} ({fb['model']}) [从离线的 {fb['original_provider']} 自动降级]"
-                    fallback_note = f"\n⚠️ [自动容错提示] 检测到 {fb['original_provider'].upper()} 本地网关离线，已为您免等待平滑降级至【象盒企业 Hermes 网关】完成推演！\n"
+                    fallback_note = f"\n⚠️ [自动容错提示] 检测到 {fb['original_provider'].upper()} 本地网关离线，已为您免等待平滑降级至【Hermes 企业网关 网关】完成推演！\n"
             except Exception as le:
                 logger.warning(f"本地测试模型决策轻微警告: {le}")
 
@@ -2357,7 +2357,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 {"action": "type", "reason": "定位并输入测试手机号", "locator": {"by": "xpath", "value": "//*[@text='请输入手机号' or contains(@resource-id, 'phone')]"}, "text": "13800138000"},
                 {"action": "call_api", "reason": "验证用户鉴权与配置接口", "method": "GET", "endpoint": "/api/config", "expected_status": 200},
                 {"action": "tap", "reason": "点击获取验证码/登录交互", "locator": {"by": "xpath", "value": "//*[@text='获取验证码' or contains(@resource-id, 'btn_login')]"}},
-                {"action": "assert_text", "reason": "断言前台界面流转正常", "expected": "象盒找房"}
+                {"action": "assert_text", "reason": "断言前台界面流转正常", "expected": "首页"}
             ]
             
             solid_file = Solidifier.solidify_test_case(
@@ -2368,13 +2368,13 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             
             output_log = f"""[本地测试模式 - 极速推演与用例固化成功]
 🎯 业务目标: {goal}
-📱 待测应用: 象盒找房 (com.apicloud.A6995433058179)
+📱 待测应用: 示例应用 (com.example.app)
 🧠 驱动模型: {actual_model}{fallback_note}
 步骤 1: 点击同意隐私政策 -> PASS
 步骤 2: 定位并输入测试手机号 [13800138000] -> PASS
 步骤 3: 触发后端用户鉴权接口 [/api/config] -> HTTP 200 OK -> PASS
 步骤 4: 触发登录交互并捕获前台 Activity -> PASS
-步骤 5: 界面文案断言 [象盒找房] -> PASS
+步骤 5: 界面文案断言 [首页] -> PASS
 
 🎉 本地测试全链路验证通过！
 💾 自动化测试脚本已成功沉淀入用例库: {solid_file.name}
@@ -2413,7 +2413,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 {
                     "step_idx": 5,
                     "action": "Assert (断言)",
-                    "reason": "断言界面文本包含 '象盒找房'",
+                    "reason": "断言界面文本包含 '首页'",
                     "detail": "断言成功",
                     "status": "PASS"
                 }
@@ -2423,7 +2423,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 title=f"【本地自测】{goal[:25]}",
                 goal=goal,
                 test_mode="local",
-                app_name="象盒找房",
+                app_name="待测应用",
                 package="com.apicloud.A6995433058179",
                 model_name=actual_model,
                 status="PASS",

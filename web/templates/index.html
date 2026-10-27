@@ -6848,7 +6848,7 @@
                                     <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">智能用例推荐</span>
                                     <div class="suggest-app-badge" id="currentSuggestAppBadge" title="当前生成用例的目标应用">
                                         <i class="bi bi-box-seam" style="font-size: 11px;"></i>
-                                        <span id="suggestTargetAppLabel">象盒找房 (默认应用)</span>
+                                        <span id="suggestTargetAppLabel">待测应用 (默认应用)</span>
                                     </div>
                                     <button class="btn btn-sm py-0 px-2" style="font-size: 11px; color: var(--text-sub); border: 1px dashed var(--border-subtle); border-radius: 9999px;" onclick="openAppPackagesModal()" title="上传新应用 APK/IPA 或从应用库选择">
                                         <i class="bi bi-upload me-1"></i>更换/上传应用
@@ -7679,7 +7679,7 @@
         let currentLocalFilterCategory = "ALL";
         let currentLocalSearchKeyword = "";
 
-        let activeAppProjectId = "xianghe_zhaofang";
+        let activeAppProjectId = "demo_app";
         let allAppProjects = [];
 
         function switchMainWorkspaceMode(mode) {
@@ -7778,7 +7778,7 @@
         }
 
         async function loadSolidifiedCasesWorkspace(appId) {
-            const targetApp = appId || activeAppProjectId || "xianghe_zhaofang";
+            const targetApp = appId || activeAppProjectId || "demo_app";
             try {
                 const res = await fetch(`/api/solidified_cases?app_id=${encodeURIComponent(targetApp)}`);
                 const data = await res.json();
@@ -12581,7 +12581,7 @@ function renderChatStream(sessionData) {
                         <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
                             <span style="font-size: 7px; color: ${checks.app?.current_app ? 'var(--status-green)' : '#f59e0b'};">●</span>
                             <span class="text-muted">应用:</span>
-                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${escapeHtml(checks.app?.current_app || '象盒找房')}</span>
+                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${escapeHtml(checks.app?.current_app || '待测应用')}</span>
                         </div>
                         <span style="font-size: 10px; color: var(--status-green);"><i class="bi bi-check2"></i></span>
                     </div>
@@ -12609,7 +12609,7 @@ function renderChatStream(sessionData) {
                     if (isReady) {
                         pill.className = "global-preflight-pill is-ready";
                         const aiName = checks.ai?.provider || 'AI';
-                        const appName = checks.app?.current_app ? checks.app.current_app.replace('.apk','') : '象盒找房';
+                        const appName = checks.app?.current_app ? checks.app.current_app.replace('.apk','') : '待测应用';
                         const devCount = checks.device?.count || 1;
                         summaryEl.innerHTML = `<strong class="text-success"><i class="bi bi-shield-check me-1"></i>100% 就绪:</strong> ${escapeHtml(aiName)} · ${escapeHtml(appName)} · ${devCount}台真机`;
                     } else {
@@ -13822,8 +13822,8 @@ function renderChatStream(sessionData) {
 
         // ================= 12. 待测应用库、真机安装管理与状态联动 =================
         let currentActiveApp = {
-            filename: "xianghe_zhaofang.apk",
-            label: "象盒找房",
+            filename: "demo_app.apk",
+            label: "示例待测应用",
             package: "com.apicloud.A6995433058179",
             version: "4.9.11",
             size: "96.9 MB",
@@ -14310,7 +14310,7 @@ function renderChatStream(sessionData) {
         }
 
         // ================= 13. 主对话区应用用例智能推荐与动态换一批 =================
-        let currentSuggestedAppName = "象盒找房 (官方演示)";
+        let currentSuggestedAppName = "待测应用 (示例)";
         window._suggestedCasesCache = [];
 
         function pickSuggestedCase(idx) {

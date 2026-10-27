@@ -37,7 +37,7 @@ class Settings:
     ANDROID_PLATFORM_VERSION: str = os.getenv("ANDROID_PLATFORM_VERSION", "14.0")
     ANDROID_AUTOMATION_NAME: str = "UiAutomator2"
     # 待测应用信息
-    ANDROID_APP_NAME: str = os.getenv("ANDROID_APP_NAME", "xianghe_zhaofang.apk")
+    ANDROID_APP_NAME: str = os.getenv("ANDROID_APP_NAME", "demo_app.apk")
     ANDROID_APP_PACKAGE: str = os.getenv("ANDROID_APP_PACKAGE", "com.apicloud.A6995433058179")
     ANDROID_APP_ACTIVITY: str = os.getenv("ANDROID_APP_ACTIVITY", "com.apicloud.A6995433058179.MainActivity")
 

@@ -11,7 +11,7 @@ def verify_agent_flow():
     mock_session = {
         "session_id": "sess_agent_flow_001",
         "title": "启动应用并处理隐私协议",
-        "goal": "启动象盒找房应用，处理首次启动隐私授权弹窗，并成功进入首页",
+        "goal": "启动待测应用应用，处理首次启动隐私授权弹窗，并成功进入首页",
         "status": "COMPLETED",
         "is_solidified": False,
         "duration": "14.2s",

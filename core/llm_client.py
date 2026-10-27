@@ -129,7 +129,7 @@ class LLMClient:
             except Exception as e:
                 logger.warning(
                     f"Google Antigravity 官方直连异常 ({e})，"
-                    f"自动平滑降级至象盒专属企业 Hermes 网关保底保障测试..."
+                    f"自动平滑降级至 Hermes 企业网关保底保障测试..."
                 )
                 try:
                     fallback_client = LLMClient(provider="hermes")
@@ -205,7 +205,7 @@ class LLMClient:
                 )
                 raw_text = response.choices[0].message.content
             except Exception as e:
-                logger.warning(f"调用 [{self.provider}] 异常: {e}，自动尝试 fallback 到象盒专属企业 Hermes 网关...")
+                logger.warning(f"调用 [{self.provider}] 异常: {e}，自动尝试 fallback 到 Hermes 企业网关...")
                 if self.provider != "hermes":
                     try:
                         fallback_client = LLMClient(provider="hermes")

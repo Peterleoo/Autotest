@@ -79,7 +79,7 @@ class DeviceContextInspector:
                     # 语义定性匹配
                     if "launcher" in result["current_activity"].lower() or any(k in all_text_str for k in ["小米钱包", "便签", "相机", "相册"]):
                         result["scene_type"] = "DESKTOP"
-                        result["planning_hint"] = "【桌面状态】：待测应用未在前台，需冷启动并打开象盒找房。"
+                        result["planning_hint"] = "【桌面状态】：待测应用未在前台，需冷启动并打开待测应用。"
                     elif any(k in all_text_str for k in ["手机号登录", "本机号码一键登录", "注册/登录", "验证码登录"]):
                         result["scene_type"] = "APP_LOGIN_BARRIER"
                         result["planning_hint"] = "【登录拦截状态】：当前屏幕弹出了登录拦截授权浮层，需先勾选协议并完成快速登录自愈。"
@@ -91,7 +91,7 @@ class DeviceContextInspector:
                         result["planning_hint"] = "【房源列表页】：应用已在前台且已处于二手房列表页，无需重复进入二手房入口，可直接从当前列表执行筛选与排序！"
                     elif any(k in all_text_str for k in ["二手房", "新房", "租房", "委托服务", "小区找房"]):
                         result["scene_type"] = "APP_HOME_PAGE"
-                        result["planning_hint"] = "【应用首页】：应用已在前台并处于象盒找房首页，无需重复冷启动打开App，直接从当前首页金刚区定位目标入口。"
+                        result["planning_hint"] = "【应用首页】：应用已在前台并处于主界面，无需重复冷启动，直接定位目标入口。"
                     else:
                         result["scene_type"] = "APP_RUNNING"
                         result["planning_hint"] = "应用已在前台运行，优先从当前页面顺势执行目标操作。"

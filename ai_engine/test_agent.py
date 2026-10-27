@@ -33,7 +33,7 @@ SYSTEM_PROMPT = """
     - 严禁掩耳盗铃！若用户的测试目标要求验证具体业务界面（如：进入房源详情、查看VR、点击咨询弹出咨询窗口、进入个人中心等），而当前真机屏幕仍停留在【登录/注册页、密码输入页、验证码拦截弹窗或网络报错页】，严禁将“拉起了登录拦截/权限控制正常”诡辩为“目标已达成”并调用 finish！
     - 系统配备了独立的 DSH 核验门禁（TaskVerifier），任何在拦截页面擅自调用 finish 的企图都会被一票否决！
     - 若当前处于登录页，优先识别输入框调用 type 注入预设账号密码登录，或点击一键登录放行；只有真正进入目标业务窗口后方可调用 finish！
-1. 【界面定性】：在 thought 中第一句必须明确输出：“【当前界面判断】：xxx界面（如：象盒找房手机号登录页/首页推荐/隐私协议弹窗）”。
+1. 【界面定性】：在 thought 中第一句必须明确输出：“【当前界面判断】：xxx界面（如：应用手机号登录页/首页推荐/隐私协议弹窗）”。
 2. 【目标驱动，严禁乱跳】：
     - 紧扣用户的【测试目标】！不要点击与目标无关的广告或偏门入口。
     - 针对新用户多页引导页/轮播图：严禁每滑一页就停下来重新截屏识别一次！只要定性为引导页，果断直接下发 {"action": "fast_forward_guide", "reason": "新用户引导页极速穿透直达首页"} 或 {"action": "swipe", "direction": "left", "repeat": 3}，一步到位直接翻到最后一页并进入应用首页！
@@ -49,7 +49,7 @@ SYSTEM_PROMPT = """
 
 JSON 输出格式样例：
 {
-  "thought": "【当前界面判断】：象盒找房登录授权界面。当前页面有手机号输入框[编号5]和隐私协议[编号10]，先点击勾选隐私政策协议。",
+  "thought": "【当前界面判断】：应用登录授权界面。当前页面有手机号输入框[编号5]和隐私协议[编号10]，先点击勾选隐私政策协议。",
   "action": "tap",
   "target_index": 10,
   "reason": "勾选同意用户服务与隐私协议"
@@ -184,7 +184,7 @@ class AITestAgent:
 
         if is_login_screen:
             from core.credential_manager import CredentialManager
-            app_key = self.app_identifier or "xianghe_zhaofang"
+            app_key = self.app_identifier or "demo_app"
             cred = CredentialManager.get_credential(app_key)
             if cred and cred.get("account"):
                 logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
@@ -279,7 +279,7 @@ class AITestAgent:
                 self._notify_status({
                     "step": 0,
                     "action": "自愈归位",
-                    "log": "🛡️ 检测到当前滞留在委托服务二级页面，自动按返回键归位至象盒找房首页"
+                    "log": "🛡️ 检测到当前滞留在委托服务二级页面，自动按返回键归位至应用首页"
                 })
                 try:
                     self.driver.back()
@@ -295,7 +295,7 @@ class AITestAgent:
         logger.info(f"目标: {goal}")
         
         # 📚 自动匹配并注入应用寻路与踩坑经验 (App Lessons Engine)
-        app_lessons = app_lessons_mgr.get_matched_lessons("com.xianghe.app", goal)
+        app_lessons = app_lessons_mgr.get_matched_lessons(self.app_identifier or "demo_app", goal)
         lessons_context = ""
         if app_lessons:
             lessons_context = "\n\n【专家寻路与避坑先验知识 (Lessons)】:\n" + "\n".join(f"- {l}" for l in app_lessons)
