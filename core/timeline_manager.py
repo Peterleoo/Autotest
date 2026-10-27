@@ -162,20 +162,24 @@ class TimelineManager:
         assertion_result: str = "",
         status: str = "COMPLETED",
         duration: str = "0.4s",
-        turn_id: int = 0
+        turn_id: int = 0,
+        thinking: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        方案 A：步骤容器化·纵向动作轨迹 (Step Execution Container)
-        按步骤将原子动作与断言结果聚合为一个优雅的收放容器卡片
+        动作执行容器卡片 (Execution Container)
+        按阶段将思考推演、原子动作与断言结果聚合为一个优雅的收放容器卡片
         """
+        import re
+        clean_title = re.sub(r"^Step\s*\d+\s*[:：]\s*", "", title, flags=re.I).strip()
         return {
             "block_id": f"blk_step_exec_{turn_id}_{step_id}",
             "type": "step_execution",
             "turn_id": turn_id,
             "step_id": step_id,
-            "title": title,
+            "title": clean_title,
             "status": status,
             "duration": duration,
+            "thinking": thinking or {},
             "actions": actions,
             "assertion_result": assertion_result,
             "timestamp": datetime.now().strftime("%H:%M:%S")

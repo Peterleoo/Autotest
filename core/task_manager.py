@@ -1287,7 +1287,7 @@ class TaskManager:
                     else:
                         tb.append(TimelineManager.create_step_execution_block(
                             step_id=step_index,
-                            title=f"Step {step_index}: {p_title} 验证通过 ✅",
+                            title=f"{p_title} 验证通过 ✅",
                             actions=prev_s.get("actions") or [
                                 {"type": "ocr", "name": "视觉感知", "desc": f"扫描定位【{p_title}】关联锚点", "observation": "文字置信度 98.5% · 成功定位组件中心坐标", "param": "OCR Match 0.985", "status": "COMPLETED"}
                             ],
@@ -1311,7 +1311,7 @@ class TaskManager:
                 else:
                     tb.append(TimelineManager.create_step_execution_block(
                         step_id=cur_step_num,
-                        title=f"Step {cur_step_num}: {cur_step['title']}",
+                        title=f"{cur_step['title']}",
                         actions=[
                             {
                                 "type": "ocr",
@@ -1619,6 +1619,15 @@ class TaskManager:
             elif "AI 决策:" in line:
                 thought_str = line.split("AI 决策:", 1)[1].strip()
                 dev_state["action"] = f"AI 决策: {thought_str[:28]}"
+                # 🚀 注入单步专属策略推演 (Step Thinking)
+                tb = session.setdefault("timeline_blocks", [])
+                cur_step_num = cur_idx + 1
+                matching_cur = [b for b in tb if b.get("type") in ["step_execution", "step_result"] and b.get("step_id") == cur_step_num]
+                if matching_cur:
+                    matching_cur[0]["thinking"] = {
+                        "content": thought_str,
+                        "status": "COMPLETED"
+                    }
 
                 # 智能识别业务阶段跃迁（严禁无动作抢跑！必须当前业务阶段已发生物理动作，且界面转场或意图转移到下一步）
                 plan_steps = session.get("plan_steps", [])

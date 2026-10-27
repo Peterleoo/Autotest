@@ -5444,6 +5444,27 @@
             opacity: 0.65;
             background: transparent !important;
         }
+        .step-thinking-capsule {
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 2px solid rgba(56, 189, 248, 0.4);
+            padding: 6px 10px;
+            border-radius: 0 4px 4px 0;
+        }
+        .thinking-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #38bdf8;
+            display: inline-block;
+        }
+        .thinking-dot.pulsing {
+            animation: thinkingPulse 1.5s infinite;
+        }
+        @keyframes thinkingPulse {
+            0% { transform: scale(0.85); opacity: 0.4; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.85); opacity: 0.4; }
+        }
         .stream-todo-tag.failed {
             color: #ef4444;
             background: rgba(239, 68, 68, 0.1);
@@ -9035,16 +9056,8 @@
                 } else {
                     // 局部更新（支持 todo_list, step_execution, step_result, test_summary 等节点动态流式刷新与折叠状态响应）
                     if (blk.type === "todo_list" || blk.type === "step_execution" || blk.type === "step_result" || blk.type === "test_summary") {
-                        // 🛡️ 状态守卫：若现有步骤动作卡片当前处于展开态，立即固化到状态机，严禁轮询将其重置为折叠态！
+                        // 🛡️ 单项操作详情展开保护（点击行查看参数与反馈详情不被重置）
                         if (blk.type === "step_execution" || blk.type === "step_result") {
-                            const curBody = existingEl.querySelector(".agent-trace-body");
-                            if (curBody && !curBody.classList.contains("d-none")) {
-                                window._streamStepState = window._streamStepState || {};
-                                window._streamStepState[blk.block_id] = true;
-                                if (blk.step_id) window._streamStepState["step_" + blk.step_id] = true;
-                                if (existingEl.id) window._streamStepState[existingEl.id] = true;
-                            }
-                            // 🚀 单项操作详情展开状态保护（点击行查看参数与反馈详情不被重置）
                             existingEl.querySelectorAll(".agent-tool-row").forEach(row => {
                                 const detail = row.querySelector(".tool-row-detail");
                                 if (detail && !detail.classList.contains("d-none") && row.dataset.actIdx !== undefined) {
@@ -10818,6 +10831,7 @@
 
         
         window._streamStepState = window._streamStepState || {};
+        window._userExplicitStepState = window._userExplicitStepState || {};
         window._actionDetailState = window._actionDetailState || {};
 
         function toggleActionDetail(el, event) {
@@ -10860,14 +10874,16 @@
                 label.innerText = isNowOpen ? "收起" : "明细";
             }
 
-            // 多维度稳定记录展开状态，轮询刷新绝不覆盖
-            window._streamStepState[blockId] = isNowOpen;
+            // 🛡️ 记录用户的显式交互意图 (User Explicit Intent)，100% 尊重大师级操作
+            window._userExplicitStepState = window._userExplicitStepState || {};
+            window._userExplicitStepState[blockId] = isNowOpen;
             if (stepId) {
-                window._streamStepState["step_" + stepId] = isNowOpen;
+                window._userExplicitStepState["step_" + stepId] = isNowOpen;
             }
             if (box && box.dataset && box.dataset.stepId) {
-                window._streamStepState["step_" + box.dataset.stepId] = isNowOpen;
+                window._userExplicitStepState["step_" + box.dataset.stepId] = isNowOpen;
             }
+            window._streamStepState[blockId] = isNowOpen;
         }
 
         function toggleStreamTodo(blkId) {
@@ -11001,7 +11017,7 @@
 
                 let titleText = blk.title || '任务清单';
                 if (isGoalAchieved) {
-                    titleText = `任务清单 · 全部目标达成 (${effCompleted}/${totalItems} 步骤)`;
+                    titleText = `任务清单 · 全部目标达成 (${effCompleted}/${totalItems})`;
                 } else if (effCompleted > 0) {
                     titleText = `更新任务清单 · ${effCompleted}/${totalItems} 已完成`;
                 }
@@ -11018,7 +11034,7 @@
                                 <span>${escapeHtml(titleText)}</span>
                                 ${isGoalAchieved ? '<span class="mono-pill" style="font-size: 9.5px; color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border); padding: 1px 6px;">100% 达成</span>' : ''}
                             </div>
-                            <span class="mono-tag" style="font-size: 10px;">${effCompleted}/${totalItems} 步骤</span>
+                            <span class="mono-tag" style="font-size: 10px;">${effCompleted}/${totalItems} 已完成</span>
                         </div>
                         <div class="stream-todo-body ${bodyClass}" id="body_todo_${blk.block_id}">
                             ${itemsHtml}
@@ -11037,31 +11053,39 @@
                     return "";
                 }
 
-                window._streamStepState = window._streamStepState || {};
+                window._userExplicitStepState = window._userExplicitStepState || {};
                 const sId = blk.step_id || 1;
                 let isExpanded = false;
-                if (window._streamStepState[blk.block_id] !== undefined) {
-                    isExpanded = window._streamStepState[blk.block_id];
-                } else if (window._streamStepState["step_" + sId] !== undefined) {
-                    isExpanded = window._streamStepState["step_" + sId];
+
+                // 🛡️ 核心双轨状态机：
+                // 1. 若用户曾显式手动收展过，100% 尊重大师意图
+                if (window._userExplicitStepState[blk.block_id] !== undefined) {
+                    isExpanded = window._userExplicitStepState[blk.block_id];
+                } else if (window._userExplicitStepState["step_" + sId] !== undefined) {
+                    isExpanded = window._userExplicitStepState["step_" + sId];
                 } else {
-                    const domEl = document.getElementById(blk.block_id) || document.querySelector(`.agent-trace-box[data-step-id="${sId}"]`);
-                    if (domEl) {
-                        const domBody = domEl.querySelector(".agent-trace-body");
-                        if (domBody && !domBody.classList.contains("d-none")) {
-                            isExpanded = true;
-                            window._streamStepState[blk.block_id] = true;
-                            window._streamStepState["step_" + sId] = true;
-                        } else {
-                            isExpanded = (isRunning || isFailed);
-                        }
-                    } else {
-                        isExpanded = (isRunning || isFailed);
-                    }
+                    // 2. 否则遵循生命周期：进行中或失败受阻自动展开；完成达成后自动折叠收拢！
+                    isExpanded = (isRunning || isFailed);
                 }
 
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
+
+                // 🧠 极简 thinking... 推演微胶囊
+                let thinkingHtml = "";
+                const thinkingObj = blk.thinking || {};
+                const thinkingText = (typeof thinkingObj === 'string') ? thinkingObj : (thinkingObj.content || thinkingObj.situation || "");
+                if (isRunning || thinkingText) {
+                    thinkingHtml = `
+                        <div class="step-thinking-capsule mb-2">
+                            <div class="d-flex align-items-center gap-1.5 text-muted" style="font-size: 11px;">
+                                <span class="thinking-dot ${isRunning ? 'pulsing' : ''}"></span>
+                                <span class="thinking-label" style="font-family: var(--font-mono); font-weight: 500; color: var(--text-sub);">thinking...</span>
+                            </div>
+                            ${thinkingText ? `<div class="step-thinking-content mt-1 text-muted" style="font-size: 11px; line-height: 1.55; opacity: 0.85;">${escapeHtml(thinkingText)}</div>` : ''}
+                        </div>
+                    `;
+                }
 
                 let actionsHtml = "";
                 acts.forEach((act, actIdx) => {
@@ -11163,6 +11187,7 @@
                             </div>
                         </div>
                         <div class="agent-trace-body ${bodyClass}" id="body_${blk.block_id}">
+                            ${thinkingHtml}
                             ${actionsHtml}
                             ${isFailed ? `<div class="agent-trace-error"><i class="bi bi-exclamation-triangle-fill me-1"></i>${escapeHtml(blk.assertion_result || '底层执行受阻中断')}</div>` : ''}
                         </div>
