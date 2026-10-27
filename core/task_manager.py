@@ -1603,6 +1603,8 @@ class TaskManager:
             cmd.extend(["--app", session["app_filename"]])
         if session.get("provider"):
             cmd.extend(["--provider", session["provider"]])
+        if session.get("session_id"):
+            cmd.extend(["--session-id", session["session_id"]])
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,

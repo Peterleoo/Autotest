@@ -5289,6 +5289,63 @@
         .token-pressure-dot.normal { background: #10b981; box-shadow: 0 0 5px #10b981; }
         .token-pressure-dot.warning { background: #f59e0b; box-shadow: 0 0 5px #f59e0b; }
         .token-pressure-dot.critical { background: #ef4444; box-shadow: 0 0 5px #ef4444; }
+
+        /* 🎯 输入框内嵌待测应用专属标签条 (Linear/Raycast 现代工程级极简质感) */
+        .input-target-app-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 9px;
+            margin: 2px 0 6px 0;
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+        body[data-theme="light"] .input-target-app-bar {
+            background: rgba(0, 0, 0, 0.025);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .input-target-app-bar:hover {
+            background: var(--bg-surface-hover);
+            border-color: var(--border-hover);
+        }
+        .input-app-target-label {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+        .input-app-target-name {
+            font-size: 11.5px;
+            color: var(--text-main);
+            font-weight: 600;
+            max-width: 140px;
+        }
+        .input-app-target-pkg {
+            font-size: 10px;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            max-width: 180px;
+        }
+        .input-app-target-action {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            font-size: 10px;
+            color: var(--text-sub);
+            flex-shrink: 0;
+            opacity: 0.75;
+            transition: opacity 0.15s;
+        }
+        .input-target-app-bar:hover .input-app-target-action {
+            opacity: 1;
+            color: var(--accent-primary);
+        }
         
         .deliverable-item-card {
             background: rgba(255, 255, 255, 0.02);
@@ -6903,6 +6960,21 @@
                     </button>
                 </div>
 
+                <!-- 🎯 输入框内嵌待测应用专属标签条 (清晰指示测试对象，可一键点击切换/上传) -->
+                <div class="input-target-app-bar" id="inputTargetAppBar" onclick="openSettingsModal('apps')" title="点击切换待测应用或上传新安装包">
+                    <div class="d-flex align-items-center gap-1.5 overflow-hidden flex-grow-1">
+                        <span class="status-indicator-dot dot-online" id="inputAppStatusDot"></span>
+                        <i class="bi bi-box-seam" style="font-size: 11px; opacity: 0.85;"></i>
+                        <span class="input-app-target-label">待测应用:</span>
+                        <span class="input-app-target-name text-truncate" id="inputAppLabel">待测应用</span>
+                        <span class="input-app-target-pkg text-truncate" id="inputAppPkg"></span>
+                    </div>
+                    <div class="input-app-target-action">
+                        <span>更换</span>
+                        <i class="bi bi-chevron-right" style="font-size: 9px;"></i>
+                    </div>
+                </div>
+
                 <textarea id="taskInputText" class="gpt-textarea" rows="1" placeholder="描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）..." oninput="onInputTextChange()"></textarea>
 
                 <!-- 胶囊底部工具栏 -->
@@ -7555,36 +7627,52 @@
 
                     <!-- 右侧内容面板 5: 新手引导 -->
                     <div class="settings-content-area d-none" id="panelSettingsGuide">
-                        <div class="settings-section-title">新手引导</div>
-                        <div class="settings-section-desc">通过交互式聚光灯向导，快速了解系统核心操作流程。</div>
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <div class="settings-section-title">新手引导与交互向导</div>
+                                <div class="settings-section-desc">通过交互式聚光灯向导，快速了解系统核心操作流程与人机协同。</div>
+                            </div>
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary" id="tourStatusBadge" style="font-size: 11px;">检测状态中...</span>
+                        </div>
 
-                        <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
-                            <!-- 步骤预览 -->
+                        <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+                            <!-- 步骤流程卡片 -->
                             <div style="background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
-                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">1</span>
-                                    确认物理真机已通过 USB 连接并开启调试模式
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">1</span>
+                                    <span><strong>真机状态确认：</strong>物理真机 USB 连接并开启开发者调试，杜绝仿真；</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
-                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">2</span>
-                                    在此设置页选定目标待测应用（APK / 包名）
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">2</span>
+                                    <span><strong>待测应用锁定：</strong>输入框常驻显示当前待测应用，可随时上传/切换 APK；</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
-                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">3</span>
-                                    在底部工具栏选择 AI 推理模型
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">3</span>
+                                    <span><strong>推理模型选择：</strong>支持 DeepSeek、Hermes 本地模型或 Google Antigravity；</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-main);">
-                                    <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">4</span>
-                                    在输入框输入业务意图，按 Enter 启动自动化测试
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">4</span>
+                                    <span><strong>意图下发与规划：</strong>自然语言输入测试目标，实时推演与多轮对话执行；</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">5</span>
+                                    <span><strong>投屏与人机协同：</strong>遇登录鉴权自动弹出决策卡，支持凭证注入与手动接管。</span>
                                 </div>
                             </div>
 
-                            <!-- 启动按钮 -->
-                            <button class="btn-fidelity-action" style="align-self: flex-start; padding: 8px 18px;" onclick="launchTourFromSettings()">
-                                <i class="bi bi-play-fill"></i>
-                                <span>启动交互式向导</span>
-                            </button>
-                            <div style="font-size: 11px; color: var(--text-muted);">向导将高亮显示各操作区域，点击"下一步"逐步引导。</div>
+                            <!-- 调试与启动操作区 -->
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn-fidelity-action" onclick="launchTourFromSettings()">
+                                    <i class="bi bi-play-circle-fill"></i>
+                                    <span>启动聚光灯新手向导</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" onclick="resetTourGuideStatus()" style="font-size: 11.5px; border-radius: 6px;">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>重置引导状态 (调试)
+                                </button>
+                            </div>
+                            <div class="text-muted" style="font-size: 11px;">
+                                💡 提示：重置引导后，下次打开或点击启动即可重新体验完整聚光灯流程；向导过程中支持随时点击“跳过”或按 ESC 退出。
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -9348,32 +9436,38 @@
             closeAllPopovers();
         }
 
-        // ================= 全屏聚光灯新手 4 步向导控制器 =================
+        // ================= 全屏聚光灯新手 5 步向导控制器 =================
         let currentTourStep = 1;
         const TOUR_STEPS = [
             {
-                targetId: "pillDeviceWrapper",
-                badge: "第 1 步 / 共 4 步",
-                title: "第 1 步：确认物理真机在线（杜绝仿真）",
-                desc: "系统已全面杜绝免机仿真，只支持物理真机实测。请使用 USB 数据线连接手机并开启【USB 调试】。当胶囊显示绿色【真机在线】后方可开始测试。"
+                targetId: "brandStatusTrigger",
+                badge: "第 1 步 / 共 5 步",
+                title: "第 1 步：确认物理真机在线（拒绝免机仿真）",
+                desc: "系统仅支持物理真机实测，拒绝免机仿真。请使用 USB 连接手机并开启【USB 调试】。当顶部显示绿色【测试就绪 / 真机在线】后方可开展测试。"
             },
             {
-                targetId: "pillAppWrapper",
-                badge: "第 2 步 / 共 4 步",
-                title: "第 2 步：选定待测应用 (APK / 包名)",
-                desc: "系统已自动扫描 apps/ 目录下的安装包。点击可直接切换待测应用或手动刷新，未安装时系统将自动在真机完成部署并复核就绪状态。"
+                targetId: "inputTargetAppBar",
+                badge: "第 2 步 / 共 5 步",
+                title: "第 2 步：核对与选定待测应用 (APK / 包名)",
+                desc: "输入框上方常驻当前选定的待测应用。点击可直接上传新 APK 或从应用库切换目标包，系统将自动校验安装并同步应用包名给 AI 决策模型！"
             },
             {
                 targetId: "pillModelWrapper",
-                badge: "第 3 步 / 共 4 步",
+                badge: "第 3 步 / 共 5 步",
                 title: "第 3 步：选择 AI 推理与编排模型",
                 desc: "支持 Hermes (DeepSeek 本地加速)、Google Antigravity 官方授权、DeepSeek 官方 API 等。点击胶囊即可随时一键无缝切换。"
             },
             {
                 targetId: "taskInputText",
-                badge: "第 4 步 / 共 4 步",
+                badge: "第 4 步 / 共 5 步",
                 title: "第 4 步：输入业务意图并发送",
                 desc: "以自然语言输入测试目标（如：冷启动应用并测试登录），或直接点击上方推荐用例。按 Enter 键系统将自动分解前置检查、驱动真机并实时输出打字机结论！"
+            },
+            {
+                targetId: "btnTogglePipScreen",
+                badge: "第 5 步 / 共 5 步",
+                title: "第 5 步：端侧实时投屏与人机协同 (HITL)",
+                desc: "测试过程中可点击右上角图标随时唤起真机实时画面；若遇到登录拦截或验证码，系统将下发人机协同决策卡，支持账号代填、验证码透传或投屏接管！"
             }
         ];
 
@@ -9398,7 +9492,10 @@
             const stepConfig = TOUR_STEPS[stepNum - 1];
             if (!stepConfig) return;
 
-            const targetEl = document.getElementById(stepConfig.targetId);
+            let targetEl = document.getElementById(stepConfig.targetId);
+            if (!targetEl && stepConfig.targetId === "inputTargetAppBar") {
+                targetEl = document.getElementById("taskInputText") || document.getElementById("pillAppWrapper");
+            }
             const spotlight = document.getElementById("tourSpotlight");
             const tooltip = document.getElementById("tourTooltipCard");
             const badge = document.getElementById("tourBadge");
@@ -9465,7 +9562,28 @@
 
         function finishTourGuide() {
             localStorage.setItem("autotest_tour_completed", "true");
+            updateTourStatusBadge();
             closeTourGuide();
+        }
+
+        // 新手向导状态同步与调试管理
+        function updateTourStatusBadge() {
+            const badge = document.getElementById("tourStatusBadge");
+            if (!badge) return;
+            const completed = localStorage.getItem("autotest_tour_completed") === "true";
+            if (completed) {
+                badge.innerHTML = `<span class="status-indicator-dot dot-online me-1"></span>已完成首次引导`;
+                badge.className = "badge rounded-pill bg-success-subtle text-success border border-success-subtle";
+            } else {
+                badge.innerHTML = `<span class="status-indicator-dot dot-warning me-1"></span>未完成 / 待调试`;
+                badge.className = "badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle";
+            }
+        }
+
+        function resetTourGuideStatus() {
+            localStorage.removeItem("autotest_tour_completed");
+            updateTourStatusBadge();
+            alert("已成功重置首次使用引导标记！可点击【启动聚光灯新手向导】随时重新体验与调试。");
         }
 
         // 从 Settings 面板手动触发向导（关闭弹窗后启动）
@@ -13443,6 +13561,7 @@ function renderChatStream(sessionData) {
             loadAntigravityStatus();
             loadEnvStatus();
             loadApps();
+            updateTourStatusBadge();
             
             // 同步当前主题卡片高亮
             const savedTheme = localStorage.getItem("autotest_theme") || "dark";
@@ -13491,6 +13610,7 @@ function renderChatStream(sessionData) {
             if (isApps) loadApps();
             if (isGoogle) loadAntigravityStatus();
             if (isModels) loadModelConfig();
+            if (isGuide) updateTourStatusBadge();
         }
 
         // 统一入驻：openAppPackagesModal 直接平滑切换至设置中的应用管理选项卡
@@ -14133,6 +14253,20 @@ function renderChatStream(sessionData) {
             // 同步工具栏应用胶囊安装状态点
             const toolbarAppDotEl = document.getElementById("toolbarAppDot");
             if (toolbarAppDotEl) toolbarAppDotEl.className = dotCls;
+
+            // 同步输入框内嵌应用标签与包名
+            const inputAppLabelEl = document.getElementById("inputAppLabel");
+            const inputAppPkgEl = document.getElementById("inputAppPkg");
+            const inputAppStatusDotEl = document.getElementById("inputAppStatusDot");
+            if (inputAppLabelEl) inputAppLabelEl.innerText = displayName;
+            if (inputAppPkgEl) inputAppPkgEl.innerText = currentActiveApp.package ? `(${currentActiveApp.package})` : "";
+            if (inputAppStatusDotEl) inputAppStatusDotEl.className = dotCls;
+
+            // 动态响应输入框 placeholder，确保用户输入时心智高度明确当前待测对象
+            const taskInputTa = document.getElementById("taskInputText");
+            if (taskInputTa && (!taskInputTa.value || taskInputTa.value.trim() === "")) {
+                taskInputTa.placeholder = `针对「${displayName}」描述自动化测试目标，如：冷启动应用，测试登录并断言进入首页（Enter 发送，Shift+Enter 换行）...`;
+            }
         }
 
         // 切换当前激活应用

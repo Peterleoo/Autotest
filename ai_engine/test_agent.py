@@ -1,4 +1,4 @@
-import time
+﻿import time
 import json
 import logging
 import subprocess
@@ -66,6 +66,17 @@ class AITestAgent:
         self.api_client = APIClient()
         self.app_identifier = app_identifier
         self.session_id = session_id
+        # 提取目标应用元数据供大模型决策精准感知
+        self.app_info = {}
+        if self.app_identifier:
+            try:
+                from core.app_manager import AppManager
+                app_mgr = AppManager()
+                target_apk = app_mgr.find_target_app(self.app_identifier)
+                if target_apk:
+                    self.app_info = app_mgr.get_apk_info(target_apk)
+            except Exception as e:
+                logger.debug(f"获取待测包元数据跳过: {e}")
         self.executor = ActionExecutor(driver=self.driver, api_client=self.api_client, app_identifier=app_identifier)
         self.status_callback = status_callback
         self._has_prompted_credential = False
@@ -425,8 +436,20 @@ class AITestAgent:
 3. 若元素列表中未提取出文字，长表单的提交按钮通常固定在屏幕正下方悬浮操作条，可直接点击底部 [540, 2150] 附近区域触发提交校验！
 """
 
-            # 2. 构造 Prompt
+            # 2. 构造 Prompt（深度注入目标应用元数据，确保模型知晓测试对象）
+            app_context_lines = []
+            if self.app_info.get('label'):
+                app_context_lines.append(f"- 应用名称: {self.app_info['label']}")
+            if self.app_info.get('package'):
+                app_context_lines.append(f"- 应用包名: {self.app_info['package']}")
+            if self.app_identifier:
+                app_context_lines.append(f"- 目标安装包: {self.app_identifier}")
+            app_context_str = "\n".join(app_context_lines) if app_context_lines else "- 未指定特定安装包（直接操作当前前台应用）"
+
             user_prompt = f"""
+【待测目标应用】
+{app_context_str}
+
 【用户测试总目标】
 {goal}
 
