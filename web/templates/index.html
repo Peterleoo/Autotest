@@ -10423,6 +10423,23 @@
             const raw = String(errorMsg || "").trim();
             let situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
             let suggestion = "请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查待测应用是否在前台。";
+            let isModelError = false;
+
+            if (/模型决策异常|Google 授权端点|备用网关|502 Bad Gateway|504 Gateway|550 EdgeOne|WinError 10054|ConnectionReset|API key not valid|RESOURCE_EXHAUSTED|ConnectTimeout|ReadTimeout|大模型决策调用异常|LLM_CONNECTION_ERROR/i.test(raw)) {
+                isModelError = true;
+                if (/502|550|EdgeOne|Bad Gateway/i.test(raw)) {
+                    situation = "主通道 Google 授权端点网络超时/重置，且备用中转网关 (Hermes) 响应 502/550 宕机异常，导致大模型双通道均未能连通。";
+                } else if (/Timeout|超时/i.test(raw)) {
+                    situation = "大模型推理端点请求超时（超过 40s 未收到首包响应），网络可能存在高延迟或阻断。";
+                } else if (/10054|ConnectionReset/i.test(raw)) {
+                    situation = "底层 TCP 连接被对端重置 (ConnectionResetError / WinError 10054)，网络连接被防火墙或代理中断。";
+                } else if (/API key|UNAUTHENTICATED|PERMISSION_DENIED/i.test(raw)) {
+                    situation = "大模型 API Key 鉴权失败或已失效，上游大模型服务拒绝访问。";
+                } else {
+                    situation = `大模型推理通道调用异常：${raw.replace(/^.*[ERROR]\s*/, '')}`;
+                }
+                suggestion = "1. 检查外网或网络代理连通性；2. 点击【设置】切换为 DeepSeek 或其他大模型；3. 配置可用中转 API Key 后重试。";
+            }
 
             if (!raw || raw === "undefined") {
                 situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
@@ -10455,6 +10472,7 @@
                 stepTitle: failedStepTitle || "业务交互执行",
                 situation: situation,
                 suggestion: suggestion,
+                isModelError: isModelError,
                 raw: raw
             };
         }
@@ -10518,8 +10536,13 @@
                         } else {
                             fCapsule.className = "floating-step-capsule status-failed";
                             if (fIcon) fIcon.className = "bi bi-exclamation-octagon text-danger";
-                            const errTitle = failedStep ? (failedStep.title || `第 ${failedIdx} 步`) : '执行中断';
-                            fText.innerText = `在第 ${failedIdx || activeIdx} 步受阻: ${errTitle} ↗`;
+                            const isModelFailed = (sessionData.error_type === "LLM_CONNECTION_ERROR") || /模型决策异常|Google 授权|备用网关|502|550|未连通/i.test(sessionData.error_message || "");
+                            if (isModelFailed) {
+                                fText.innerText = `AI 推理通道未连通 · 决策受阻 ↗`;
+                            } else {
+                                const errTitle = failedStep ? (failedStep.title || `第 ${failedIdx} 步`) : '执行中断';
+                                fText.innerText = `在第 ${failedIdx || activeIdx} 步受阻: ${errTitle} ↗`;
+                            }
                         }
                     } else {
                         // 执行中
@@ -10853,6 +10876,21 @@
                     `;
                 } else if (isFailed) {
                     const trans = translateDiagnostic(st.error_msg || sessionData.error_message, stepNum, stepTitle);
+                    const modelActionDock = trans.isModelError ? `
+                        <div class="mt-2 pt-2 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top" style="border-color: rgba(239, 68, 68, 0.2) !important;">
+                            <span class="mono-pill" style="font-size: 9.5px; color: #f87171; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3);">
+                                <i class="bi bi-wifi-off me-1"></i>推理通道未连通
+                            </span>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <button class="btn btn-sm" onclick="openSettingsModal('models')" style="background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 500;">
+                                    <i class="bi bi-sliders2 me-1"></i>配置/切换模型
+                                </button>
+                                <button class="btn btn-sm" onclick="retryGoalAfterSatisfied(currentActiveSessionData?.goal || '')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; font-size: 11px; padding: 2px 8px; border-radius: 5px;">
+                                    <i class="bi bi-arrow-repeat me-1"></i>重试
+                                </button>
+                            </div>
+                        </div>
+                    ` : '';
                     statusDetailCardHtml = `
                         <div class="p-2 rounded" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; font-size: 11px;">
                             <div class="fw-semibold d-flex align-items-center gap-1 mb-1" style="color: #f87171;">
@@ -10860,6 +10898,7 @@
                             </div>
                             <div class="mb-1" style="color: #fecaca; line-height: 1.4;"><strong>现状：</strong>${escapeHtml(trans.situation)}</div>
                             <div style="color: #cbd5e1; line-height: 1.4;"><strong>建议：</strong>${escapeHtml(trans.suggestion)}</div>
+                            ${modelActionDock}
                         </div>
                     `;
                 } else if (isRunning) {
@@ -11510,6 +11549,38 @@
                 const verdictBadgeColor = isPass ? "var(--status-green)" : (isBlocked ? "#f59e0b" : "#ef4444");
                 const isSolidified = !!sessionData.is_solidified || !!blk.is_solidified;
                 const solidFile = blk.solidified_filename || sessionData.solidified_filename || `test_${sid}.py`;
+                const isModelErr = (sessionData.error_type === "LLM_CONNECTION_ERROR") || 
+                                   /模型决策异常|Google 授权端点|备用网关|502 Bad Gateway|550 EdgeOne|WinError 10054|ConnectionReset|ConnectTimeout|大模型决策调用异常/i.test(sessionData.error_message || blk.error_message || "");
+                let modelErrorBannerHtml = "";
+                if (!isPass && isModelErr) {
+                    const trans = translateDiagnostic(sessionData.error_message || blk.error_message || "模型无法连通");
+                    modelErrorBannerHtml = `
+                        <div class="summary-model-error-banner mb-2.5 p-2.5 rounded" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.28); border-radius: 8px;">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="d-flex align-items-center gap-1.5" style="color: #f87171; font-weight: 600; font-size: 12px;">
+                                    <i class="bi bi-wifi-off"></i>
+                                    <span>AI 推理通道连接受阻 · 模型未响应</span>
+                                </div>
+                                <span class="mono-pill" style="font-size: 9px; color: #f87171; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3); padding: 1px 6px;">双通道未连通</span>
+                            </div>
+                            <div class="mb-2" style="font-size: 11.5px; color: #fca5a5; line-height: 1.45;">
+                                ${escapeHtml(trans.situation)}
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1.5 border-top" style="border-color: rgba(239, 68, 68, 0.15) !important;">
+                                <div class="text-sub" style="font-size: 11px; color: #cbd5e1;"><strong style="color: #f87171;">排查：</strong>${escapeHtml(trans.suggestion)}</div>
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <button class="btn btn-sm" onclick="openSettingsModal('models')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fff; font-size: 11px; padding: 2px 10px; border-radius: 6px; font-weight: 500;">
+                                        <i class="bi bi-sliders2 me-1"></i>切换模型 / 配置 Key
+                                    </button>
+                                    <button class="btn btn-sm" onclick="retryGoalAfterSatisfied(sessionData?.goal || '')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; font-size: 11px; padding: 2px 10px; border-radius: 6px;">
+                                        <i class="bi bi-arrow-repeat me-1"></i>立即重试
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 const artifacts = blk.artifacts || [
                     { name: "6 大测试维度全景交付物报告", file: `test_report_${sid.slice(-6)}.md`, type: "report" },
                     { name: "端侧底层执行与诊断日志流", file: `execution_${sid.slice(-6)}.log`, type: "log" },
@@ -11583,6 +11654,8 @@
 
                         <!-- 极简细线留白 -->
                         <div class="summary-divider"></div>
+
+                        ${modelErrorBannerHtml}
 
                         <!-- 交付物与自动化资产列表 (单层无嵌套框) -->
                         <div class="d-flex flex-column gap-1">

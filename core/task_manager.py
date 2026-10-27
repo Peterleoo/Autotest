@@ -1939,26 +1939,70 @@ class TaskManager:
         else:
             session["is_success"] = False
             fail_reason = ""
+            error_type = "GENERAL_ERROR"
+
+            # 🛡️ 事实核验优先级 1：模型决策与网络通道/网关异常 (最高优先级，直接提取真实原因)
+            llm_patterns = [
+                "模型决策异常", "Google 授权端点异常", "备用网关异常", "502 Bad Gateway",
+                "504 Gateway Time-out", "550 EdgeOne", "ConnectionResetError", "WinError 10054",
+                "API key not valid", "PERMISSION_DENIED", "UNAUTHENTICATED", "RESOURCE_EXHAUSTED",
+                "ReadTimeout", "ConnectTimeout", "大模型决策调用异常"
+            ]
             for idx, l in enumerate(all_output):
-                if "❌ [设备自学习阻断]" in l or "❌ 测试受阻详情" in l:
+                if any(k in l for k in llm_patterns):
+                    clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
                     next_detail = all_output[idx + 1] if idx + 1 < len(all_output) else ""
                     if next_detail and not next_detail.startswith("2026-") and "=====" not in next_detail:
-                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
                         fail_reason = f"{clean_line} {next_detail}".strip()
                     else:
-                        fail_reason = l
-                    break
-                elif "❌ AI 自动化测试未能达成预期目标" in l:
-                    fail_reason = l
+                        fail_reason = clean_line
+                    error_type = "LLM_CONNECTION_ERROR"
                     break
 
+            # 🛡️ 事实核验优先级 2：设备自学习阻断 / 测试受阻详情
+            if not fail_reason:
+                for idx, l in enumerate(all_output):
+                    if "❌ [设备自学习阻断]" in l or "❌ 测试受阻详情" in l:
+                        next_detail = all_output[idx + 1] if idx + 1 < len(all_output) else ""
+                        if next_detail and not next_detail.startswith("2026-") and "=====" not in next_detail:
+                            clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                            fail_reason = f"{clean_line} {next_detail}".strip()
+                        else:
+                            fail_reason = l
+                        error_type = "DEVICE_LEARNING_BLOCKED"
+                        break
+
+            # 🛡️ 事实核验优先级 3：设备脱机/安装失败/底层通信异常
             if not fail_reason:
                 for l in reversed(all_output):
-                    if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
-                        fail_reason = l
+                    if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "device unauthorized", "adb server killed"]):
+                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                        fail_reason = clean_line
+                        error_type = "DEVICE_ENVIRONMENT_ERROR"
                         break
+
+            # 🛡️ 事实核验优先级 4：DSH 核验门禁一票否决
+            if not fail_reason:
+                for l in reversed(all_output):
+                    if any(k in l for k in ["[DSH 核验门禁一票否决]", "DSH Verifier 门禁驳回"]):
+                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                        fail_reason = clean_line
+                        error_type = "VERIFIER_REJECTED"
+                        break
+
+            # 🛡️ 事实核验优先级 5：其他底层异常或堆栈
+            if not fail_reason:
+                for l in reversed(all_output):
+                    if any(k in l for k in ["ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
+                        if "❌ AI 自动化测试未能达成预期目标" not in l:
+                            clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                            fail_reason = clean_line
+                            break
+
+            session["error_type"] = error_type
             session["error_message"] = fail_reason or last_error_line or "测试前置检查未通过或执行中断"
-            dev_state["action"] = f"测试执行受阻：{session['error_message'][:40]}"
+            dev_state["error_type"] = error_type
+            dev_state["action"] = f"测试执行受阻：{session['error_message'][:50]}" 
 
             # 🛡️ 事实核查：检查整个执行过程中是否真正跨过了前置引导页
             all_thoughts = " ".join([l for l in all_output if "AI 决策:" in l])
@@ -2002,6 +2046,17 @@ class TaskManager:
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
         )
         # 🚀 同步挂载测试全景总结卡片 (Test Summary Block)
+        # 若发生致命模型连通异常，先注入结构化故障诊断卡片
+        if not is_success and session.get("error_type") == "LLM_CONNECTION_ERROR":
+            session["timeline_blocks"].append(
+                TimelineManager.create_fault_diagnosis_block(
+                    fail_step_title="AI 模型决策推演",
+                    current_situation=f"大模型推理通道无法连通：{session.get('error_message', '')}",
+                    suggestion="建议检查外网代理，或在【设置】中切换为 DeepSeek 或其他模型，配置有效 Key 后重试",
+                    turn_id=max(0, turn_no - 1)
+                )
+            )
+
         session["timeline_blocks"].append(
             TimelineManager.create_test_summary_block(
                 session_id=session["session_id"],
@@ -2012,7 +2067,9 @@ class TaskManager:
                 deliverables=session.get("deliverables"),
                 is_solidified=session.get("is_solidified", False),
                 solidified_filename=session.get("solidified_filename", ""),
-                turn_id=max(0, turn_no - 1)
+                turn_id=max(0, turn_no - 1),
+                error_message=session.get("error_message", ""),
+                error_type=session.get("error_type", "")
             )
         )
 

@@ -499,11 +499,13 @@ class AITestAgent:
                     "log": f"AI 决策 [{decision.get('action')}]: {thought}"
                 })
             except Exception as e:
-                logger.error(f"模型决策异常: {e}")
+                err_msg = str(e)
+                logger.error(f"❌ 模型决策异常: {err_msg}")
+                final_block_reason = f"大模型决策调用异常: {err_msg}"
                 self._notify_status({
                     "step": step_count,
                     "action": "决策异常",
-                    "log": f"❌ 模型决策异常: {e}"
+                    "log": f"❌ 模型决策异常: {err_msg}"
                 })
                 break
 

@@ -207,7 +207,9 @@ class TimelineManager:
         deliverables: Optional[List[Dict[str, Any]]] = None,
         is_solidified: bool = False,
         solidified_filename: str = "",
-        turn_id: int = 0
+        turn_id: int = 0,
+        error_message: str = "",
+        error_type: str = ""
     ) -> Dict[str, Any]:
         """
         生成测试结果全景总结卡片：
@@ -248,6 +250,8 @@ class TimelineManager:
             "artifacts": artifacts,
             "is_solidified": is_solidified,
             "solidified_filename": solidified_filename,
+            "error_message": error_message,
+            "error_type": error_type,
             "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 
