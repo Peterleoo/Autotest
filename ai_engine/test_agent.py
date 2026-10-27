@@ -38,6 +38,7 @@ SYSTEM_PROMPT = """
     - 紧扣用户的【测试目标】！不要点击与目标无关的广告或偏门入口。
     - 针对新用户多页引导页/轮播图：严禁每滑一页就停下来重新截屏识别一次！只要定性为引导页，果断直接下发 {"action": "fast_forward_guide", "reason": "新用户引导页极速穿透直达首页"} 或 {"action": "swipe", "direction": "left", "repeat": 3}，一步到位直接翻到最后一页并进入应用首页！
     - 针对长列表浏览：若目标需浏览推荐列表或信息流，可直接使用 repeat 连续滑动（如 {"action": "swipe", "direction": "up", "repeat": 2}），一气呵成减少交互轮次。
+    - 针对多轮具身与代词消解（DeepSeek Harness 规范）：若指令中包含“第2个/第2套/第二条/刚才那个”等代词，严格遵照注入的【代词消解】或【活跃列表实体】指示，直接定位并点击该条目或物理坐标，严禁退回桌面或重复重新搜索！
     - 针对登录流程：若有协议勾选先点击协议勾选 -> 点击手机号输入框输入测试号码 -> 点击获取验证码/用密码登录 -> 验证跳转。
     - 针对搜索流程：若当前不在首页（例如误入“委托服务”或“我的”页面），第一步必须先按返回键 {"action": "press_key", "key": "back"} 或点击底部【首页】Tab 回到主页；然后在主页顶部点击搜索框（带有“搜索”或“请输入小区名”）进入搜索页面；在搜索页面，可直接点击下方的【热门搜索】条目（如‘钰龙天下’、‘华润凤凰城’、‘星城国际’）或搜索联想条目，即可一键直达房源搜索结果列表；在房源列表中执行下拉滑动或文本断言（如包含‘万’、‘室’、‘m²’等房源信息），达成目标后果断调用 finish 完成测试！
     - 针对表单录入与必填校验：长表单页面的“免费发布/立即提交”按钮往往固定在屏幕最底部的悬浮操作条（Sticky Bottom Bar）中。严禁在上下滑动中盲目震荡！若表单项已就绪，优先点击页面底部的提交/发布按钮触发必填校验；达成必填校验拦截后，果断调用 finish 完成测试！
@@ -87,6 +88,33 @@ class AITestAgent:
                 self.status_callback(data)
             except Exception as e:
                 logger.warning(f"状态回调异常: {e}")
+
+    def _sync_working_memory(self, screen_info: Dict[str, Any], decision: Optional[Dict[str, Any]] = None):
+        """实时同步屏幕实体与最新动作至 Working Memory (Muse 范式)"""
+        if not self.session_id:
+            return
+        try:
+            from core.memory_manager import MemoryManager
+            from pathlib import Path
+            sess_file = Path("data/sessions") / f"{self.session_id}.json"
+            if not sess_file.exists():
+                sess_file = Path("outputs/sessions") / f"{self.session_id}.json"
+            if sess_file.exists():
+                sess_data = json.loads(sess_file.read_text(encoding="utf-8"))
+                last_act = self.executor.action_history[-1] if self.executor.action_history else None
+                MemoryManager.extract_and_update_working_memory(
+                    sess_data,
+                    screen_info.get("elements", []),
+                    last_action=last_act,
+                    page_summary=decision.get("thought", "")[:50] if decision else None
+                )
+                curr_pkg = getattr(self.driver, "current_package", None) or getattr(self.driver, "package_name", None)
+                curr_act = getattr(self.driver, "current_activity", None)
+                if curr_pkg or curr_act:
+                    MemoryManager.update_fact_memory(sess_data, current_package=curr_pkg, current_activity=curr_act)
+                sess_file.write_text(json.dumps(sess_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.debug(f"同步工作记忆跳过: {e}")
 
 
     def _execute_credential_injection(self, acc: str, pwd: str, screen_info: Dict[str, Any]) -> bool:
@@ -373,6 +401,8 @@ class AITestAgent:
 
             # 只有离开阻断状态后，才正式递增有效探索步骤
             step_count += 1
+            # 实时沉淀当前真机屏幕实体与工作记忆 (Muse 范式)
+            self._sync_working_memory(screen_info)
             logger.info(f"\n--- [Step {step_count}/{max_steps}] 感知界面与决策 ---")
             self._notify_status({
                 "step": step_count,
@@ -482,12 +512,29 @@ class AITestAgent:
                 app_context_lines.append(f"- 目标安装包: {self.app_identifier}")
             app_context_str = "\n".join(app_context_lines) if app_context_lines else "- 未指定特定安装包（直接操作当前前台应用）"
 
+            # 动态检测用户目标是否命中 Working Memory 代词消解 (Muse 槽位继承)
+            coref_hint = ""
+            if self.session_id:
+                try:
+                    from core.memory_manager import MemoryManager
+                    from pathlib import Path
+                    sess_file = Path("data/sessions") / f"{self.session_id}.json"
+                    if not sess_file.exists():
+                        sess_file = Path("outputs/sessions") / f"{self.session_id}.json"
+                    if sess_file.exists():
+                        sess_data = json.loads(sess_file.read_text(encoding="utf-8"))
+                        hint = MemoryManager.resolve_coreference(goal, sess_data)
+                        if hint:
+                            coref_hint = f"\n{hint}\n"
+                except Exception:
+                    pass
+
             user_prompt = f"""
 【待测目标应用】
 {app_context_str}
 
 【用户测试总目标】
-{goal}
+{goal}{coref_hint}
 
 【当前已执行的操作历史】
 {json.dumps([{'action': h.get('action'), 'reason': h.get('reason'), 'error': h.get('error')} for h in self.executor.action_history[-4:]], ensure_ascii=False)}
@@ -605,6 +652,8 @@ class AITestAgent:
                     "action": "执行成功",
                     "log": f"✅ 操作完成: {decision.get('reason') or decision.get('action')}"
                 })
+            # 动作执行后及时固化最新物理锚点与界面状态 (Working Memory)
+            self._sync_working_memory(screen_info, decision)
 
         logger.info(f"========== 测试结束，共执行 {step_count} 步 ==========")
         return {

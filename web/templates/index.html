@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -6687,6 +6687,74 @@
 
 
 
+        /* 具身工作记忆与多轮实体胶囊 (Linear / Raycast 范式) */
+        .working-memory-capsule-bar {
+            padding: 5px 12px;
+            background: rgba(16, 185, 129, 0.05);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.12);
+            font-size: 11px;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+        .wm-header-badge {
+            color: #10b981;
+            font-weight: 600;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: rgba(16, 185, 129, 0.12);
+            display: inline-flex;
+            align-items: center;
+        }
+        .wm-pkg-pill {
+            color: var(--text-muted);
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: var(--bg-surface-elevated, rgba(255,255,255,0.04));
+            border: 1px solid var(--border-subtle);
+            display: inline-flex;
+            align-items: center;
+        }
+        .wm-entity-tag {
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 7px;
+            border-radius: 9999px;
+            background: var(--bg-surface-elevated, rgba(255,255,255,0.06));
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            font-size: 10.5px;
+            transition: all 0.15s ease;
+            max-width: 150px;
+        }
+        .wm-entity-tag:hover {
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.1);
+        }
+        .wm-entity-tag .wm-idx {
+            color: #10b981;
+            font-weight: 600;
+            font-size: 9.5px;
+        }
+        .wm-entity-tag .wm-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .turn-summary-pill {
+            background: var(--bg-surface-elevated, rgba(255,255,255,0.03));
+            border: 1px solid var(--border-subtle);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.15s ease;
+        }
+        .turn-summary-pill:hover {
+            background: var(--bg-surface-hover, rgba(255,255,255,0.06));
+        }
+
     </style>
 
 </head>
@@ -6899,6 +6967,8 @@
         <div class="gpt-input-area">
             <!-- 输入框上方常驻任务卡 (Pinned Bottom Task Capsule，参考主流 Agent 架构) -->
             <div class="gpt-input-box">
+                <!-- 具身工作记忆与活跃实体快捷胶囊 (DeepSeek Harness + Muse) -->
+                <div id="workingMemoryCapsuleBar" class="d-none working-memory-capsule-bar"></div>
                 <!-- 自适应多行文本输入框 -->
 
 
@@ -12326,25 +12396,52 @@ function renderChatStream(sessionData) {
                 const reworkBadge = turn.is_rework ? '<span class="badge bg-warning text-dark me-1" style="font-size: 10px;"><i class="bi bi-arrow-counterclockwise"></i> 返工要求</span>' : '';
                 const reworkNote = (turn.is_rework && turn.rework_reason) ? `<div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">原因: ${escapeHtml(turn.rework_reason)}</div>` : '';
 
+                // 多轮折叠 Accordion 状态判断 (非活跃的历史轮次默认优雅收起)
+                window._turnExpandedState = window._turnExpandedState || {};
+                const isTurnExpanded = isLatestTurn || (window._turnExpandedState[`turn_${turnId}`] === true);
+                const turnAccordionChevron = isTurnExpanded ? "bi-chevron-up" : "bi-chevron-down";
+                const turnAccordionText = isTurnExpanded ? "收起明细" : "展开明细";
+                const turnDetailClass = isTurnExpanded ? "" : "d-none";
+
+                let turnHeaderHtml = "";
+                if (!isLatestTurn && totalTurns > 1) {
+                    turnHeaderHtml = `
+                        <div class="turn-summary-pill d-flex align-items-center justify-content-between p-2 mb-2" onclick="toggleTurnAccordion('${turnId}')">
+                            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 80%;">
+                                <span class="badge ${turn.status === 'COMPLETED' ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted'}" style="font-size: 10px;">Turn ${turnId}</span>
+                                <span class="fw-medium text-truncate" style="font-size: 12px; color: var(--text-main);">${escapeHtml(userText)}</span>
+                                <span class="text-muted text-truncate" style="font-size: 11px;">· ${turnSteps.length} 步骤已校验达成</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1.5 text-muted" style="font-size: 11px;">
+                                <span id="turn_acc_text_${turnId}">${turnAccordionText}</span>
+                                <i class="bi ${turnAccordionChevron}" id="turn_acc_chevron_${turnId}" style="font-size: 9px;"></i>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 // 组装本 Turn 完整流动气泡
                 allTurnsHtml += `
                     <div class="dsh-turn-wrapper" id="turn_wrapper_${turnId}">
-                        <!-- 用户指令气泡 (浅蓝紫精雕气泡) -->
-                        <div class="stream-user-row">
-                            <div class="stream-user-bubble ${turn.is_rework ? 'rework-bubble' : ''}">
-                                ${reworkBadge}
-                                <span>${escapeHtml(userText)}</span>
-                                ${reworkNote}
+                        ${turnHeaderHtml}
+                        <div class="turn-detail-container ${turnDetailClass}" id="turn_detail_body_${turnId}">
+                            <!-- 用户指令气泡 (浅蓝紫精雕气泡) -->
+                            <div class="stream-user-row">
+                                <div class="stream-user-bubble ${turn.is_rework ? 'rework-bubble' : ''}">
+                                    ${reworkBadge}
+                                    <span>${escapeHtml(userText)}</span>
+                                    ${reworkNote}
+                                </div>
                             </div>
-                        </div>
 
-                        <!-- AI 流式响应体 -->
-                        <div class="msg-ai-row">
-                            ${thinkingHtml}
-                            ${todoCardHtml}
-                            ${stepCardsHtml}
-                            ${stepAlertHtml}
-                            ${conclusionHtml}
+                            <!-- AI 流式响应体 -->
+                            <div class="msg-ai-row">
+                                ${thinkingHtml}
+                                ${todoCardHtml}
+                                ${stepCardsHtml}
+                                ${stepAlertHtml}
+                                ${conclusionHtml}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -12410,6 +12507,92 @@ function renderChatStream(sessionData) {
             }
             updateConsoleLogs();
             updateCurrentStepCapsule(sessionData);
+            updateWorkingMemoryCapsule(sessionData);
+        }
+
+        // =========================================================================
+        // 具身工作记忆与多轮交互辅助逻辑 (DeepSeek Harness + Muse 范式)
+        // =========================================================================
+        function toggleTurnAccordion(turnId) {
+            window._turnExpandedState = window._turnExpandedState || {};
+            const key = `turn_${turnId}`;
+            window._turnExpandedState[key] = !window._turnExpandedState[key];
+            const isExp = window._turnExpandedState[key];
+            
+            const body = document.getElementById(`turn_detail_body_${turnId}`);
+            if (body) {
+                if (isExp) body.classList.remove("d-none");
+                else body.classList.add("d-none");
+            }
+            const textEl = document.getElementById(`turn_acc_text_${turnId}`);
+            if (textEl) textEl.textContent = isExp ? "收起明细" : "展开明细";
+            const chevEl = document.getElementById(`turn_acc_chevron_${turnId}`);
+            if (chevEl) {
+                chevEl.className = `bi ${isExp ? "bi-chevron-up" : "bi-chevron-down"}`;
+            }
+        }
+
+        function updateWorkingMemoryCapsule(sessionData) {
+            const bar = document.getElementById("workingMemoryCapsuleBar");
+            const ta = document.getElementById("taskInputText");
+            if (!bar) return;
+
+            if (!sessionData || sessionData.status === "EMPTY" || !sessionData.session_id) {
+                bar.classList.add("d-none");
+                bar.innerHTML = "";
+                return;
+            }
+
+            const turns = sessionData.turns || [];
+            const totalTurns = turns.length;
+            const wm = sessionData.working_memory || {};
+            const activeEnt = wm.active_entities || {};
+            const listItems = activeEnt.list_items || [];
+            const fm = sessionData.fact_memory || {};
+            const currPkg = fm.current_package || sessionData.app_package || "";
+
+            // 动态更新输入框 placeholder
+            if (ta && totalTurns >= 1 && (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW")) {
+                const nextTurnId = totalTurns + 1;
+                ta.placeholder = `Turn ${nextTurnId} · 原地继承当前界面继续测试（例如：“点进第2个房源核验价格”、“返回重新排序”）...`;
+            }
+
+            // 若无实体且仅有单轮，不喧宾夺主
+            if (listItems.length === 0 && !currPkg && totalTurns <= 1) {
+                bar.classList.add("d-none");
+                bar.innerHTML = "";
+                return;
+            }
+
+            let itemsPillsHtml = "";
+            listItems.slice(0, 4).forEach(item => {
+                itemsPillsHtml += `
+                    <span class="wm-entity-tag" onclick="insertPromptShortcut('点进第${item.index}项核对详情')" title="点击快捷填入本条目指令">
+                        <span class="wm-idx">[${item.index}]</span>
+                        <span class="wm-text">${escapeHtml(item.text)}</span>
+                    </span>
+                `;
+            });
+
+            bar.classList.remove("d-none");
+            bar.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-1">
+                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                        <span class="wm-header-badge" title="DeepSeek Harness 具身工作记忆，跨轮无缝继承"><i class="bi bi-cpu me-1"></i>工作记忆</span>
+                        ${currPkg ? `<span class="wm-pkg-pill" title="当前真机停留应用"><i class="bi bi-phone me-1"></i>${escapeHtml(currPkg.split('.').pop() || currPkg)}</span>` : ''}
+                        ${itemsPillsHtml}
+                    </div>
+                    ${totalTurns > 1 ? `<span class="text-muted" style="font-size: 10px;">已连续交互 ${totalTurns} 轮</span>` : ''}
+                </div>
+            `;
+        }
+
+        function insertPromptShortcut(text) {
+            const ta = document.getElementById("taskInputText");
+            if (!ta) return;
+            ta.value = text;
+            ta.focus();
+            if (typeof onInputTextChange === "function") onInputTextChange();
         }
 
         function triggerTypewriterConclusion(sessionId, fullText, shouldAnimate) {
