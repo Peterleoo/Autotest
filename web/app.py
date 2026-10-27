@@ -47,6 +47,26 @@ screen_stream_hub.set_adb_bin(app_mgr.adb_bin)
 task_mgr = TaskManager()
 auth_mgr = AuthManager()
 
+
+def _get_connected_device_ids() -> List[str]:
+    """读取当前在线真机序列号，兼容 get_connected_devices 返回字符串或字典两种形态。"""
+    try:
+        connected = app_mgr.get_connected_devices()
+        return [d if isinstance(d, str) else d.get("id") for d in connected if d]
+    except Exception:
+        return []
+
+
+def _resolve_device_id(device_id: Optional[str] = None) -> Optional[str]:
+    """
+    将前端传入的空值 / auto / 过期序列号统一解析为当前真实在线设备。
+    避免投屏与触控接口写死旧设备号导致 404 / ADB 报错。
+    """
+    ids = _get_connected_device_ids()
+    if device_id and device_id not in ("default", "auto", "mock-device", "local-simulator") and device_id in ids:
+        return device_id
+    return ids[0] if ids else None
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     response = templates.TemplateResponse("index.html", {"request": request})
@@ -90,6 +110,18 @@ async def get_devices(probe: bool = False, force: bool = False):
                 if probe:
                     input_healthy, input_tip = device_knowledge_mgr.probe_input_permission(dev_id)
                 
+                screen_w, screen_h = 0, 0
+                try:
+                    size_res = subprocess.run(
+                        [adb_bin, "-s", dev_id, "shell", "wm", "size"],
+                        capture_output=True, text=True, timeout=2
+                    )
+                    size_match = re.search(r"(\d+)x(\d+)", size_res.stdout or "")
+                    if size_match:
+                        screen_w, screen_h = int(size_match.group(1)), int(size_match.group(2))
+                except Exception:
+                    pass
+
                 devices.append({
                     "id": dev_id,
                     "model": f"{dev_fp.get('brand')} {dev_fp.get('model')}" if dev_fp.get("brand") != "Android" else model,
@@ -98,6 +130,8 @@ async def get_devices(probe: bool = False, force: bool = False):
                     "rom": dev_fp.get("rom", ""),
                     "platform": "Android",
                     "version": version,
+                    "width": screen_w,
+                    "height": screen_h,
                     "input_healthy": input_healthy,
                     "input_tip": input_tip or "",
                     "status": "在线 (Online)"
@@ -123,19 +157,12 @@ async def get_devices(probe: bool = False, force: bool = False):
 async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70):
     """获取指定真机设备的实时屏幕截图 (依托显存 RAW 直读与 PC 端 SIMD 硬件级转码，耗时压缩至 0.6s，内存 0ms 秒回)"""
     # 🌟 第一性原理：先核查真机真实连接状态，无真机在线时坚决返回 404，杜绝伪造假象
-    try:
-        connected = app_mgr.get_connected_devices()
-        conn_ids = [d if isinstance(d, str) else d.get("id") for d in connected if d]
-    except Exception:
-        conn_ids = []
-
+    conn_ids = _get_connected_device_ids()
     if not conn_ids:
         return Response(status_code=404, content=b"No device connected", media_type="text/plain")
 
-    target_dev = device_id
-    if not target_dev or target_dev in ["mock-device", "local-simulator", "default", "auto"]:
-        target_dev = conn_ids[0]
-    elif target_dev not in conn_ids:
+    target_dev = _resolve_device_id(device_id)
+    if not target_dev:
         return Response(status_code=404, content=b"Device offline", media_type="text/plain")
 
     try:
@@ -166,17 +193,9 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
     """原生 ADB 极速 MJPEG 实时帧流发生器 (依托显存 RAW 直读 + OpenCV SIMD，端到端延迟低至 600ms)"""
     import asyncio
 
-    target_dev = device_id
-    if not target_dev or target_dev in ["default", "auto"]:
-        try:
-            connected = app_mgr.get_connected_devices()
-            if connected:
-                target_dev = connected[0].get("id")
-        except Exception:
-            pass
-
+    target_dev = _resolve_device_id(device_id)
     if not target_dev:
-        target_dev = "2145189e"
+        return Response(status_code=404, content=b"No device connected", media_type="text/plain")
 
     async def frame_generator():
         while True:
@@ -203,7 +222,9 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
 @app.post("/api/device/tap")
 async def tap_device(payload: Dict[str, Any] = Body(...)):
     """鼠标穿透控制：接收网页点击相对坐标，转化为真机 ADB 物理手势"""
-    dev_id = payload.get("device_id") or "2145189e"
+    dev_id = _resolve_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No device connected"}, status_code=404)
     x = int(payload.get("x", 0))
     y = int(payload.get("y", 0))
     if x <= 0 or y <= 0:
@@ -220,7 +241,9 @@ async def tap_device(payload: Dict[str, Any] = Body(...)):
 @app.post("/api/device/swipe")
 async def swipe_device(payload: Dict[str, Any] = Body(...)):
     """真机拖拽/滑动穿透控制：接收滑动起点与终点物理坐标及持续时间"""
-    dev_id = payload.get("device_id") or "2145189e"
+    dev_id = _resolve_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No device connected"}, status_code=404)
     x1 = int(payload.get("x1", 0))
     y1 = int(payload.get("y1", 0))
     x2 = int(payload.get("x2", 0))
@@ -243,7 +266,9 @@ async def swipe_device(payload: Dict[str, Any] = Body(...)):
 @app.post("/api/device/key")
 async def send_device_key(payload: Dict[str, Any] = Body(...)):
     """真机按键控制：支持返回、桌面、多任务等虚拟导航键"""
-    dev_id = payload.get("device_id") or "2145189e"
+    dev_id = _resolve_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No device connected"}, status_code=404)
     key = str(payload.get("key", "")).lower()
     key_map = {"back": "4", "home": "3", "app_switch": "187", "menu": "82", "volume_up": "24", "volume_down": "25"}
     keycode = key_map.get(key, key)
@@ -271,9 +296,11 @@ async def get_deliverables_list():
 async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
     """⚡ 0 Token 毫秒级原生用例回放：多级智能寻址并直接通过 Pytest 执行固化脚本"""
     safe_ref = payload.get("safeRef") or payload.get("script_path", "")
-    device_id = payload.get("device_id") or "2145189e"
     if not safe_ref:
         return JSONResponse({"success": False, "passed": False, "duration": 0, "error": "缺少测试脚本路径 (safeRef 为空)"})
+    device_id = _resolve_device_id(payload.get("device_id"))
+    if not device_id:
+        return JSONResponse({"success": False, "passed": False, "duration": 0, "error": "未检测到在线真机设备"})
 
     # 多级鲁棒寻址
     file_path = None
