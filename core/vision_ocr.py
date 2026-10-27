@@ -88,36 +88,57 @@ class VisionOCR:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if res.returncode == 0 and res.stdout.strip():
                 raw_json = res.stdout.strip()
-                # 提取 JSON 部分
-                if "[" in raw_json and "]" in raw_json:
-                    start = raw_json.find("[")
-                    end = raw_json.rfind("]") + 1
-                    data = json.loads(raw_json[start:end])
-                    
-                    elements = []
-                    for item in data:
-                        text = item.get("text", "").strip()
-                        # 清洗连带的空格（例如 "用 密 码 登 录" -> "用密码登录"）
-                        clean_text = "".join(text.split())
-                        center = item.get("center", [540, 960])
-                        bounds = item.get("bounds", "")
-                        
-                        elements.append({
-                            "index": item.get("index"),
-                            "text": clean_text,
-                            "raw_text": text,
-                            "desc": clean_text,
-                            "resource_id": "",
-                            "class": "VisionTextElement",
-                            "clickable": True,
-                            "center": (center[0], center[1]),
-                            "bounds": bounds,
-                            "source": "vision_ocr"
-                        })
-                    logger.info(f"视觉 OCR 成功提取屏幕文字元素: {len(elements)} 个")
-                    _LAST_OCR_FINGERPRINT = current_fp
-                    _LAST_OCR_RESULTS = elements
-                    return elements, False
+                data = None
+
+                # PowerShell 的 ConvertTo-Json 在只有一条结果时会输出对象而不是数组，
+                # 因此先整体解析，再兼容数组/带前后噪声的文本。
+                try:
+                    data = json.loads(raw_json)
+                except Exception:
+                    for left, right in [("[", "]"), ("{", "}")]:
+                        start = raw_json.find(left)
+                        end = raw_json.rfind(right) + 1
+                        if start != -1 and end > start:
+                            try:
+                                data = json.loads(raw_json[start:end])
+                                break
+                            except Exception:
+                                data = None
+
+                if isinstance(data, dict):
+                    data = [data]
+                if not isinstance(data, list):
+                    logger.warning(f"OCR 输出无法解析为元素数组: {raw_json[:200]}")
+                    data = []
+
+                elements = []
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    text = str(item.get("text", "")).strip()
+                    # 清洗连带的空格（例如 "用 密 码 登 录" -> "用密码登录"）
+                    clean_text = "".join(text.split())
+                    center = item.get("center") or [540, 960]
+                    if not isinstance(center, (list, tuple)) or len(center) < 2:
+                        center = [540, 960]
+                    bounds = item.get("bounds", "")
+
+                    elements.append({
+                        "index": item.get("index"),
+                        "text": clean_text,
+                        "raw_text": text,
+                        "desc": clean_text,
+                        "resource_id": "",
+                        "class": "VisionTextElement",
+                        "clickable": True,
+                        "center": (int(center[0]), int(center[1])),
+                        "bounds": bounds,
+                        "source": "vision_ocr"
+                    })
+                logger.info(f"视觉 OCR 成功提取屏幕文字元素: {len(elements)} 个")
+                _LAST_OCR_FINGERPRINT = current_fp
+                _LAST_OCR_RESULTS = elements
+                return elements, False
             else:
                 logger.warning(f"OCR 识别执行异常: {res.stderr}")
         except Exception as e:

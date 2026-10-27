@@ -1,8 +1,12 @@
 import base64
+import io
+import logging
 import re
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Tuple
 from appium import webdriver
+
+logger = logging.getLogger("ScreenParser")
 
 class ScreenParser:
     """
@@ -93,6 +97,37 @@ class ScreenParser:
             ocr_elements, ocr_cached = VisionOCR.recognize_elements(raw_bytes)
         except Exception:
             ocr_elements, ocr_cached = [], False
+
+        # 将 OCR 基于截图坐标系的元素映射回真机物理坐标（截图可能被降采样到 480 宽）
+        if ocr_elements:
+            try:
+                from PIL import Image
+                screenshot = Image.open(io.BytesIO(raw_bytes))
+                img_w, img_h = screenshot.size
+                win_size = driver.get_window_size()
+                dev_w, dev_h = win_size.get("width", img_w), win_size.get("height", img_h)
+                scale_x, scale_y = dev_w / img_w, dev_h / img_h
+
+                if abs(scale_x - 1.0) > 0.01 or abs(scale_y - 1.0) > 0.01:
+                    for oe in ocr_elements:
+                        center = oe.get("center")
+                        if center:
+                            oe["center"] = (int(round(center[0] * scale_x)), int(round(center[1] * scale_y)))
+                        bounds = oe.get("bounds")
+                        if bounds:
+                            nums = re.findall(r"\d+", bounds)
+                            if len(nums) == 4:
+                                x1, y1, x2, y2 = map(int, nums)
+                                oe["bounds"] = (
+                                    f"[{int(round(x1 * scale_x))},{int(round(y1 * scale_y))}]"
+                                    f"[{int(round(x2 * scale_x))},{int(round(y2 * scale_y))}]"
+                                )
+                    logger.info(
+                        f"OCR 坐标已映射至真机分辨率: 截图 {img_w}x{img_h} -> 设备 {dev_w}x{dev_h} "
+                        f"(scale {scale_x:.3f}, {scale_y:.3f})"
+                    )
+            except Exception as e:
+                logger.warning(f"OCR 坐标缩放失败，将使用原始截图坐标: {e}")
 
         # 智能融合：将 OCR 识别出的高精度视觉文字元素补齐入列表
         merged_elements = list(elements)

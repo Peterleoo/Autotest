@@ -151,7 +151,26 @@ class NativeADBDriver:
         return base64.b64encode(raw_bytes).decode("utf-8")
 
     def get_screenshot_as_png(self) -> bytes:
-        """通过 adb exec-out screencap 获取物理屏幕原图二进制字节 (优先使用显存 RAW 直读 + PC 端硬件加速)"""
+        """
+        获取真机物理分辨率原图，供 OCR 与 AI 视觉使用。
+        注意：实时投屏的 480 宽缩略图会丢失自绘/Flutter 页面的文字细节与坐标精度，
+        因此这里优先走全分辨率 screencap，失败后再回退到投屏帧。
+        """
+        full_cmd = [self.adb_bin]
+        if self.device_id:
+            full_cmd.extend(["-s", self.device_id])
+        full_cmd.extend(["exec-out", "screencap", "-p"])
+        try:
+            res = subprocess.run(full_cmd, capture_output=True, timeout=10)
+            raw = res.stdout
+            if res.returncode == 0 and raw:
+                if not raw.startswith(b"\x89PNG\x0d\x0a\x1a\x0a") and b"PNG" in raw[:16]:
+                    raw = raw.replace(b"\r\r\n", b"\n").replace(b"\r\n", b"\n")
+                if raw.startswith(b"\x89PNG"):
+                    return raw
+        except Exception as e:
+            logger.warning(f"全分辨率截图失败，回退投屏帧: {e}")
+
         try:
             from core.screen_stream_hub import _capture_raw_and_encode_sync, HAS_OPENCV
             import cv2
@@ -167,12 +186,7 @@ class NativeADBDriver:
         except Exception:
             pass
 
-        full_cmd = [self.adb_bin]
-        if self.device_id:
-            full_cmd.extend(["-s", self.device_id])
-        full_cmd.extend(["exec-out", "screencap", "-p"])
-        res = subprocess.run(full_cmd, capture_output=True, timeout=10)
-        return res.stdout
+        return b""
 
     def find_element(self, by: Any, value: str) -> NativeElement:
         """从页面中定位元素并包装为 NativeElement"""
