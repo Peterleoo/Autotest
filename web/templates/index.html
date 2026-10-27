@@ -9920,10 +9920,11 @@
             const btnSend = document.getElementById("btnSendTask");
             const inputTa = document.getElementById("taskInputText");
 
-            const hasRealDevices = (availableDevices.length > 0 && checked.length > 0);
+            const hasRealDevices = (availableDevices && availableDevices.length > 0 && (checked.length > 0 || document.querySelectorAll(".device-checkbox").length === 0));
+            const devCount = checked.length > 0 ? checked.length : (availableDevices ? availableDevices.length : 0);
 
             if (lbl) {
-                lbl.innerText = hasRealDevices ? `${checked.length} 台真机在线` : `0 台真机在线`;
+                lbl.innerText = hasRealDevices ? `${devCount} 台真机在线` : `0 台真机在线`;
             }
             if (dot) {
                 dot.className = hasRealDevices ? "status-indicator-dot dot-online" : "status-indicator-dot dot-offline";
@@ -13056,6 +13057,16 @@ function renderChatStream(sessionData) {
                     renderGlobalPreflightPopoverContent(data);
                 }
 
+                // 🌟 若检测到环境全景已就绪，且当前对话流仍停留在历史未就绪引导卡片中（未激活任务会话），自动清理并平滑恢复空状态看板
+                if (isReady && !activeSessionId) {
+                    const flow = document.getElementById("messagesFlow");
+                    const emptyBox = document.getElementById("emptyStateBox");
+                    if (flow && flow.innerHTML.includes("系统自检助理")) {
+                        flow.innerHTML = "";
+                        if (emptyBox) emptyBox.classList.remove("d-none");
+                    }
+                }
+
                 if (typeof loadDevices === "function") {
                     loadDevices();
                 }
@@ -13619,7 +13630,11 @@ function renderChatStream(sessionData) {
 
                 // 分支 B: 当前无激活任务时，创建全新的自动化测试会话 (纯真机)
                 const checkedBoxes = document.querySelectorAll(".device-checkbox:checked");
-                const selectedDevIds = Array.from(checkedBoxes).map(c => c.value);
+                let selectedDevIds = Array.from(checkedBoxes).map(c => c.value);
+                if (selectedDevIds.length === 0) {
+                    const activeDev = getActiveTargetDeviceId();
+                    if (activeDev) selectedDevIds = [activeDev];
+                }
 
                 const formData = new FormData();
                 formData.append("goal", goal);
