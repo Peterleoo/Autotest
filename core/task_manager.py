@@ -1734,15 +1734,31 @@ class TaskManager:
                 except Exception:
                     existing_cred = None
 
+                mode = "manual_takeover" if "mode=manual_takeover" in line else "credential"
+                title = "人机协同 · 请在投屏手动完成" if mode == "manual_takeover" else "人机协同 · 需要登录凭证"
+                desc = (
+                    "已尝试自动填入凭证，但端侧需要进一步操作（如选择公司/滑动验证码）。请直接在右侧真机投屏中轻触完成，完成后点击【我已在投屏中完成】！"
+                    if mode == "manual_takeover" else
+                    "检测到目标应用进入账号密码/登录鉴权页，请提供测试账号密码，或在右侧投屏手动完成登录："
+                )
+
+                # 保留此前会话中用户已输入的账号，避免重复输入
+                prior_account = ""
+                if session.get("hitl_decision") and session["hitl_decision"].get("preset_account"):
+                    prior_account = session["hitl_decision"]["preset_account"]
+                elif existing_cred and existing_cred.get("account"):
+                    prior_account = existing_cred["account"]
+
                 session["hitl_decision"] = {
                     "type": "credential",
+                    "mode": mode,
                     "app_key": app_key,
-                    "title": "人机协同 · 需要登录凭证",
-                    "desc": "检测到目标应用进入账号密码登录页，请提供测试账号或在投屏手动完成登录",
-                    "preset_account": existing_cred.get("account", "") if existing_cred else "",
+                    "title": title,
+                    "desc": desc,
+                    "preset_account": prior_account,
                     "timestamp": time.time()
                 }
-                dev_state["action"] = "⏸️ 挂起中：等待输入账号密码或投屏手动登录"
+                dev_state["action"] = "⏸️ 挂起中：请在投屏手动操作并点击已完成" if mode == "manual_takeover" else "⏸️ 挂起中：等待输入账号密码或投屏手动登录"
                 self._save_session(session["session_id"])
 
             # 实时捕获异常日志

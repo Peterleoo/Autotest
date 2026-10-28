@@ -81,6 +81,8 @@ class AITestAgent:
         self.executor = ActionExecutor(driver=self.driver, api_client=self.api_client, app_identifier=app_identifier)
         self.status_callback = status_callback
         self._has_prompted_credential = False
+        self._hitl_attempts = 0
+        self._last_hitl_signature = None
 
     def _notify_status(self, data: Dict[str, Any]):
         if self.status_callback:
@@ -120,7 +122,7 @@ class AITestAgent:
     def _execute_credential_injection(self, acc: str, pwd: str, screen_info: Dict[str, Any]) -> bool:
         """
         确定性端侧凭证自动注入流水线 (DSH Credential Injection Pipeline)
-        真实模拟用户物理操作：切换密码登录 -> 勾选协议 -> 填手机号 -> 填密码 -> 提交登录
+        真实模拟用户物理操作：切换密码登录 -> 自动选组织/公司 -> 勾选协议 -> 填手机号/登录码 -> 填密码 -> 提交登录
         """
         logger.info(f"🔑 [DSH 凭证自动注入] 开始对真机执行账号 [{acc}] 真实登录注入流水线...")
         self._notify_status({
@@ -129,56 +131,113 @@ class AITestAgent:
             "log": f"🔑 正在自动填入测试凭证 [{acc}] 并执行物理登录..."
         })
 
+        elements = screen_info.get("elements", [])
+
         # 1. 检查是否在验证码登录模式，若有'密码登录'/'账号密码登录'切换按钮，先切换
-        for el in screen_info.get("elements", []):
+        for el in elements:
             t = (el.get("text") or el.get("content_desc") or "").strip()
             if any(k in t for k in ["用密码登录", "密码登录", "账号密码登录"]):
                 logger.info(f"点击切换到密码登录模式: {t}")
                 self.executor._locate_and_click(el, None)
                 time.sleep(0.6)
                 screen_info = ScreenParser.get_screen_summary(self.driver)
+                elements = screen_info.get("elements", [])
                 break
 
-        # 2. 扫描定位关键组件：手机号框、密码框、协议框、登录按钮
-        phone_el, pwd_el, agree_el, login_btn = None, None, None, None
-        for el in screen_info.get("elements", []):
+        # 2. 扫描定位关键组件：手机号/登录码框、密码框、协议框、登录按钮、公司选择框
+        phone_el, pwd_el, agree_el, login_btn, company_el = None, None, None, None, None
+        edit_texts = []
+
+        for el in elements:
             t = (el.get("text") or el.get("content_desc") or "").strip()
-            if not phone_el and any(k in t for k in ["手机号", "账号", "请输入手机", "请输入账号", "登录码", "合伙人"]):
+            cls = el.get("class", "")
+            is_input = el.get("is_input", False) or "EditText" in cls
+
+            if is_input:
+                edit_texts.append(el)
+
+            if not phone_el and any(k in t for k in ["手机号", "账号", "请输入手机", "请输入账号", "登录码", "合伙人", "工号"]):
                 phone_el = el
             elif not pwd_el and any(k in t for k in ["密码", "请输入密码"]):
                 pwd_el = el
-            elif not agree_el and any(k in t for k in ["协议", "同意", "已阅读"]):
+            elif not agree_el and any(k in t for k in ["协议", "同意", "已阅读", "我已阅读"]):
                 agree_el = el
             elif not login_btn and any(k in t for k in ["登录", "进入", "下一步", "同意隐私并下一步"]):
-                # 排除"密码登录"等切换按钮
                 if not any(k in t for k in ["密码登录", "切换", "验证码登录"]):
                     login_btn = el
+            elif not company_el and any(k in t for k in ["请选择您所在的公司", "选择公司", "所属公司"]):
+                company_el = el
 
-        # 3. 执行物理点击协议
+        # 智能兜底：若有自绘或占位符未暴露在文本中的空 EditText
+        if not phone_el and edit_texts:
+            phone_el = edit_texts[0]
+            logger.info(f"使用首个输入框作为账号目标: {phone_el.get('bounds')}")
+        if not pwd_el and len(edit_texts) >= 2:
+            pwd_el = edit_texts[1]
+            logger.info(f"使用次位输入框作为密码目标: {pwd_el.get('bounds')}")
+
+        # 3. 若有公司/组织选择下拉框，尝试轻触展开并选定默认公司
+        if company_el:
+            logger.info("检测到公司选择下拉框，尝试轻触选定...")
+            self.executor._locate_and_click(company_el, None)
+            time.sleep(0.6)
+            post_company_screen = ScreenParser.get_screen_summary(self.driver)
+            # 在弹出的选项中点击包含“象盒”或第一项列表
+            for cand in post_company_screen.get("elements", []):
+                ct = (cand.get("text") or cand.get("content_desc") or "").strip()
+                if any(k in ct for k in ["象盒", "总公司", "测试", "默认", "房产"]):
+                    self.executor._locate_and_click(cand, None)
+                    logger.info(f"已选中公司组织项: {ct}")
+                    time.sleep(0.4)
+                    break
+
+        # 4. 执行物理点击协议 (优先点击协议文本左侧勾选框，避免点进隐私条款跳转)
         if agree_el:
             logger.info("勾选服务与隐私协议")
-            self.executor._locate_and_click(agree_el, None)
+            agree_bounds = agree_el.get("bounds", "")
+            checkbox_clicked = False
+            for el in elements:
+                if el.get("clickable") and el != agree_el:
+                    b = el.get("bounds", "")
+                    if b and agree_bounds:
+                        try:
+                            import re
+                            m_cb = re.findall(r"\[(\d+),(\d+)\]", b)
+                            m_ag = re.findall(r"\[(\d+),(\d+)\]", agree_bounds)
+                            if m_cb and m_ag:
+                                x2_cb = int(m_cb[1][0])
+                                x1_ag = int(m_ag[0][0])
+                                y1_cb = int(m_cb[0][1])
+                                y1_ag = int(m_ag[0][1])
+                                if abs(y1_cb - y1_ag) < 60 and abs(x2_cb - x1_ag) < 80:
+                                    self.executor._locate_and_click(el, None)
+                                    checkbox_clicked = True
+                                    logger.info(f"精准命中协议左侧单选框: {b}")
+                                    break
+                        except Exception:
+                            pass
+            if not checkbox_clicked:
+                self.executor._locate_and_click(agree_el, None)
             time.sleep(0.3)
 
-        # 4. 执行填入账号
+        # 5. 执行填入账号
         if phone_el and acc:
-            logger.info(f"填入账号: {acc}")
+            logger.info(f"填入账号/登录码: {acc}")
             self.executor._locate_and_type(phone_el, acc)
             time.sleep(0.4)
 
-        # 5. 执行填入密码
+        # 6. 执行填入密码 (仅当页面有密码框且用户提供了密码时)
         if pwd_el and pwd:
             logger.info("填入密码: ******")
             self.executor._locate_and_type(pwd_el, pwd)
             time.sleep(0.4)
 
-        # 6. 点击登录提交按钮
+        # 7. 点击登录提交按钮
         if login_btn:
             logger.info("点击登录提交按钮")
             self.executor._locate_and_click(login_btn, None)
-            time.sleep(2.0)
+            time.sleep(1.8)
         else:
-            # 兜底：尝试按回车或根据坐标点击
             logger.info("未明确检出登录按钮，尝试发送回车键提交")
             try:
                 self.driver.press_keycode(66) # KEYCODE_ENTER
@@ -186,10 +245,17 @@ class AITestAgent:
             except Exception:
                 pass
 
-        # 7. 复核是否已成功跳出登录界面
+        # 8. 自适应等待画面转场静止
+        try:
+            ScreenParser.wait_for_visual_settling(self.driver, max_wait=2.5)
+        except Exception:
+            time.sleep(1.5)
+
+        # 9. 复核是否已成功跳出登录界面
         after_screen = ScreenParser.get_screen_summary(self.driver)
-        after_texts = [e.get("text", "") for e in after_screen.get("elements", [])]
-        is_still_login = any(any(kw in t for kw in ["手机号登录", "密码登录", "请输入密码"]) for t in after_texts)
+        after_texts = [e.get("text", "") or e.get("content_desc", "") for e in after_screen.get("elements", [])]
+        after_combined = " ".join(after_texts)
+        is_still_login = any(kw in after_combined for kw in ["手机号登录", "密码登录", "请输入密码", "请输入您的合伙人登录码", "请选择您所在的公司"])
 
         if not is_still_login:
             logger.info("🎉 [DSH 凭证自动注入] 验证通过：已成功完成登录并跳出鉴权拦截页！")
@@ -198,9 +264,11 @@ class AITestAgent:
                 "action": "登录完成",
                 "log": "✅ 测试凭证自动注入完成，真机已成功跨过登录拦截，业务链路恢复流转！"
             })
+            self._hitl_attempts = 0
+            self._last_hitl_signature = None
             return True
         else:
-            logger.warning("⚠️ [DSH 凭证自动注入] 尝试注入后真机仍停留在登录页，可能存在图形滑块验证码或密码校验失败")
+            logger.warning("⚠️ [DSH 凭证自动注入] 尝试注入后真机仍停留在登录页，可能存在图形滑块验证码、公司未选定或需要手动确认")
             return False
 
     def _check_and_prompt_hitl_credential(self, screen_info: Dict[str, Any], goal: str) -> bool:
@@ -208,7 +276,8 @@ class AITestAgent:
         人机协同登录决策拦截门禁 (Human-in-the-Loop Credential Gate, 对标 DeepSeek Harness 设计)
         若真机界面进入账号密码/验证码/登录码登录页面：
         1. 优先检索当前 App 是否已在设置中心配置预设真实凭证，若有则自动静默注入，保持 100% 无人值守；
-        2. 若未配置凭证，立即挂起任务流，向前端发出协同信号唤出【人机协同决策卡片】，AI 推理与步数时钟完全冻结，等待用户输入或投屏手动接管。
+        2. 若未配置凭证，立即挂起任务流，向前端发出协同信号唤出【人机协同决策卡片】，AI 推理与步数时钟完全冻结；
+        3. 若检测到同界面多次阻断，智能熔断防死循环，自动升级为【投屏手动接管引导】，支持一键放行！
         """
         texts = [e.get("text", "") or e.get("content_desc", "") for e in screen_info.get("elements", [])]
         combined = " ".join(texts)
@@ -239,22 +308,45 @@ class AITestAgent:
         if not cred and "." in app_key:
             cred = CredentialManager.get_credential(app_key.split(".")[-1])
 
-        if cred and cred.get("account"):
+        # 生成当前屏幕文本特征指纹 (防死循环追踪)
+        curr_sig = "|".join(sorted(set(t for t in texts if len(t) >= 2))[:8])
+        if self._last_hitl_signature == curr_sig:
+            self._hitl_attempts += 1
+        else:
+            self._hitl_attempts = 1
+            self._last_hitl_signature = curr_sig
+
+        session_id = self.session_id or "default_session"
+
+        # 若未达到熔断阈值且已预置凭证，尝试自动注入
+        if self._hitl_attempts == 1 and cred and cred.get("account"):
             logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
             injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info)
             if injected:
                 return True
-            logger.warning(f"⚠️ [自动注入未能成功跳出] 界面可能需要短信验证码、滑块拼图或人工确认，无缝转入人机协同决策卡片！")
+            logger.warning(f"⚠️ [自动注入未能成功跳出] 界面可能需要滑块拼图、公司选择或人工确认，升级转入人机协同决策卡片！")
 
-        session_id = self.session_id or "default_session"
-        logger.info(f"🛡️ [人机协同挂起] 检测到应用进入登录界面 [{app_key}] 且未预置有效凭证，AI 推理与步数时钟安全挂起，等待人工决策...")
-        print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}\n", flush=True)
+        # 🚀 死循环重试熔断器 (Anti-Loop Circuit Breaker)
+        # 若同一界面已经触发过 1 次注入但真机仍停留在该界面，坚决不再重复要求填表单，自动升级为【投屏手动接管模式】
+        is_manual_takeover = (self._hitl_attempts >= 2)
+        takeover_param = "&mode=manual_takeover" if is_manual_takeover else ""
 
-        self._notify_status({
-            "step": getattr(self, "step_count", 0),
-            "action": "人机协同挂起",
-            "log": "⏸️ 检测到目标应用进入账号密码/登录鉴权页，自动化已安全挂起（步数冻结），等待输入凭证或投屏手动登录..."
-        })
+        if is_manual_takeover:
+            logger.warning(f"🛡️ [人机协同死循环熔断] 同一登录界面已尝试注入但真机未跳出 (attempt={self._hitl_attempts})，自动升级为【投屏手动接管模式】！")
+            print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}{takeover_param}&attempt={self._hitl_attempts}\n", flush=True)
+            self._notify_status({
+                "step": getattr(self, "step_count", 0),
+                "action": "等待投屏手动完成",
+                "log": f"⏸️ 已为您自动填入凭证，端侧检测到需要进一步操作（如选择公司/滑动验证码）。请直接在右侧真机投屏中轻触完成，完成后点击【我已在投屏中完成】！"
+            })
+        else:
+            logger.info(f"🛡️ [人机协同挂起] 检测到应用进入登录界面 [{app_key}]，AI 推理与步数时钟安全挂起，等待人工决策...")
+            print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}&attempt={self._hitl_attempts}\n", flush=True)
+            self._notify_status({
+                "step": getattr(self, "step_count", 0),
+                "action": "人机协同挂起",
+                "log": "⏸️ 检测到目标应用进入账号密码/登录鉴权页，自动化已安全挂起（步数冻结），等待输入凭证或投屏手动登录..."
+            })
 
         from pathlib import Path
         import json
@@ -281,34 +373,18 @@ class AITestAgent:
                             acc = data.get("account", "").strip()
                             pwd = data.get("password", "").strip()
                             if acc:
-                                logger.info(f"💉 注入用户提供的测试账号: {acc}")
-                                phone_el, pwd_el, agree_el, login_btn = None, None, None, None
-                                for el in screen_info.get("elements", []):
-                                    t = (el.get("text") or el.get("content_desc") or "").strip()
-                                    if any(k in t for k in ["手机号", "账号", "请输入手机", "登录码", "合伙人"]):
-                                        phone_el = el
-                                    elif any(k in t for k in ["密码", "请输入密码"]):
-                                        pwd_el = el
-                                    elif any(k in t for k in ["协议", "同意", "隐私"]):
-                                        agree_el = el
-                                    elif any(k in t for k in ["登录", "进入", "下一步", "同意隐私并下一步"]):
-                                        login_btn = el
-                                
-                                if agree_el:
-                                    self.executor._locate_and_click(agree_el, None)
-                                    time.sleep(0.5)
-                                if phone_el:
-                                    self.executor._locate_and_type(phone_el, acc)
-                                    time.sleep(0.5)
-                                if pwd and pwd_el:
-                                    self.executor._locate_and_type(pwd_el, pwd)
-                                    time.sleep(0.5)
-                                if login_btn:
-                                    self.executor._locate_and_click(login_btn, None)
-                                    time.sleep(1.5)
+                                injected = self._execute_credential_injection(acc, pwd, screen_info)
+                                if injected:
+                                    self._hitl_attempts = 0
+                                    self._last_hitl_signature = None
+                                else:
+                                    # 注入后仍在原界面，将重试计数拉升为 2，确保下次立即升级为投屏手动引导
+                                    self._hitl_attempts = max(self._hitl_attempts, 2)
                         elif decision_type == "manual_done":
-                            logger.info("✅ 用户已在投屏手动完成登录，继续自动化测试")
-                            time.sleep(1.5)
+                            logger.info("✅ 用户已在投屏手动完成登录，重置人机协同计数器并恢复自动化")
+                            self._hitl_attempts = 0
+                            self._last_hitl_signature = None
+                            time.sleep(1.0)
                         elif decision_type == "skip":
                             logger.info("⏩ 用户选择跳过登录，模拟返回键继续")
                             try: self.driver.back()

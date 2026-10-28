@@ -9492,12 +9492,40 @@
                 gateEl.remove();
             }
 
-            // 🛡️ 人机协同登录决策卡片（挂起时呈现）
+            // 🛡️ 人机协同登录决策卡片（挂起时呈现，具备死循环熔断与投屏接管自愈）
             const hitl = sessionData.hitl_decision;
             const isWaitingHitl = (sessionData.status === "WAITING_USER_INPUT" || Boolean(hitl));
             let hitlEl = flow.querySelector(".hitl-decision-card");
             if (isWaitingHitl && hitl) {
                 const sid = sessionData.session_id || activeSessionId;
+                const isTakeover = (hitl.mode === "manual_takeover");
+                const defaultAcc = hitl.preset_account || window._lastHitlAccount || "";
+                const defaultPwd = window._lastHitlPassword || "";
+
+                let takeoverBanner = "";
+                let heroActionHtml = "";
+
+                if (isTakeover) {
+                    takeoverBanner = `
+                        <div class="alert alert-warning d-flex align-items-center gap-2 mb-3 py-2 px-3 border-0 shadow-sm" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-radius: 8px;">
+                            <i class="bi bi-display fs-4"></i>
+                            <div style="font-size: 12px; line-height: 1.5;">
+                                <strong style="font-size: 12.5px;">端侧需手动轻触介入：</strong>系统已自动尝试填入登录码，但目标应用需要进一步操作（如<strong>点击选择公司</strong>、<strong>滑块拼图</strong>或勾选协议）。请直接在<strong>右侧真机投屏</strong>中轻触完成，完成后点击下方绿色按钮即可无缝继续！
+                            </div>
+                        </div>
+                    `;
+                    heroActionHtml = `
+                        <div class="p-2.5 rounded mb-3 text-center" style="background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.35); padding: 12px;">
+                            <button class="btn btn-sm btn-success py-2 px-4 fw-semibold w-100 shadow-sm" style="font-size: 13px; border-radius: 8px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
+                                <i class="bi bi-check2-circle me-1.5 fs-6"></i> 我已在投屏/手机上完成操作，立即恢复自动化
+                            </button>
+                            <div class="text-muted small mt-1.5" style="font-size: 11px;">
+                                <i class="bi bi-info-circle me-1"></i>在右侧投屏轻触选择公司或通过验证后，点击此按钮秒级解除挂起
+                            </div>
+                        </div>
+                    `;
+                }
+
                 const hitlHtml = `
                     <div class="hitl-decision-card mt-3" id="hitlDecisionCard_${sid}">
                         <div class="d-flex align-items-center justify-content-between mb-2">
@@ -9509,20 +9537,25 @@
                                 <i class="bi bi-hourglass-split me-1"></i>自动化已安全挂起
                             </span>
                         </div>
+                        
+                        ${takeoverBanner}
+
                         <div class="text-sub small mb-3" style="line-height: 1.5; font-size: 12px;">
                             ${hitl.desc || '检测到端侧进入账号登录或鉴权拦截界面，自动化已安全挂起。请提供测试账号密码/验证码，或在右侧真机投屏手动完成登录：'}
                         </div>
+
+                        ${heroActionHtml}
                         
                         <div class="p-2.5 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); padding: 10px;">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="fw-medium text-main" style="font-size: 12px;"><i class="bi bi-key me-1 text-primary"></i> 方式一：输入测试凭证（自动代填账号/密码或短信验证码）</span>
+                                <span class="fw-medium text-main" style="font-size: 12px;"><i class="bi bi-key me-1 text-primary"></i> ${isTakeover ? '重新注入测试账号/登录码：' : '方式一：输入测试凭证（自动代填账号/登录码与密码）'}</span>
                             </div>
                             <div class="row g-2 mb-2">
                                 <div class="col-6">
-                                    <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="手机号 / 账号" value="${hitl.preset_account || ''}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                    <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="手机号 / 账号 / 合伙人登录码" value="${escapeHtml(defaultAcc)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
                                 </div>
                                 <div class="col-6">
-                                    <input type="text" class="form-control form-control-sm" id="hitlPasswordInput_${sid}" placeholder="密码 或 短信验证码" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                    <input type="text" class="form-control form-control-sm" id="hitlPasswordInput_${sid}" placeholder="密码 (若页面无密码框可留空)" value="${escapeHtml(defaultPwd)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
                                 </div>
                             </div>
                             <div class="d-flex align-items-center justify-content-between">
@@ -9533,15 +9566,16 @@
                                     </label>
                                 </div>
                                 <button class="btn btn-sm btn-primary px-3 py-1 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'inject')">
-                                    <i class="bi bi-lightning-charge-fill me-1"></i> 立即自动注入并提交
+                                    <i class="bi bi-lightning-charge-fill me-1"></i> ${isTakeover ? '再次尝试自动注入' : '立即自动注入并提交'}
                                 </button>
                             </div>
                         </div>
 
+                        ${!isTakeover ? `
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
                             <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px;">
                                 <i class="bi bi-display text-info"></i>
-                                <span>若需滑块拼图或物理机接码：可直接在右侧真机镜像手动操作</span>
+                                <span>若需滑块拼图或选择公司：可直接在右侧真机镜像手动操作</span>
                             </div>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-sm btn-outline-secondary py-1" style="font-size: 11.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'skip')">
@@ -9552,10 +9586,14 @@
                                 </button>
                             </div>
                         </div>
+                        ` : ''}
                     </div>
                 `;
                 if (!hitlEl) {
                     flow.insertAdjacentHTML("beforeend", hitlHtml);
+                } else if (isTakeover && !hitlEl.querySelector(".alert-warning")) {
+                    // 若从普通模式升级为接管模式，平滑更新内部结构
+                    hitlEl.outerHTML = hitlHtml;
                 }
             } else if (hitlEl) {
                 hitlEl.remove();
@@ -10876,6 +10914,8 @@
             
             const account = accountInput ? accountInput.value.trim() : "";
             const password = passwordInput ? passwordInput.value.trim() : "";
+            if (account) window._lastHitlAccount = account;
+            if (password) window._lastHitlPassword = password;
             const remember = rememberInput ? rememberInput.checked : true;
             
             if (decisionType === "inject" && !account) {
