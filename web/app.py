@@ -743,14 +743,25 @@ ALL_SUGGESTED_CASES = [
 ]
 
 @app.api_route("/api/ai/suggest_cases", methods=["GET", "POST"])
-async def suggest_cases(request: Request, app_name: Optional[str] = None):
-    """AI 测试用例助手：针对当前应用生成完善的多样化测试用例矩阵"""
-    import random
+async def suggest_cases(request: Request, app_name: Optional[str] = None, package_name: Optional[str] = None):
+    """AI 测试用例助手：针对当前应用生成端到端业务旅程套件与单点精选用例 (Journey Synthesizer)"""
     if not app_name:
         app_name = request.query_params.get("app_name") or "待测应用"
-    # 随机抽取 4 个不重复的业务用例
-    sampled = random.sample(ALL_SUGGESTED_CASES, min(4, len(ALL_SUGGESTED_CASES)))
-    return {"app_name": app_name, "cases": sampled}
+    if not package_name:
+        package_name = request.query_params.get("package_name") or ""
+
+    from core.journey_synthesizer import JourneySynthesizer
+    domain = JourneySynthesizer.infer_app_domain(f"{app_name} {package_name}")
+    suites = JourneySynthesizer.generate_journey_suites(app_name, package_name)
+    cases = JourneySynthesizer.generate_single_cases(app_name, package_name)
+
+    return {
+        "app_name": app_name,
+        "package_name": package_name,
+        "domain": domain,
+        "journey_suites": suites,
+        "cases": cases
+    }
 
 METADATA_FILE = settings.SOLIDIFIED_DIR / "cases_metadata.json"
 

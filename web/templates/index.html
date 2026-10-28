@@ -6755,6 +6755,59 @@
             background: var(--bg-surface-hover, rgba(255,255,255,0.06));
         }
 
+        /* 业务旅程套件 (Journey Suites - Linear / Raycast 范式) */
+        .journey-suite-card {
+            background: var(--bg-surface-elevated, rgba(255,255,255,0.03));
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 12px 14px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .journey-suite-card:hover {
+            border-color: rgba(16, 185, 129, 0.4);
+            background: var(--bg-surface-hover, rgba(255,255,255,0.06));
+            transform: translateY(-1px);
+        }
+        .journey-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 9999px;
+        }
+        .badge-activation {
+            background: rgba(59, 130, 246, 0.12);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        .badge-core {
+            background: rgba(16, 185, 129, 0.12);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .badge-edge {
+            background: rgba(245, 158, 11, 0.12);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .journey-stages-track {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .journey-stage-step {
+            background: rgba(255, 255, 255, 0.04);
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-subtle);
+        }
+
     </style>
 
 </head>
@@ -6941,6 +6994,15 @@
                                     </div>
                                     <button class="btn btn-sm py-0 px-2" style="font-size: 11px; color: var(--text-sub); border: 1px dashed var(--border-subtle); border-radius: 9999px;" onclick="openAppPackagesModal()" title="上传新应用 APK/IPA 或从应用库选择">
                                         <i class="bi bi-upload me-1"></i>更换/上传应用
+                                    </button>
+                                </div>
+                                <!-- 旅程套件 vs 单点场景模式切换器 (Journey Synthesizer) -->
+                                <div class="d-flex align-items-center gap-1 p-0.5 rounded" style="background: var(--bg-surface-elevated, rgba(255,255,255,0.05)); border: 1px solid var(--border-subtle); border-radius: 9999px;">
+                                    <button type="button" class="btn btn-xs py-0.5 px-2 fw-medium suggest-mode-pill active" id="btnModeJourney" onclick="switchSuggestMode('journey')" style="font-size: 11px; border-radius: 9999px; border: none; background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                                        <i class="bi bi-signpost-2 me-1"></i>业务旅程套件 (Journey)
+                                    </button>
+                                    <button type="button" class="btn btn-xs py-0.5 px-2 fw-medium suggest-mode-pill" id="btnModeSingle" onclick="switchSuggestMode('single')" style="font-size: 11px; border-radius: 9999px; border: none; background: transparent; color: var(--text-muted);">
+                                        <i class="bi bi-lightning-charge me-1"></i>单点用例 (Cases)
                                     </button>
                                 </div>
                                 <button class="suggest-refresh-btn" id="btnRefreshSuggestCases" onclick="refreshAppSuggestedCases()" title="换一批不同业务场景测试用例">
@@ -15372,28 +15434,78 @@ function renderChatStream(sessionData) {
             }
         }
 
-        async function refreshAppSuggestedCases(appName) {
-            if (appName) {
-                currentSuggestedAppName = appName;
+        window._suggestMode = window._suggestMode || 'journey';
+        window._suggestDataCache = null;
+
+        function switchSuggestMode(mode) {
+            window._suggestMode = mode;
+            const btnJ = document.getElementById("btnModeJourney");
+            const btnS = document.getElementById("btnModeSingle");
+            if (btnJ && btnS) {
+                if (mode === 'journey') {
+                    btnJ.style.background = 'rgba(16, 185, 129, 0.15)';
+                    btnJ.style.color = '#10b981';
+                    btnS.style.background = 'transparent';
+                    btnS.style.color = 'var(--text-muted)';
+                } else {
+                    btnS.style.background = 'rgba(16, 185, 129, 0.15)';
+                    btnS.style.color = '#10b981';
+                    btnJ.style.background = 'transparent';
+                    btnJ.style.color = 'var(--text-muted)';
+                }
             }
-            const labelEl = document.getElementById("suggestTargetAppLabel");
-            if (labelEl) labelEl.innerText = currentSuggestedAppName;
+            if (window._suggestDataCache) {
+                renderSuggestContent(window._suggestDataCache);
+            } else {
+                refreshAppSuggestedCases();
+            }
+        }
 
+        function renderSuggestContent(data) {
             const grid = document.getElementById("suggestCasesGrid");
-            const btn = document.getElementById("btnRefreshSuggestCases");
-            if (btn) btn.classList.add("rotating");
+            if (!grid) return;
 
-            try {
-                const res = await fetch(`/api/ai/suggest_cases?app_name=${encodeURIComponent(currentSuggestedAppName)}`);
-                const data = await res.json();
-                const cases = data.cases || [];
-                window._suggestedCasesCache = cases;
-
-                if (cases.length === 0) {
-                    if (grid) grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无可推荐用例，可直接在下方输入框描述意图</div>`;
+            if (window._suggestMode === 'journey') {
+                const suites = data.journey_suites || [];
+                if (suites.length === 0) {
+                    grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无端到端旅程套件，可切换单点用例模式</div>`;
                     return;
                 }
+                grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(280px, 1fr))";
+                let html = "";
+                suites.forEach((s, sIdx) => {
+                    let stagesHtml = "";
+                    (s.stages || []).forEach((st, stIdx) => {
+                        stagesHtml += `<span class="journey-stage-step">${stIdx + 1}. ${escapeHtml(st)}</span>`;
+                        if (stIdx < (s.stages.length - 1)) stagesHtml += `<span style="opacity: 0.4;">➔</span>`;
+                    });
 
+                    html += `
+                        <div class="journey-suite-card" onclick="pickJourneySuite(${sIdx})">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="journey-badge ${s.badge_class || 'badge-core'}">${escapeHtml(s.badge)}</span>
+                                    <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">${escapeHtml(s.title)}</span>
+                                </div>
+                                <span class="text-success" style="font-size: 11px; font-weight: 500;">一键载入旅程 <i class="bi bi-arrow-right-short"></i></span>
+                            </div>
+                            <div class="text-muted text-truncate" style="font-size: 11.5px; line-height: 1.5;" title="${escapeHtml(s.summary)}">
+                                ${escapeHtml(s.summary)}
+                            </div>
+                            <div class="journey-stages-track mt-1">
+                                ${stagesHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+                grid.innerHTML = html;
+            } else {
+                const cases = data.cases || [];
+                grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
+                if (cases.length === 0) {
+                    grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无可推荐用例，可直接在下方输入框描述意图</div>`;
+                    return;
+                }
                 let html = "";
                 cases.forEach((c, idx) => {
                     const levelClass = c.level === 'P0' ? 'mono-tag-active' : '';
@@ -15409,7 +15521,34 @@ function renderChatStream(sessionData) {
                         </div>
                     `;
                 });
-                if (grid) grid.innerHTML = html;
+                grid.innerHTML = html;
+            }
+        }
+
+        function pickJourneySuite(idx) {
+            if (!window._suggestDataCache || !window._suggestDataCache.journey_suites) return;
+            const suite = window._suggestDataCache.journey_suites[idx];
+            if (!suite || !suite.goal) return;
+            applyCaseGoal(suite.goal);
+        }
+
+        async function refreshAppSuggestedCases(appName) {
+            if (appName) {
+                currentSuggestedAppName = appName;
+            }
+            const labelEl = document.getElementById("suggestTargetAppLabel");
+            if (labelEl) labelEl.innerText = currentSuggestedAppName;
+
+            const grid = document.getElementById("suggestCasesGrid");
+            const btn = document.getElementById("btnRefreshSuggestCases");
+            if (btn) btn.classList.add("rotating");
+
+            try {
+                const res = await fetch(`/api/ai/suggest_cases?app_name=${encodeURIComponent(currentSuggestedAppName)}`);
+                const data = await res.json();
+                window._suggestDataCache = data;
+                window._suggestedCasesCache = data.cases || [];
+                renderSuggestContent(data);
             } catch (e) {
                 if (grid) grid.innerHTML = `<div class="p-2 text-danger small" style="grid-column: 1 / -1;">推荐用例加载失败，请重试</div>`;
             } finally {
