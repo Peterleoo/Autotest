@@ -1817,6 +1817,19 @@ async def get_session_token_pressure(session_id: str):
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
+@app.get("/api/sessions/{session_id}/compatibility_matrix")
+async def get_session_compatibility_matrix(session_id: str):
+    """获取当前会话的多机型视觉差异与步骤对齐对比看板 (Multi-Device Visual Diff Matrix)"""
+    try:
+        session = task_mgr.get_session(session_id)
+        if not session:
+            return JSONResponse(status_code=404, content={"error": "会话不存在"})
+        from core.report_generator import ReportGenerator
+        matrix = ReportGenerator.generate_compatibility_matrix(session)
+        return matrix
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
 # ==================== 智能测试规划与人机协同执行引擎 ====================
 
 CURRENT_PLAN_SESSION = {
