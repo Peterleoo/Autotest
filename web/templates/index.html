@@ -1403,12 +1403,12 @@
             height: 30px;
             padding: 0 14px;
             margin-bottom: 8px;
-            background: rgba(22, 22, 26, 0.92);
+            background: var(--bg-surface-elevated);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-medium);
             border-radius: 9999px;
-            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
             cursor: pointer;
             user-select: none;
             pointer-events: auto;
@@ -1416,10 +1416,11 @@
             align-self: center;
             max-width: 90%;
             z-index: 40;
+            color: var(--text-main);
         }
         .floating-task-hud:hover {
-            background: rgba(30, 30, 36, 0.98);
-            border-color: rgba(255, 255, 255, 0.2);
+            background: var(--bg-surface-hover);
+            border-color: var(--border-hover);
             transform: translateY(-1px);
         }
         .floating-task-hud.replan-pulse {
@@ -1428,13 +1429,13 @@
         @keyframes hudReplanGlow {
             0% { border-color: rgba(16, 185, 129, 0.2); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
             50% { border-color: rgba(16, 185, 129, 0.8); box-shadow: 0 0 16px 2px rgba(16, 185, 129, 0.3); }
-            100% { border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35); }
+            100% { border-color: var(--border-medium); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18); }
         }
         .hud-status-dot {
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: var(--status-green, #10b981);
+            background: var(--status-green);
             flex-shrink: 0;
         }
         .hud-status-dot.pulsing {
@@ -1442,7 +1443,7 @@
         }
         @keyframes hudPulseDot {
             0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 8px #10b981; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 8px var(--status-green); }
             100% { transform: scale(0.95); opacity: 0.8; }
         }
         .hud-step-pill {
@@ -1451,32 +1452,60 @@
             font-weight: 600;
             padding: 1px 6px;
             border-radius: 4px;
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-main, #ececed);
+            background: var(--bg-surface-hover);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            transition: all 0.2s ease;
+        }
+        .hud-step-pill.is-completed {
+            background: var(--status-green-bg);
+            border-color: var(--status-green-border);
+            color: var(--status-green);
         }
         .hud-task-title {
             font-size: 11.5px;
             font-weight: 500;
-            color: var(--text-sub, #a1a1aa);
+            color: var(--text-sub);
+        }
+        .hud-expand-hint {
+            font-size: 10.5px;
+            color: var(--text-sub);
+        }
+        .hud-chevron-arrow {
+            color: var(--text-sub);
+            font-size: 9px;
+            transition: transform 0.2s ease;
         }
         .task-dropup-sheet {
             position: absolute;
             bottom: calc(100% + 4px);
             left: 0;
             right: 0;
-            background: rgba(22, 22, 26, 0.96);
+            background: var(--bg-surface-elevated);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border: 1px solid var(--border-medium);
             border-radius: 12px;
-            box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.25);
             z-index: 105;
             pointer-events: auto;
+            color: var(--text-main);
             animation: dropupFadeSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
         @keyframes dropupFadeSlide {
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        .dropup-header {
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .hud-progress-badge {
+            font-size: 10px;
+            background: var(--status-green-bg);
+            color: var(--status-green);
+            border: 1px solid var(--status-green-border);
+            border-radius: 4px;
+            padding: 1px 6px;
         }
         .dropup-item-row {
             display: flex;
@@ -1486,14 +1515,78 @@
             border-radius: 6px;
             margin-bottom: 2px;
             font-size: 11.5px;
+            color: var(--text-main);
             transition: background 0.15s ease;
         }
         .dropup-item-row:hover {
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--bg-surface-hover);
         }
         .dropup-item-row.running {
-            background: rgba(16, 185, 129, 0.08);
-            border: 1px solid rgba(16, 185, 129, 0.2);
+            background: var(--status-green-bg);
+            border: 1px solid var(--status-green-border);
+        }
+
+        /* 🌟 白天模式专属极简微透质感 (Light Theme Overrides) */
+        body.theme-light .floating-task-hud,
+        body[data-theme="light"] .floating-task-hud {
+            background: rgba(255, 255, 255, 0.88);
+            border-color: rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+            color: var(--text-main);
+        }
+        body.theme-light .floating-task-hud:hover,
+        body[data-theme="light"] .floating-task-hud:hover {
+            background: rgba(255, 255, 255, 0.98);
+            border-color: rgba(0, 0, 0, 0.16);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+        }
+        body.theme-light .hud-step-pill,
+        body[data-theme="light"] .hud-step-pill {
+            background: rgba(0, 0, 0, 0.04);
+            border-color: rgba(0, 0, 0, 0.08);
+            color: #18181b;
+        }
+        body.theme-light .hud-step-pill.is-completed,
+        body[data-theme="light"] .hud-step-pill.is-completed {
+            background: rgba(5, 150, 105, 0.08);
+            border-color: rgba(5, 150, 105, 0.25);
+            color: #059669;
+        }
+        body.theme-light .hud-task-title,
+        body[data-theme="light"] .hud-task-title {
+            color: #52525b;
+        }
+        body.theme-light .hud-expand-hint,
+        body[data-theme="light"] .hud-expand-hint,
+        body.theme-light .hud-chevron-arrow,
+        body[data-theme="light"] .hud-chevron-arrow {
+            color: #71717a;
+        }
+        body.theme-light .task-dropup-sheet,
+        body[data-theme="light"] .task-dropup-sheet {
+            background: rgba(255, 255, 255, 0.96);
+            border-color: rgba(0, 0, 0, 0.09);
+            box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.08), 0 -2px 6px rgba(0, 0, 0, 0.04);
+            color: var(--text-main);
+        }
+        body.theme-light .dropup-header,
+        body[data-theme="light"] .dropup-header {
+            border-color: rgba(0, 0, 0, 0.06) !important;
+        }
+        body.theme-light .hud-progress-badge,
+        body[data-theme="light"] .hud-progress-badge {
+            background: rgba(5, 150, 105, 0.08);
+            color: #059669;
+            border-color: rgba(5, 150, 105, 0.22);
+        }
+        body.theme-light .dropup-item-row:hover,
+        body[data-theme="light"] .dropup-item-row:hover {
+            background: rgba(0, 0, 0, 0.035);
+        }
+        body.theme-light .dropup-item-row.running,
+        body[data-theme="light"] .dropup-item-row.running {
+            background: rgba(5, 150, 105, 0.06);
+            border-color: rgba(5, 150, 105, 0.2);
         }
         .gpt-input-box {
             width: 100%;
@@ -7187,11 +7280,11 @@
 
                 <!-- 就地向上展开的活任务清单抽屉 (Dropup Sheet) -->
                 <div id="taskDropupSheet" class="task-dropup-sheet d-none" onclick="event.stopPropagation()">
-                    <div class="dropup-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom" style="border-color: rgba(255, 255, 255, 0.08) !important;">
+                    <div class="dropup-header d-flex align-items-center justify-content-between px-3 py-2">
                         <div class="d-flex align-items-center gap-1.5">
                             <span class="fw-semibold" style="font-size: 12px;" id="dropupSheetTitle">📋 具身活任务看板 (实时对齐端侧)</span>
                         </div>
-                        <span class="badge" style="font-size: 10px; background: rgba(16, 185, 129, 0.12); color: var(--status-green); border: 1px solid rgba(16, 185, 129, 0.25);" id="dropupProgressBadge">0/0 推进中</span>
+                        <span class="hud-progress-badge" id="dropupProgressBadge">0/0 推进中</span>
                     </div>
                     <div class="dropup-body p-2" id="dropupItemsContainer" style="max-height: 240px; overflow-y: auto;">
                         <!-- 动态注入任务项 -->
@@ -9750,7 +9843,10 @@
             const dropup = document.getElementById("taskDropupSheet");
             if (!hud) return;
 
-            if (!sessionData || !sessionData.plan_steps || sessionData.plan_steps.length === 0) {
+            // 🌟 核心绝对门禁：仅在已有活跃会话且非空状态、且规划了任务步骤时才呈现胶囊；新建任务或空状态下绝对隐藏！
+            const emptyBox = document.getElementById("emptyStateBox");
+            const isEmptyState = emptyBox && !emptyBox.classList.contains("d-none");
+            if (!activeSessionId || isEmptyState || !sessionData || !sessionData.plan_steps || sessionData.plan_steps.length === 0) {
                 hud.classList.add("d-none");
                 if (dropup) dropup.classList.add("d-none");
                 return;
@@ -9776,12 +9872,12 @@
             if (isFinished) {
                 if (dotEl) {
                     dotEl.classList.remove("pulsing");
-                    dotEl.style.background = "var(--status-green, #10b981)";
+                    dotEl.style.background = "var(--status-green)";
                 }
                 if (pillEl) {
                     pillEl.innerText = `${total}/${total} 达成`;
-                    pillEl.style.background = "rgba(16, 185, 129, 0.15)";
-                    pillEl.style.color = "var(--status-green, #10b981)";
+                    pillEl.classList.add("is-completed");
+                    pillEl.removeAttribute("style");
                 }
                 if (titleEl) {
                     titleEl.innerText = `全链路业务目标已闭环达成 · 100% 通过`;
@@ -9794,12 +9890,12 @@
                 const curStep = steps[runningIdx] || steps[0] || {};
                 if (dotEl) {
                     dotEl.classList.add("pulsing");
-                    dotEl.style.background = "var(--status-green, #10b981)";
+                    dotEl.style.background = "var(--status-green)";
                 }
                 if (pillEl) {
                     pillEl.innerText = `${curStepNum}/${total}`;
-                    pillEl.style.background = "rgba(255, 255, 255, 0.08)";
-                    pillEl.style.color = "var(--text-main, #ececed)";
+                    pillEl.classList.remove("is-completed");
+                    pillEl.removeAttribute("style");
                 }
                 if (titleEl) {
                     titleEl.innerText = `正在执行: ${curStep.title || '端侧业务动作'}`;
@@ -10797,6 +10893,14 @@
                 alertBanner.classList.add("d-none");
                 alertBanner.innerHTML = "";
             }
+
+            // 🌟 新建任务时严禁展示任务胶囊与下拉活清单，彻底杜绝幽灵胶囊
+            const hud = document.getElementById("floatingTaskHud");
+            if (hud) hud.classList.add("d-none");
+            const dropup = document.getElementById("taskDropupSheet");
+            if (dropup) dropup.classList.add("d-none");
+            const chevron = document.getElementById("hudChevron");
+            if (chevron) chevron.style.transform = "rotate(0deg)";
 
             // 6. 安全更新（若节点或控制台容器存在才更新，防止 null 报错阻断全局脚本）
             const pNodes = document.getElementById("pipelineNodesList");
