@@ -27,6 +27,46 @@ class ScreenParser:
         return model_b64, raw_bytes
 
     @staticmethod
+    def wait_for_visual_settling(driver: webdriver.Remote, max_wait: float = 2.5, interval: float = 0.15) -> Tuple[str, bytes]:
+        """
+        自适应视觉静默检测门禁 (Visual Settling Guard)
+        在动作派发后，智能探测屏幕帧指纹变动率；
+        一旦画面连续两次变动率低于 2.5%（转场或数据已渲染稳定），提前极速放行（通常仅需 200~400ms）；
+        若页面存在持续动画或慢请求，最多等待 max_wait 秒，彻底消灭白屏/半加载导致的假阴性决策。
+        """
+        import time
+        from PIL import Image
+        import io
+
+        last_sample = None
+        start_time = time.time()
+        last_b64, last_bytes = None, None
+
+        while True:
+            b64_img, raw_bytes = ScreenParser.capture_screen(driver)
+            last_b64, last_bytes = b64_img, raw_bytes
+
+            # 极速生成 32x32 灰度指纹
+            try:
+                img = Image.open(io.BytesIO(raw_bytes)).convert("L").resize((32, 32))
+                current_sample = img.tobytes()
+            except Exception:
+                break
+
+            if last_sample is not None:
+                diff_count = sum(1 for a, b in zip(last_sample, current_sample) if abs(a - b) > 18)
+                diff_ratio = diff_count / 1024.0
+                if diff_ratio < 0.025:  # 画面变动率 < 2.5%，即刻静止放行
+                    break
+
+            last_sample = current_sample
+            if time.time() - start_time >= max_wait:
+                break
+            time.sleep(interval)
+
+        return last_b64, last_bytes
+
+    @staticmethod
     def parse_elements(driver: webdriver.Remote) -> List[Dict[str, Any]]:
         """
         从 Page Source XML 中提取所有可交互或关键文本元素，并赋予编号
@@ -81,9 +121,12 @@ class ScreenParser:
         return elements
 
     @staticmethod
-    def get_screen_summary(driver: webdriver.Remote) -> Dict[str, Any]:
+    def get_screen_summary(driver: webdriver.Remote, wait_settling: bool = False) -> Dict[str, Any]:
         """组合截图、原生控件树与视觉 OCR 识别，生成具备高精度视觉透视能力的页面概览"""
-        b64_img, raw_bytes = ScreenParser.capture_screen(driver)
+        if wait_settling:
+            b64_img, raw_bytes = ScreenParser.wait_for_visual_settling(driver)
+        else:
+            b64_img, raw_bytes = ScreenParser.capture_screen(driver)
         elements = ScreenParser.parse_elements(driver)
 
         # 引入视觉 OCR 图片识别（解决 Hybrid / 自绘应用原生控件树缺失、看不清界面的致命痛点）

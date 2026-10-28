@@ -389,8 +389,8 @@ class AITestAgent:
                 logger.info("🛑 收到外部主动终止信号，安全退出执行循环")
                 break
 
-            # 1. 首先感知当前真机屏幕与元素
-            screen_info = ScreenParser.get_screen_summary(self.driver)
+            # 1. 感知当前真机屏幕与元素 (动作后启用转场自适应静默门禁 Visual Settling Guard)
+            screen_info = ScreenParser.get_screen_summary(self.driver, wait_settling=(step_count > 0))
 
             # 🛡️ 步骤前置：检查并触发人机协同登录凭证门禁 (DeepSeek Harness 步数冻结)
             # 若处于登录拦截状态，安全挂起等待用户决策；挂起期间 step_count 绝不累加

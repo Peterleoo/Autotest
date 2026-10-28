@@ -125,12 +125,50 @@ class NativeADBDriver:
         except Exception as e:
             logger.warning(f"跳过手势探针校验: {e}")
 
+        # ⚡ 自动唤醒屏幕并启用 USB 供电常亮保护 (Device Health Watchdog)
+        self.ensure_device_awake()
+
+    def ensure_device_awake(self):
+        """
+        Device Health Watchdog (设备常态保活哨兵)
+        1. 探活并自动唤醒屏幕 (input keyevent 224)
+        2. 启用 USB 连接常亮保护 (svc power stayon usb)
+        3. 轻量上滑解开无密码滑动锁屏，保证界面随时处于可交互状态
+        """
+        if not self.device_id:
+            return
+        try:
+            res = subprocess.run([self.adb_bin, "-s", self.device_id, "shell", "dumpsys", "power"], capture_output=True, text=True, timeout=4)
+            out = res.stdout or ""
+            is_off = ("mHoldingDisplaySuspendBlocker=false" in out) or ("Display Power: state=OFF" in out) or ("isInteractive=false" in out)
+            if is_off:
+                logger.info(f"⚡ [Device Watchdog] 设备 [{self.device_id}] 处于熄屏状态，立即下发唤醒指令...")
+                subprocess.run([self.adb_bin, "-s", self.device_id, "shell", "input", "keyevent", "224"], capture_output=True, timeout=3)
+                time.sleep(0.3)
+                # 上滑解开普通滑动锁
+                subprocess.run([self.adb_bin, "-s", self.device_id, "shell", "input", "swipe", "540", "1800", "540", "600", "250"], capture_output=True, timeout=3)
+            # 固化 USB 供电常亮保护，防止测试中意外黑屏休眠
+            subprocess.run([self.adb_bin, "-s", self.device_id, "shell", "svc", "power", "stayon", "usb"], capture_output=True, timeout=3)
+        except Exception as e:
+            logger.debug(f"保活探针跳过: {e}")
+
     def execute_adb(self, cmd_args: List[str], timeout: int = 15) -> subprocess.CompletedProcess:
         full_cmd = [self.adb_bin]
         if self.device_id:
             full_cmd.extend(["-s", self.device_id])
         full_cmd.extend(cmd_args)
-        return subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
+        try:
+            res = subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
+            err = (res.stderr or "").lower()
+            if "device offline" in err or "device not found" in err:
+                logger.warning(f"⚠️ [Watchdog 掉线自愈] 设备 [{self.device_id}] 临时离线，尝试执行快速重连...")
+                subprocess.run([self.adb_bin, "reconnect", "offline"], capture_output=True, timeout=4)
+                time.sleep(0.8)
+                res = subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
+            return res
+        except subprocess.TimeoutExpired:
+            logger.error(f"ADB 指令超时: {' '.join(full_cmd)}")
+            raise
 
     @property
     def page_source(self) -> str:
@@ -234,6 +272,7 @@ class NativeADBDriver:
 
     def launch_app(self, package: str, activity: Optional[str] = None):
         """直接调起真机目标应用前台，零重装零弹窗（支持前台智能就地接管）"""
+        self.ensure_device_awake()
         if not package:
             return
 
