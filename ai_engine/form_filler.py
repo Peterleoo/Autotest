@@ -44,12 +44,16 @@ class SmartFormFiller:
             except Exception:
                 pass
         
-        # 1. 手机号 / 联系方式 / 账号
-        if re.search(r"手机|电话|联系方式|联系电话|mobile|phone|账号|用户名", context_str, re.I):
+        # 1. 手机号 / 联系方式 / 账号 / 登录码
+        if re.search(r"手机|电话|联系方式|联系电话|mobile|phone|账号|用户名|登录码|工号|合伙人", context_str, re.I):
             if app_cred and app_cred.get("account"):
                 logger.info(f"🔑 [智能表单] 命中真实测试账号，应用预置凭证: {app_cred['account']}")
                 return app_cred["account"]
-            logger.info(f"💡 [智能表单] 命中联系方式规则，自动填充基线测试号: {cls.DEFAULT_PRESETS['mobile']}")
+            # 🛡️ 严格防瞎编铁律：若是登录/鉴权界面且无预设凭证，严禁捏造假号码，交由人机协同输入！
+            if re.search(r"登录|账号|密码|工号|合伙人|鉴权|注册", context_str, re.I):
+                logger.warning("🛡️ [智能表单防瞎编] 当前属于登录鉴权输入框且无预设凭证，严禁瞎编假号码！")
+                return ""
+            logger.info(f"💡 [智能表单] 命中业务联系方式规则，填充基线测试号: {cls.DEFAULT_PRESETS['mobile']}")
             return cls.DEFAULT_PRESETS["mobile"]
 
         # 1.1 密码
@@ -57,7 +61,9 @@ class SmartFormFiller:
             if app_cred and app_cred.get("password"):
                 logger.info(f"🔑 [智能表单] 命中真实测试密码，应用预置凭证")
                 return app_cred["password"]
-            return "Password123"
+            # 🛡️ 严格防瞎编铁律：严禁捏造虚假密码
+            logger.warning("🛡️ [智能表单防瞎编] 密码字段未配置有效真实凭证，严禁填入虚假密码！")
+            return ""
 
         # 2. 姓名 / 称呼 / 联系人
         if re.search(r"称呼|姓名|联系人|业主姓名|房东|name", context_str, re.I):

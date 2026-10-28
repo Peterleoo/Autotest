@@ -10,6 +10,7 @@ from core.api_client import APIClient
 from ai_engine.screen_parser import ScreenParser
 from ai_engine.action_executor import ActionExecutor
 from core.app_lessons_manager import app_lessons_mgr
+from ai_engine.verifier import TaskVerifier
 
 logger = logging.getLogger("AITestAgent")
 
@@ -33,6 +34,7 @@ SYSTEM_PROMPT = """
     - 严禁掩耳盗铃！若用户的测试目标要求验证具体业务界面（如：进入房源详情、查看VR、点击咨询弹出咨询窗口、进入个人中心等），而当前真机屏幕仍停留在【登录/注册页、密码输入页、验证码拦截弹窗或网络报错页】，严禁将“拉起了登录拦截/权限控制正常”诡辩为“目标已达成”并调用 finish！
     - 系统配备了独立的 DSH 核验门禁（TaskVerifier），任何在拦截页面擅自调用 finish 的企图都会被一票否决！
     - 若当前处于登录页，优先识别输入框调用 type 注入预设账号密码登录，或点击一键登录放行；只有真正进入目标业务窗口后方可调用 finish！
+    - 【严禁捏造虚假登录账号与密码】：遇到任何登录、鉴权、绑定手机号界面时，严禁自行臆造手机号、账号或密码（如 13800138000、123456Aa、admin 等）！必须等待系统凭证自动注入或触发人机协作！擅自伪造凭据将直接判定为用例严重违规！
 1. 【界面定性】：在 thought 中第一句必须明确输出：“【当前界面判断】：xxx界面（如：应用手机号登录页/首页推荐/隐私协议弹窗）”。
 2. 【目标驱动，严禁乱跳】：
     - 紧扣用户的【测试目标】！不要点击与目标无关的广告或偏门入口。
