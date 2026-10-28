@@ -44,6 +44,13 @@ class ActionExecutor:
                 el_info = self._find_element_by_index(target_idx, elements_map)
                 locator = self._locate_and_click(el_info, action_dict.get("coordinates"))
                 trace_item["locator"] = locator
+                if el_info:
+                    trace_item["element_text"] = el_info.get("text", "")
+                    trace_item["element_desc"] = el_info.get("desc", "")
+                    trace_item["element_id"] = el_info.get("resource_id", "")
+                    trace_item["center"] = el_info.get("center")
+                win_size = getattr(self.driver, "get_window_size", lambda: {"width": 1080, "height": 2160})()
+                trace_item["screen_size"] = win_size
 
             elif action == "type":
                 target_idx = action_dict.get("target_index")
@@ -57,6 +64,13 @@ class ActionExecutor:
                 locator = self._locate_and_type(el_info, text)
                 trace_item["locator"] = locator
                 trace_item["text"] = text
+                if el_info:
+                    trace_item["element_text"] = el_info.get("text", "")
+                    trace_item["element_desc"] = el_info.get("desc", "")
+                    trace_item["element_id"] = el_info.get("resource_id", "")
+                    trace_item["center"] = el_info.get("center")
+                win_size = getattr(self.driver, "get_window_size", lambda: {"width": 1080, "height": 2160})()
+                trace_item["screen_size"] = win_size
 
             elif action == "swipe":
                 direction = action_dict.get("direction", "up").lower()
@@ -180,7 +194,14 @@ class ActionExecutor:
             self.driver.execute_adb(["shell", "input", "tap", str(x), str(y)])
             cost_ms = int((time.perf_counter() - t0) * 1000)
             logger.info(f"原生 ADB 物理手势精准点击完成: ({x}, {y}) [{name}] (用时 {cost_ms}ms)")
-            return {"by": "coordinates", "value": f"{x},{y}", "cost_ms": cost_ms}
+            return {
+                "by": "coordinates",
+                "value": f"{x},{y}",
+                "cost_ms": cost_ms,
+                "text": el_info.get("text", "") if el_info else "",
+                "res_id": el_info.get("resource_id", "") if el_info else "",
+                "desc": el_info.get("desc", "") if el_info else ""
+            }
 
         # 2. 如果是传统 Appium 驱动且元素有定位符
         if el_info:
