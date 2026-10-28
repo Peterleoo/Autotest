@@ -46,7 +46,15 @@ SYSTEM_PROMPT = """
     - 针对表单录入与必填校验：长表单页面的“免费发布/立即提交”按钮往往固定在屏幕最底部的悬浮操作条（Sticky Bottom Bar）中。严禁在上下滑动中盲目震荡！若表单项已就绪，优先点击页面底部的提交/发布按钮触发必填校验；达成必填校验拦截后，果断调用 finish 完成测试！
     - 针对表单智能推断填充：常规输入框（姓名、手机号、期望售价、租金、面积、小区等），系统内置智能推断引擎，可直接下发 type 动作并给出标准测试值（如手机号 13800138000，姓名 张先生，售价 300，面积 98），系统将秒级合规上屏，严禁停滞等待人工输入！
     - 针对委托服务区：严禁在未要求测试委托服务时点击委托房源或委托卡片！若要求测试委托服务但首页金刚区未看到，优先在金刚区区域执行一次向左滑动手势 (swipe left) 翻页！
-3. 【坐标精准感知】：元素列表中附带了视觉 OCR 探测出的屏幕精确物理坐标 [x, y]，你可以直接基于编号或坐标点击。
+3. 【具身闭环与动态任务对齐铁律（核心）】：
+    - 思考三部曲：
+      ① 现实环境核验：当前真机屏幕实际是什么页面？有哪些关键特征与控件？
+      ② 任务可行性判断：对照【当前规划的测试任务清单】，原定当前步骤在眼前现实环境下是否可执行？
+      ③ 动作或动态重规划决策：
+         - 若可执行，下发物理动作推进；
+         - 若现实环境变化、遇到阻碍弹窗、或端侧已直接联动完成后续任务，你必须在 thought 中明确阐明原因，并在 JSON 中提供 "step_progress": <当前已达到的步骤编号，例如 3>，或可选提供 "plan_update": [<调整后的后续步骤数组>]；
+    - 严禁机械死板！任务规划必须随时随地随端侧现实演进，保持任务与现实 100% 同步！
+4. 【坐标精准感知】：元素列表中附带了视觉 OCR 探测出的屏幕精确物理坐标 [x, y]，你可以直接基于编号或坐标点击。
 4. 【禁止无意义刷步与盲目滑动】：严禁原地重复上下滑动；达成业务目标后应果断调用 finish 完成测试。
 5. 输出格式必须是纯 JSON，不要包含任何 markdown 代码块包裹或解释文本。
 
@@ -92,6 +100,31 @@ class AITestAgent:
                 self.status_callback(data)
             except Exception as e:
                 logger.warning(f"状态回调异常: {e}")
+
+    def _get_plan_steps_summary(self) -> str:
+        """动态获取当前会话的最新任务清单与执行状态"""
+        if not self.session_id:
+            return ""
+        try:
+            from pathlib import Path
+            sess_file = Path("data/sessions") / f"{self.session_id}.json"
+            if not sess_file.exists():
+                sess_file = Path("outputs/sessions") / f"{self.session_id}.json"
+            if sess_file.exists():
+                sess_data = json.loads(sess_file.read_text(encoding="utf-8"))
+                steps = sess_data.get("plan_steps", [])
+                if steps:
+                    lines = ["【当前规划的测试任务清单 (活任务看板)】:"]
+                    for idx, st in enumerate(steps, 1):
+                        st_name = st.get("title", "")
+                        st_desc = st.get("desc", "")
+                        st_status = st.get("status", "PENDING")
+                        status_zh = "已完成" if st_status in ["COMPLETED", "PASS"] else ("进行中" if st_status == "RUNNING" else "待执行")
+                        lines.append(f"  {idx}. [{status_zh}] {st_name} (要求: {st_desc[:28]})")
+                    return "\n".join(lines) + "\n\n"
+        except Exception:
+            pass
+        return ""
 
     def _sync_working_memory(self, screen_info: Dict[str, Any], decision: Optional[Dict[str, Any]] = None):
         """实时同步屏幕实体与最新动作至 Working Memory (Muse 范式)"""
@@ -607,12 +640,15 @@ class AITestAgent:
                 except Exception:
                     pass
 
+            plan_steps_summary = self._get_plan_steps_summary()
             user_prompt = f"""
 【待测目标应用】
 {app_context_str}
 
 【用户测试总目标】
 {goal}{coref_hint}
+
+{plan_steps_summary}
 
 【当前已执行的操作历史】
 {json.dumps([{'action': h.get('action'), 'reason': h.get('reason'), 'error': h.get('error')} for h in self.executor.action_history[-4:]], ensure_ascii=False)}
@@ -652,6 +688,12 @@ class AITestAgent:
                 )
                 thought = decision.get('thought', '')
                 logger.info(f"AI 决策: {thought}")
+                step_prog = decision.get('step_progress')
+                if step_prog:
+                    logger.info(f"📋 [STEP_PROGRESS]: advance_to={step_prog}")
+                plan_update = decision.get('plan_update')
+                if plan_update and isinstance(plan_update, list):
+                    logger.info(f"📋 [PLAN_UPDATE]: {json.dumps(plan_update, ensure_ascii=False)}")
                 self._notify_status({
                     "step": step_count,
                     "action": f"决策: {decision.get('action')}",

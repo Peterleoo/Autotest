@@ -1387,6 +1387,114 @@
             pointer-events: none;
             transform: none !important;
         }
+        /* 🌟 黄金眼动区态势感知胶囊 (Docked Task HUD Bar，位于输入框正上方) */
+        .gpt-input-dock-wrapper {
+            width: 100%;
+            max-width: 760px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .floating-task-hud {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 30px;
+            padding: 0 14px;
+            margin-bottom: 8px;
+            background: rgba(22, 22, 26, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 9999px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+            cursor: pointer;
+            user-select: none;
+            pointer-events: auto;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            align-self: center;
+            max-width: 90%;
+            z-index: 40;
+        }
+        .floating-task-hud:hover {
+            background: rgba(30, 30, 36, 0.98);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+        .floating-task-hud.replan-pulse {
+            animation: hudReplanGlow 1.8s ease-in-out;
+        }
+        @keyframes hudReplanGlow {
+            0% { border-color: rgba(16, 185, 129, 0.2); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { border-color: rgba(16, 185, 129, 0.8); box-shadow: 0 0 16px 2px rgba(16, 185, 129, 0.3); }
+            100% { border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35); }
+        }
+        .hud-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--status-green, #10b981);
+            flex-shrink: 0;
+        }
+        .hud-status-dot.pulsing {
+            animation: hudPulseDot 2s infinite;
+        }
+        @keyframes hudPulseDot {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 8px #10b981; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .hud-step-pill {
+            font-family: var(--font-mono, monospace);
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main, #ececed);
+        }
+        .hud-task-title {
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--text-sub, #a1a1aa);
+        }
+        .task-dropup-sheet {
+            position: absolute;
+            bottom: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: rgba(22, 22, 26, 0.96);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.5);
+            z-index: 105;
+            pointer-events: auto;
+            animation: dropupFadeSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes dropupFadeSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .dropup-item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-radius: 6px;
+            margin-bottom: 2px;
+            font-size: 11.5px;
+            transition: background 0.15s ease;
+        }
+        .dropup-item-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .dropup-item-row.running {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
         .gpt-input-box {
             width: 100%;
             max-width: 760px;
@@ -7063,8 +7171,35 @@
 
         <!-- ================= 3. 底部悬浮大胶囊 (集成模型切换与常驻任务卡) ================= -->
         <div class="gpt-input-area">
-            <!-- 输入框上方常驻任务卡 (Pinned Bottom Task Capsule，参考主流 Agent 架构) -->
-            <div class="gpt-input-box">
+            <div class="gpt-input-dock-wrapper">
+                <!-- 🌟 黄金眼动区态势感知胶囊 (Docked Task HUD Bar，位于输入框正上方) -->
+                <div id="floatingTaskHud" class="floating-task-hud d-none" onclick="toggleTaskDropup(event)">
+                    <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
+                        <span class="hud-status-dot pulsing" id="hudStatusDot"></span>
+                        <span class="hud-step-pill" id="hudStepPill">1/5</span>
+                        <span class="hud-task-title text-truncate" id="hudTaskTitle">初始化任务中...</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-1 text-muted flex-shrink-0" style="font-size: 10.5px;">
+                        <span class="hud-expand-hint" id="hudExpandHint">展开活清单</span>
+                        <i class="bi bi-chevron-up hud-chevron-arrow" id="hudChevron" style="font-size: 9px; transition: transform 0.2s ease;"></i>
+                    </div>
+                </div>
+
+                <!-- 就地向上展开的活任务清单抽屉 (Dropup Sheet) -->
+                <div id="taskDropupSheet" class="task-dropup-sheet d-none" onclick="event.stopPropagation()">
+                    <div class="dropup-header d-flex align-items-center justify-content-between px-3 py-2 border-bottom" style="border-color: rgba(255, 255, 255, 0.08) !important;">
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fw-semibold" style="font-size: 12px;" id="dropupSheetTitle">📋 具身活任务看板 (实时对齐端侧)</span>
+                        </div>
+                        <span class="badge" style="font-size: 10px; background: rgba(16, 185, 129, 0.12); color: var(--status-green); border: 1px solid rgba(16, 185, 129, 0.25);" id="dropupProgressBadge">0/0 推进中</span>
+                    </div>
+                    <div class="dropup-body p-2" id="dropupItemsContainer" style="max-height: 240px; overflow-y: auto;">
+                        <!-- 动态注入任务项 -->
+                    </div>
+                </div>
+
+                <!-- 输入框上方常驻任务卡 (Pinned Bottom Task Capsule，参考主流 Agent 架构) -->
+                <div class="gpt-input-box">
                 <!-- 具身工作记忆与活跃实体快捷胶囊 (DeepSeek Harness + Muse) -->
                 <div id="workingMemoryCapsuleBar" class="d-none working-memory-capsule-bar"></div>
                 <!-- 自适应多行文本输入框 -->
@@ -7196,6 +7331,7 @@
                     </div>
                 </div>
             </div>
+            </div> <!-- 闭合 gpt-input-dock-wrapper -->
 
 
         </div>
@@ -9601,7 +9737,134 @@
 
             // 悬浮画中画或步骤微胶囊保持同步
             renderStepsDrawerBody(sessionData, sessionData.plan_steps || []);
+
+            // 🌟 黄金眼动区态势感知胶囊 (Docked Task HUD Bar，位于输入框正上方) 实时联动
+            updateTaskHud(sessionData);
         }
+
+        // =========================================================================
+        // 🌟 黄金眼动区态势感知胶囊 (Docked Task HUD) 与就地活清单交互引擎
+        // =========================================================================
+        function updateTaskHud(sessionData) {
+            const hud = document.getElementById("floatingTaskHud");
+            const dropup = document.getElementById("taskDropupSheet");
+            if (!hud) return;
+
+            if (!sessionData || !sessionData.plan_steps || sessionData.plan_steps.length === 0) {
+                hud.classList.add("d-none");
+                if (dropup) dropup.classList.add("d-none");
+                return;
+            }
+
+            const steps = sessionData.plan_steps;
+            const total = steps.length;
+            let completedCount = steps.filter(s => s.status === "COMPLETED" || s.status === "PASS").length;
+            let runningIdx = steps.findIndex(s => s.status === "RUNNING");
+            if (runningIdx === -1 && completedCount < total) {
+                runningIdx = completedCount;
+            }
+
+            const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || completedCount === total);
+            
+            hud.classList.remove("d-none");
+
+            const dotEl = document.getElementById("hudStatusDot");
+            const pillEl = document.getElementById("hudStepPill");
+            const titleEl = document.getElementById("hudTaskTitle");
+            const progressBadge = document.getElementById("dropupProgressBadge");
+
+            if (isFinished) {
+                if (dotEl) {
+                    dotEl.classList.remove("pulsing");
+                    dotEl.style.background = "var(--status-green, #10b981)";
+                }
+                if (pillEl) {
+                    pillEl.innerText = `${total}/${total} 达成`;
+                    pillEl.style.background = "rgba(16, 185, 129, 0.15)";
+                    pillEl.style.color = "var(--status-green, #10b981)";
+                }
+                if (titleEl) {
+                    titleEl.innerText = `全链路业务目标已闭环达成 · 100% 通过`;
+                }
+                if (progressBadge) {
+                    progressBadge.innerText = `${total}/${total} 全部完成`;
+                }
+            } else {
+                const curStepNum = Math.min(runningIdx + 1, total);
+                const curStep = steps[runningIdx] || steps[0] || {};
+                if (dotEl) {
+                    dotEl.classList.add("pulsing");
+                    dotEl.style.background = "var(--status-green, #10b981)";
+                }
+                if (pillEl) {
+                    pillEl.innerText = `${curStepNum}/${total}`;
+                    pillEl.style.background = "rgba(255, 255, 255, 0.08)";
+                    pillEl.style.color = "var(--text-main, #ececed)";
+                }
+                if (titleEl) {
+                    titleEl.innerText = `正在执行: ${curStep.title || '端侧业务动作'}`;
+                }
+                if (progressBadge) {
+                    progressBadge.innerText = `${completedCount}/${total} 进行中`;
+                }
+            }
+
+            // 更新 Dropup 抽屉中的项目
+            const dropupContainer = document.getElementById("dropupItemsContainer");
+            if (dropupContainer) {
+                let itemsHtml = "";
+                steps.forEach((st, idx) => {
+                    const isDone = (st.status === "COMPLETED" || st.status === "PASS");
+                    const isRun = (st.status === "RUNNING");
+                    const num = idx + 1;
+                    let iconHtml = isDone 
+                        ? '<i class="bi bi-check-circle-fill text-success" style="font-size: 12px;"></i>' 
+                        : (isRun ? '<span class="spinner-border spinner-border-sm text-primary" style="width: 10px; height: 10px;"></span>' : '<i class="bi bi-circle text-muted" style="font-size: 11px; opacity: 0.5;"></i>');
+                    
+                    itemsHtml += `
+                        <div class="dropup-item-row ${isRun ? 'running' : ''}">
+                            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 82%;">
+                                ${iconHtml}
+                                <span class="fw-medium text-truncate" style="color: ${isDone ? 'var(--text-main)' : (isRun ? '#3b82f6' : 'var(--text-sub)')};">
+                                    Step ${num}: ${escapeHtml(st.title)}
+                                </span>
+                            </div>
+                            <span style="font-size: 10px; font-family: var(--font-mono); opacity: 0.65;">
+                                ${isDone ? '已完成' : (isRun ? '执行中' : '待执行')}
+                            </span>
+                        </div>
+                    `;
+                });
+                dropupContainer.innerHTML = itemsHtml;
+            }
+        }
+
+        function toggleTaskDropup(event) {
+            if (event) event.stopPropagation();
+            const dropup = document.getElementById("taskDropupSheet");
+            const chevron = document.getElementById("hudChevron");
+            if (!dropup) return;
+            const isHidden = dropup.classList.contains("d-none");
+            if (isHidden) {
+                dropup.classList.remove("d-none");
+                if (chevron) chevron.style.transform = "rotate(180deg)";
+            } else {
+                dropup.classList.add("d-none");
+                if (chevron) chevron.style.transform = "rotate(0deg)";
+            }
+        }
+
+        document.addEventListener("click", function(e) {
+            const dropup = document.getElementById("taskDropupSheet");
+            const hud = document.getElementById("floatingTaskHud");
+            const chevron = document.getElementById("hudChevron");
+            if (dropup && !dropup.classList.contains("d-none")) {
+                if (!dropup.contains(e.target) && (!hud || !hud.contains(e.target))) {
+                    dropup.classList.add("d-none");
+                    if (chevron) chevron.style.transform = "rotate(0deg)";
+                }
+            }
+        });
 
         function onInputTextChange() {
             const textarea = document.getElementById("taskInputText");
@@ -11621,7 +11884,8 @@
             if (blk.type === "step_execution" || blk.type === "step_result") {
                 const acts = blk.actions || [];
                 const isRunning = (blk.status === "RUNNING");
-                const isFailed = (blk.status === "FAILED" || blk.status === "FAIL");
+                const isSessionSuccess = (sessionData.is_success !== false) && (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || sessionData.status === "PASS");
+                const isFailed = !isSessionSuccess && (blk.status === "FAILED" || blk.status === "FAIL");
                 const isCanceled = (blk.status === "CANCELED" || blk.status === "SKIPPED");
                 
                 // 🛡️ 极简原则：无实际动作的取消/跳过步骤不渲染任何动作卡片，任务状态仅在上方任务清单集中呈现

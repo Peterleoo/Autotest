@@ -294,7 +294,9 @@ class MemoryManager:
         fm = session.get("fact_memory") or MemoryManager.create_empty_fact_memory()
         pkg = fm.get("current_package") or session.get("app_package") or "前台应用"
         act = fm.get("current_activity") or session.get("app_activity") or "MainActivity"
-        return f"• 端侧环境快照: 包名 [{pkg}] | 活跃界面 [{act}]"
+        milestones = fm.get("passed_milestones", [])
+        m_str = f" | 里程碑 [{', '.join(milestones)}]" if milestones else ""
+        return f"• 端侧环境快照: 包名 [{pkg}] | 活跃界面 [{act}]{m_str}"
 
     @staticmethod
     def _provider_goal_evolution(session: Dict[str, Any]) -> str:
@@ -360,7 +362,7 @@ class MemoryManager:
 • 本轮核心测试目标:
   👉 “{curr_msg}”
 • 具身决策准则:
-  1. 继承前序已达成的端侧现场，严禁退回桌面重新冷启动；
+  1. 继承前序已达成的端侧现场，严禁退回桌面盲目重新冷启动；
   2. 若用户指令涉及序号（如“第2个/第3条”），严格对齐活跃列表实体中已标注的条目与物理坐标；
   3. 若本轮为打回返工，针对用户指出的缺陷点执行精准重测与断言。
 ===================================================================================
