@@ -580,49 +580,22 @@ class TaskManager:
         session_id = f"sess_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
         title = goal[:20] + ("..." if len(goal) > 20 else "")
         is_auto = (approval_mode == "auto")
-        init_status = "RUNNING" if is_auto else "AWAITING_APPROVAL"
+        init_status = "PLANNING" if is_auto else "AWAITING_APPROVAL"
 
-        # 🚀 毫秒级端侧情境探针：先看真机真实物理状态（安装/前台/具体页面），再因地制宜规划！
-        t_decomp_start = time.time()
-        primary_dev = device_ids[0] if device_ids else None
-        if not primary_dev:
-            conn_devs = app_mgr.get_connected_devices()
-            if conn_devs:
-                primary_dev = conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id")
-        from core.device_context_inspector import DeviceContextInspector
-        dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package) if primary_dev else None
-        
-        plan_steps = self._decompose_plan_steps(goal, is_auto, device_context=dev_ctx)
-        decomp_dur = round(time.time() - t_decomp_start + 0.35, 2)
-        duration_str = f"{decomp_dur}s"
-
-        step_titles = [s["title"] for s in plan_steps]
-        key_steps_str = " ➔ ".join(step_titles[:3]) if len(step_titles) >= 2 else "业务流程推进"
-        assert_step = next((s["title"] for s in plan_steps if "断言" in s["title"]), "核心业务指标")
-        
-        # 智能寻路推演：分析目标属于哪类业务场景（找房/业主委托/交易表单/个人中心）
-        g_low = goal.lower()
-        if any(k in g_low for k in ["委托", "卖房", "出租", "放盘"]):
-            nav_strategy = "【业主委托链路】入口寻路推演：1. 优先扫描首页金刚区核心功能位（识别'委托服务/我要卖房'图文控件）；2. 若首屏未检出，降级至底栏【我的】个人中心定位'业主服务/房屋委托'。"
-        elif any(k in g_low for k in ["搜索", "二手房", "租房", "新房", "商圈"]):
-            nav_strategy = "【买房/租房检索链路】入口寻路推演：首选首页金刚区核心频道入口，进入列表后通过顶栏搜索框或多维筛选器流转。"
-        else:
-            nav_strategy = f"【业务闭环链路】针对【{key_steps_str}】采用页面组件树感知与 OCR 双通道动态寻路。"
-
-        thinking_data = {
-            "duration": duration_str,
+        # 🚀 0ms 极速首包响应：初始轻量思考态，端侧截屏与大模型推演沉降至后台工作线程，告别网络阻塞
+        initial_thinking = {
+            "duration": "推演中...",
             "bullets": [
-                {"tag": "端侧环境感知与起点确认", "content": dev_ctx.get("planning_hint", "物理真机已在线，结合当前画面按需推演起跑点。")},
-                {"tag": "业务意图推演", "content": f"深度解析测试目标【{goal}】，拆解为 {len(plan_steps)} 个差量业务阶段：{key_steps_str}。"},
-                {"tag": "入口寻路策略", "content": nav_strategy},
-                {"tag": "断言与防抖策略", "content": f"针对【{assert_step}】启用视图状态核验与表单响应防抖，确保字段与校验结果确定性。"}
+                {"tag": "端侧环境感知与起点确认", "content": "物理真机已在线，正在感知端侧前台状态并推演起跑点..."},
+                {"tag": "业务意图推演", "content": f"深度解析测试目标【{goal}】，正在构建最优差量执行路径..."},
+                {"tag": "入口寻路策略", "content": "动态规划业务核心频道与控件巡航策略..."},
+                {"tag": "断言与防抖策略", "content": "制定视图核验与表单响应防抖预案..."}
             ]
         }
 
         init_timeline = [
             TimelineManager.create_user_block(goal, turn_id=0),
-            TimelineManager.create_thought_block(duration_str, thinking_data["bullets"], turn_id=0),
-            TimelineManager.create_todo_block(plan_steps, turn_id=0)
+            TimelineManager.create_thought_block("推演中...", initial_thinking["bullets"], turn_id=0)
         ]
 
         init_fact = MemoryManager.create_empty_fact_memory()
@@ -632,8 +605,8 @@ class TaskManager:
             "turn_id": 1,
             "user_message": goal,
             "timestamp": datetime.now().strftime("%H:%M:%S"),
-            "thinking": thinking_data,
-            "plan_steps": plan_steps,
+            "thinking": initial_thinking,
+            "plan_steps": [],
             "actions": [],
             "conclusion": "",
             "status": init_status,
@@ -658,7 +631,7 @@ class TaskManager:
             "timestamp": time.time(),
             "status": init_status,
             "target_devices": device_ids,
-            "thinking": thinking_data,
+            "thinking": initial_thinking,
             "clarification": None,
             "messages": [
                 {"role": "user", "content": goal, "timestamp": datetime.now().strftime("%H:%M:%S")}
@@ -673,7 +646,7 @@ class TaskManager:
                 "pressure_level": "normal"
             },
             "timeline_blocks": init_timeline,
-            "plan_steps": plan_steps,
+            "plan_steps": [],
             "devices": {},
             "report_url": "",
             "is_solidified": False,
@@ -692,8 +665,8 @@ class TaskManager:
                 "status": "QUEUED" if is_auto else "AWAITING_APPROVAL",
                 "step": 0,
                 "max_steps": 15,
-                "action": "等待自动分发调度..." if is_auto else "等待人工审批确认方案...",
-                "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] 任务会话已创建 (审批模式: {'自动放行' if is_auto else '等待人工确认'})，分配设备 [{model_label}]"],
+                "action": "端侧情境感知与动态规划中...",
+                "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] 任务会话已创建，分配设备 [{model_label}]，正在感知端侧意图与情境..."],
                 "report_url": "",
                 "success": None,
                 "duration": "0s",
@@ -704,48 +677,121 @@ class TaskManager:
         self.active_session_id = session_id
         self._save_session(session_id)
 
-        # 🚀 后台异步大模型富化推演：在后台线程调用大模型细化思考与步骤，平滑回填，绝不阻塞会话创建
-        def _async_enrich_thinking():
+        # 🚀 毫秒级首包即返：端侧情境探测、规划步骤分解与大模型推演全部在后台工作线程并发推进
+        def _async_plan_and_dispatch():
             try:
-                ai_thinking, ai_steps = self._generate_ai_plan_and_thinking(goal, is_auto, test_mode, provider=provider, model=model)
+                t_decomp_start = time.time()
+                primary_dev = device_ids[0] if device_ids else None
+                if not primary_dev:
+                    conn_devs = app_mgr.get_connected_devices()
+                    if conn_devs:
+                        primary_dev = conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id")
+                from core.device_context_inspector import DeviceContextInspector
+                dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package) if primary_dev else None
+
+                plan_steps = self._decompose_plan_steps(goal, is_auto, device_context=dev_ctx)
+                decomp_dur = round(time.time() - t_decomp_start + 0.35, 2)
+                duration_str = f"{decomp_dur}s"
+
+                step_titles = [s["title"] for s in plan_steps]
+                key_steps_str = " ➔ ".join(step_titles[:3]) if len(step_titles) >= 2 else "业务流程推进"
+                assert_step = next((s["title"] for s in plan_steps if "断言" in s["title"]), "核心业务指标")
+
+                g_low = goal.lower()
+                if any(k in g_low for k in ["委托", "卖房", "出租", "放盘"]):
+                    nav_strategy = "【业主委托链路】入口寻路推演：1. 优先扫描首页金刚区核心功能位（识别'委托服务/我要卖房'图文控件）；2. 若首屏未检出，降级至底栏【我的】个人中心定位'业主服务/房屋委托'。"
+                elif any(k in g_low for k in ["搜索", "二手房", "租房", "新房", "商圈"]):
+                    nav_strategy = "【买房/租房检索链路】入口寻路推演：首选首页金刚区核心频道入口，进入列表后通过顶栏搜索框或多维筛选器流转。"
+                else:
+                    nav_strategy = f"【业务闭环链路】针对【{key_steps_str}】采用页面组件树感知与 OCR 双通道动态寻路。"
+
+                final_thinking = {
+                    "duration": duration_str,
+                    "bullets": [
+                        {"tag": "端侧环境感知与起点确认", "content": dev_ctx.get("planning_hint", "物理真机已在线，结合当前画面按需推演起跑点。") if dev_ctx else "物理真机已在线，结合当前画面按需推演起跑点。"},
+                        {"tag": "业务意图推演", "content": f"深度解析测试目标【{goal}】，拆解为 {len(plan_steps)} 个差量业务阶段：{key_steps_str}。"},
+                        {"tag": "入口寻路策略", "content": nav_strategy},
+                        {"tag": "断言与防抖策略", "content": f"针对【{assert_step}】启用视图状态核验与表单响应防抖，确保字段与校验结果确定性。"}
+                    ]
+                }
+
                 cur_sess = self.sessions.get(session_id)
-                if cur_sess and cur_sess.get("status") not in ["STOPPED", "FAILED", "COMPLETED"]:
-                    cur_sess["thinking"] = ai_thinking
-                    existing_steps = cur_sess.get("plan_steps", [])
-                    has_progressed = any(s.get("status") in ["COMPLETED", "FAIL"] for s in existing_steps)
-                    if not has_progressed and ai_steps:
-                        cur_sess["plan_steps"] = ai_steps
-                        # 🚀 原子同步更新 timeline_blocks 中的 todo_list 与 thought 块，杜绝双轨制脱节！
-                        tb = cur_sess.setdefault("timeline_blocks", [])
-                        for b in tb:
-                            if b.get("type") == "todo_list":
-                                b["total_count"] = len(ai_steps)
-                                b["title"] = f"更新任务清单 · 0/{len(ai_steps)} 已完成"
-                                b["items"] = [
-                                    {
-                                        "title": s["title"],
-                                        "desc": s.get("desc", ""),
-                                        "status": s.get("status", "READY"),
-                                        "diff_type": "added"
-                                    }
-                                    for s in ai_steps
-                                ]
-                            elif b.get("type") == "thought" and ai_thinking:
-                                b["bullets"] = ai_thinking.get("bullets", b.get("bullets", []))
-                                if ai_thinking.get("duration"):
-                                    b["duration"] = ai_thinking["duration"]
-                    self._save_session(session_id)
-            except Exception as e:
-                logger.warning(f"异步富化任务会话 [{session_id}] AI 推演异常: {e}")
+                if not cur_sess or cur_sess.get("status") in ["STOPPED", "FAILED"]:
+                    return
 
-        self.executor.submit(_async_enrich_thinking)
+                cur_sess["thinking"] = final_thinking
+                cur_sess["plan_steps"] = plan_steps
+                cur_sess["status"] = "RUNNING" if is_auto else "AWAITING_APPROVAL"
+                if cur_sess.get("turns"):
+                    cur_sess["turns"][0]["thinking"] = final_thinking
+                    cur_sess["turns"][0]["plan_steps"] = plan_steps
+                    cur_sess["turns"][0]["status"] = cur_sess["status"]
 
-        # 🚀 若为自动审批，立即派发线程并发执行；若为人工审批，则挂起等待用户确认
-        if is_auto:
-            for dev_id in device_ids:
-                self.executor.submit(self._device_worker, session_id, dev_id, goal, case_name, test_mode)
+                # 原子更新时间轴块
+                tb = cur_sess.setdefault("timeline_blocks", [])
+                thought_block = next((b for b in tb if b.get("type") == "thought"), None)
+                if thought_block:
+                    thought_block["duration"] = duration_str
+                    thought_block["bullets"] = final_thinking["bullets"]
+                
+                # 挂载或更新 todo 块
+                todo_block = next((b for b in tb if b.get("type") == "todo_list"), None)
+                if not todo_block:
+                    tb.append(TimelineManager.create_todo_block(plan_steps, turn_id=0))
+                else:
+                    todo_block["total_count"] = len(plan_steps)
+                    todo_block["title"] = f"任务清单 · 0/{len(plan_steps)} 已完成"
+                    todo_block["items"] = [
+                        {"title": s["title"], "desc": s.get("desc", ""), "status": s.get("status", "READY"), "diff_type": "added"}
+                        for s in plan_steps
+                    ]
+
+                for dev_id in device_ids:
+                    if dev_id in cur_sess.get("devices", {}):
+                        cur_sess["devices"][dev_id]["action"] = "等待自动分发调度..." if is_auto else "等待人工审批确认方案..."
+
+                self._save_session(session_id)
+
+                # 🚀 若为自动放行模式，规划完毕后立即派发设备工作线程并发执行
+                if is_auto:
+                    for dev_id in device_ids:
+                        self.executor.submit(self._device_worker, session_id, dev_id, goal, case_name, test_mode)
+
+                # 🚀 继续在后台异步进行大模型细化富化推演（若开启）
+                try:
+                    ai_thinking, ai_steps = self._generate_ai_plan_and_thinking(goal, is_auto, test_mode, provider=provider, model=model)
+                    c_sess = self.sessions.get(session_id)
+                    if c_sess and c_sess.get("status") not in ["STOPPED", "FAILED", "COMPLETED"]:
+                        if ai_thinking:
+                            c_sess["thinking"] = ai_thinking
+                            for b in c_sess.get("timeline_blocks", []):
+                                if b.get("type") == "thought":
+                                    b["bullets"] = ai_thinking.get("bullets", b.get("bullets", []))
+                                    if ai_thinking.get("duration"):
+                                        b["duration"] = ai_thinking["duration"]
+                        existing_steps = c_sess.get("plan_steps", [])
+                        has_progressed = any(s.get("status") in ["COMPLETED", "FAIL"] for s in existing_steps)
+                        if not has_progressed and ai_steps:
+                            c_sess["plan_steps"] = ai_steps
+                            for b in c_sess.get("timeline_blocks", []):
+                                if b.get("type") == "todo_list":
+                                    b["total_count"] = len(ai_steps)
+                                    b["title"] = f"更新任务清单 · 0/{len(ai_steps)} 已完成"
+                                    b["items"] = [
+                                        {"title": s["title"], "desc": s.get("desc", ""), "status": s.get("status", "READY"), "diff_type": "added"}
+                                        for s in ai_steps
+                                    ]
+                        self._save_session(session_id)
+                except Exception as e:
+                    logger.warning(f"异步富化任务会话 [{session_id}] AI 推演异常: {e}")
+
+            except Exception as ex:
+                logger.error(f"后台规划与派发任务异常: {ex}", exc_info=True)
+
+        self.executor.submit(_async_plan_and_dispatch)
 
         return session_id
+
 
     def approve_session(self, session_id: str) -> bool:
         """人工审批放行：唤醒任务并开始向各设备分发执行"""
