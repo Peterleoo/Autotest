@@ -7,7 +7,7 @@ load_dotenv()
 
 class AIConfig:
     """
-    多模型统一配置：支持象盒 Hermes 专属网关、Google Antigravity OAuth、官方 DeepSeek 与通用 OpenAI 协议
+    多模型统一配置：支持 Hermes 企业网关、Google Antigravity OAuth、官方 DeepSeek 与通用 OpenAI 协议
     所有参数动态感知环境变量变更，支持运行态热切换模型
     """
     @property
@@ -19,14 +19,14 @@ class AIConfig:
         if value:
             os.environ["AI_PROVIDER"] = str(value).lower()
 
-    # 1. 象盒企业 Hermes 网关（DeepSeek-Flash，实测连通）
+    # 1. Hermes 企业网关（DeepSeek 高速推理引擎）
     @property
     def HERMES_API_KEY(self) -> str:
         return os.getenv("HERMES_API_KEY", "")
 
     @property
     def HERMES_BASE_URL(self) -> str:
-        return os.getenv("HERMES_BASE_URL", "https://labela.xhj.com/hermes")
+        return os.getenv("HERMES_BASE_URL", "https://api.example.com/hermes")
 
     @property
     def HERMES_MODEL(self) -> str:
@@ -35,7 +35,7 @@ class AIConfig:
     # 2. Google Antigravity OAuth 配置
     @property
     def ANTIGRAVITY_CONFIG_PATH(self) -> str:
-        return os.getenv("ANTIGRAVITY_CONFIG_PATH", r"F:\PM-product\data\desktop-home\gemini-oauth-bridge.json")
+        return os.getenv("ANTIGRAVITY_CONFIG_PATH", str(Path(__file__).resolve().parent / "antigravity_oauth.json"))
 
     @property
     def ANTIGRAVITY_MODEL(self) -> str:
@@ -91,7 +91,7 @@ class AIConfig:
     def get_current_model_info(self) -> dict:
         p = self.PROVIDER
         if p == "hermes":
-            return {"provider": "hermes", "name": "象盒 Hermes 企业网关", "model": self.HERMES_MODEL}
+            return {"provider": "hermes", "name": "Hermes 企业网关", "model": self.HERMES_MODEL}
         elif p == "antigravity":
             return {"provider": "antigravity", "name": "Google Antigravity 官方授权", "model": self.ANTIGRAVITY_MODEL}
         elif p == "deepseek":

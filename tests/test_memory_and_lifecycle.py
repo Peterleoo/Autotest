@@ -11,7 +11,7 @@ def test_fact_memory_and_turn_model():
     """验证多轮 Turn 数据模型与端侧事实状态机正常流转"""
     session = {
         "session_id": "sess_test_turn_1",
-        "goal": "打开象盒找房进入买房首页",
+        "goal": "打开待测应用进入买房首页",
         "app_package": "com.apicloud.A6995433058179",
         "status": "COMPLETED",
         "plan_steps": [
@@ -24,7 +24,7 @@ def test_fact_memory_and_turn_model():
     turns = MemoryManager.ensure_session_turns(session)
     assert len(turns) == 1
     assert turns[0]["turn_id"] == 1
-    assert turns[0]["user_message"] == "打开象盒找房进入买房首页"
+    assert turns[0]["user_message"] == "打开待测应用进入买房首页"
 
     # 2. 模拟第 2 轮用户追加指令
     t2 = MemoryManager.create_turn(2, "查看第2个房源详情并截图")

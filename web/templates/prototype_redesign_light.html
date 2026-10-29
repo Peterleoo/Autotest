@@ -988,7 +988,7 @@
             <!-- 待测应用 -->
             <div class="header-chip" title="当前待测目标应用">
                 <i class="bi bi-box-seam" style="font-size: 11px;"></i>
-                <span>象盒找房 v4.9.11 (已安装)</span>
+                <span>待测应用 v4.9.11 (已安装)</span>
             </div>
             <!-- 主题切换 -->
             <div class="header-chip" onclick="toggleTheme()" title="切换极简黑白模式 (深色/浅色)">
@@ -1072,7 +1072,7 @@
                 <!-- 1. 用户提问意图 -->
                 <div class="user-message-row">
                     <div class="user-bubble">
-                        冷启动象盒找房，在首页点击第一套推荐房源进入详情页，查看户型与VR看房标识，点击'微聊'按钮验证咨询窗口正确弹出。
+                        冷启动待测应用，在首页点击第一套推荐房源进入详情页，查看户型与VR看房标识，点击'微聊'按钮验证咨询窗口正确弹出。
                     </div>
                 </div>
 
@@ -1165,7 +1165,7 @@
 
                     <!-- 纯文本总结 -->
                     <p class="summary-text-desc">
-                        已在物理真机（Xiaomi MIX 2）上成功跑通象盒找房冷启动、跳过开屏广告、首页推荐房源视觉定位、详情页跳转及微聊咨询窗口激活，端侧渲染及断言核验全部通过，未发生 Crash 或卡顿。
+                        已在物理真机（Xiaomi MIX 2）上成功跑通待测应用冷启动、跳过开屏广告、首页推荐房源视觉定位、详情页跳转及微聊咨询窗口激活，端侧渲染及断言核验全部通过，未发生 Crash 或卡顿。
                     </p>
 
                     <!-- 紧凑指标药丸 -->
@@ -1225,7 +1225,7 @@
                         </div>
                         <div class="pill-capsule" title="当前待测应用">
                             <i class="bi bi-box-seam" style="font-size: 11px;"></i>
-                            <span>象盒找房</span>
+                            <span>待测应用</span>
                             <i class="bi bi-chevron-down" style="font-size: 8px;"></i>
                         </div>
                         <div class="pill-capsule" title="放行审批流">
@@ -1349,11 +1349,11 @@
                         <span class="mono-pill" style="font-size: 9.5px;">GFM 渲染</span>
                     </div>
                     <div class="right-md-body" id="inspectorMdBox">
-<span class="md-h1"># 象盒找房自动化测试执行报告 (TR-20261021-01)</span>
+<span class="md-h1"># 待测应用自动化测试执行报告 (TR-20261021-01)</span>
 
 > **测试时间**: 2026-10-21 15:42:10  
 > **执行环境**: Xiaomi MIX 2 (MIUI 12 / Android 9.0)  
-> **待测应用**: 象盒找房 (v4.9.11, com.apicloud.A6995433058179)  
+> **待测应用**: 待测应用 (v4.9.11, com.apicloud.A6995433058179)  
 > **最终结论**: <span class="md-pass">**PASS (全部 6 项断言通过)**</span>
 
 ---
@@ -1517,7 +1517,7 @@
 
             if (type === 'case') {
                 titleEl.innerText = 'TEST_CASE_HOUSING_VERIFICATION.md';
-                box.innerHTML = `<span class="md-h1"># 象盒找房自动化测试用例 (TC-HOUSING-001)</span>
+                box.innerHTML = `<span class="md-h1"># 待测应用自动化测试用例 (TC-HOUSING-001)</span>
 
 > **用例名称**: 首页推荐房源进入与微聊验证  
 > **编写人员**: PM 业务自测团队  
@@ -1525,7 +1525,7 @@
 
 <span class="md-h2">## 前置条件</span>
 1. 真机已连接且已开启开发者 USB 调试  
-2. 已安装象盒找房 App (com.apicloud.A6995433058179)  
+2. 已安装待测应用 App (com.apicloud.A6995433058179)  
 
 <span class="md-h2">## 测试步骤</span>
 1. 启动应用并跳过广告  
@@ -1534,11 +1534,11 @@
 4. 点击右下角微聊按钮，断言咨询弹窗唤起  `;
             } else {
                 titleEl.innerText = 'TEST_REPORT_20261021_HOUSING.md';
-                box.innerHTML = `<span class="md-h1"># 象盒找房自动化测试执行报告 (TR-20261021-01)</span>
+                box.innerHTML = `<span class="md-h1"># 待测应用自动化测试执行报告 (TR-20261021-01)</span>
 
 > **测试时间**: 2026-10-21 15:42:10  
 > **执行环境**: Xiaomi MIX 2 (MIUI 12 / Android 9.0)  
-> **待测应用**: 象盒找房 (v4.9.11, com.apicloud.A6995433058179)  
+> **待测应用**: 待测应用 (v4.9.11, com.apicloud.A6995433058179)  
 > **最终结论**: <span class="md-pass">**PASS (全部 6 项断言通过)**</span>
 
 ---

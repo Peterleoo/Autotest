@@ -4,15 +4,17 @@ import sys
 import time
 import json
 import shutil
+import socket
 import logging
 import subprocess
 import threading
 import asyncio
 from datetime import datetime
+from urllib.parse import urlparse
 
 logger = logging.getLogger("WebApp")
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks, Body
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -54,6 +56,18 @@ async def index(request: Request):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+def _is_appium_available(timeout: float = 0.5) -> bool:
+    """探测 Appium 服务是否真实可连通，避免把未接入的 iOS 占位节点当成可用真机。"""
+    try:
+        parsed = urlparse(settings.APPIUM_SERVER_URL)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or (443 if parsed.scheme == "https" else 4723)
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
 
 # ================= 优化：设备列表内存级低开销缓存 (5秒 TTL，杜绝高频 ADB 子进程与物理点击探针) =================
 _DEVICE_CACHE = {"timestamp": 0.0, "data": None}
@@ -105,38 +119,76 @@ async def get_devices(probe: bool = False, force: bool = False):
     except Exception as e:
         pass
 
-    ios_node = {
-        "id": "remote-ios",
-        "model": settings.IOS_DEVICE_NAME,
-        "platform": "iOS",
-        "version": settings.IOS_PLATFORM_VERSION,
-        "status": f"局域网 Mac: {settings.APPIUM_SERVER_URL}"
-    }
+    # iOS 节点仅在 Appium 服务真实可连通时才对外暴露，避免占位设备被误选为目标真机
+    ios_node = None
+    if _is_appium_available():
+        ios_node = {
+            "id": "remote-ios",
+            "model": settings.IOS_DEVICE_NAME,
+            "platform": "iOS",
+            "version": settings.IOS_PLATFORM_VERSION,
+            "status": f"局域网 Mac: {settings.APPIUM_SERVER_URL}"
+        }
 
     result = {"android_devices": devices, "ios_node": ios_node}
     _DEVICE_CACHE["timestamp"] = now
     _DEVICE_CACHE["data"] = result
     return result
 
-@app.get("/api/devices/{device_id}/screenshot")
-@app.get("/api/device/screenshot")
-async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70):
-    """获取指定真机设备的实时屏幕截图 (依托显存 RAW 直读与 PC 端 SIMD 硬件级转码，耗时压缩至 0.6s，内存 0ms 秒回)"""
-    # 🌟 第一性原理：先核查真机真实连接状态，无真机在线时坚决返回 404，杜绝伪造假象
+_DEVICE_DIMENSIONS_CACHE: Dict[str, Tuple[int, int]] = {}
+
+def resolve_target_device_id(preferred_id: Optional[str] = None) -> Optional[str]:
+    """动态解析当前真实在线的目标真机 ID (杜绝硬编码设备序列号导致的脱靶)"""
     try:
         connected = app_mgr.get_connected_devices()
-        conn_ids = [d if isinstance(d, str) else d.get("id") for d in connected if d]
+        conn_ids = [d.get("id") if isinstance(d, dict) else d for d in connected if d]
     except Exception:
         conn_ids = []
 
     if not conn_ids:
-        return Response(status_code=404, content=b"No device connected", media_type="text/plain")
+        return None
 
-    target_dev = device_id
-    if not target_dev or target_dev in ["mock-device", "local-simulator", "default", "auto"]:
-        target_dev = conn_ids[0]
-    elif target_dev not in conn_ids:
-        return Response(status_code=404, content=b"Device offline", media_type="text/plain")
+    # 若指定了有效在线设备且在当前在线列表中，直接使用
+    if preferred_id and preferred_id not in ["mock-device", "local-simulator", "default", "auto", "2145189e"]:
+        if preferred_id in conn_ids:
+            return preferred_id
+
+    # 否则自动平滑对齐至当前首选在线真机
+    return conn_ids[0]
+
+def _get_device_screen_dimensions(device_id: str) -> Tuple[int, int]:
+    """获取目标真机的真实物理分辨率 (带内存缓存，优先从 Frame 获取，降级使用 wm size)"""
+    if device_id in _DEVICE_DIMENSIONS_CACHE:
+        return _DEVICE_DIMENSIONS_CACHE[device_id]
+
+    # 1. 尝试从 screen_stream_hub 内存缓存中获取真实帧的宽高
+    cached = screen_stream_hub._cache.get(device_id)
+    if cached and cached.get("w") and cached.get("h"):
+        dim = (int(cached["w"]), int(cached["h"]))
+        _DEVICE_DIMENSIONS_CACHE[device_id] = dim
+        return dim
+
+    # 2. 降级通过 adb shell wm size 快速探查
+    try:
+        res = subprocess.run([app_mgr.adb_bin, "-s", device_id, "shell", "wm", "size"], capture_output=True, text=True, timeout=2)
+        match = re.findall(r"(\d+)x(\d+)", res.stdout)
+        if match:
+            w, h = map(int, match[-1])
+            _DEVICE_DIMENSIONS_CACHE[device_id] = (w, h)
+            return (w, h)
+    except Exception:
+        pass
+
+    return (1080, 2400)
+
+
+@app.get("/api/devices/{device_id}/screenshot")
+@app.get("/api/device/screenshot")
+async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70):
+    """获取指定真机设备的实时屏幕截图 (依托显存 RAW 直读与 PC 端 SIMD 硬件级转码，耗时压缩至 0.6s，内存 0ms 秒回)"""
+    target_dev = resolve_target_device_id(device_id)
+    if not target_dev:
+        return Response(status_code=404, content=b"No device connected", media_type="text/plain")
 
     try:
         # 1. 优先通过极速屏幕采集分发中枢获取 (内存缓存命中仅 0.01ms，过期自动极速采集)
@@ -152,7 +204,6 @@ async def get_device_screenshot(device_id: Optional[str] = None, format: str = "
         logger.warning(f"获取设备 [{target_dev}] 极速屏幕截图异常: {e}")
 
     # 🌟 杜绝伪造历史截屏：当物理真机断开时坚决返回 404，由前端平滑呈现未连接排查指引
-
     return Response(status_code=404, content=b"Device screenshot unavailable", media_type="text/plain")
 
 
@@ -166,17 +217,9 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
     """原生 ADB 极速 MJPEG 实时帧流发生器 (依托显存 RAW 直读 + OpenCV SIMD，端到端延迟低至 600ms)"""
     import asyncio
 
-    target_dev = device_id
-    if not target_dev or target_dev in ["default", "auto"]:
-        try:
-            connected = app_mgr.get_connected_devices()
-            if connected:
-                target_dev = connected[0].get("id")
-        except Exception:
-            pass
-
+    target_dev = resolve_target_device_id(device_id)
     if not target_dev:
-        target_dev = "2145189e"
+        return Response(status_code=404, content=b"No online device connected", media_type="text/plain")
 
     async def frame_generator():
         while True:
@@ -202,10 +245,20 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
 
 @app.post("/api/device/tap")
 async def tap_device(payload: Dict[str, Any] = Body(...)):
-    """鼠标穿透控制：接收网页点击相对坐标，转化为真机 ADB 物理手势"""
-    dev_id = payload.get("device_id") or "2145189e"
-    x = int(payload.get("x", 0))
-    y = int(payload.get("y", 0))
+    """鼠标穿透控制：接收网页点击相对坐标或归一化比例，转化为真机 ADB 物理手势"""
+    dev_id = resolve_target_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No online device available"})
+
+    norm_x = payload.get("norm_x")
+    norm_y = payload.get("norm_y")
+    if norm_x is not None and norm_y is not None:
+        dim = _get_device_screen_dimensions(dev_id)
+        x = int(float(norm_x) * dim[0])
+        y = int(float(norm_y) * dim[1])
+    else:
+        x = int(payload.get("x", 0))
+        y = int(payload.get("y", 0))
     if x <= 0 or y <= 0:
         return JSONResponse({"success": False, "error": "Invalid coordinates"})
 
@@ -219,12 +272,27 @@ async def tap_device(payload: Dict[str, Any] = Body(...)):
 
 @app.post("/api/device/swipe")
 async def swipe_device(payload: Dict[str, Any] = Body(...)):
-    """真机拖拽/滑动穿透控制：接收滑动起点与终点物理坐标及持续时间"""
-    dev_id = payload.get("device_id") or "2145189e"
-    x1 = int(payload.get("x1", 0))
-    y1 = int(payload.get("y1", 0))
-    x2 = int(payload.get("x2", 0))
-    y2 = int(payload.get("y2", 0))
+    """真机拖拽/滑动穿透控制：接收滑动起点与终点物理坐标或归一化比例及持续时间"""
+    dev_id = resolve_target_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No online device available"})
+
+    norm_x1 = payload.get("norm_x1")
+    norm_y1 = payload.get("norm_y1")
+    norm_x2 = payload.get("norm_x2")
+    norm_y2 = payload.get("norm_y2")
+    if None not in (norm_x1, norm_y1, norm_x2, norm_y2):
+        dim = _get_device_screen_dimensions(dev_id)
+        x1 = int(float(norm_x1) * dim[0])
+        y1 = int(float(norm_y1) * dim[1])
+        x2 = int(float(norm_x2) * dim[0])
+        y2 = int(float(norm_y2) * dim[1])
+    else:
+        x1 = int(payload.get("x1", 0))
+        y1 = int(payload.get("y1", 0))
+        x2 = int(payload.get("x2", 0))
+        y2 = int(payload.get("y2", 0))
+
     duration = int(payload.get("duration", 300))
     if x1 <= 0 or y1 <= 0 or x2 <= 0 or y2 <= 0:
         return JSONResponse({"success": False, "error": "Invalid coordinates"})
@@ -243,7 +311,9 @@ async def swipe_device(payload: Dict[str, Any] = Body(...)):
 @app.post("/api/device/key")
 async def send_device_key(payload: Dict[str, Any] = Body(...)):
     """真机按键控制：支持返回、桌面、多任务等虚拟导航键"""
-    dev_id = payload.get("device_id") or "2145189e"
+    dev_id = resolve_target_device_id(payload.get("device_id"))
+    if not dev_id:
+        return JSONResponse({"success": False, "error": "No online device available"})
     key = str(payload.get("key", "")).lower()
     key_map = {"back": "4", "home": "3", "app_switch": "187", "menu": "82", "volume_up": "24", "volume_down": "25"}
     keycode = key_map.get(key, key)
@@ -269,30 +339,117 @@ async def get_deliverables_list():
 
 @app.post("/api/deliverables/replay")
 async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
-    """⚡ 0 Token 毫秒级原生用例回放：直接通过 Pytest 执行固化脚本"""
+    """⚡ 0 Token 毫秒级原生用例回放：多级智能寻址并直接通过 Pytest 执行固化脚本"""
     safe_ref = payload.get("safeRef") or payload.get("script_path", "")
+    device_id = resolve_target_device_id(payload.get("device_id"))
     if not safe_ref:
-        return JSONResponse({"success": False, "error": "缺少脚本路径 safeRef"})
+        return JSONResponse({"success": False, "passed": False, "duration": 0, "error": "缺少测试脚本路径 (safeRef 为空)"})
 
-    file_path = BASE_DIR / safe_ref
-    if not file_path.exists():
-        return JSONResponse({"success": False, "error": f"测试脚本不存在: {safe_ref}"})
+    # 多级鲁棒寻址
+    file_path = None
+    ref_name = Path(safe_ref).name
+    candidates = [
+        BASE_DIR / safe_ref,
+        BASE_DIR / "tests" / "solidified" / safe_ref,
+        BASE_DIR / "tests" / "solidified" / ref_name
+    ]
+    for c in candidates:
+        if c.exists() and c.is_file():
+            file_path = c
+            break
+
+    if not file_path:
+        solid_dir = BASE_DIR / "tests" / "solidified"
+        if solid_dir.exists():
+            matched = list(solid_dir.rglob(ref_name))
+            if matched and matched[0].is_file():
+                file_path = matched[0]
+
+    if not file_path or not file_path.exists():
+        return JSONResponse({
+            "success": False,
+            "passed": False,
+            "duration": 0,
+            "error": f"测试脚本未找到: 在用例库中未检索到【{ref_name}】"
+        })
+
+    # 尝试确保真机前台目标应用就绪
+    try:
+        from core.native_adb_driver import NativeADBDriver
+        adb = NativeADBDriver(device_id=device_id)
+        current_app = adb.get_current_app()
+        if "launcher" in current_app.lower() or not current_app:
+            default_pkg = payload.get("app_package") or getattr(settings, "ANDROID_APP_PACKAGE", "")
+            if default_pkg:
+                adb.execute_shell(f"monkey -p {default_pkg} -c android.intent.category.LAUNCHER 1")
+                time.sleep(1.2)
+    except Exception as e:
+        logger.warning(f"回放前置检查调起应用异常 (非致命): {e}")
 
     cmd = [sys.executable, "-m", "pytest", str(file_path), "-v", "-s", "--color=no"]
     start_t = time.time()
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(BASE_DIR))
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=90, cwd=str(BASE_DIR))
         duration = round(time.time() - start_t, 2)
         passed = (res.returncode == 0)
+        raw_output = res.stdout or res.stderr or ""
+        
+        # 提炼关键错误摘要 (优先提炼最底层 AssertionError/异常明细)
+        error_summary = ""
+        if not passed:
+            for line in raw_output.splitlines():
+                line_str = line.strip()
+                if "AssertionError:" in line_str:
+                    parts = line_str.split("AssertionError:", 1)
+                    if len(parts) > 1 and parts[1].strip():
+                        error_summary = parts[1].strip()
+                    else:
+                        error_summary = line_str
+                    break
+            
+            if not error_summary:
+                for line in raw_output.splitlines():
+                    line_str = line.strip()
+                    if (line_str.startswith("E   ") or line_str.startswith("E ")) and ("Error" in line_str or "Exception" in line_str):
+                        error_summary = line_str.lstrip("E ").strip()
+                        break
+
+            if not error_summary:
+                for line in raw_output.splitlines():
+                    line_str = line.strip()
+                    if any(k in line_str for k in ["FAILED", "Error:"]) and len(line_str) < 150:
+                        error_summary = line_str
+                        break
+
+            if not error_summary:
+                error_summary = "用例断言未通过，界面未出现预期元素或转场超时"
         return JSONResponse({
             "success": True,
             "passed": passed,
             "duration": duration,
-            "output": res.stdout or res.stderr,
+            "error": error_summary if not passed else "",
+            "summary": error_summary,
+            "output": raw_output[:3000],
             "returncode": res.returncode
         })
+    except subprocess.TimeoutExpired:
+        duration = round(time.time() - start_t, 2)
+        return JSONResponse({
+            "success": False,
+            "passed": False,
+            "duration": duration,
+            "error": "执行超时：用例在 90 秒内未完成执行",
+            "summary": "执行超时 (90s)"
+        })
     except Exception as e:
-        return JSONResponse({"success": False, "error": str(e), "duration": round(time.time() - start_t, 2)})
+        duration = round(time.time() - start_t, 2)
+        return JSONResponse({
+            "success": False,
+            "passed": False,
+            "duration": duration,
+            "error": f"用例执行抛出异常: {str(e)}",
+            "summary": str(e)
+        })
 
 @app.get("/api/system/preflight")
 async def system_preflight():
@@ -572,7 +729,7 @@ async def suggest_cases(request: Request, app_name: Optional[str] = None):
     """AI 测试用例助手：针对当前应用生成完善的多样化测试用例矩阵"""
     import random
     if not app_name:
-        app_name = request.query_params.get("app_name") or "象盒找房"
+        app_name = request.query_params.get("app_name") or "待测应用"
     # 随机抽取 4 个不重复的业务用例
     sampled = random.sample(ALL_SUGGESTED_CASES, min(4, len(ALL_SUGGESTED_CASES)))
     return {"app_name": app_name, "cases": sampled}
@@ -736,7 +893,7 @@ async def get_app_projects():
                 "filename": apk_file.name,
                 "case_count": len(py_files),
                 "folder": f"tests/solidified/{app_id}",
-                "is_current": (app_id == "xianghe_zhaofang" or len(projects) == 0)
+                "is_current": (app_id == "demo_app" or len(projects) == 0)
             })
 
     if settings.SOLIDIFIED_DIR.exists():
@@ -769,7 +926,7 @@ async def get_app_projects():
             "is_current": True
         })
 
-    return {"projects": projects, "current_project_id": projects[0]["id"] if projects else "xianghe_zhaofang"}
+    return {"projects": projects, "current_project_id": projects[0]["id"] if projects else "demo_app"}
 
 def parse_case_timestamp(file_path: Path, meta: dict) -> tuple:
     """提取用例的高精度时间戳与可读时间字符串，确保绝对时间倒序"""
@@ -803,7 +960,7 @@ async def get_solidified_cases(app_id: Optional[str] = None):
         if not target_dir.exists():
             target_dir = settings.SOLIDIFIED_DIR
     else:
-        target_dir = settings.SOLIDIFIED_DIR / "xianghe_zhaofang"
+        target_dir = settings.SOLIDIFIED_DIR / "demo_app"
         if not target_dir.exists() or not list(target_dir.glob("*.py")):
             target_dir = settings.SOLIDIFIED_DIR
 
@@ -897,27 +1054,72 @@ async def save_session_to_local_case(
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     case_name = f"{prefix}_{ts}"
 
-    # 3. 构造 Pytest 动作轨迹代码并固化落盘
+    # 3. 构造 Pytest 动作轨迹代码并固化落盘 (优先萃取真机真实执行的动作轨迹)
     action_trace = []
-    for idx, s in enumerate(plan_steps, 1):
-        action_trace.append({
-            "action": "wait" if idx == 1 else "assert_text",
-            "reason": f"步骤 {idx}: {s.get('title', '')} - {s.get('desc', '')}",
-            "expected": s.get("title", ""),
-            "seconds": 1
-        })
-    if not action_trace:
-        action_trace = [
-            {"action": "wait", "reason": "应用冷启动与上下文感知", "seconds": 2},
-            {"action": "assert_text", "reason": "业务目标校验", "expected": goal[:10]}
-        ]
+    blocks = session.get("timeline_blocks", [])
+    step_blocks = [b for b in blocks if b.get("type") == "step_execution"]
 
-    # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 xianghe_zhaofang)
+    for sb in step_blocks:
+        for act in sb.get("actions", []):
+            atype = act.get("type", "")
+            if atype == "ocr":
+                continue
+            elif atype == "tap":
+                param = act.get("param", "")
+                target_name = act.get("target") or "目标元素"
+                m = re.search(r"\((\d+),\s*(\d+)\)", param)
+                if m:
+                    action_trace.append({
+                        "action": "tap",
+                        "reason": f"点击【{target_name}】",
+                        "locator": {"by": "coordinates", "value": f"{m.group(1)},{m.group(2)}"}
+                    })
+            elif atype in ["fast_forward_guide", "skip_guide"]:
+                action_trace.append({
+                    "action": "fast_forward_guide",
+                    "reason": "新用户引导页穿透"
+                })
+            elif atype == "swipe":
+                action_trace.append({
+                    "action": "swipe",
+                    "reason": act.get("desc") or "滑动浏览列表",
+                    "direction": "up"
+                })
+            elif atype == "type":
+                action_trace.append({
+                    "action": "type",
+                    "reason": f"输入内容: {act.get('text', '')}",
+                    "text": act.get("text", "")
+                })
+
+    # 若未从执行流水中提取到动作，则降级为规划步骤与业务断言
+    if not action_trace:
+        action_trace.append({"action": "wait", "reason": "应用冷启动与上下文感知", "seconds": 2})
+        for idx, s in enumerate(plan_steps, 1):
+            action_trace.append({
+                "action": "wait",
+                "reason": f"步骤 {idx}: {s.get('title', '')} - {s.get('desc', '')}",
+                "seconds": 1
+            })
+        action_trace.append({
+            "action": "assert_text",
+            "reason": "业务目标端侧断言",
+            "expected": goal[:12] if goal else "首页"
+        })
+    else:
+        # 补充终态校验
+        action_trace.append({
+            "action": "assert_text",
+            "reason": "端侧业务闭环与界面渲染断言",
+            "expected": goal[:8] if goal else "首页"
+        })
+
+    # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 demo_app)
     app_id = session.get("app_id")
     if not app_id and session.get("target_app"):
         app_id = Path(session["target_app"]).stem
     if not app_id:
-        app_id = "xianghe_zhaofang"
+        app_id = "demo_app"
 
     target_app_dir = settings.SOLIDIFIED_DIR / app_id
     target_app_dir.mkdir(parents=True, exist_ok=True)
@@ -987,7 +1189,7 @@ async def batch_run_solidified_cases(payload: Dict[str, Any] = Body(default={}))
     """
     category = payload.get("category", "ALL")
     app_id = payload.get("app_id")
-    target_dir = settings.SOLIDIFIED_DIR / app_id if app_id else settings.SOLIDIFIED_DIR / "xianghe_zhaofang"
+    target_dir = settings.SOLIDIFIED_DIR / app_id if app_id else settings.SOLIDIFIED_DIR / "demo_app"
     if not target_dir.exists() or not list(target_dir.glob("*.py")):
         target_dir = settings.SOLIDIFIED_DIR
 
@@ -1430,6 +1632,20 @@ async def create_task_session(
     device_ids = []
     if devices and devices != "auto":
         device_ids = [d.strip() for d in devices.split(",") if d.strip()]
+    if "remote-ios" in device_ids and not _is_appium_available():
+        device_ids = [d for d in device_ids if d != "remote-ios"]
+        if not device_ids:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "所选 iOS 节点未接入：本机 Appium 未启动，请改选 Android 真机后重试。"}
+            )
+    if app_filename:
+        app_filename = Path(app_filename).name
+        if not (settings.APPS_DIR / app_filename).exists():
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": f"所选待测应用不存在：{app_filename}，请重新上传或选择应用包。"}
+            )
     session_id = task_mgr.create_session(
         goal=goal,
         device_ids=device_ids,
@@ -1610,7 +1826,7 @@ CURRENT_PLAN_SESSION = {
 plan_input_event = threading.Event()
 plan_interrupt_flag = threading.Event()
 
-def judge_plan_need(goal: str, app_name: str = "象盒找房") -> dict:
+def judge_plan_need(goal: str, app_name: str = "待测应用") -> dict:
     """AI 智能体研判用户测试需求是否需要规划节点"""
     goal_clean = goal.strip()
     atomic_keywords = ["返回", "按返回", "截屏", "截图", "home", "查看当前", "版本号", "按键", "滑动一下", "下滑", "上滑"]
@@ -1650,7 +1866,7 @@ def judge_plan_need(goal: str, app_name: str = "象盒找房") -> dict:
         "reason": "根据目标复杂度评估，自动匹配最优执行策略。" if need else "单一目标即时执行。"
     }
 
-def generate_test_plan_ai(goal: str, app_name: str = "象盒找房") -> dict:
+def generate_test_plan_ai(goal: str, app_name: str = "待测应用") -> dict:
     """使用 AI 大模型针对宏观测试目标自动规划结构化节点与合理性评估"""
     from core.llm_client import LLMClient
     llm = LLMClient()
@@ -1694,7 +1910,7 @@ def generate_test_plan_ai(goal: str, app_name: str = "象盒找房") -> dict:
 2. 涉及登录、验证码等需要人工补充信息的节点，将 requires_input 设为 true，type 设为 interactive。
 3. 必须包含 evaluation 评估对象，给出 0-100 的合理性评分和风险等级。"""
 
-    user_p = f"待测应用：{app_name}（包名 com.apicloud.A6995433058179）。测试目标：{goal}。请规划测试节点与评估。"
+    user_p = f"待测应用：{app_name}（包名 com.example.app）。测试目标：{goal}。请规划测试节点与评估。"
     try:
         raw_res = llm.chat_decision(system_prompt=system_p, user_prompt=user_p)
         if isinstance(raw_res, dict):
@@ -1916,8 +2132,8 @@ def _execute_plan_pipeline(session_id: str, test_mode: str):
             title=f"【计划测试】{CURRENT_PLAN_SESSION['plan_title'][:30]}",
             goal=goal,
             test_mode=test_mode,
-            app_name="象盒找房",
-            package="com.apicloud.A6995433058179",
+            app_name="待测应用",
+            package=getattr(settings, "ANDROID_APP_PACKAGE", "") or "com.example.app",
             model_name=ai_config.PROVIDER.upper(),
             status="PASS",
             steps=executed_steps_data,
@@ -1931,7 +2147,7 @@ def _execute_plan_pipeline(session_id: str, test_mode: str):
         log(f"\n测试计划未能通过所有节点。")
 
 @app.post("/api/plan/judge")
-async def plan_judge(goal: str = Form(...), app_name: str = Form("象盒找房")):
+async def plan_judge(goal: str = Form(...), app_name: str = Form("待测应用")):
     """AI 智能研判用户测试目标是否需要规划节点"""
     try:
         judgement = judge_plan_need(goal=goal, app_name=app_name)
@@ -1940,7 +2156,7 @@ async def plan_judge(goal: str = Form(...), app_name: str = Form("象盒找房")
         return {"success": True, "need_plan": len(goal.strip()) > 15, "reason": f"智能研判兜底: {e}"}
 
 @app.post("/api/plan/generate")
-async def plan_generate(goal: str = Form(...), app_name: str = Form("象盒找房")):
+async def plan_generate(goal: str = Form(...), app_name: str = Form("待测应用")):
     """调用大模型规划结构化测试计划用例清单与合理性自检评估"""
     try:
         plan_data = generate_test_plan_ai(goal=goal, app_name=app_name)
@@ -2104,11 +2320,18 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             }
         
         cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name]
+        # 子进程输出统一 UTF-8，避免 Windows 管道默认 GBK 导致 emoji 日志崩溃 / 中文乱码
+        child_env = os.environ.copy()
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env["PYTHONUTF8"] = "1"
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=child_env,
             cwd=str(BASE_DIR),
             bufsize=1
         )
@@ -2149,7 +2372,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 fail_summary = "华为手机安全拦截：Appium 底层驱动 (androidTest) 尚未在手机上允许安装。请点亮手机屏幕解锁，在手机弹窗中点击【已了解风险】并【仍然安装】；或在上方切换至【本地极速自测模式】直接体验完整测试报告与脚本固化。"
                 steps = [
                     {"action": "Device Check", "reason": "在线真机检测", "detail": f"已识别真机: {dev_id}", "status": "PASS"},
-                    {"action": "App Launch", "reason": "拉起象盒找房", "detail": "MainActivity (免重装)", "status": "PASS"},
+                    {"action": "App Launch", "reason": "拉起待测应用", "detail": "MainActivity (免重装)", "status": "PASS"},
                     {"action": "Driver Connect", "reason": "初始化 UiAutomator2 测试运行器", "detail": fail_summary, "status": "FAIL"}
                 ]
             elif "连接 Appium 驱动失败" in combined_output or "UnknownError" in combined_output:
@@ -2160,12 +2383,12 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 ]
             else:
                 steps = [
-                    {"action": "App Launch", "reason": "调起象盒找房", "detail": "MainActivity", "status": "PASS"},
+                    {"action": "App Launch", "reason": "调起待测应用", "detail": "MainActivity", "status": "PASS"},
                     {"action": "AI Execution", "reason": "执行测试目标流转", "detail": "执行未能完全达成目标断言", "status": "FAIL"}
                 ]
         else:
             steps = [
-                {"action": "App Launch", "reason": "调起象盒找房主界面", "detail": "MainActivity", "status": "PASS"},
+                {"action": "App Launch", "reason": "调起待测应用主界面", "detail": "MainActivity", "status": "PASS"},
                 {"action": "AI Perception & Touch", "reason": "视觉截屏感知与手势交互流转", "detail": "多模态意图识别并成功操作", "status": "PASS"},
                 {"action": "Touch & Verify", "reason": "屏幕交互手势与断言验证", "detail": goal, "status": "PASS"}
             ]
@@ -2174,8 +2397,8 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             title=f"【真机实测】{goal[:25]}",
             goal=goal,
             test_mode="real",
-            app_name="象盒找房",
-            package="com.apicloud.A6995433058179",
+            app_name="待测应用",
+            package=getattr(settings, "ANDROID_APP_PACKAGE", "") or "com.example.app",
             model_name=ai_config.PROVIDER.upper(),
             status=status,
             steps=steps,
@@ -2206,7 +2429,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
         
         # 针对目标进行 AI 决策演练
         system_p = "你是一个自动化测试决策引擎，请针对用户测试目标，输出结构化的测试动作流 JSON。包含 action(tap/type/call_api/assert_text), target_index, text, expected 等字段。"
-        prompt = f"针对【象盒找房】应用执行本地测试：{goal}。包名 com.apicloud.A6995433058179，主界面 MainActivity。请规划至少 4 个完整的测试动作（含接口验证与UI断言）。"
+        prompt = f"针对【待测应用】执行本地测试：{goal}。包名 com.example.app，主界面 MainActivity。请规划至少 4 个完整的测试动作（含接口验证与UI断言）。"
         
         try:
             fallback_note = ""
@@ -2216,7 +2439,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 if getattr(llm, "last_fallback_info", None):
                     fb = llm.last_fallback_info
                     actual_model = f"{fb['fallback_provider'].upper()} ({fb['model']}) [从离线的 {fb['original_provider']} 自动降级]"
-                    fallback_note = f"\n⚠️ [自动容错提示] 检测到 {fb['original_provider'].upper()} 本地网关离线，已为您免等待平滑降级至【象盒企业 Hermes 网关】完成推演！\n"
+                    fallback_note = f"\n⚠️ [自动容错提示] 检测到 {fb['original_provider'].upper()} 本地网关离线，已为您免等待平滑降级至【Hermes 企业网关 网关】完成推演！\n"
             except Exception as le:
                 logger.warning(f"本地测试模型决策轻微警告: {le}")
 
@@ -2226,7 +2449,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 {"action": "type", "reason": "定位并输入测试手机号", "locator": {"by": "xpath", "value": "//*[@text='请输入手机号' or contains(@resource-id, 'phone')]"}, "text": "13800138000"},
                 {"action": "call_api", "reason": "验证用户鉴权与配置接口", "method": "GET", "endpoint": "/api/config", "expected_status": 200},
                 {"action": "tap", "reason": "点击获取验证码/登录交互", "locator": {"by": "xpath", "value": "//*[@text='获取验证码' or contains(@resource-id, 'btn_login')]"}},
-                {"action": "assert_text", "reason": "断言前台界面流转正常", "expected": "象盒找房"}
+                {"action": "assert_text", "reason": "断言前台界面流转正常", "expected": "首页"}
             ]
             
             solid_file = Solidifier.solidify_test_case(
@@ -2237,13 +2460,13 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             
             output_log = f"""[本地测试模式 - 极速推演与用例固化成功]
 🎯 业务目标: {goal}
-📱 待测应用: 象盒找房 (com.apicloud.A6995433058179)
+📱 待测应用: 示例应用 (com.example.app)
 🧠 驱动模型: {actual_model}{fallback_note}
 步骤 1: 点击同意隐私政策 -> PASS
 步骤 2: 定位并输入测试手机号 [13800138000] -> PASS
 步骤 3: 触发后端用户鉴权接口 [/api/config] -> HTTP 200 OK -> PASS
 步骤 4: 触发登录交互并捕获前台 Activity -> PASS
-步骤 5: 界面文案断言 [象盒找房] -> PASS
+步骤 5: 界面文案断言 [首页] -> PASS
 
 🎉 本地测试全链路验证通过！
 💾 自动化测试脚本已成功沉淀入用例库: {solid_file.name}
@@ -2282,7 +2505,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 {
                     "step_idx": 5,
                     "action": "Assert (断言)",
-                    "reason": "断言界面文本包含 '象盒找房'",
+                    "reason": "断言界面文本包含 '首页'",
                     "detail": "断言成功",
                     "status": "PASS"
                 }
@@ -2292,8 +2515,8 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
                 title=f"【本地自测】{goal[:25]}",
                 goal=goal,
                 test_mode="local",
-                app_name="象盒找房",
-                package="com.apicloud.A6995433058179",
+                app_name="待测应用",
+                package=getattr(settings, "ANDROID_APP_PACKAGE", "") or "com.example.app",
                 model_name=actual_model,
                 status="PASS",
                 steps=steps,

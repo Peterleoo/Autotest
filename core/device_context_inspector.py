@@ -15,7 +15,8 @@ class DeviceContextInspector:
     """
 
     @classmethod
-    def inspect(cls, adb_bin: str, device_id: str, target_package: str = "com.apicloud.A6995433058179") -> Dict[str, Any]:
+    def inspect(cls, adb_bin: str, device_id: str, target_package: Optional[str] = None) -> Dict[str, Any]:
+        target_package = target_package or ""
         result = {
             "device_id": device_id,
             "target_package": target_package,
@@ -51,7 +52,11 @@ class DeviceContextInspector:
                 if match:
                     result["current_package"] = match.group(1)
                     result["current_activity"] = match.group(2)
-                    result["is_foreground"] = (result["current_package"] == target_package)
+                    if not target_package and "launcher" not in result["current_package"].lower():
+                        target_package = result["current_package"]
+                        result["target_package"] = target_package
+                        result["is_installed"] = True
+                    result["is_foreground"] = bool(target_package and result["current_package"] == target_package)
 
             # 3. 超轻量截屏感知与语义定性 (优先使用显存 RAW 直读 + PC 端硬件加速)
             screen_bytes = None
@@ -79,7 +84,7 @@ class DeviceContextInspector:
                     # 语义定性匹配
                     if "launcher" in result["current_activity"].lower() or any(k in all_text_str for k in ["小米钱包", "便签", "相机", "相册"]):
                         result["scene_type"] = "DESKTOP"
-                        result["planning_hint"] = "【桌面状态】：待测应用未在前台，需冷启动并打开象盒找房。"
+                        result["planning_hint"] = "【桌面状态】：待测应用未在前台，需冷启动并打开待测应用。"
                     elif any(k in all_text_str for k in ["手机号登录", "本机号码一键登录", "注册/登录", "验证码登录"]):
                         result["scene_type"] = "APP_LOGIN_BARRIER"
                         result["planning_hint"] = "【登录拦截状态】：当前屏幕弹出了登录拦截授权浮层，需先勾选协议并完成快速登录自愈。"
@@ -91,7 +96,7 @@ class DeviceContextInspector:
                         result["planning_hint"] = "【房源列表页】：应用已在前台且已处于二手房列表页，无需重复进入二手房入口，可直接从当前列表执行筛选与排序！"
                     elif any(k in all_text_str for k in ["二手房", "新房", "租房", "委托服务", "小区找房"]):
                         result["scene_type"] = "APP_HOME_PAGE"
-                        result["planning_hint"] = "【应用首页】：应用已在前台并处于象盒找房首页，无需重复冷启动打开App，直接从当前首页金刚区定位目标入口。"
+                        result["planning_hint"] = "【应用首页】：应用已在前台并处于主界面，无需重复冷启动，直接定位目标入口。"
                     else:
                         result["scene_type"] = "APP_RUNNING"
                         result["planning_hint"] = "应用已在前台运行，优先从当前页面顺势执行目标操作。"

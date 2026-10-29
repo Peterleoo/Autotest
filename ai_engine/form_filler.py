@@ -19,7 +19,7 @@ class SmartFormFiller:
         "price": "300",          # 期望售价 300万 / 租金 3500元
         "rent_price": "3500",
         "area": "98",             # 建筑面积 98㎡
-        "community": "钰龙天下",   # 象盒找房常用标杆小区
+        "community": "阳光花园",   # 通用示例小区
         "code": "123456",
         "email": "test_qa@example.com",
     }

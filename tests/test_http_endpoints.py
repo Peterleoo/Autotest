@@ -7,7 +7,7 @@ def test_screenshot_http():
     
     # 1. 抓取第一帧 (触发极速采集)
     t0 = time.time()
-    req = urllib.request.Request("http://127.0.0.1:8000/api/devices/2145189e/screenshot?format=jpeg")
+    req = urllib.request.Request("http://127.0.0.1:8000/api/devices/auto/screenshot?format=jpeg")
     with urllib.request.urlopen(req, timeout=5) as resp:
         data1 = resp.read()
         cost1 = time.time() - t0
@@ -28,7 +28,7 @@ def test_screenshot_http():
 
     # 3. 验证 MJPEG 实时帧流接口
     print("[HTTP-3] 验证 MJPEG 实时帧流接口:")
-    stream_req = urllib.request.Request("http://127.0.0.1:8000/api/device/screen/stream?device_id=2145189e")
+    stream_req = urllib.request.Request("http://127.0.0.1:8000/api/device/screen/stream?device_id=auto")
     t2 = time.time()
     with urllib.request.urlopen(stream_req, timeout=8) as resp:
         stream_ct = resp.headers.get("Content-Type")

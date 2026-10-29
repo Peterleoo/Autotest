@@ -67,9 +67,9 @@ def test_stream_actions_and_collapse():
     tm._append_action_to_session_step(session, 0, {
         "type": "tap",
         "name": "手势点击",
-        "desc": "点击启动象盒找房App",
+        "desc": "点击启动待测应用App",
         "param": "tap(668, 824)",
-        "observation": "真机通道响应 18ms · 触控坐标 (668, 824) [象盒找房]",
+        "observation": "真机通道响应 18ms · 触控坐标 (668, 824) [待测应用]",
         "status": "COMPLETED"
     })
     # 动作 3: 返回自愈

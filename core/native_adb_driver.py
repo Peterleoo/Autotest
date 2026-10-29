@@ -64,7 +64,7 @@ class NativeADBDriver:
 
     def _detect_device(self):
         try:
-            res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
             lines = res.stdout.strip().split("\n")[1:]
         except Exception as e:
             raise ConnectionError(f"无法执行 ADB 获取设备列表: {e}")
@@ -89,7 +89,7 @@ class NativeADBDriver:
                     logger.warning(f"设备 [{self.device_id}] 处于 offline 状态，尝试执行 adb reconnect...")
                     subprocess.run([self.adb_bin, "reconnect", "offline"], capture_output=True, timeout=5)
                     time.sleep(1)
-                    res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, timeout=5)
+                    res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
                     for l in res.stdout.strip().split("\n")[1:]:
                         p = l.split()
                         if len(p) >= 2 and p[0] == self.device_id and p[1] == "device":
@@ -130,7 +130,7 @@ class NativeADBDriver:
         if self.device_id:
             full_cmd.extend(["-s", self.device_id])
         full_cmd.extend(cmd_args)
-        return subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
+        return subprocess.run(full_cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
     @property
     def page_source(self) -> str:
@@ -174,7 +174,10 @@ class NativeADBDriver:
         try:
             from core.screen_stream_hub import _capture_raw_and_encode_sync, HAS_OPENCV
             import cv2
-            target_dev = self.device_id or "2145189e"
+            target_dev = self.device_id
+            if not target_dev:
+                self._detect_device()
+                target_dev = self.device_id
             frame_data = _capture_raw_and_encode_sync(self.adb_bin, target_dev)
             if frame_data:
                 bgr = frame_data.get("bgr")
@@ -266,6 +269,39 @@ class NativeADBDriver:
 
     def implicitly_wait(self, timeout: int):
         pass
+
+    def tap(self, positions: List[Any], duration: Optional[int] = None):
+        """兼容 Appium 标准 driver.tap([(x, y)]) 物理坐标点击"""
+        if not positions:
+            return
+        pos = positions[0]
+        if isinstance(pos, (tuple, list)) and len(pos) >= 2:
+            x, y = int(pos[0]), int(pos[1])
+        else:
+            return
+        logger.info(f"原生 ADB 物理触控点击: ({x}, {y})")
+        if duration and duration > 100:
+            self.execute_adb(["shell", "input", "swipe", str(x), str(y), str(x), str(y), str(duration)])
+        else:
+            self.execute_adb(["shell", "input", "tap", str(x), str(y)])
+        time.sleep(0.5)
+
+    def get_current_app(self) -> str:
+        """获取当前前台应用包名/窗口名"""
+        try:
+            res = self.execute_adb(["shell", "dumpsys", "window"])
+            for line in res.stdout.splitlines():
+                if "mCurrentFocus" in line or "mFocusedApp" in line:
+                    return line.strip()
+        except Exception:
+            pass
+        return ""
+
+    def execute_shell(self, command: str) -> str:
+        """执行原生 adb shell 指令"""
+        cmd_args = ["shell"] + command.split()
+        res = self.execute_adb(cmd_args)
+        return (res.stdout or res.stderr or "").strip()
 
     def quit(self):
         logger.info("原生 ADB 会话结束")

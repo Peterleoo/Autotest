@@ -1,4 +1,4 @@
-import time
+﻿import time
 import json
 import logging
 import subprocess
@@ -27,8 +27,13 @@ SYSTEM_PROMPT = """
 8. assert_text: 文本断言。例如 {"action": "assert_text", "expected": "首页", "reason": "断言是否成功跳转"}。
 9. finish: 当测试目标已经全部达成且验证通过时返回。例如 {"action": "finish", "reason": "已完整走通登录流程并断言成功"}。
 
+
 🔥 核心决策守则（严格遵守，严禁在 App 内盲目乱跳）：
-1. 【界面定性】：在 thought 中第一句必须明确输出：“【当前界面判断】：xxx界面（如：象盒找房手机号登录页/首页推荐/隐私协议弹窗）”。
+0. 【DSH 反伪造达成铁律】：
+    - 严禁掩耳盗铃！若用户的测试目标要求验证具体业务界面（如：进入房源详情、查看VR、点击咨询弹出咨询窗口、进入个人中心等），而当前真机屏幕仍停留在【登录/注册页、密码输入页、验证码拦截弹窗或网络报错页】，严禁将“拉起了登录拦截/权限控制正常”诡辩为“目标已达成”并调用 finish！
+    - 系统配备了独立的 DSH 核验门禁（TaskVerifier），任何在拦截页面擅自调用 finish 的企图都会被一票否决！
+    - 若当前处于登录页，优先识别输入框调用 type 注入预设账号密码登录，或点击一键登录放行；只有真正进入目标业务窗口后方可调用 finish！
+1. 【界面定性】：在 thought 中第一句必须明确输出：“【当前界面判断】：xxx界面（如：应用手机号登录页/首页推荐/隐私协议弹窗）”。
 2. 【目标驱动，严禁乱跳】：
     - 紧扣用户的【测试目标】！不要点击与目标无关的广告或偏门入口。
     - 针对新用户多页引导页/轮播图：严禁每滑一页就停下来重新截屏识别一次！只要定性为引导页，果断直接下发 {"action": "fast_forward_guide", "reason": "新用户引导页极速穿透直达首页"} 或 {"action": "swipe", "direction": "left", "repeat": 3}，一步到位直接翻到最后一页并进入应用首页！
@@ -44,7 +49,7 @@ SYSTEM_PROMPT = """
 
 JSON 输出格式样例：
 {
-  "thought": "【当前界面判断】：象盒找房登录授权界面。当前页面有手机号输入框[编号5]和隐私协议[编号10]，先点击勾选隐私政策协议。",
+  "thought": "【当前界面判断】：应用登录授权界面。当前页面有手机号输入框[编号5]和隐私协议[编号10]，先点击勾选隐私政策协议。",
   "action": "tap",
   "target_index": 10,
   "reason": "勾选同意用户服务与隐私协议"
@@ -61,6 +66,17 @@ class AITestAgent:
         self.api_client = APIClient()
         self.app_identifier = app_identifier
         self.session_id = session_id
+        # 提取目标应用元数据供大模型决策精准感知
+        self.app_info = {}
+        if self.app_identifier:
+            try:
+                from core.app_manager import AppManager
+                app_mgr = AppManager()
+                target_apk = app_mgr.find_target_app(self.app_identifier)
+                if target_apk:
+                    self.app_info = app_mgr.get_apk_info(target_apk)
+            except Exception as e:
+                logger.debug(f"获取待测包元数据跳过: {e}")
         self.executor = ActionExecutor(driver=self.driver, api_client=self.api_client, app_identifier=app_identifier)
         self.status_callback = status_callback
         self._has_prompted_credential = False
@@ -71,6 +87,93 @@ class AITestAgent:
                 self.status_callback(data)
             except Exception as e:
                 logger.warning(f"状态回调异常: {e}")
+
+
+    def _execute_credential_injection(self, acc: str, pwd: str, screen_info: Dict[str, Any]) -> bool:
+        """
+        确定性端侧凭证自动注入流水线 (DSH Credential Injection Pipeline)
+        真实模拟用户物理操作：切换密码登录 -> 勾选协议 -> 填手机号 -> 填密码 -> 提交登录
+        """
+        logger.info(f"🔑 [DSH 凭证自动注入] 开始对真机执行账号 [{acc}] 真实登录注入流水线...")
+        self._notify_status({
+            "step": 0,
+            "action": "自动登录注入",
+            "log": f"🔑 正在自动填入测试凭证 [{acc}] 并执行物理登录..."
+        })
+
+        # 1. 检查是否在验证码登录模式，若有'密码登录'/'账号密码登录'切换按钮，先切换
+        for el in screen_info.get("elements", []):
+            t = (el.get("text") or el.get("content_desc") or "").strip()
+            if any(k in t for k in ["用密码登录", "密码登录", "账号密码登录"]):
+                logger.info(f"点击切换到密码登录模式: {t}")
+                self.executor._locate_and_click(el, None)
+                time.sleep(0.6)
+                screen_info = ScreenParser.get_screen_summary(self.driver)
+                break
+
+        # 2. 扫描定位关键组件：手机号框、密码框、协议框、登录按钮
+        phone_el, pwd_el, agree_el, login_btn = None, None, None, None
+        for el in screen_info.get("elements", []):
+            t = (el.get("text") or el.get("content_desc") or "").strip()
+            if not phone_el and any(k in t for k in ["手机号", "账号", "请输入手机", "请输入账号"]):
+                phone_el = el
+            elif not pwd_el and any(k in t for k in ["密码", "请输入密码"]):
+                pwd_el = el
+            elif not agree_el and any(k in t for k in ["协议", "同意", "已阅读"]):
+                agree_el = el
+            elif not login_btn and any(k in t for k in ["登录", "进入"]):
+                # 排除"密码登录"等切换按钮
+                if not any(k in t for k in ["密码登录", "切换", "验证码登录"]):
+                    login_btn = el
+
+        # 3. 执行物理点击协议
+        if agree_el:
+            logger.info("勾选服务与隐私协议")
+            self.executor._locate_and_click(agree_el, None)
+            time.sleep(0.3)
+
+        # 4. 执行填入账号
+        if phone_el and acc:
+            logger.info(f"填入账号: {acc}")
+            self.executor._locate_and_type(phone_el, acc)
+            time.sleep(0.4)
+
+        # 5. 执行填入密码
+        if pwd_el and pwd:
+            logger.info("填入密码: ******")
+            self.executor._locate_and_type(pwd_el, pwd)
+            time.sleep(0.4)
+
+        # 6. 点击登录提交按钮
+        if login_btn:
+            logger.info("点击登录提交按钮")
+            self.executor._locate_and_click(login_btn, None)
+            time.sleep(2.0)
+        else:
+            # 兜底：尝试按回车或根据坐标点击
+            logger.info("未明确检出登录按钮，尝试发送回车键提交")
+            try:
+                self.driver.press_keycode(66) # KEYCODE_ENTER
+                time.sleep(1.5)
+            except Exception:
+                pass
+
+        # 7. 复核是否已成功跳出登录界面
+        after_screen = ScreenParser.get_screen_summary(self.driver)
+        after_texts = [e.get("text", "") for e in after_screen.get("elements", [])]
+        is_still_login = any(any(kw in t for kw in ["手机号登录", "密码登录", "请输入密码"]) for t in after_texts)
+
+        if not is_still_login:
+            logger.info("🎉 [DSH 凭证自动注入] 验证通过：已成功完成登录并跳出鉴权拦截页！")
+            self._notify_status({
+                "step": 0,
+                "action": "登录完成",
+                "log": "✅ 测试凭证自动注入完成，真机已成功跨过登录拦截，业务链路恢复流转！"
+            })
+            return True
+        else:
+            logger.warning("⚠️ [DSH 凭证自动注入] 尝试注入后真机仍停留在登录页，可能存在图形滑块验证码或密码校验失败")
+            return False
 
     def _check_and_prompt_hitl_credential(self, screen_info: Dict[str, Any], goal: str) -> bool:
         """
@@ -92,11 +195,14 @@ class AITestAgent:
 
         if is_login_screen:
             from core.credential_manager import CredentialManager
-            app_key = self.app_identifier or "xianghe_zhaofang"
+            app_key = self.app_identifier or "demo_app"
             cred = CredentialManager.get_credential(app_key)
             if cred and cred.get("account"):
-                logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，将自动注入登录！")
-                return False
+                logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
+                injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info)
+                if injected:
+                    return True
+                logger.warning(f"⚠️ [自动注入未能成功跳出] 界面可能需要短信验证码、滑块拼图或人工确认，无缝转入人机协同决策卡片！")
 
             session_id = self.session_id or "default_session"
             logger.info("🛡️ [人机协同介入] 检测到应用进入登录界面且未预置凭证，挂起测试并等待人工决策...")
@@ -186,7 +292,7 @@ class AITestAgent:
                 self._notify_status({
                     "step": 0,
                     "action": "自愈归位",
-                    "log": "🛡️ 检测到当前滞留在委托服务二级页面，自动按返回键归位至象盒找房首页"
+                    "log": "🛡️ 检测到当前滞留在委托服务二级页面，自动按返回键归位至应用首页"
                 })
                 try:
                     self.driver.back()
@@ -202,7 +308,7 @@ class AITestAgent:
         logger.info(f"目标: {goal}")
         
         # 📚 自动匹配并注入应用寻路与踩坑经验 (App Lessons Engine)
-        app_lessons = app_lessons_mgr.get_matched_lessons("com.xianghe.app", goal)
+        app_lessons = app_lessons_mgr.get_matched_lessons(self.app_identifier or "demo_app", goal)
         lessons_context = ""
         if app_lessons:
             lessons_context = "\n\n【专家寻路与避坑先验知识 (Lessons)】:\n" + "\n".join(f"- {l}" for l in app_lessons)
@@ -258,7 +364,7 @@ class AITestAgent:
                     dev_info = device_knowledge_mgr.get_device_fingerprint(dev_id or "")
 
                     # 抓取最近底层 logcat
-                    res_log = subprocess.run([device_knowledge_mgr.adb_bin, "-s", dev_id, "logcat", "-d", "-t", "40"], capture_output=True, text=True, timeout=3) if dev_id else None
+                    res_log = subprocess.run([device_knowledge_mgr.adb_bin, "-s", dev_id, "logcat", "-d", "-t", "40"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3) if dev_id else None
                     log_text = res_log.stdout if res_log else ""
 
                     # 优先匹配已知机型知识，无记录则 AI 自动学习并保存
@@ -330,8 +436,20 @@ class AITestAgent:
 3. 若元素列表中未提取出文字，长表单的提交按钮通常固定在屏幕正下方悬浮操作条，可直接点击底部 [540, 2150] 附近区域触发提交校验！
 """
 
-            # 2. 构造 Prompt
+            # 2. 构造 Prompt（深度注入目标应用元数据，确保模型知晓测试对象）
+            app_context_lines = []
+            if self.app_info.get('label'):
+                app_context_lines.append(f"- 应用名称: {self.app_info['label']}")
+            if self.app_info.get('package'):
+                app_context_lines.append(f"- 应用包名: {self.app_info['package']}")
+            if self.app_identifier:
+                app_context_lines.append(f"- 目标安装包: {self.app_identifier}")
+            app_context_str = "\n".join(app_context_lines) if app_context_lines else "- 未指定特定安装包（直接操作当前前台应用）"
+
             user_prompt = f"""
+【待测目标应用】
+{app_context_str}
+
 【用户测试总目标】
 {goal}
 
@@ -381,21 +499,47 @@ class AITestAgent:
                     "log": f"AI 决策 [{decision.get('action')}]: {thought}"
                 })
             except Exception as e:
-                logger.error(f"模型决策异常: {e}")
+                err_msg = str(e)
+                logger.error(f"❌ 模型决策异常: {err_msg}")
+                final_block_reason = f"大模型决策调用异常: {err_msg}"
                 self._notify_status({
                     "step": step_count,
                     "action": "决策异常",
-                    "log": f"❌ 模型决策异常: {e}"
+                    "log": f"❌ 模型决策异常: {err_msg}"
                 })
                 break
 
-            # 4. 判断是否完成
+            # 4. 🚀 借鉴 DeepSeek Harness (DSH)：通过独立 TaskVerifier 门禁审查 finish 请求
             if decision.get("action") == "finish":
-                logger.info(f"🎉 目标完成: {decision.get('reason')}")
+                is_valid, verifier_msg, barrier_info = TaskVerifier.verify_finish_claim(
+                    goal=goal,
+                    screen_info=screen_info,
+                    model_thought=thought,
+                    model_reason=decision.get("reason", "")
+                )
+                if not is_valid:
+                    logger.warning(f"🛡️ [DSH 核验门禁一票否决]: {verifier_msg}")
+                    self._notify_status({
+                        "step": step_count,
+                        "action": "门禁驳回",
+                        "log": f"🛡️ [DSH Verifier 门禁驳回]: {verifier_msg}"
+                    })
+                    # 强力纠偏：将否决原因作为不可辩驳的事实注入下一轮模型推理上下文
+                    self.memory_context.append(f"【系统严格核验门禁一票否决】：你发起的 finish 已被驳回！原因：{verifier_msg}。当前未达成最终目标，严禁擅自宣布成功！请根据界面真实情况继续推进业务或排除阻断！")
+                    
+                    # 若属于登录阻断，立即触发自动登录注入门禁
+                    if barrier_info and barrier_info.get("type") == "LOGIN_BARRIER":
+                        resolved = self._check_and_prompt_hitl_credential(screen_info, goal)
+                        if resolved:
+                            screen_info = ScreenParser.get_screen_summary(self.driver)
+                    continue
+
+                # 仅当独立 Verifier 审核通过，才批准完成
+                logger.info(f"🎉 目标完成并通过 DSH 独立核验门禁: {decision.get('reason')}")
                 self._notify_status({
                     "step": step_count,
                     "action": "完成",
-                    "log": f"🎉 测试目标顺利达成: {decision.get('reason')}"
+                    "log": f"🎉 测试目标顺利达成 (DSH Verifier 批准通过): {decision.get('reason')}"
                 })
                 execution_success = True
                 break

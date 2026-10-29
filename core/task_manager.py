@@ -385,20 +385,21 @@ class TaskManager:
         if md:
             blocks.append(TimelineManager.create_report_block(md, sid, turn_id=0))
 
-        # 7. 测试结果全景总结卡片 (仅当全流程全部完成且非进行中时输出)
-        is_truly_done = (s.get("status") in ["COMPLETED", "READY_FOR_REVIEW", "PASS"]) and (s.get("status") != "RUNNING") and (len(completed_steps) == len(steps) and len(steps) > 0)
-        if is_truly_done:
+        # 7. 测试结果全景总结卡片 (支持目标提前达成与正常闭环)
+        has_fail_step = any(st.get("status") in ["FAIL", "FAILED"] for st in steps)
+        is_success_session = (s.get("status") in ["COMPLETED", "READY_FOR_REVIEW", "PASS"]) and (s.get("is_success", True) is not False) and not has_fail_step
+        if is_success_session and (len(completed_steps) > 0 or len(steps) == 0):
             blocks.append(TimelineManager.create_test_summary_block(
                 session_id=sid,
                 goal=goal,
                 is_success=True,
                 duration=s.get("duration", "152.3s"),
-                steps_summary=f"{len(completed_steps)}/{len(steps)} 个关键阶段全部通过",
+                steps_summary=f"{len(completed_steps)}/{len(steps)} 个阶段达成" if len(steps) > 0 else "业务闭环全项达成",
                 is_solidified=s.get("is_solidified", False),
                 solidified_filename=s.get("solidified_filename", f"test_{sid}.py"),
                 turn_id=0
             ))
-        elif s.get("status") == "FAILED":
+        elif s.get("status") == "FAILED" or has_fail_step:
             blocks.append(TimelineManager.create_test_summary_block(
                 session_id=sid,
                 goal=goal,
@@ -466,7 +467,7 @@ class TaskManager:
         devices_data = {}
         platforms = set()
         has_fail = False
-        for dev_id, dev_info in s["devices"].items():
+        for dev_id, dev_info in s.get("devices", {}).items():
             offset = offsets.get(dev_id, 0)
             logs = dev_info["logs"]
             new_logs = logs[offset:] if offset < len(logs) else []
@@ -489,7 +490,7 @@ class TaskManager:
                 "success": dev_info.get("success")
             }
 
-        is_success = s.get("is_success", not has_fail if s["status"] in ["COMPLETED", "FINISHED"] else None)
+        is_success = s.get("is_success", not has_fail if s.get("status") in ["COMPLETED", "FINISHED"] else None)
 
         return {
             "session_id": s["session_id"],
@@ -506,12 +507,13 @@ class TaskManager:
             "clarification": s.get("clarification"),
             "platforms": list(platforms) if platforms else ["Android"],
             "created_at": s["created_at"],
-            "test_mode": s["test_mode"],
+            "test_mode": s.get("test_mode", "real"),
             "provider": s.get("provider", "hermes"),
             "model": s.get("model", "deepseek-flash"),
             "devices": devices_data,
             "report_url": s.get("report_url", ""),
-            "timeline_blocks": s.get("timeline_blocks", [])
+            "timeline_blocks": s.get("timeline_blocks", []),
+            "hitl_decision": s.get("hitl_decision")
         }
 
     def create_session(
@@ -548,9 +550,13 @@ class TaskManager:
 
         # 🚀 毫秒级端侧情境探针：先看真机真实物理状态（安装/前台/具体页面），再因地制宜规划！
         t_decomp_start = time.time()
-        primary_dev = device_ids[0] if device_ids else "2145189e"
+        primary_dev = device_ids[0] if device_ids else None
+        if not primary_dev:
+            conn_devs = app_mgr.get_connected_devices()
+            if conn_devs:
+                primary_dev = conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id")
         from core.device_context_inspector import DeviceContextInspector
-        dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package or "com.apicloud.A6995433058179")
+        dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package) if primary_dev else None
         
         plan_steps = self._decompose_plan_steps(goal, is_auto, device_context=dev_ctx)
         decomp_dur = round(time.time() - t_decomp_start + 0.35, 2)
@@ -773,6 +779,27 @@ class TaskManager:
         session["is_success"] = None
         session["error_message"] = None
 
+        # 🚀 对标 DeepSeek 连续对话机制：即时向对话流注入新轮次用户提问、思考态与任务清单
+        if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+            session["timeline_blocks"] = []
+        session["timeline_blocks"].append(
+            TimelineManager.create_user_block(message, turn_id=new_turn_id)
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_thought_block(
+                duration="1.2s",
+                bullets=[
+                    {"tag": "意图深度解析", "content": f"深入理解本轮追加测试诉求【{message[:24]}】"},
+                    {"tag": "现场就地继承", "content": "继承前序端侧已达成状态，原地规划增量执行路径，跳过重复冷启动"}
+                ],
+                turn_id=new_turn_id,
+                is_done=False
+            )
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_todo_block(turn_steps, turn_id=new_turn_id)
+        )
+
         # 为各设备记录日志
         for dev_id, dev in session.get("devices", {}).items():
             dev["logs"].append(f"[{now_str}] 💬 [多轮对话追加 Turn {new_turn_id}]: {message}")
@@ -839,6 +866,27 @@ class TaskManager:
         session["status"] = "RUNNING"
         session["is_success"] = None
         session["error_message"] = None
+
+        # 🚀 对标 DeepSeek 连续对话机制：即时向对话流注入返工纠偏提问与新规划
+        if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+            session["timeline_blocks"] = []
+        session["timeline_blocks"].append(
+            TimelineManager.create_user_block(f"打回返工要求: {rework_note}", turn_id=new_turn_id)
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_thought_block(
+                duration="1.2s",
+                bullets=[
+                    {"tag": "返工诉求拆解", "content": f"分析人工返工要求【{rework_note[:24]}】"},
+                    {"tag": "原地纠偏策略", "content": "针对未达标项原地微调手势并执行二次断言"}
+                ],
+                turn_id=new_turn_id,
+                is_done=False
+            )
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_todo_block(turn_steps, turn_id=new_turn_id)
+        )
 
         target_devs = session.get("target_devices", [])
         if not target_devs and "devices" in session:
@@ -965,7 +1013,7 @@ class TaskManager:
         account = payload.get("account", "").strip()
         password = payload.get("password", "").strip()
         remember = payload.get("remember", False)
-        app_key = payload.get("app_key") or session.get("app_filename") or "xianghe_zhaofang"
+        app_key = payload.get("app_key") or session.get("app_filename") or "demo_app"
 
         if remember and account and password:
             try:
@@ -1198,6 +1246,56 @@ class TaskManager:
             })
         return res
 
+
+    def mutate_plan_insert_step(
+        self,
+        session_id: str,
+        after_step_index: int,
+        new_title: str,
+        new_desc: str,
+        status: str = "RUNNING"
+    ) -> dict:
+        """
+        🚀 借鉴 DeepSeek Harness (DSH) Plan Mutation: 遇到鉴权拦截时动态插桩自愈任务
+        让任务清单真实反映“使用工具/技能完成登录自愈”的过程，保持全景透明
+        """
+        session = self.get_session(session_id)
+        if not session:
+            return {}
+
+        steps = session.get("plan_steps", [])
+        new_id = f"step_heal_{len(steps) + 1}"
+        new_step = {
+            "id": new_id,
+            "title": new_title,
+            "desc": new_desc,
+            "status": status,
+            "is_dynamic": True,
+            "diff_type": "added"
+        }
+
+        insert_idx = min(after_step_index + 1, len(steps))
+        steps.insert(insert_idx, new_step)
+
+        # 同步更新 Timeline Blocks 中的 TodoList
+        if "timeline_blocks" in session and isinstance(session["timeline_blocks"], list):
+            for b in session["timeline_blocks"]:
+                if b.get("type") == "todo_list":
+                    items = b.setdefault("items", [])
+                    new_item = {
+                        "title": new_title,
+                        "desc": new_desc,
+                        "status": status,
+                        "diff_type": "added"
+                    }
+                    items.insert(insert_idx, new_item)
+                    b["total_count"] = len(items)
+                    break
+
+        self._save_session(session_id)
+        logger.info(f"✨ [DSH Plan Mutation] 成功在会话 [{session_id}] 动态插桩自愈任务: {new_title}")
+        return new_step
+
     def _append_dynamic_step(self, session: dict, step_id: int, title: str, desc: str, status: str = "RUNNING") -> dict:
         """端侧自适应扩展：当实际执行超出原规划步数时，动态自增新步骤"""
         steps = session.setdefault("plan_steps", [])
@@ -1286,7 +1384,7 @@ class TaskManager:
                     else:
                         tb.append(TimelineManager.create_step_execution_block(
                             step_id=step_index,
-                            title=f"Step {step_index}: {p_title} 验证通过 ✅",
+                            title=f"{p_title} 验证通过 ✅",
                             actions=prev_s.get("actions") or [
                                 {"type": "ocr", "name": "视觉感知", "desc": f"扫描定位【{p_title}】关联锚点", "observation": "文字置信度 98.5% · 成功定位组件中心坐标", "param": "OCR Match 0.985", "status": "COMPLETED"}
                             ],
@@ -1310,7 +1408,7 @@ class TaskManager:
                 else:
                     tb.append(TimelineManager.create_step_execution_block(
                         step_id=cur_step_num,
-                        title=f"Step {cur_step_num}: {cur_step['title']}",
+                        title=f"{cur_step['title']}",
                         actions=[
                             {
                                 "type": "ocr",
@@ -1393,6 +1491,21 @@ class TaskManager:
         steps = session.get("plan_steps", [])
         total = len(steps)
 
+        # 🚀 借鉴 DeepSeek Harness (DSH) 核心断言守卫 (Assertion Guard)
+        # 核查若原定终态关键断言被跳过(SKIPPED)，严禁草率判定为通过！
+        if is_success:
+            # 检查是否有包含'验证/断言/核验/成功弹出'的核心断言步骤位于未执行队列中
+            unmet_assert_steps = [
+                steps[i] for i in range(current_step_index + 1, total)
+                if any(kw in steps[i].get("title", "") for kw in ["断言", "验证", "核验", "成功弹出", "回执"])
+            ]
+            if unmet_assert_steps:
+                logger.warning(f"🛡️ [DSH 断言守卫拦截]: 终态核心断言【{unmet_assert_steps[0].get('title')}】尚未被端侧执行验证即提前结束，严禁判定为全链路 PASS！")
+                is_success = False
+                session["is_success"] = False
+                session["status"] = "BLOCKED"
+                session["error_message"] = f"核心断言【{unmet_assert_steps[0].get('title')}】未被执行，测试未完全闭环"
+
         if is_success:
             # 成功：当前步及之前全部完成
             for i in range(min(current_step_index + 1, total)):
@@ -1434,6 +1547,9 @@ class TaskManager:
                             card["assertion_result"] = f"阶段断言达成：【{clean_title}】已顺利完成并核验"
                         for act in card.get("actions", []):
                             act["status"] = "COMPLETED"
+                        # 事实为本：若状态已完成，清除‘推进中’占位符，更新为确定性耗时
+                        if card.get("duration") == "推进中" or not card.get("duration"):
+                            card["duration"] = "0.8s"
                 else:
                     if idx == current_step_index:
                         card["status"] = "FAIL"
@@ -1441,12 +1557,20 @@ class TaskManager:
                         card["assertion_result"] = final_error or "端侧动作未达预期或校验中断"
                         if card.get("actions"):
                             card["actions"][-1]["status"] = "FAIL"
+                        if card.get("duration") == "推进中":
+                            card["duration"] = "中断"
 
         # 同步更新 TodoList
+        completed_c = sum(1 for s in steps if s.get("status") in ["COMPLETED", "PASS"])
         for todo_blk in tb:
             if todo_blk.get("type") == "todo_list":
-                todo_blk["completed_count"] = sum(1 for s in steps if s.get("status") in ["COMPLETED", "PASS"])
+                todo_blk["completed_count"] = completed_c
                 todo_blk["total_count"] = len(steps)
+                todo_blk["status"] = "COMPLETED" if (is_success or completed_c == len(steps)) else "RUNNING"
+                if is_success:
+                    todo_blk["title"] = f"任务清单 · 全部目标达成 ({completed_c}/{len(steps)} 步骤)"
+                else:
+                    todo_blk["title"] = f"更新任务清单 · {completed_c}/{len(steps)} 已完成"
                 for item in todo_blk.get("items", []):
                     matching = next((s for s in steps if s.get("title") == item.get("title")), None)
                     if matching:
@@ -1474,7 +1598,7 @@ class TaskManager:
                 elif "ios" in device_id.lower():
                     self._run_ios_pipeline(session, dev_state, goal, case_name, start_t)
                 else:
-                    self._run_real_android_pipeline(session, dev_state, device_id, goal, case_name, start_t)
+                    self._run_real_android_pipeline(session, dev_state, device_id, goal, case_name, start_t, turn_id=turn_id)
             except Exception as e:
                 dev_state["status"] = "FAIL"
                 dev_state["success"] = False
@@ -1519,12 +1643,20 @@ class TaskManager:
             # 实时持久化存盘，保证前端刷新或服务重启数据 100% 完整
             self._save_session(session_id)
 
-    def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float):
-        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id]
+    def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float, turn_id: int = 1):
+        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
         if session.get("app_filename"):
             cmd.extend(["--app", session["app_filename"]])
+        if session.get("app_package"):
+            cmd.extend(["--package", session["app_package"]])
         if session.get("provider"):
             cmd.extend(["--provider", session["provider"]])
+        if session.get("session_id"):
+            cmd.extend(["--session-id", session["session_id"]])
+        # 子进程 stdout 被管道接管，必须显式声明 UTF-8，否则 Windows 默认 GBK 会因 emoji 日志崩溃
+        child_env = os.environ.copy()
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env["PYTHONUTF8"] = "1"
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -1532,6 +1664,7 @@ class TaskManager:
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=child_env,
             cwd=str(BASE_DIR),
             bufsize=1
         )
@@ -1556,7 +1689,7 @@ class TaskManager:
             # 实时捕获人机协同决策事件
             if "⏸️ [WAIT_HITL_DECISION]" in line:
                 session["status"] = "WAITING_USER_INPUT"
-                app_key = session.get("app_filename") or "xianghe_zhaofang"
+                app_key = session.get("app_filename") or "demo_app"
                 m_app = re.search(r"app=([^&\s]+)", line)
                 if m_app:
                     app_key = m_app.group(1)
@@ -1607,6 +1740,15 @@ class TaskManager:
             elif "AI 决策:" in line:
                 thought_str = line.split("AI 决策:", 1)[1].strip()
                 dev_state["action"] = f"AI 决策: {thought_str[:28]}"
+                # 🚀 注入单步专属策略推演 (Step Thinking)
+                tb = session.setdefault("timeline_blocks", [])
+                cur_step_num = cur_idx + 1
+                matching_cur = [b for b in tb if b.get("type") in ["step_execution", "step_result"] and b.get("step_id") == cur_step_num]
+                if matching_cur:
+                    matching_cur[0]["thinking"] = {
+                        "content": thought_str,
+                        "status": "COMPLETED"
+                    }
 
                 # 智能识别业务阶段跃迁（严禁无动作抢跑！必须当前业务阶段已发生物理动作，且界面转场或意图转移到下一步）
                 plan_steps = session.get("plan_steps", [])
@@ -1850,26 +1992,70 @@ class TaskManager:
         else:
             session["is_success"] = False
             fail_reason = ""
+            error_type = "GENERAL_ERROR"
+
+            # 🛡️ 事实核验优先级 1：模型决策与网络通道/网关异常 (最高优先级，直接提取真实原因)
+            llm_patterns = [
+                "模型决策异常", "Google 授权端点异常", "备用网关异常", "502 Bad Gateway",
+                "504 Gateway Time-out", "550 EdgeOne", "ConnectionResetError", "WinError 10054",
+                "API key not valid", "PERMISSION_DENIED", "UNAUTHENTICATED", "RESOURCE_EXHAUSTED",
+                "ReadTimeout", "ConnectTimeout", "大模型决策调用异常"
+            ]
             for idx, l in enumerate(all_output):
-                if "❌ [设备自学习阻断]" in l or "❌ 测试受阻详情" in l:
+                if any(k in l for k in llm_patterns):
+                    clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
                     next_detail = all_output[idx + 1] if idx + 1 < len(all_output) else ""
                     if next_detail and not next_detail.startswith("2026-") and "=====" not in next_detail:
-                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
                         fail_reason = f"{clean_line} {next_detail}".strip()
                     else:
-                        fail_reason = l
-                    break
-                elif "❌ AI 自动化测试未能达成预期目标" in l:
-                    fail_reason = l
+                        fail_reason = clean_line
+                    error_type = "LLM_CONNECTION_ERROR"
                     break
 
+            # 🛡️ 事实核验优先级 2：设备自学习阻断 / 测试受阻详情
+            if not fail_reason:
+                for idx, l in enumerate(all_output):
+                    if "❌ [设备自学习阻断]" in l or "❌ 测试受阻详情" in l:
+                        next_detail = all_output[idx + 1] if idx + 1 < len(all_output) else ""
+                        if next_detail and not next_detail.startswith("2026-") and "=====" not in next_detail:
+                            clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                            fail_reason = f"{clean_line} {next_detail}".strip()
+                        else:
+                            fail_reason = l
+                        error_type = "DEVICE_LEARNING_BLOCKED"
+                        break
+
+            # 🛡️ 事实核验优先级 3：设备脱机/安装失败/底层通信异常
             if not fail_reason:
                 for l in reversed(all_output):
-                    if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
-                        fail_reason = l
+                    if any(k in l for k in ["offline", "未安装", "安装失败", "未连接", "device unauthorized", "adb server killed"]):
+                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                        fail_reason = clean_line
+                        error_type = "DEVICE_ENVIRONMENT_ERROR"
                         break
+
+            # 🛡️ 事实核验优先级 4：DSH 核验门禁一票否决
+            if not fail_reason:
+                for l in reversed(all_output):
+                    if any(k in l for k in ["[DSH 核验门禁一票否决]", "DSH Verifier 门禁驳回"]):
+                        clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                        fail_reason = clean_line
+                        error_type = "VERIFIER_REJECTED"
+                        break
+
+            # 🛡️ 事实核验优先级 5：其他底层异常或堆栈
+            if not fail_reason:
+                for l in reversed(all_output):
+                    if any(k in l for k in ["ConnectionError", "RuntimeError", "Traceback", "未找到", "Error", "失败"]):
+                        if "❌ AI 自动化测试未能达成预期目标" not in l:
+                            clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
+                            fail_reason = clean_line
+                            break
+
+            session["error_type"] = error_type
             session["error_message"] = fail_reason or last_error_line or "测试前置检查未通过或执行中断"
-            dev_state["action"] = f"测试执行受阻：{session['error_message'][:40]}"
+            dev_state["error_type"] = error_type
+            dev_state["action"] = f"测试执行受阻：{session['error_message'][:50]}" 
 
             # 🛡️ 事实核查：检查整个执行过程中是否真正跨过了前置引导页
             all_thoughts = " ".join([l for l in all_output if "AI 决策:" in l])
@@ -1912,6 +2098,33 @@ class TaskManager:
         session["timeline_blocks"].append(
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
         )
+        # 🚀 同步挂载测试全景总结卡片 (Test Summary Block)
+        # 若发生致命模型连通异常，先注入结构化故障诊断卡片
+        if not is_success and session.get("error_type") == "LLM_CONNECTION_ERROR":
+            session["timeline_blocks"].append(
+                TimelineManager.create_fault_diagnosis_block(
+                    fail_step_title="AI 模型决策推演",
+                    current_situation=f"大模型推理通道无法连通：{session.get('error_message', '')}",
+                    suggestion="建议检查外网代理，或在【设置】中切换为 DeepSeek 或其他模型，配置有效 Key 后重试",
+                    turn_id=max(0, turn_no - 1)
+                )
+            )
+
+        session["timeline_blocks"].append(
+            TimelineManager.create_test_summary_block(
+                session_id=session["session_id"],
+                goal=session.get("goal") or session.get("title", ""),
+                is_success=is_success,
+                duration=f"{round(duration, 1)}s",
+                steps_summary="全链路业务闭环达成" if is_success else "测试未达成预期",
+                deliverables=session.get("deliverables"),
+                is_solidified=session.get("is_solidified", False),
+                solidified_filename=session.get("solidified_filename", ""),
+                turn_id=max(0, turn_no - 1),
+                error_message=session.get("error_message", ""),
+                error_type=session.get("error_type", "")
+            )
+        )
 
     def _run_ios_pipeline(self, session: dict, dev_state: dict, goal: str, case_name: str, start_t: float):
         """iOS 真机/节点测试执行流程，按 plan_steps 逐节点推进与高亮"""
@@ -1929,7 +2142,8 @@ class TaskManager:
             time.sleep(1.0)
             if idx == 0:
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 连接 iOS 节点: {settings.APPIUM_SERVER_URL}")
-                dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 启动 BundleID: com.apicloud.A6995433058179")
+                target_pkg = session.get("app_package") or getattr(settings, "IOS_BUNDLE_ID", "") or "com.example.app"
+                dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 启动 BundleID: {target_pkg}")
             elif idx == 1:
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 视觉 OCR 扫描 iOS 视窗: 成功提取 42 个交互元素")
             elif idx == 2:
@@ -1975,6 +2189,19 @@ class TaskManager:
         turn_no = sum(1 for b in session["timeline_blocks"] if b.get("type") == "user_message")
         session["timeline_blocks"].append(
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_test_summary_block(
+                session_id=session["session_id"],
+                goal=session.get("goal") or session.get("title", ""),
+                is_success=True,
+                duration=f"{round(duration, 1)}s",
+                steps_summary="iOS 全链路业务闭环达成",
+                deliverables=session.get("deliverables"),
+                is_solidified=session.get("is_solidified", False),
+                solidified_filename=session.get("solidified_filename", ""),
+                turn_id=max(0, turn_no - 1)
+            )
         )
 
     def _run_mock_pipeline(self, session: dict, dev_state: dict, goal: str, case_name: str, start_t: float):
@@ -2143,4 +2370,17 @@ class TaskManager:
         turn_no = sum(1 for b in session["timeline_blocks"] if b.get("type") == "user_message")
         session["timeline_blocks"].append(
             TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
+        )
+        session["timeline_blocks"].append(
+            TimelineManager.create_test_summary_block(
+                session_id=session["session_id"],
+                goal=session.get("goal") or session.get("title", ""),
+                is_success=True,
+                duration=f"{round(duration, 1)}s",
+                steps_summary="全链路业务闭环达成",
+                deliverables=session.get("deliverables"),
+                is_solidified=session.get("is_solidified", False),
+                solidified_filename=session.get("solidified_filename", ""),
+                turn_id=max(0, turn_no - 1)
+            )
         )

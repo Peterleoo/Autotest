@@ -71,6 +71,17 @@
 - 测试通过后，动作追踪器将操作时序自动编译固化为纯 Python 原生回归脚本（存放在 `tests/solidified/` 目录下）；
 - 后续可脱离大模型调用，以**零 Token、零延迟、100% 确定性**直接用于 CI/CD 与高频冒烟回归。
 
+### 9. ⚖️ 借鉴 DeepSeek Harness (DSH) 的三权分立与假阳性防护门禁
+- **独立任务核验门禁（TaskVerifier Gate）**：
+  - 剥夺执行大模型（LLM）既当执行者又当裁判的权力，建立独立审查门禁（`TaskVerifier`）；
+  - 当大模型在未跳出登录/注册页面、或未进入目标业务页面就试图调用 `finish` 并声称“验证了权限拦截逻辑正常”时，门禁予以**一票否决**，强制注入警示并促使自愈，彻底杜绝虚假达成（False Positive）；
+- **真实凭证物理注入流水线（Credential Injection Pipeline）**：
+  - 遇到登录鉴权阻断且配置了测试凭证时，系统自动执行真实输入：OCR 精准定位账号/密码框、物理键入凭证、智能勾选协议单选框并提交，核验真机真实跳出登录页后继续执行；
+- **动态任务突变与自愈插桩（Plan Mutation）**：
+  - 执行中感知到鉴权阻断时，任务中心在当前步骤后即时插桩 `[动态自愈] 自动注入测试凭证完成登录放行`（标注 `diff_type: "added"`），并在前端 TodoList 以动效流式呈现自愈全貌；
+- **终态核心断言守卫（Assertion Guard）**：
+  - 若原任务中带有“验证/断言/核验/成功弹出”等核心断言步骤被跳过（SKIPPED），系统坚决拒绝草率判定为通过，如实定性为 `BLOCKED`（业务受阻 / 待补前置），前端以高质感琥珀金胶囊条清晰展示。
+
 ---
 
 ## 📁 项目目录结构
@@ -85,17 +96,19 @@ f:\Autotest
 │   ├── app_manager.py           # 原生应用生命周期与包管理
 │   ├── device_knowledge_manager.py # 🌟 设备画像识别与故障自进化知识库管理器
 │   ├── native_adb_driver.py     # 原生 ADB 极速真机驱动引擎 (含手势探针)
-│   ├── task_manager.py          # 任务调度中心、步骤流水线与多会话状态机
+│   ├── task_manager.py          # 任务调度中心、DSH 计划突变与断言守卫
 │   └── llm_client.py            # 大模型统一网关与结构化推理
 ├── ai_engine/
+│   ├── verifier.py              # 🌟 独立核验门禁与反幻觉审查 (TaskVerifier Gate)
 │   ├── screen_parser.py         # 视觉截屏与 OCR 感知
 │   ├── action_executor.py       # 原子动作执行器 (点击/滑动/输入/断言)
-│   ├── test_agent.py            # AI 测试智能体核心循环 (含防死锁与自学习诊断)
+│   ├── test_agent.py            # AI 测试智能体核心循环 (含凭证注入与门禁审查)
 │   └── solidifier.py            # 动作轨迹一键固化编译引擎
 ├── data/
 │   ├── device_knowledge.json    # 🌟 持久化设备特征与机型避坑规则知识库
 │   └── sessions/                # 历史测试会话与诊断日志 JSON 存储
 ├── tests/
+│   ├── test_dsh_verifier_and_injection.py # 🌟 DSH 独立门禁与凭证注入机制单元测试
 │   ├── solidified/              # 固化生成的标准自动化测试脚本 (.py)
 │   └── test_engine.py           # 基础驱动自检单元测试
 ├── web/
