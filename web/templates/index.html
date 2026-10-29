@@ -5145,75 +5145,127 @@
         }
 
     
-        /* ================= Stream Timeline 现代主流流式时间线样式 (参考 Cursor / Claude 架构) ================= */
+        /* ================= Google Antigravity 原生交互与流式展示范式 ================= */
+        /* 1. 沉浸式自然用户提问 (User Prompt Timeline Node) */
         .stream-user-row {
             display: flex;
-            justify-content: flex-end;
-            margin-bottom: 16px;
-            margin-top: 14px;
+            justify-content: flex-start;
+            width: 100%;
+            margin: 8px 0 14px;
         }
-        .stream-user-bubble {
-            background: #e0e7ff;
-            color: #1e1b4b;
-            padding: 8px 14px;
-            border-radius: 14px 14px 2px 14px;
-            font-size: 13px;
-            line-height: 1.5;
-            max-width: 78%;
-            word-break: break-word;
-            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
+        .stream-user-prompt {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 8px;
+            padding: 10px 14px;
+            transition: all 0.15s ease;
         }
-        body[data-theme="dark"] .stream-user-bubble {
-            background: rgba(99, 102, 241, 0.18);
-            color: #e0e7ff;
-            border: 1px solid rgba(99, 102, 241, 0.3);
+        body[data-theme="light"] .stream-user-prompt,
+        body.theme-light .stream-user-prompt {
+            background: #f8fafc;
+            border-color: rgba(0, 0, 0, 0.07);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
-
-        /* 极简思考折叠栏 */
-        .stream-thought-box {
-            margin-bottom: 10px;
-        }
-        .stream-thought-row {
-            display: inline-flex;
+        .stream-user-prompt-meta {
+            display: flex;
             align-items: center;
             gap: 6px;
+            font-size: 11px;
+            color: var(--text-sub);
+            margin-bottom: 4px;
+            user-select: none;
+        }
+        .stream-user-prompt-content {
+            font-size: 13.5px;
+            font-weight: 500;
+            line-height: 1.55;
+            color: var(--text-main);
+            word-break: break-word;
+        }
+
+        /* 2. 思维推演微胶囊 (Thinking Capsule & Drawer) */
+        .stream-thought-box {
+            margin-bottom: 12px;
+        }
+        .stream-thought-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 3px 10px 3px 8px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.07);
             font-size: 11.5px;
             color: var(--text-sub);
             cursor: pointer;
-            padding: 3px 0;
             user-select: none;
-            transition: color 0.15s ease;
+            transition: all 0.15s ease;
         }
-        .stream-thought-row:hover {
+        body[data-theme="light"] .stream-thought-pill,
+        body.theme-light .stream-thought-pill {
+            background: #f1f5f9;
+            border-color: rgba(0, 0, 0, 0.06);
+            color: #475569;
+        }
+        .stream-thought-pill:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.14);
             color: var(--text-main);
         }
-        .stream-thought-body {
-            border-left: none !important; padding-left: 4px;
-            padding-left: 12px;
-            margin-top: 6px;
-            margin-bottom: 10px;
+        body[data-theme="light"] .stream-thought-pill:hover,
+        body.theme-light .stream-thought-pill:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .thought-pulse-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #6366f1;
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+        .thought-pulse-dot.pulsing {
+            animation: thoughtPulse 1.8s infinite;
+        }
+        @keyframes thoughtPulse {
+            0% { transform: scale(0.9); opacity: 0.5; box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            70% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+            100% { transform: scale(0.9); opacity: 0.5; box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+        .stream-thought-drawer {
+            margin-top: 8px;
+            padding: 6px 12px 6px 14px;
+            border-left: 1.5px solid rgba(255, 255, 255, 0.08);
+            margin-left: 8px;
             font-size: 12px;
             color: var(--text-sub);
             line-height: 1.6;
         }
+        body[data-theme="light"] .stream-thought-drawer,
+        body.theme-light .stream-thought-drawer {
+            border-left-color: rgba(0, 0, 0, 0.1);
+            color: #475569;
+        }
 
-        /* 任务清单变更卡片 (带 Diff 对比) */
+        /* 3. 规划路线图卡片 (Roadmap Checklist) */
         .stream-todo-card {
             background: var(--bg-surface);
             border: 1px solid var(--border-subtle);
-            border-radius: 9px;
+            border-radius: 8px;
             margin-bottom: 12px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
         .stream-todo-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 12px;
+            padding: 7px 12px;
             background: rgba(255, 255, 255, 0.02);
             border-bottom: 1px solid var(--border-subtle);
-            font-size: 12px;
+            font-size: 11.5px;
             font-weight: 500;
             color: var(--text-main);
             cursor: pointer;
@@ -5223,55 +5275,41 @@
             background: var(--bg-surface-hover);
         }
         .stream-todo-body {
-            padding: 8px 12px;
-        }
-        .stream-todo-diff-label {
-            font-size: 10.5px;
-            color: var(--text-muted);
-            margin-bottom: 6px;
+            padding: 6px 12px;
         }
         .stream-todo-item {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             justify-content: space-between;
             gap: 8px;
-            padding: 5px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 5px 6px;
+            border-radius: 5px;
             font-size: 12px;
             line-height: 1.45;
+            transition: background 0.12s ease;
         }
-        .stream-todo-item:last-child {
-            border-bottom: none;
+        .stream-todo-item.running {
+            background: rgba(99, 102, 241, 0.08);
         }
-        .stream-todo-item.added .item-sign {
-            color: #10b981;
-            font-weight: bold;
-        }
-        .stream-todo-item.removed .item-sign {
-            color: #ef4444;
+        body[data-theme="light"] .stream-todo-item.running,
+        body.theme-light .stream-todo-item.running {
+            background: rgba(99, 102, 241, 0.06);
         }
         .stream-todo-item.completed {
-            color: var(--text-muted);
+            opacity: 0.72;
         }
         .stream-todo-item.completed .item-title {
-            text-decoration: line-through;
+            color: var(--text-sub);
         }
-        .stream-todo-tag {
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 4px;
-            white-space: nowrap;
-        }
-        .stream-todo-tag.running {
-            background: rgba(16, 185, 129, 0.12);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-        .stream-todo-tag.pending {
-            color: var(--text-muted);
-        }
-        .stream-todo-tag.completed {
-            color: var(--text-muted);
+        .todo-mini-spinner {
+            width: 12px;
+            height: 12px;
+            border: 1.5px solid rgba(99, 102, 241, 0.25);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            flex-shrink: 0;
         }
 
         /* 极简无边框设计 (Border-less & Icon-less Minimal Timeline) */
@@ -7031,55 +7069,199 @@
             display: block;
         }
 
-        /* ================= Antigravity 2.0 风格原子动作微流水线 (Agent Trace) ================= */
-        .agent-trace-box {
-            margin: 4px 0 6px;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.015);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+        /* ================= Antigravity 原生原子动作瓦片与时间线节点 (Action Tiles) ================= */
+        .stream-step-node, .agent-trace-box {
+            margin: 6px 0 10px;
+            border-radius: 8px;
             transition: all 0.15s ease;
         }
-        body[data-theme="light"] .agent-trace-box {
-            background: rgba(0, 0, 0, 0.015);
-            border-color: rgba(0, 0, 0, 0.06);
-        }
-        .agent-trace-box:hover {
-            border-color: var(--border-hover);
-        }
-        .agent-trace-header {
+        .stream-step-node-header, .agent-trace-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 5px 9px;
+            padding: 4px 6px 6px 6px;
             cursor: pointer;
-            border-radius: 6px;
             user-select: none;
             font-size: 11.5px;
             color: var(--text-sub);
             transition: all 0.12s ease;
         }
-        .agent-trace-header:hover {
-            background: rgba(255, 255, 255, 0.04);
+        .stream-step-node-header:hover, .agent-trace-header:hover {
             color: var(--text-main);
         }
-        body[data-theme="light"] .agent-trace-header:hover {
-            background: rgba(0, 0, 0, 0.03);
+        .step-node-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
         }
-        .agent-trace-title {
-            font-family: var(--font-mono, monospace);
-            font-size: 11.5px;
-            font-weight: 500;
+        .step-node-dot.running {
+            background: #6366f1;
+            box-shadow: 0 0 6px #6366f1;
+            animation: thoughtPulse 1.8s infinite;
         }
-        .agent-trace-body {
-            padding: 3px 6px 6px 10px;
-            border-left: 2px solid var(--border-subtle);
-            margin-left: 14px;
-            margin-top: 2px;
-            margin-bottom: 4px;
+        .step-node-dot.completed {
+            background: var(--status-green, #10b981);
+        }
+        .step-node-dot.failed {
+            background: #ef4444;
+        }
+        .step-node-title {
+            font-size: 12px;
+            color: var(--text-main);
+        }
+        .stream-step-node-body, .agent-trace-body {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 4px;
         }
+
+        .antigravity-action-tile, .agent-tool-row {
+            width: 100%;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            overflow: hidden;
+            cursor: pointer;
+            transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+            user-select: none;
+            margin-bottom: 3px;
+        }
+        body[data-theme="light"] .antigravity-action-tile,
+        body[data-theme="light"] .agent-tool-row,
+        body.theme-light .antigravity-action-tile,
+        body.theme-light .agent-tool-row {
+            background: #ffffff;
+            border-color: rgba(0, 0, 0, 0.07);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        }
+        .antigravity-action-tile:hover, .agent-tool-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+        body[data-theme="light"] .antigravity-action-tile:hover,
+        body[data-theme="light"] .agent-tool-row:hover,
+        body.theme-light .antigravity-action-tile:hover,
+        body.theme-light .agent-tool-row:hover {
+            background: #f8fafc;
+            border-color: rgba(0, 0, 0, 0.12);
+        }
+        .antigravity-action-tile.running, .agent-tool-row.action-running {
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+        }
+        .antigravity-action-tile.warn, .agent-tool-row.tool-row-warn {
+            border-color: rgba(239, 68, 68, 0.35);
+            background: rgba(239, 68, 68, 0.04);
+        }
+
+        .action-tile-main, .tool-row-main {
+            height: 34px;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .action-tile-icon, .tool-action-icon {
+            font-size: 11.5px;
+            opacity: 0.75;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .action-tile-verb, .tool-action-verb {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--text-main);
+            letter-spacing: -0.1px;
+        }
+        .action-tile-sep, .tool-action-dot {
+            opacity: 0.35;
+            font-size: 11px;
+        }
+        .action-tile-target, .tool-action-target {
+            font-size: 11.5px;
+            color: var(--text-sub);
+        }
+        .action-tile-param, .tool-action-param {
+            font-family: var(--font-mono, monospace);
+            font-size: 10px;
+            color: var(--text-dim, #9ca3af);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1px 5px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        body[data-theme="light"] .action-tile-param,
+        body[data-theme="light"] .tool-action-param,
+        body.theme-light .action-tile-param,
+        body.theme-light .tool-action-param {
+            background: #f1f5f9;
+            border-color: #e2e8f0;
+            color: #64748b;
+        }
+
+        .action-mini-spinner {
+            width: 11px;
+            height: 11px;
+            border: 1.5px solid rgba(99, 102, 241, 0.25);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+        .action-tile-chevron, .tool-chevron-arrow {
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .antigravity-action-tile.expanded .action-tile-chevron {
+            transform: rotate(180deg);
+        }
+
+        /* 终端代码抽屉 (Terminal Console Drawer) */
+        .action-tile-drawer, .tool-row-detail {
+            padding: 7px 10px 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.22);
+            font-family: var(--font-mono, monospace);
+            font-size: 10.5px;
+            line-height: 1.55;
+            user-select: text;
+        }
+        body[data-theme="light"] .action-tile-drawer,
+        body[data-theme="light"] .tool-row-detail,
+        body.theme-light .action-tile-drawer,
+        body.theme-light .tool-row-detail {
+            border-top-color: rgba(0, 0, 0, 0.05);
+            background: #f8fafc;
+        }
+        .action-terminal-command {
+            color: var(--text-main);
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            margin-bottom: 3px;
+            word-break: break-all;
+        }
+        .terminal-prompt {
+            color: #6366f1;
+            font-weight: bold;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .action-terminal-output {
+            color: var(--text-sub);
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            word-break: break-word;
+        }
+        .terminal-arrow {
+            color: var(--status-green, #10b981);
+            font-weight: bold;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
         .agent-trace-error {
             margin-top: 4px;
             padding: 5px 8px;
@@ -9834,9 +10016,9 @@
                 const blkId = blk.block_id;
                 let existingEl = document.getElementById(blkId);
                 
-                // 兼容根据 step_id 定位已渲染节点
+                // 兼容根据 step_id 定位已渲染节点 (支持 Antigravity stream-step-node)
                 if (!existingEl && (blk.type === "step_execution" || blk.type === "step_result")) {
-                    existingEl = flow.querySelector(`.stream-step-card[data-step-id="${blk.step_id}"], .agent-trace-box[data-step-id="${blk.step_id}"]`);
+                    existingEl = flow.querySelector(`.stream-step-node[data-step-id="${blk.step_id}"], .stream-step-card[data-step-id="${blk.step_id}"], .agent-trace-box[data-step-id="${blk.step_id}"]`);
                 }
                 // 🛡️ 兼容定位已渲染的总结卡片（即使 block_id 不一致也原地替换，绝不向页面插入第二个！）
                 if (!existingEl && blk.type === "test_summary") {
@@ -9853,7 +10035,7 @@
                     // 局部更新（支持 thought, todo_list, step_execution, step_result, test_summary 等节点动态流式刷新与折叠状态响应）
                     if (blk.type === "thought" || blk.type === "todo_list" || blk.type === "step_execution" || blk.type === "step_result" || blk.type === "test_summary") {
                         if (blk.type === "thought") {
-                            const curBody = existingEl.querySelector(".stream-thought-body");
+                            const curBody = existingEl.querySelector(".stream-thought-drawer, .stream-thought-body");
                             if (curBody && !curBody.classList.contains("d-none")) {
                                 window._streamThoughtState = window._streamThoughtState || {};
                                 window._streamThoughtState[blk.block_id] = true;
@@ -9861,8 +10043,8 @@
                         }
                         // 🛡️ 单项操作详情展开保护（点击行查看参数与反馈详情不被重置）
                         if (blk.type === "step_execution" || blk.type === "step_result") {
-                            existingEl.querySelectorAll(".agent-tool-row").forEach(row => {
-                                const detail = row.querySelector(".tool-row-detail");
+                            existingEl.querySelectorAll(".antigravity-action-tile, .agent-tool-row").forEach(row => {
+                                const detail = row.querySelector(".action-tile-drawer, .tool-row-detail");
                                 if (detail && !detail.classList.contains("d-none") && row.dataset.actIdx !== undefined) {
                                     window._actionDetailState = window._actionDetailState || {};
                                     window._actionDetailState[`${blk.block_id}_act_${row.dataset.actIdx}`] = true;
@@ -12044,30 +12226,30 @@
             const isHidden = body.classList.contains("d-none");
             if (isHidden) {
                 body.classList.remove("d-none");
-                if (chevron) chevron.className = "bi bi-chevron-up";
+                if (chevron) chevron.className = "bi bi-chevron-up ms-1";
                 window._streamThoughtState[blkId] = true;
             } else {
                 body.classList.add("d-none");
-                if (chevron) chevron.className = "bi bi-chevron-down";
+                if (chevron) chevron.className = "bi bi-chevron-down ms-1";
                 window._streamThoughtState[blkId] = false;
             }
         }
 
-        
         window._streamStepState = window._streamStepState || {};
         window._userExplicitStepState = window._userExplicitStepState || {};
         window._actionDetailState = window._actionDetailState || {};
 
         function toggleActionDetail(el, event) {
             if (event) event.stopPropagation();
-            const detail = el.querySelector(".tool-row-detail");
-            const arrow = el.querySelector(".tool-chevron-arrow");
+            const detail = el.querySelector(".action-tile-drawer, .tool-row-detail");
+            const arrow = el.querySelector(".action-tile-chevron, .tool-chevron-arrow");
             if (detail) detail.classList.toggle("d-none");
             const isHidden = detail && detail.classList.contains("d-none");
             if (arrow) {
                 arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(180deg)";
             }
-            const box = el.closest(".agent-trace-box");
+            el.classList.toggle("expanded", !isHidden);
+            const box = el.closest(".stream-step-node, .agent-trace-box");
             if (box && el.dataset && el.dataset.actIdx !== undefined) {
                 const k = box.id + "_act_" + el.dataset.actIdx;
                 window._actionDetailState[k] = !isHidden;
@@ -12088,14 +12270,9 @@
             }
 
             // 同步箭头图标
-            const icon = document.getElementById("chevron_" + blockId) || (box ? box.querySelector(".agent-trace-header i.bi-chevron-up, .agent-trace-header i.bi-chevron-down") : null);
+            const icon = document.getElementById("chevron_" + blockId) || (box ? box.querySelector("i.bi-chevron-up, i.bi-chevron-down") : null);
             if (icon) {
                 icon.className = isNowOpen ? "bi bi-chevron-up" : "bi bi-chevron-down";
-            }
-            // 同步收起/明细文字
-            const label = box ? box.querySelector(".step-toggle-label") : null;
-            if (label) {
-                label.innerText = isNowOpen ? "收起" : "明细";
             }
 
             // 🛡️ 记录用户的显式交互意图 (User Explicit Intent)，100% 尊重大师级操作
@@ -12136,10 +12313,16 @@
 
         function buildBlockHtml(blk, sessionData) {
             if (blk.type === "user_message") {
-                                return `
+                return `
                     <div class="stream-user-row" id="${blk.block_id}">
-                        <div class="stream-user-bubble">
-                            ${escapeHtml(blk.content || '')}
+                        <div class="stream-user-prompt">
+                            <div class="stream-user-prompt-meta">
+                                <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
+                                <span>用户目标</span>
+                            </div>
+                            <div class="stream-user-prompt-content">
+                                ${escapeHtml(blk.content || '')}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -12150,27 +12333,26 @@
                     blk.bullets.forEach(b => {
                         const pointText = b.content || b.tag || '';
                         bulletsHtml += `
-                            <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
-                                <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                            <div class="d-flex align-items-start gap-2 mb-1.5" style="font-size: 11.5px; line-height: 1.55;">
+                                <span style="color: #6366f1; opacity: 0.7; font-size: 10px; margin-top: 1px;">↳</span>
                                 <span>${escapeHtml(pointText)}</span>
                             </div>
                         `;
                     });
                 }
                 const isPlanning = (blk.duration === "推演中..." || !blk.duration || blk.duration === "0s");
+                let durStr = blk.duration || '0.8s';
+                if (!durStr.endsWith('s') && !durStr.includes('秒')) durStr += 's';
+
                 if (isPlanning) {
                     return `
                         <div class="stream-thought-box" id="${blk.block_id}">
-                            <div class="stream-thought-shimmer-card">
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <span class="hud-status-dot pulsing"></span>
-                                    <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">深度推演端侧测试链路...</span>
-                                    <span class="ms-auto font-mono text-sub" style="font-size: 11px;">推演中</span>
-                                </div>
-                                <div class="shimmer-bar mb-2"></div>
-                                <div class="stream-thought-body p-0 border-0" id="body_${blk.block_id}">
-                                    ${bulletsHtml}
-                                </div>
+                            <div class="stream-thought-pill">
+                                <span class="thought-pulse-dot pulsing"></span>
+                                <span class="fw-medium font-mono" style="font-size: 11px;">Thinking...</span>
+                            </div>
+                            <div class="stream-thought-drawer" id="body_${blk.block_id}">
+                                ${bulletsHtml || '<div class="text-muted" style="font-size: 11px;">正在深度推演端侧测试链路...</div>'}
                             </div>
                         </div>
                     `;
@@ -12180,26 +12362,22 @@
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
-                let durStr = blk.duration || '0.8s';
-                if (!durStr.endsWith('s') && !durStr.includes('秒')) durStr += 's';
-
                 return `
                     <div class="stream-thought-box" id="${blk.block_id}">
-                        <div class="stream-thought-row" onclick="toggleStreamThought('${blk.block_id}')">
-                            <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 10px;"></i>
-                            <span>思考过程 · ${escapeHtml(durStr)}</span>
+                        <div class="stream-thought-pill" onclick="toggleStreamThought('${blk.block_id}')">
+                            <span class="thought-pulse-dot"></span>
+                            <span class="font-mono" style="font-size: 11px;">Thought for ${escapeHtml(durStr)}</span>
+                            <i class="bi ${chevronClass} ms-1" id="chevron_${blk.block_id}" style="font-size: 9px; opacity: 0.6;"></i>
                         </div>
-                        <div class="stream-thought-body ${bodyClass}" id="body_${blk.block_id}">
+                        <div class="stream-thought-drawer ${bodyClass}" id="body_${blk.block_id}">
                             ${bulletsHtml}
                         </div>
                     </div>
                 `;
             }
             if (blk.type === "todo_list") {
-                const isFinishedSession = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW");
                 let itemsHtml = "";
                 let completedCount = 0;
-                let skippedCount = 0;
                 let totalItems = Array.isArray(blk.items) ? blk.items.length : (blk.total_count || 0);
 
                 if (Array.isArray(blk.items)) {
@@ -12207,65 +12385,37 @@
                         const isRunning = (it.status === "RUNNING");
                         const isCompleted = (it.status === "COMPLETED" || it.status === "PASS");
                         const isFailed = (it.status === "FAILED" || it.status === "FAIL");
-                        const isSkipped = (it.status === "SKIPPED");
-                        const isCanceled = (it.status === "CANCELED");
-                        const isRemoved = (it.status === "REMOVED");
-                        const diffClass = it.diff_type || (isRunning ? 'added' : '');
                         
-                        let signChar = '○';
-                        let tagClass = 'pending';
-                        let tagText = '待处理';
-                        let titleHint = '';
+                        let statusIcon = '<i class="bi bi-circle text-muted" style="font-size: 11px; opacity: 0.45;"></i>';
+                        let itemClass = '';
                         if (isCompleted) {
                             completedCount++;
-                            signChar = '✓';
-                            tagClass = 'completed';
-                            tagText = '';
+                            statusIcon = '<i class="bi bi-check-circle-fill text-success" style="font-size: 12px;"></i>';
+                            itemClass = 'completed';
                         } else if (isRunning) {
-                            signChar = '◐';
-                            tagClass = 'running';
-                            tagText = '进行中';
+                            statusIcon = '<span class="todo-mini-spinner"></span>';
+                            itemClass = 'running';
                         } else if (isFailed) {
-                            signChar = '✕';
-                            tagClass = 'failed';
-                            tagText = '未通过';
-                        } else if (isSkipped) {
-                            skippedCount++;
-                            signChar = '↷';
-                            tagClass = 'skipped';
-                            tagText = '已略过';
-                            titleHint = 'title="测试目标已提前达成，此规划步骤免除执行"';
-                        } else if (isCanceled) {
-                            signChar = '⊘';
-                            tagClass = 'pending';
-                            tagText = '已取消';
-                        } else if (isRemoved) {
-                            signChar = '-';
-                            tagClass = 'pending';
-                            tagText = '已移除';
+                            statusIcon = '<i class="bi bi-x-circle-fill text-danger" style="font-size: 12px;"></i>';
+                            itemClass = 'failed';
                         }
 
                         itemsHtml += `
-                            <div class="stream-todo-item cascade-step-item ${diffClass}" style="--step-idx: ${idx};" ${titleHint}>
-                                <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
-                                    <span class="item-sign" style="font-family: var(--font-mono); opacity: 0.7;">${signChar}</span>
+                            <div class="stream-todo-item ${itemClass}">
+                                <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 100%;">
+                                    ${statusIcon}
                                     <span class="item-title text-truncate">
                                         <span class="fw-medium text-main">${escapeHtml(it.title)}</span>
                                         ${(it.desc && it.desc !== it.title && !it.desc.startsWith(it.title)) ? `<span class="text-sub ms-1.5 opacity-75" style="font-size: 11px;">${escapeHtml(it.desc)}</span>` : ''}
                                     </span>
                                 </div>
-                                ${tagText ? `<span class="stream-todo-tag ${tagClass}">${tagText}</span>` : ""}
                             </div>
                         `;
                     });
                 }
 
-                // 动态自愈完成度与达成文案：坚决杜绝因旧数据写着 0/5 已完成而误导用户
                 const effCompleted = (completedCount > 0) ? completedCount : (blk.completed_count || 0);
-                const isAllDone = (totalItems > 0 && effCompleted === totalItems);
-                const isGoalAchieved = isFinishedSession || isAllDone || (totalItems > 0 && effCompleted > 0 && (completedCount + skippedCount === totalItems));
-
-                const isExpanded = (window._streamTodoState[blk.block_id] !== false); // 默认展开
+                const isExpanded = (window._streamTodoState[blk.block_id] !== false);
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
@@ -12273,10 +12423,13 @@
                     <div class="stream-todo-card" id="${blk.block_id}">
                         <div class="stream-todo-header" onclick="toggleStreamTodo('${blk.block_id}')">
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 10px;"></i>
-                                <span class="fw-medium">任务清单</span>
+                                <i class="bi bi-list-check" style="font-size: 12.5px; color: #6366f1;"></i>
+                                <span class="fw-medium">任务规划</span>
                             </div>
-                            <span class="mono-tag font-mono" style="font-size: 10.5px; opacity: 0.85;">${effCompleted}/${totalItems}</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="font-mono text-muted" style="font-size: 10.5px;">${effCompleted}/${totalItems}</span>
+                                <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 9.5px; opacity: 0.6;"></i>
+                            </div>
                         </div>
                         <div class="stream-todo-body ${bodyClass}" id="body_todo_${blk.block_id}">
                             ${itemsHtml}
@@ -12289,9 +12442,7 @@
                 const isRunning = (blk.status === "RUNNING");
                 const isSessionSuccess = (sessionData.is_success !== false) && (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || sessionData.status === "PASS");
                 const isFailed = !isSessionSuccess && (blk.status === "FAILED" || blk.status === "FAIL");
-                const isCanceled = (blk.status === "CANCELED" || blk.status === "SKIPPED");
                 
-                // 🛡️ 极简原则：无实际动作的取消/跳过步骤不渲染任何动作卡片，任务状态仅在上方任务清单集中呈现
                 if (acts.length === 0 && !isRunning && !isFailed) {
                     return "";
                 }
@@ -12299,33 +12450,31 @@
                 window._userExplicitStepState = window._userExplicitStepState || {};
                 const sId = blk.step_id || 1;
                 let isExpanded = false;
-
-                // 🛡️ 核心双轨状态机：
-                // 1. 若用户曾显式手动收展过，100% 尊重大师意图
                 if (window._userExplicitStepState[blk.block_id] !== undefined) {
                     isExpanded = window._userExplicitStepState[blk.block_id];
                 } else if (window._userExplicitStepState["step_" + sId] !== undefined) {
                     isExpanded = window._userExplicitStepState["step_" + sId];
                 } else {
-                    // 2. 否则遵循生命周期：进行中或失败受阻自动展开；完成达成后自动折叠收拢！
                     isExpanded = (isRunning || isFailed);
                 }
 
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
-                // 🧠 极简 thinking... 推演微胶囊
+                let displayDuration = blk.duration || '0.8s';
+                if (!isRunning && (displayDuration === '推进中' || !displayDuration)) {
+                    displayDuration = '0.8s';
+                }
+
+                // 步骤内单行 Thinking
                 let thinkingHtml = "";
                 const thinkingObj = blk.thinking || {};
                 const thinkingText = (typeof thinkingObj === 'string') ? thinkingObj : (thinkingObj.content || thinkingObj.situation || "");
-                if (isRunning || thinkingText) {
+                if (thinkingText) {
                     thinkingHtml = `
-                        <div class="step-thinking-capsule mb-2">
-                            <div class="d-flex align-items-center gap-1.5 text-muted" style="font-size: 11px;">
-                                <span class="thinking-dot ${isRunning ? 'pulsing' : ''}"></span>
-                                <span class="thinking-label" style="font-family: var(--font-mono); font-weight: 500; color: var(--text-sub);">thinking...</span>
-                            </div>
-                            ${thinkingText ? `<div class="step-thinking-content mt-1 text-muted" style="font-size: 11px; line-height: 1.55; opacity: 0.85;">${escapeHtml(thinkingText)}</div>` : ''}
+                        <div class="d-flex align-items-center gap-1.5 mb-1 px-1 text-muted" style="font-size: 11px;">
+                            <span class="thought-pulse-dot" style="width: 4.5px; height: 4.5px; background: #6366f1;"></span>
+                            <span class="font-mono" style="opacity: 0.85;">${escapeHtml(thinkingText)}</span>
                         </div>
                     `;
                 }
@@ -12336,100 +12485,111 @@
                     const rawTarget = act.desc || act.target || act.action || '';
                     const rawCostTime = act.cost_time || (act.duration_ms ? `${act.duration_ms}ms` : (act.duration ? act.duration : ''));
                     const observation = act.observation || act.detail || '';
+                    const codeSnippet = act.code_snippet || act.command || '';
                     const isRunningAct = (act.status === 'RUNNING');
                     const isFailedAct = (act.status === 'FAILED' || act.status === 'FAIL');
                     const isRetry = !!act.is_retry || rawName.includes('重试') || rawTarget.includes('重试');
                     const isWarn = isFailedAct || isRetry;
 
-                    // 遵循 Linear / Raycast 顶级工程极简：彻底清除彩色 Emoji，采用低饱和微矢量单色图标
-                    let iconHtml = '<i class="bi bi-terminal text-muted" style="font-size: 11px; opacity: 0.7;"></i>';
+                    let iconHtml = '<i class="bi bi-terminal"></i>';
                     let verb = rawName;
                     if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-hand-index text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
-                        verb = "物理点击";
+                        iconHtml = '<i class="bi bi-hand-index"></i>';
+                        verb = "点击";
                     } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-eye text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                        iconHtml = '<i class="bi bi-eye"></i>';
                         verb = "视觉感知";
                     } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-keyboard text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                        iconHtml = '<i class="bi bi-keyboard"></i>';
                         verb = "文本键入";
                     } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-arrow-down-up text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                        iconHtml = '<i class="bi bi-arrow-down-up"></i>';
                         verb = "滑动手势";
-                    } else if (/宏|穿透|fast_forward/i.test(rawName) || /fast_forward/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-lightning-charge text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
-                        verb = "穿透宏";
                     } else if (/等待|wait/i.test(rawName) || /wait/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-hourglass-split text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
-                        verb = "状态等待";
+                        iconHtml = '<i class="bi bi-hourglass-split"></i>';
+                        verb = "等待";
                     } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-shield-check text-success" style="font-size: 11px; opacity: 0.85;"></i>';
+                        iconHtml = '<i class="bi bi-shield-check text-success"></i>';
                         verb = "断言校验";
                     }
 
                     let paramHtml = "";
                     if (act.param) {
-                        paramHtml = `<span class="tool-action-param">${escapeHtml(act.param)}</span>`;
-                    }
-
-                    let detailHtml = "";
-                    if (observation) {
-                        detailHtml += `
-                            <div class="d-flex align-items-start gap-1.5 text-muted" style="font-size: 11px; line-height: 1.5;">
-                                <span style="color: var(--status-green); font-size: 10px;">↳</span>
-                                <span style="opacity: 0.7;">反馈:</span>
-                                <span style="color: var(--text-main);">${escapeHtml(observation)}</span>
-                            </div>
-                        `;
+                        paramHtml = `<span class="action-tile-param">${escapeHtml(act.param)}</span>`;
                     }
 
                     const actDetailKey = `${blk.block_id}_act_${actIdx}`;
                     const isDetailOpen = window._actionDetailState && window._actionDetailState[actDetailKey] === true;
+                    const costTimeHtml = rawCostTime ? `<span class="font-mono text-muted" style="font-size: 10px;">${escapeHtml(rawCostTime)}</span>` : '';
 
-                    // 事实为本：仅在有真实采集耗时才呈现时间微胶囊，杜绝无中生有的 18ms 假数据！
-                    const costTimeHtml = rawCostTime ? `<span>${escapeHtml(rawCostTime)}</span>` : '';
+                    // 控制台抽屉内容
+                    let drawerContent = "";
+                    if (codeSnippet) {
+                        drawerContent += `
+                            <div class="action-terminal-command">
+                                <span class="terminal-prompt">$</span>
+                                <span>${escapeHtml(codeSnippet)}</span>
+                            </div>
+                        `;
+                    }
+                    if (observation) {
+                        drawerContent += `
+                            <div class="action-terminal-output">
+                                <span class="terminal-arrow">↳</span>
+                                <span>${escapeHtml(observation)}</span>
+                            </div>
+                        `;
+                    }
+                    if (!drawerContent) {
+                        drawerContent = `
+                            <div class="action-terminal-output text-muted">
+                                <span class="terminal-arrow">↳</span>
+                                <span>底层通道响应正常</span>
+                            </div>
+                        `;
+                    }
 
                     actionsHtml += `
-                        <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
-                            <div class="tool-row-main d-flex align-items-center justify-content-between">
+                        <div class="antigravity-action-tile ${isRunningAct ? 'running' : ''} ${isWarn ? 'warn' : ''} ${isDetailOpen ? 'expanded' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
+                            <div class="action-tile-main">
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
-                                    <span class="tool-action-icon">${iconHtml}</span>
-                                    <span class="tool-action-verb fw-medium">${escapeHtml(verb)}</span>
-                                    <span class="tool-action-dot" style="opacity: 0.4;">·</span>
-                                    <span class="tool-action-target text-truncate">${escapeHtml(rawTarget)}</span>
+                                    <span class="action-tile-icon">${iconHtml}</span>
+                                    <span class="action-tile-verb">${escapeHtml(verb)}</span>
+                                    <span class="action-tile-sep">·</span>
+                                    <span class="action-tile-target text-truncate">${escapeHtml(rawTarget)}</span>
                                     ${paramHtml}
                                 </div>
-                                <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10px;">
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
                                     ${costTimeHtml}
-                                    <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4; transform: ${isDetailOpen ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
+                                    <span class="action-tile-status">
+                                        ${isRunningAct ? '<span class="action-mini-spinner"></span>' : (isFailedAct ? '<i class="bi bi-x-circle text-danger" style="font-size: 11.5px;"></i>' : '<i class="bi bi-check2 text-success" style="font-size: 12.5px;"></i>')}
+                                    </span>
+                                    <i class="bi bi-chevron-down action-tile-chevron" style="font-size: 8.5px; opacity: 0.45;"></i>
                                 </div>
                             </div>
-                            <div class="tool-row-detail ${(isWarn || isDetailOpen) ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
-                                ${detailHtml || '<div class="text-muted" style="font-size: 10px;">状态正常，无额外详细输出</div>'}
+                            <div class="action-tile-drawer ${isDetailOpen ? '' : 'd-none'}">
+                                ${drawerContent}
                             </div>
                         </div>
                     `;
                 });
 
-                // Antigravity 2.0 极简动作微流：不带有任务重复标题，不带有冗余的完成/取消徽章
-                let displayDuration = blk.duration || '0.8s';
-                if (!isRunning && (displayDuration === '推进中' || !displayDuration)) {
-                    displayDuration = '0.8s';
-                }
+                const stepTitle = blk.title ? blk.title : `步骤 ${sId}`;
 
                 return `
-                    <div class="agent-trace-box" id="${blk.block_id}" data-step-id="${blk.step_id || 1}">
-                        <div class="agent-trace-header" onclick="toggleStreamStep('${blk.block_id}', '${blk.step_id || 1}')">
+                    <div class="stream-step-node" id="${blk.block_id}" data-step-id="${sId}">
+                        <div class="stream-step-node-header d-flex align-items-center justify-content-between" onclick="toggleStreamStep('${blk.block_id}', '${sId}')">
                             <div class="d-flex align-items-center gap-2">
-                                <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
-                                <span class="agent-trace-title">执行动作 · ${acts.length}</span>
-                                <span class="font-mono text-sub opacity-75" style="font-size: 10.5px;">${escapeHtml(displayDuration)}</span>
+                                <span class="step-node-dot ${isRunning ? 'running' : (isFailed ? 'failed' : 'completed')}"></span>
+                                <span class="step-node-title fw-medium">${escapeHtml(stepTitle)}</span>
+                                <span class="font-mono text-muted" style="font-size: 10.5px; opacity: 0.75;">· ${acts.length} 动作</span>
                             </div>
-                            <div class="d-flex align-items-center text-muted" style="font-size: 10px;">
+                            <div class="d-flex align-items-center gap-1.5">
+                                <span class="font-mono text-muted" style="font-size: 10.5px;">${escapeHtml(displayDuration)}</span>
                                 <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 9px; opacity: 0.6;"></i>
                             </div>
                         </div>
-                        <div class="agent-trace-body ${bodyClass}" id="body_${blk.block_id}">
+                        <div class="stream-step-node-body ${bodyClass}" id="body_${blk.block_id}">
                             ${thinkingHtml}
                             ${actionsHtml}
                             ${isFailed ? `<div class="agent-trace-error"><i class="bi bi-exclamation-triangle-fill me-1"></i>${escapeHtml(blk.assertion_result || '底层执行受阻中断')}</div>` : ''}
@@ -12907,45 +13067,47 @@
                 const costTimeHtml = rawCostTime ? `<span>${escapeHtml(rawCostTime)}</span>` : '';
 
                 actionsHtml += `
-                    <div class="agent-tool-row ${isWarn ? 'tool-row-warn' : ''} ${isRunningAct ? 'action-running' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
-                        <div class="tool-row-main d-flex align-items-center justify-content-between">
+                    <div class="antigravity-action-tile ${isRunningAct ? 'running' : ''} ${isWarn ? 'warn' : ''} ${isDetailOpen ? 'expanded' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
+                        <div class="action-tile-main">
                             <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
-                                <span class="tool-action-icon">${iconHtml}</span>
-                                <span class="tool-action-verb fw-medium">${escapeHtml(verb)}</span>
-                                <span class="tool-action-dot" style="opacity: 0.4;">·</span>
-                                <span class="tool-action-target text-truncate">${escapeHtml(rawDesc)}</span>
-                                ${param ? `<span class="tool-action-param">${escapeHtml(param)}</span>` : ''}
+                                <span class="action-tile-icon">${iconHtml}</span>
+                                <span class="action-tile-verb">${escapeHtml(verb)}</span>
+                                <span class="action-tile-sep">·</span>
+                                <span class="action-tile-target text-truncate">${escapeHtml(rawDesc)}</span>
+                                ${param ? `<span class="action-tile-param">${escapeHtml(param)}</span>` : ''}
                             </div>
-                            <div class="d-flex align-items-center gap-1.5 flex-shrink-0 text-muted" style="font-family: var(--font-mono); font-size: 10px;">
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
                                 ${costTimeHtml}
-                                <i class="bi bi-chevron-down tool-chevron-arrow" style="font-size: 9px; opacity: 0.4; transform: ${isDetailOpen ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
+                                <span class="action-tile-status">
+                                    ${isRunningAct ? '<span class="action-mini-spinner"></span>' : (isFailedAct ? '<i class="bi bi-x-circle text-danger" style="font-size: 11.5px;"></i>' : '<i class="bi bi-check2 text-success" style="font-size: 12.5px;"></i>')}
+                                </span>
+                                <i class="bi bi-chevron-down action-tile-chevron" style="font-size: 8.5px; opacity: 0.45;"></i>
                             </div>
                         </div>
-                        <div class="tool-row-detail ${(isWarn || isDetailOpen) ? '' : 'd-none'} mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
-                            <div class="d-flex align-items-start gap-1.5 text-muted" style="font-size: 11px; line-height: 1.5;">
-                                <span style="color: var(--status-green); font-size: 10px;">↳</span>
-                                <span style="opacity: 0.7;">反馈:</span>
-                                <span style="color: var(--text-main);">${escapeHtml(act.observation || act.detail || '屏幕状态响应就绪')}</span>
+                        <div class="action-tile-drawer ${isDetailOpen ? '' : 'd-none'}">
+                            <div class="action-terminal-output">
+                                <span class="terminal-arrow">↳</span>
+                                <span>${escapeHtml(act.observation || act.detail || '屏幕状态响应就绪')}</span>
                             </div>
                         </div>
                     </div>
                 `;
             });
 
-            // Antigravity 2.0 极简动作微流
             return `
-                <div class="agent-trace-box" id="${blockId}" data-step-id="${stepNum}">
-                    <div class="agent-trace-header" onclick="toggleStreamStep('${blockId}', '${stepNum}')">
+                <div class="stream-step-node" id="${blockId}" data-step-id="${stepNum}">
+                    <div class="stream-step-node-header d-flex align-items-center justify-content-between" onclick="toggleStreamStep('${blockId}', '${stepNum}')">
                         <div class="d-flex align-items-center gap-2">
-                            <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
-                            <span class="agent-trace-title">执行动作 · ${acts.length}</span>${stepDuration ? `<span class="agent-trace-dur font-mono text-muted ms-auto me-2" style="font-size: 11px;">${escapeHtml(stepDuration)}</span>` : ''}
+                            <span class="step-node-dot ${isRunning ? 'running' : (isFailed ? 'failed' : 'completed')}"></span>
+                            <span class="step-node-title fw-medium">${escapeHtml(stepTitle)}</span>
+                            <span class="font-mono text-muted" style="font-size: 10.5px; opacity: 0.75;">· ${acts.length} 动作</span>
                         </div>
-                        <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
-                            
-                            <i class="bi ${chevronClass}" id="chevron_${blockId}" style="font-size: 9px;"></i>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="font-mono text-muted" style="font-size: 10.5px;">${escapeHtml(stepDuration)}</span>
+                            <i class="bi ${chevronClass}" id="chevron_${blockId}" style="font-size: 9px; opacity: 0.6;"></i>
                         </div>
                     </div>
-                    <div class="agent-trace-body ${bodyClass}" id="body_${blockId}">
+                    <div class="stream-step-node-body ${bodyClass}" id="body_${blockId}">
                         ${actionsHtml}
                         ${isFailed ? `<div class="agent-trace-error"><i class="bi bi-exclamation-triangle-fill me-1"></i>受阻原因：${escapeHtml(st.error_msg || '端侧组件定位超时或界面响应未达到预期断言')}</div>` : ''}
                     </div>
