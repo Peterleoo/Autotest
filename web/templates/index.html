@@ -8372,6 +8372,10 @@
             }
 
             if (mode === "local") {
+                // 🌟 双向心智对齐：自动将本地回归工作台与当前 AI 测试选中的 App 项目精准对齐
+                if (currentActiveApp && currentActiveApp.app_id && currentActiveApp.app_id !== "demo_app") {
+                    activeAppProjectId = currentActiveApp.app_id;
+                }
                 loadAppProjects();
                 loadSolidifiedCasesWorkspace(activeAppProjectId);
             }
@@ -8389,6 +8393,13 @@
                 if (allAppProjects.length === 0) {
                     listEl.innerHTML = `<div class="small text-muted p-3 text-center" style="font-size: 11px;">暂无 App 项目工程</div>`;
                     return;
+                }
+
+                // 🌟 若当前选中的 App 工程存在，保持优先高亮；否则对齐第一个项目
+                if (activeAppProjectId && allAppProjects.some(p => p.id === activeAppProjectId)) {
+                    // 保持已对齐的项目
+                } else if (allAppProjects.length > 0) {
+                    activeAppProjectId = allAppProjects[0].id;
                 }
 
                 let html = "";
@@ -11795,12 +11806,14 @@
                 const data = await res.json();
                 if (data.success) {
                     if (body) {
+                        const targetProjName = data.app_name || (data.app_id === 'xianghe_zhaofang' ? '象盒找房' : (data.app_id === 'xianghe_workbench' ? '象盒工作台' : data.app_id)) || '本地工程';
                         body.innerHTML = `
                             <div class="p-3 text-center">
                                 <i class="bi bi-check-circle-fill text-success" style="font-size: 32px;"></i>
                                 <div class="fw-bold mt-2" style="font-size: 14px; color: #34d399;">已成功沉淀为团队用例！</div>
                                 <div class="text-muted mt-1" style="font-size: 11.5px; line-height: 1.5;">
-                                    已生成确定性脚本【${escapeHtml(data.filename)}】<br>已支持团队秒级免 Token 回归与 CI 门禁接入。
+                                    已对齐归入【<strong>${escapeHtml(targetProjName)}</strong>】本地用例工程库<br>
+                                    自动化脚本：<code>${escapeHtml(data.filename)}</code>
                                 </div>
                                 <button class="btn btn-sm btn-outline-light mt-3 px-4 rounded-pill" data-bs-dismiss="modal" style="font-size: 11.5px;">完成</button>
                             </div>
@@ -14662,6 +14675,7 @@ function renderChatStream(sessionData) {
                 formData.append("case_name", "matrix_flow");
                 formData.append("provider", currentActiveProvider);
                 formData.append("model", currentActiveModel);
+                formData.append("app_id", currentActiveApp.app_id || "");
                 formData.append("app_filename", currentActiveApp.filename || "");
                 formData.append("app_package", currentActiveApp.package || "");
                 formData.append("app_label", currentActiveApp.label || "");
@@ -15450,7 +15464,28 @@ function renderChatStream(sessionData) {
 
         // 切换当前激活应用
         function switchActiveApp(appObj) {
+            // 🌟 提取规范的确定性 App 工程唯一标识 (app_id)
+            let aid = appObj.app_id;
+            if (!aid) {
+                if (appObj.filename) {
+                    aid = appObj.filename.replace(/\.apk$/i, '');
+                } else if (appObj.package) {
+                    const p = String(appObj.package);
+                    const l = String(appObj.label || "");
+                    if (p.includes("A6995433058179") || l.includes("象盒找房")) {
+                        aid = "xianghe_zhaofang";
+                    } else if (p.includes("workbench") || l.includes("象盒工作台")) {
+                        aid = "xianghe_workbench";
+                    } else {
+                        aid = p.replace(/[^\w]+/g, '_').toLowerCase();
+                    }
+                } else {
+                    aid = "demo_app";
+                }
+            }
+
             currentActiveApp = {
+                app_id: aid,
                 source: appObj.source || (appObj.filename ? 'local' : 'device'),
                 filename: appObj.filename || "",
                 label: appObj.label || appObj.package || appObj.filename || "真机应用",
@@ -15460,6 +15495,7 @@ function renderChatStream(sessionData) {
                 size: appObj.size || "",
                 isInstalled: true
             };
+            activeAppProjectId = aid;
             try {
                 localStorage.setItem("autotest_active_app", JSON.stringify(currentActiveApp));
             } catch (e) {}

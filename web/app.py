@@ -897,15 +897,76 @@ def auto_categorize_case(goal: str, title: str = "", steps: list = None) -> tupl
         clean_title = clean_title[:28] + "..."
     return module, level, clean_title
 
+KNOWN_APP_META = {
+    "xianghe_zhaofang": {
+        "name": "象盒找房",
+        "package": "com.apicloud.A6995433058179",
+        "version": "真机已安装",
+    },
+    "xianghe_workbench": {
+        "name": "象盒工作台",
+        "package": "com.xhj.workbench",
+        "version": "真机已安装",
+    },
+    "demo_app": {
+        "name": "待测示例应用",
+        "package": "com.autotest.demo",
+        "version": "v1.0.0",
+    }
+}
+
+def resolve_session_app_id(session: dict) -> str:
+    """提取会话确切归属的 App 工程标识 (app_id)"""
+    aid = session.get("app_id")
+    if aid and aid != "demo_app":
+        return aid
+    fn = session.get("app_filename")
+    if fn:
+        from pathlib import Path
+        return Path(fn).stem
+    pkg = str(session.get("app_package") or "")
+    lbl = str(session.get("app_label") or "")
+    if "apicloud.A6995433058179" in pkg or "象盒找房" in lbl:
+        return "xianghe_zhaofang"
+    if "xhj.workbench" in pkg or "象盒工作台" in lbl:
+        return "xianghe_workbench"
+    if pkg:
+        return re.sub(r"[^\w]+", "_", pkg).strip("_").lower()
+    if lbl:
+        return re.sub(r"[^\w]+", "_", lbl).strip("_").lower()
+    return "demo_app"
+
 @app.get("/api/app_projects")
 async def get_app_projects():
     """获取所有跟随 App 建立的测试项目文件夹清单与用例统计"""
     projects = []
     seen_ids = set()
+
+    # 1. 优先扫描真机常见已知 App 项目工程
+    for app_id, meta in KNOWN_APP_META.items():
+        proj_dir = settings.SOLIDIFIED_DIR / app_id
+        if proj_dir.exists() or app_id in ["xianghe_zhaofang", "xianghe_workbench"]:
+            proj_dir.mkdir(parents=True, exist_ok=True)
+            seen_ids.add(app_id)
+            py_files = list(proj_dir.glob("*.py"))
+            projects.append({
+                "id": app_id,
+                "name": meta["name"],
+                "package": meta["package"],
+                "version": meta["version"],
+                "filename": f"{app_id}.apk",
+                "case_count": len(py_files),
+                "folder": f"tests/solidified/{app_id}",
+                "is_current": (app_id == "xianghe_zhaofang")
+            })
+
+    # 2. 扫描 apps/ 本地 APK 安装包
     apps_dir = settings.APPS_DIR
     if apps_dir.exists():
         for apk_file in sorted(apps_dir.glob("*.apk")):
             app_id = apk_file.stem
+            if app_id in seen_ids:
+                continue
             seen_ids.add(app_id)
             info = app_mgr.get_apk_info(apk_file)
             proj_dir = settings.SOLIDIFIED_DIR / app_id
@@ -922,19 +983,21 @@ async def get_app_projects():
                 "filename": apk_file.name,
                 "case_count": len(py_files),
                 "folder": f"tests/solidified/{app_id}",
-                "is_current": (app_id == "demo_app" or len(projects) == 0)
+                "is_current": (len(projects) == 0)
             })
 
+    # 3. 扫描 tests/solidified/ 下已有的其他独立工程目录
     if settings.SOLIDIFIED_DIR.exists():
         for sub in sorted(settings.SOLIDIFIED_DIR.iterdir()):
             if sub.is_dir() and not sub.name.startswith((".", "_")) and sub.name not in seen_ids and sub.name != "__pycache__":
                 seen_ids.add(sub.name)
                 py_files = list(sub.glob("*.py"))
+                known = KNOWN_APP_META.get(sub.name, {})
                 projects.append({
                     "id": sub.name,
-                    "name": sub.name.replace("_", " ").title(),
-                    "package": f"com.{sub.name}",
-                    "version": "v1.0.0",
+                    "name": known.get("name") or sub.name.replace("_", " ").title(),
+                    "package": known.get("package") or f"com.{sub.name}",
+                    "version": known.get("version") or "v1.0.0",
                     "filename": f"{sub.name}.apk",
                     "case_count": len(py_files),
                     "folder": f"tests/solidified/{sub.name}",
@@ -1143,13 +1206,8 @@ async def save_session_to_local_case(
             "expected": goal[:8] if goal else "首页"
         })
 
-    # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 demo_app)
-    app_id = session.get("app_id")
-    if not app_id and session.get("target_app"):
-        app_id = Path(session["target_app"]).stem
-    if not app_id:
-        app_id = "demo_app"
-
+    # 🌟 确定保存的目标 App 项目文件夹 (精准对齐待测 App，彻底杜绝全部堆入 demo_app)
+    app_id = resolve_session_app_id(session)
     target_app_dir = settings.SOLIDIFIED_DIR / app_id
     target_app_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1197,17 +1255,19 @@ async def save_session_to_local_case(
     session["solidified_app_id"] = app_id
     task_mgr._save_session(session_id)
 
+    app_display_name = KNOWN_APP_META.get(app_id, {}).get("name") or session.get("app_label") or app_id
     logger.info(f"💾 用户主动将测试会话 [{session_id}] 固化保存为本地用例: {solid_file.name} (项目目录: {app_id}, 归类: {module})")
     return {
         "success": True,
         "filename": solid_file.name,
         "app_id": app_id,
+        "app_name": app_display_name,
         "module": module,
         "title": final_title,
         "level": auto_level,
         "case_id": case_id,
         "created_at": now_str,
-        "message": f"用例已成功保存至【{app_id}】项目库，自动归类至【{module}】"
+        "message": f"用例已成功保存至【{app_display_name}】专属用例工程库，自动归类至【{module}】"
     }
 
 @app.post("/api/solidified_cases/batch_run")
@@ -1657,7 +1717,8 @@ async def create_task_session(
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
     app_label: Optional[str] = Form(None),
-    app_activity: Optional[str] = Form(None)
+    app_activity: Optional[str] = Form(None),
+    app_id: Optional[str] = Form(None)
 ):
     """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型"""
     device_ids = []
@@ -1674,7 +1735,8 @@ async def create_task_session(
         app_filename=app_filename,
         app_package=app_package,
         app_label=app_label,
-        app_activity=app_activity
+        app_activity=app_activity,
+        app_id=app_id
     )
     return {"success": True, "session_id": session_id, "message": "测试会话已创建"}
 

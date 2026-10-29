@@ -534,6 +534,7 @@ class TaskManager:
             "test_mode": s.get("test_mode", "real"),
             "provider": s.get("provider", "hermes"),
             "model": s.get("model", "deepseek-flash"),
+            "app_id": s.get("app_id", "demo_app"),
             "devices": devices_data,
             "report_url": s.get("report_url", ""),
             "timeline_blocks": s.get("timeline_blocks", []),
@@ -552,7 +553,8 @@ class TaskManager:
         app_filename: Optional[str] = None,
         app_package: Optional[str] = None,
         app_label: Optional[str] = None,
-        app_activity: Optional[str] = None
+        app_activity: Optional[str] = None,
+        app_id: Optional[str] = None
     ) -> str:
         """
         创建一个新任务会话并分发给一个或多个目标设备并发执行，支持自动放行与人工审批确认
@@ -614,6 +616,32 @@ class TaskManager:
             "rework_note": ""
         }
 
+        # 🌟 统一 App 标识符提取规则 (精准对齐待测工程目录，彻底杜绝无序落入 demo_app)
+        calc_app_id = app_id
+        if not calc_app_id or calc_app_id == "demo_app":
+            if app_filename:
+                from pathlib import Path
+                calc_app_id = Path(app_filename).stem
+            elif app_package:
+                pkg_str = str(app_package)
+                lbl_str = str(app_label or "")
+                if "apicloud.A6995433058179" in pkg_str or "象盒找房" in lbl_str:
+                    calc_app_id = "xianghe_zhaofang"
+                elif "xhj.workbench" in pkg_str or "象盒工作台" in lbl_str:
+                    calc_app_id = "xianghe_workbench"
+                else:
+                    calc_app_id = re.sub(r"[^\w]+", "_", pkg_str).strip("_").lower()
+            elif app_label:
+                lbl_str = str(app_label)
+                if "象盒找房" in lbl_str:
+                    calc_app_id = "xianghe_zhaofang"
+                elif "象盒工作台" in lbl_str:
+                    calc_app_id = "xianghe_workbench"
+                else:
+                    calc_app_id = re.sub(r"[^\w]+", "_", lbl_str).strip("_").lower()
+            else:
+                calc_app_id = "demo_app"
+
         session = {
             "session_id": session_id,
             "title": title,
@@ -623,6 +651,7 @@ class TaskManager:
             "approval_mode": approval_mode,
             "provider": provider,
             "model": model,
+            "app_id": calc_app_id,
             "app_filename": app_filename,
             "app_package": app_package,
             "app_label": app_label,
