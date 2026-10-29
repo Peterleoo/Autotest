@@ -7316,7 +7316,7 @@
                                     <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">智能用例推荐</span>
                                     <div class="suggest-app-badge" id="currentSuggestAppBadge" title="当前生成用例的目标应用">
                                         <i class="bi bi-box-seam" style="font-size: 11px;"></i>
-                                        <span id="suggestTargetAppLabel">待测应用 (默认应用)</span>
+                                        <span id="suggestTargetAppLabel">待测应用</span>
                                     </div>
                                     <button class="btn btn-sm py-0 px-2" style="font-size: 11px; color: var(--text-sub); border: 1px dashed var(--border-subtle); border-radius: 9999px;" onclick="openAppPackagesModal()" title="上传新应用 APK/IPA 或从应用库选择">
                                         <i class="bi bi-upload me-1"></i>更换/上传应用
@@ -7325,10 +7325,10 @@
                                 <!-- 旅程套件 vs 单点场景模式切换器 (Journey Synthesizer) -->
                                 <div class="d-flex align-items-center gap-1 p-0.5 rounded" style="background: var(--bg-surface-elevated, rgba(255,255,255,0.05)); border: 1px solid var(--border-subtle); border-radius: 9999px;">
                                     <button type="button" class="btn btn-xs py-0.5 px-2 fw-medium suggest-mode-pill active" id="btnModeJourney" onclick="switchSuggestMode('journey')" style="font-size: 11px; border-radius: 9999px; border: none; background: rgba(16, 185, 129, 0.15); color: #10b981;">
-                                        <i class="bi bi-signpost-2 me-1"></i>业务旅程套件 (Journey)
+                                        <i class="bi bi-signpost-2 me-1"></i>业务旅程
                                     </button>
                                     <button type="button" class="btn btn-xs py-0.5 px-2 fw-medium suggest-mode-pill" id="btnModeSingle" onclick="switchSuggestMode('single')" style="font-size: 11px; border-radius: 9999px; border: none; background: transparent; color: var(--text-muted);">
-                                        <i class="bi bi-lightning-charge me-1"></i>单点用例 (Cases)
+                                        <i class="bi bi-lightning-charge me-1"></i>单点用例
                                     </button>
                                 </div>
                                 <button class="suggest-refresh-btn" id="btnRefreshSuggestCases" onclick="refreshAppSuggestedCases()" title="换一批不同业务场景测试用例">
@@ -7362,7 +7362,7 @@
                         <span class="hud-task-title text-truncate" id="hudTaskTitle">初始化任务中...</span>
                     </div>
                     <div class="d-flex align-items-center gap-1 text-muted flex-shrink-0" style="font-size: 10.5px;">
-                        <span class="hud-expand-hint" id="hudExpandHint">展开活清单</span>
+                        
                         <i class="bi bi-chevron-up hud-chevron-arrow" id="hudChevron" style="font-size: 9px; transition: transform 0.2s ease;"></i>
                     </div>
                 </div>
@@ -7371,9 +7371,9 @@
                 <div id="taskDropupSheet" class="task-dropup-sheet d-none" onclick="event.stopPropagation()">
                     <div class="dropup-header d-flex align-items-center justify-content-between px-3 py-2">
                         <div class="d-flex align-items-center gap-1.5">
-                            <span class="fw-semibold" style="font-size: 12px;" id="dropupSheetTitle">📋 具身活任务看板 (实时对齐端侧)</span>
+                            <span class="fw-semibold" style="font-size: 12px;" id="dropupSheetTitle">任务清单</span>
                         </div>
-                        <span class="hud-progress-badge" id="dropupProgressBadge">0/0 推进中</span>
+                        <span class="hud-progress-badge" id="dropupProgressBadge">0/0</span>
                     </div>
                     <div class="dropup-body p-2" id="dropupItemsContainer" style="max-height: 240px; overflow-y: auto;">
                         <!-- 动态注入任务项 -->
@@ -7387,7 +7387,7 @@
                 <!-- 自适应多行文本输入框 -->
 
 
-                <textarea id="taskInputText" class="gpt-textarea" rows="1" placeholder="描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）..." oninput="onInputTextChange()"></textarea>
+                <textarea id="taskInputText" class="gpt-textarea" rows="1" placeholder="输入测试目标或追加指令..." oninput="onInputTextChange()"></textarea>
 
                 <!-- 胶囊底部工具栏 -->
                 <div class="gpt-toolbar">
@@ -7446,7 +7446,7 @@
 
                                 <!-- 底部操作条 -->
                                 <div class="p-1.5 mt-2 rounded border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important; background-color: var(--bg-surface);">
-                                    <span class="small text-muted" style="font-size: 10.5px;">管理更多应用？</span>
+                                    
                                     <button class="btn btn-sm btn-outline-secondary py-0.5 px-2" style="font-size: 10.5px; border-radius: 9999px;" onclick="openAppPackagesModal(); closeAllPopovers();">
                                         <i class="bi bi-gear me-1"></i>应用设置
                                     </button>
@@ -7464,13 +7464,13 @@
                                 <div class="popover-item active" onclick="setApprovalMode('auto', '自动放行')" id="itemApproveAuto">
                                     <div class="d-flex align-items-center gap-1.5">
                                         <i class="bi bi-lightning-charge"></i>
-                                        <span>自动放行 (Auto)</span>
+                                        <span>自动放行</span>
                                     </div>
                                 </div>
                                 <div class="popover-item" onclick="setApprovalMode('manual', '人工逐步')" id="itemApproveManual">
                                     <div class="d-flex align-items-center gap-1.5">
                                         <i class="bi bi-hand-index-thumb"></i>
-                                        <span>人工逐步 (Manual)</span>
+                                        <span>人工逐步</span>
                                     </div>
                                 </div>
                             </div>
@@ -7668,7 +7668,7 @@
                         <!-- 底部状态指示条 (60 FPS 与延迟指示) -->
                         <div class="device-status-footer" style="height: 24px; background: var(--bg-surface); border-top: 1px solid var(--border-subtle); padding: 0 10px; display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: var(--text-muted); font-family: var(--font-mono);">
                             <span id="floatingDeviceFps">60 FPS · 延迟 38ms</span>
-                            <span id="floatingDeviceStatus">触控注入就绪</span>
+                            <span id="floatingDeviceStatus" class="d-none"></span>
                         </div>
                     </div>
 
@@ -7731,7 +7731,7 @@
                 <div class="settings-modal-body">
                     <!-- 左侧分类导航 (偏好设置三大顶级工程维度) -->
                     <div class="settings-sidebar">
-                        <div class="settings-nav-category">偏好设置</div>
+                        
                         <div class="settings-nav-item active" id="tabNavApps" onclick="switchSettingsTab('apps')">
                             <i class="bi bi-box-seam-fill" style="font-size: 13.5px;"></i>
                             <span>待测应用管理</span>
@@ -7770,7 +7770,7 @@
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
                                 <div class="settings-section-title">待测应用与 APK 管理</div>
-                                <div class="settings-section-desc">管理端侧自动化目标应用，支持真机已安装应用直调（免传 APK）与本地 APK 库管理。</div>
+                                <div class="settings-section-desc">管理端侧自动化目标应用，支持真机直调与本地应用库。</div>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge rounded-pill bg-secondary-subtle text-secondary" id="appListCountBadge" style="font-size: 11px;">0 个应用</span>
@@ -7810,7 +7810,7 @@
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                                <span class="small fw-bold" style="font-size: 12px; color: var(--text-main);">真机桌面已安装应用 (免上传 APK 直调)</span>
+                                <span class="small fw-bold" style="font-size: 12px; color: var(--text-main);">真机已安装应用</span>
                                 <div class="small text-muted" id="modalDeviceTargetHint" style="font-size: 11px;">目标真机：检测中...</div>
                             </div>
                             <div id="settingsDeviceAppsList" class="d-flex flex-column gap-2" style="max-height: 290px; overflow-y: auto;">
@@ -7980,7 +7980,7 @@
 
                             <div class="row g-2 mb-2" id="keyAndUrlRow">
                                 <div class="col-md-6">
-                                    <label class="form-label" style="font-size: 11.5px; color: var(--text-sub); margin-bottom: 5px;">API 密钥 (API Key)</label>
+                                    <label class="form-label" style="font-size: 11.5px; color: var(--text-sub); margin-bottom: 5px;">API 密钥</label>
                                     <input type="password" id="modelApiKeyInput" class="fidelity-input" placeholder="输入 API Key">
                                 </div>
                                 <div class="col-md-6">
@@ -7996,14 +7996,14 @@
                                     <span id="fetchModelsStatusText">可向服务商接口在线探测并拉取最新可用模型</span>
                                 </div>
                                 <button type="button" class="btn-fidelity-fetch" onclick="fetchRemoteModelsAction()">
-                                    <i class="bi bi-arrow-repeat me-1"></i>动态拉取模型列表 (GET /models)
+                                    <i class="bi bi-arrow-repeat me-1"></i>拉取在线模型
                                 </button>
                             </div>
 
                             <!-- 可用模型型号管理器 (Chips 管理器) -->
                             <div class="mb-2">
                                 <label class="form-label d-flex justify-content-between align-items-center" style="font-size: 11.5px; color: var(--text-sub); margin-bottom: 5px;">
-                                    <span>可用模型型号列表 (点击设为默认，将同步出现在底栏选单中)：</span>
+                                    <span>可用模型列表</span>
                                     <span style="font-size: 10.5px; color: #10b981;" id="availableModelsCount">已配置</span>
                                 </label>
 
@@ -8022,7 +8022,7 @@
 
                                     <!-- 自由输入追加型号 (如 deepseek-v4.0, deepseek-v4.1) -->
                                     <div class="d-flex gap-2">
-                                        <input type="text" id="customModelInput" class="fidelity-input" style="flex: 1;" placeholder="输入自定义型号，如 deepseek-v4.0, deepseek-v4.1 并回车添加...">
+                                        <input type="text" id="customModelInput" class="fidelity-input" style="flex: 1;" placeholder="输入自定义型号...">
                                         <button class="btn btn-sm btn-outline-light" type="button" onclick="addCustomModelTag()" style="white-space: nowrap; font-size: 11px; border-radius: 6px;">
                                             <i class="bi bi-plus me-1"></i>添加型号
                                         </button>
@@ -8036,7 +8036,7 @@
                             <div class="d-flex justify-content-between align-items-center pt-3 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
                                 <button type="button" class="btn btn-sm btn-outline-light" onclick="testConnectionAction()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); color: #d4d4d8; font-size: 12px; padding: 6px 14px; border-radius: 6px;">
                                     <i class="bi bi-lightning-charge me-1" style="color: #10b981;"></i>
-                                    <span>测试连通性 (Ping)</span>
+                                    <span>测试连通性</span>
                                 </button>
                                 <button type="button" class="btn btn-sm fw-semibold" onclick="saveModelConfigModal()" style="background: #10b981; border: none; color: #052e16; font-size: 12px; padding: 6px 18px; border-radius: 6px;">
                                     <i class="bi bi-check2 me-1"></i>
@@ -8053,22 +8053,22 @@
 
                         <!-- 1. 外观模式卡片 1:1 复刻 -->
                         <div class="mb-3">
-                            <label class="form-label" style="font-size: 11.5px; font-weight: 500; color: var(--text-sub); margin-bottom: 8px;">外观显示模式 (白天 / 黑色 / 跟随系统)</label>
+                            <label class="form-label" style="font-size: 11.5px; font-weight: 500; color: var(--text-sub); margin-bottom: 8px;">外观主题</label>
                             <div class="settings-theme-cards">
                                 <div class="theme-select-card" id="themeCardLight" onclick="switchTheme('light')">
                                     <i class="bi bi-sun text-warning" style="font-size: 20px;"></i>
-                                    <div class="small fw-semibold mt-1">白天模式 (浅色)</div>
-                                    <div class="text-muted" style="font-size: 10px;">清爽明亮界面</div>
+                                    <div class="small fw-semibold mt-1">浅色模式</div>
+                                    
                                 </div>
                                 <div class="theme-select-card active" id="themeCardDark" onclick="switchTheme('dark')">
                                     <i class="bi bi-moon-stars text-info" style="font-size: 20px;"></i>
-                                    <div class="small fw-semibold mt-1">黑色模式 (深色)</div>
-                                    <div class="text-muted" style="font-size: 10px;">专注暗色工作台</div>
+                                    <div class="small fw-semibold mt-1">深色模式</div>
+                                    
                                 </div>
                                 <div class="theme-select-card" id="themeCardAuto" onclick="switchTheme('auto')">
                                     <i class="bi bi-display" style="font-size: 20px;"></i>
                                     <div class="small fw-semibold mt-1">跟随系统</div>
-                                    <div class="text-muted" style="font-size: 10px;">自适应操作系统</div>
+                                    
                                 </div>
                             </div>
                         </div>
@@ -8078,7 +8078,7 @@
                             <div class="d-flex align-items-center gap-3">
                                 <div class="fidelity-env-icon-box"><i class="bi bi-phone"></i></div>
                                 <div>
-                                    <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">Android Debug Bridge (ADB 运行时)</div>
+                                    <div style="font-size: 13px; font-weight: 600; color: var(--text-main);">ADB 运行环境</div>
                                     <div style="font-size: 11px; color: #71717a; margin-top: 2px;" id="adbVersionText">用于真机交互、投屏推流与指令下发的核心桥接驱动</div>
                                 </div>
                             </div>
@@ -8100,9 +8100,9 @@
                                 <div class="col-md-6">
                                     <label class="form-label" style="font-size: 11.5px; color: var(--text-sub); margin-bottom: 5px;">单步执行最大超时时长</label>
                                     <select class="fidelity-input" id="stepTimeoutSelect">
-                                        <option value="15">15 秒 (极速探索 · 适用于流畅轻量应用)</option>
-                                        <option value="30" selected>30 秒 (推荐默认 · 适用绝大多数应用)</option>
-                                        <option value="60">60 秒 (针对弱网与大型综合应用)</option>
+                                        <option value="15">15s · 极速探索</option>
+                                        <option value="30" selected>30s · 标准推荐</option>
+                                        <option value="60">60s · 复杂场景</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6">
@@ -9784,7 +9784,7 @@
                                 <i class="bi bi-shield-check text-success fs-5"></i>
                                 <span class="fw-semibold">测试验证达成，等待人工验收封板</span>
                             </div>
-                            <span class="badge bg-info-subtle text-info border border-info-subtle">待验收 (Ready for Review)</span>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">待验收</span>
                         </div>
                         <div class="text-muted small mb-3">
                             AI 智能体已执行完成本轮端侧规划与断言校验。请核验证据与交付物，满意后可验收通过并归档；若有不满意处，点击要求返工输入修改项，智能体将原地继承现场继续修正。
@@ -11030,7 +11030,7 @@
             // 4. 重置输入框为新任务引导
             const ta = document.getElementById("taskInputText");
             if (ta) {
-                ta.placeholder = "描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）...";
+                ta.placeholder = "输入测试目标或追加指令...";
                 ta.value = "";
             }
 
@@ -11128,7 +11128,7 @@
                 if (metaWrap && currentWorkspaceMode === "ai") metaWrap.classList.remove("d-none");
                 document.getElementById("currentSessionTitleDisplay").innerText = data.title;
                 const ta = document.getElementById("taskInputText");
-                if (ta) ta.placeholder = "在此会话中发送接续指令或补充测试目标（Enter 发送）...";
+                if (ta) ta.placeholder = "输入追加指令或补充测试目标...";
 
                 // 4. 渲染已有会话的原有配置信息与环境巡检 (Task 2)
                 renderSessionEnvStatus(data);
@@ -12017,10 +12017,11 @@
                 let bulletsHtml = "";
                 if (Array.isArray(blk.bullets)) {
                     blk.bullets.forEach(b => {
+                        const pointText = b.content || b.tag || '';
                         bulletsHtml += `
-                            <div class="mb-1">
-                                <strong style="color: var(--text-main); font-weight: 500;">${escapeHtml(b.tag || '推演')}：</strong>
-                                <span>${escapeHtml(b.content || '')}</span>
+                            <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                <span>${escapeHtml(pointText)}</span>
                             </div>
                         `;
                     });
@@ -12032,8 +12033,8 @@
                             <div class="stream-thought-shimmer-card">
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <span class="hud-status-dot pulsing"></span>
-                                    <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">AI 正在感知真机环境并深度推演测试链路...</span>
-                                    <span class="ms-auto font-mono text-sub" style="font-size: 11px;">端侧规划中...</span>
+                                    <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">深度推演端侧测试链路...</span>
+                                    <span class="ms-auto font-mono text-sub" style="font-size: 11px;">推演中</span>
                                 </div>
                                 <div class="shimmer-bar mb-2"></div>
                                 <div class="stream-thought-body p-0 border-0" id="body_${blk.block_id}">
@@ -12048,11 +12049,14 @@
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
 
+                let durStr = blk.duration || '0.8s';
+                if (!durStr.endsWith('s') && !durStr.includes('秒')) durStr += 's';
+
                 return `
                     <div class="stream-thought-box" id="${blk.block_id}">
                         <div class="stream-thought-row" onclick="toggleStreamThought('${blk.block_id}')">
                             <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 10px;"></i>
-                            <span>用时 ${escapeHtml(blk.duration || '0.8s')} · 业务意图与端侧策略推演</span>
+                            <span>思考过程 · ${escapeHtml(durStr)}</span>
                         </div>
                         <div class="stream-thought-body ${bodyClass}" id="body_${blk.block_id}">
                             ${bulletsHtml}
@@ -12114,7 +12118,10 @@
                             <div class="stream-todo-item cascade-step-item ${diffClass}" style="--step-idx: ${idx};" ${titleHint}>
                                 <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
                                     <span class="item-sign" style="font-family: var(--font-mono); opacity: 0.7;">${signChar}</span>
-                                    <span class="item-title text-truncate"><strong>${escapeHtml(it.title)}</strong>: ${escapeHtml(it.desc || '')}</span>
+                                    <span class="item-title text-truncate">
+                                        <span class="fw-medium text-main">${escapeHtml(it.title)}</span>
+                                        ${(it.desc && it.desc !== it.title && !it.desc.startsWith(it.title)) ? `<span class="text-sub ms-1.5 opacity-75" style="font-size: 11px;">${escapeHtml(it.desc)}</span>` : ''}
+                                    </span>
                                 </div>
                                 <span class="stream-todo-tag ${tagClass}">${tagText}</span>
                             </div>
@@ -12127,13 +12134,6 @@
                 const isAllDone = (totalItems > 0 && effCompleted === totalItems);
                 const isGoalAchieved = isFinishedSession || isAllDone || (totalItems > 0 && effCompleted > 0 && (completedCount + skippedCount === totalItems));
 
-                let titleText = blk.title || '任务清单';
-                if (isGoalAchieved) {
-                    titleText = `任务清单 · 全部目标达成 (${effCompleted}/${totalItems})`;
-                } else if (effCompleted > 0) {
-                    titleText = `更新任务清单 · ${effCompleted}/${totalItems} 已完成`;
-                }
-
                 const isExpanded = (window._streamTodoState[blk.block_id] !== false); // 默认展开
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";
@@ -12143,10 +12143,10 @@
                         <div class="stream-todo-header" onclick="toggleStreamTodo('${blk.block_id}')">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 10px;"></i>
-                                <span>${escapeHtml(titleText)}</span>
+                                <span class="fw-medium">任务清单</span>
                                 ${isGoalAchieved ? '<span class="mono-pill" style="font-size: 9.5px; color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border); padding: 1px 6px;">100% 达成</span>' : ''}
                             </div>
-                            <span class="mono-tag" style="font-size: 10px;">${effCompleted}/${totalItems} 已完成</span>
+                            <span class="mono-tag font-mono" style="font-size: 10.5px; opacity: 0.85;">${effCompleted}/${totalItems}</span>
                         </div>
                         <div class="stream-todo-body ${bodyClass}" id="body_todo_${blk.block_id}">
                             ${itemsHtml}
@@ -12292,11 +12292,11 @@
                         <div class="agent-trace-header" onclick="toggleStreamStep('${blk.block_id}', '${blk.step_id || 1}')">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
-                                <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(displayDuration)})</span>
+                                <span class="agent-trace-title">执行动作 · ${acts.length}</span>
+                                <span class="font-mono text-sub opacity-75" style="font-size: 10.5px;">${escapeHtml(displayDuration)}</span>
                             </div>
-                            <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
-                                <span class="step-toggle-label">${isExpanded ? '收起' : '明细'}</span>
-                                <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 9px;"></i>
+                            <div class="d-flex align-items-center text-muted" style="font-size: 10px;">
+                                <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 9px; opacity: 0.6;"></i>
                             </div>
                         </div>
                         <div class="agent-trace-body ${bodyClass}" id="body_${blk.block_id}">
@@ -12386,18 +12386,13 @@
 
                     return `
                         <div class="test-result-summary-card ${verdictClass} failure-compact-card" id="${blk.block_id}" style="padding: 10px 14px;">
-                            <!-- 顶层单行裁定抬头与轻量排障入口 (高度压缩至极简) -->
+                            <!-- 顶层单行裁定抬头与轻量排障入口 (极简自释) -->
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="mono-pill ${isBlocked ? 'blocked-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isBlocked ? 'BLOCKED' : 'FAIL'}</span>
-                                    <span class="summary-verdict-title">${isBlocked ? '业务前置受阻' : '业务验证受阻'}</span>
+                                    <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>
                                 </div>
                                 <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
-                                    <span>${escapeHtml(blk.steps_summary || '测试未达成预期')}</span>
-                                    <span>·</span>
-                                    <span>${escapeHtml(blk.duration || '0s')}</span>
-                                    ${blk.timestamp ? `<span>·</span><span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp)}</span>` : ''}
-                                    <span>·</span>
                                     <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="openLogViewer('${sid}')" style="font-size: 11px; color: var(--text-sub);" title="在右侧抽屉展开底层运行日志流">
                                         <i class="bi bi-terminal me-1"></i>运行日志 <i class="bi bi-chevron-right" style="font-size: 9px;"></i>
                                     </button>
@@ -12477,19 +12472,15 @@
 
                 return `
                     <div class="test-result-summary-card ${verdictClass}" id="${blk.block_id}">
-                        <!-- 顶层单行裁定抬头与聚合指标 -->
+                        <!-- 顶层单行裁定抬头与聚合指标 (极简自释) -->
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="mono-pill ${isPass ? 'pass-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isPass ? 'PASS' : 'FAIL'}</span>
-                                <span class="summary-verdict-title">${isPass ? '业务闭环全项达成' : '业务验证受阻'}</span>
+                                <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>
+                                <span style="color: var(--status-green); font-size: 11px; font-family: var(--font-mono);"><i class="bi bi-shield-check"></i> 0 异常</span>
                             </div>
                             <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
-                                <span>${escapeHtml(blk.steps_summary || '步骤全项达标')}</span>
-                                <span>·</span>
-                                <span>${escapeHtml(blk.duration || '152.3s')}</span>
-                                <span>·</span>
-                                <span style="color: var(--status-green);"><i class="bi bi-shield-check"></i> 0 异常</span>
-                                ${blk.timestamp ? `<span>·</span><span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp)}</span>` : ''}
+                                ${blk.timestamp ? `<span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp)}</span>` : ''}
                             </div>
                         </div>
 
@@ -12601,26 +12592,26 @@
                             <a href="javascript:void(0)" onclick="openReportInRightDrawer('${sid}')" class="report-file-link" title="点击在右侧打开完整交付物报告">
                                 <i class="bi bi-file-earmark-medical me-1"></i>test_report_${sid}.md
                             </a>
-                            <span style="color: var(--text-muted); font-size: 11px; margin-left: 6px;">(点击可在右侧打开完整报告)</span>
+                            
                         </div>
 
                         <!-- 2~3 行精炼核心摘要 (极简去线条) -->
                         <div class="report-summary-box">
-                            <div>• <strong>核心闭环</strong>：业务推进率 ${passRate} · 耗时 ${durationText} · ${stageText}</div>
-                            <div>• <strong>智能断言</strong>：存在性 / 页面流转 / API 状态码校验通过 · ${crashText}</div>
-                            <div>• <strong>自动化资产</strong>：已提炼零 Token 标准 Python 回归脚本与关键证据链</div>
+                            <div>• 业务推进率 ${passRate} · 耗时 ${durationText} · ${stageText}</div>
+                            <div>• 存在性 / 页面流转 / API 状态码校验通过 · ${crashText}</div>
+                            <div>• 已提炼零 Token 标准 Python 回归脚本与关键证据链</div>
                         </div>
 
                         <!-- 快捷操作栏：在右侧查看完整报告 + 恢复保存本地用例按钮 -->
                         <div class="d-flex align-items-center gap-2 mt-2 pt-1">
                             <button class="btn btn-sm btn-primary py-1 px-3 d-flex align-items-center gap-1.5" style="font-size: 11.5px; border-radius: 6px;" onclick="openReportInRightDrawer('${sid}')">
                                 <i class="bi bi-layout-sidebar-reverse"></i>
-                                <span>在右侧查看完整报告</span>
+                                <span>查看完整报告</span>
                             </button>
                             ${isSolidified ? `
                                 <button class="btn btn-sm btn-outline-secondary py-1 px-3 d-flex align-items-center gap-1.5" style="font-size: 11.5px; border-radius: 6px;" onclick="openEmbeddedCode('test_${sid}.py', '本地用例')">
                                     <i class="bi bi-check-circle-fill text-success"></i>
-                                    <span>已固化为本地用例 (查看脚本)</span>
+                                    <span>已固化为用例</span>
                                 </button>
                             ` : `
                                 <button class="btn btn-sm btn-outline-secondary py-1 px-3 d-flex align-items-center gap-1.5" id="saveCaseBtn_${sid}" style="font-size: 11.5px; border-radius: 6px;" onclick="saveSessionToLocalCase('${sid}')">
@@ -12806,10 +12797,10 @@
                     <div class="agent-trace-header" onclick="toggleStreamStep('${blockId}', '${stepNum}')">
                         <div class="d-flex align-items-center gap-2">
                             <i class="bi ${isRunning ? 'bi-arrow-repeat spin text-primary' : 'bi-terminal'}" style="font-size: 11px;"></i>
-                            <span class="agent-trace-title">执行动作 · ${acts.length} 项端侧操作 (${escapeHtml(stepDuration)})</span>
+                            <span class="agent-trace-title">执行动作 · ${acts.length}</span>${stepDuration ? `<span class="agent-trace-dur font-mono text-muted ms-auto me-2" style="font-size: 11px;">${escapeHtml(stepDuration)}</span>` : ''}
                         </div>
                         <div class="d-flex align-items-center gap-1 text-muted" style="font-size: 10.5px;">
-                            <span class="step-toggle-label">${isExpanded ? '收起' : '明细'}</span>
+                            
                             <i class="bi ${chevronClass}" id="chevron_${blockId}" style="font-size: 9px;"></i>
                         </div>
                     </div>
@@ -12935,8 +12926,8 @@ function renderChatStream(sessionData) {
                 if (thinkingObj && Array.isArray(thinkingObj.bullets) && thinkingObj.bullets.length > 0) {
                     thinkingObj.bullets.forEach(b => {
                         bulletsHtml += `
-                            <div class="mb-1">
-                                <strong style="color: var(--text-main); font-weight: 500;">${escapeHtml(b.tag || '推演')}：</strong>
+                            <div class="d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                <span class="mt-1.5" style="width: 4px; height: 4px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
                                 <span>${escapeHtml(b.content || '')}</span>
                             </div>
                         `;
@@ -12958,7 +12949,7 @@ function renderChatStream(sessionData) {
                     <div class="stream-thought-box" id="thought_box_turn_${turnId}">
                         <div class="stream-thought-row" onclick="toggleStreamThought('turn_${turnId}')">
                             <i class="bi ${thoughtChevron}" id="chevron_thought_turn_${turnId}" style="font-size: 10px;"></i>
-                            <span>用时 ${escapeHtml(thinkingDuration)} · Turn ${turnId} 业务意图与策略推演</span>
+                            <span>思考过程 · ${escapeHtml(thinkingDuration)}</span>
                         </div>
                         <div class="stream-thought-body ${thoughtBodyClass}" id="body_thought_turn_${turnId}">
                             ${bulletsHtml}
@@ -12989,7 +12980,7 @@ function renderChatStream(sessionData) {
                             <div class="stream-todo-item ${itemClass}" onclick="toggleStepsDrawer(event)" title="点击展开右侧详细指令抽屉">
                                 <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 82%;">
                                     <span class="item-sign" style="font-size: 11px; width: 12px; text-align: center;">${signChar}</span>
-                                    <span class="item-title text-truncate"><strong>Step ${sNum}</strong>: ${escapeHtml(sTitle)} - <span class="text-muted">${escapeHtml(sDesc)}</span></span>
+                                    <span class="item-title text-truncate fw-medium">${escapeHtml(sTitle)} <span class="text-muted ms-1 fw-normal">${escapeHtml(sDesc)}</span></span>
                                 </div>
                                 <span class="stream-todo-tag ${tagClass}">${tagText}</span>
                             </div>
@@ -13009,17 +13000,17 @@ function renderChatStream(sessionData) {
                             <div class="stream-todo-header" onclick="toggleStreamTodo('turn_${turnId}')">
                                 <div class="d-flex align-items-center gap-2">
                                     <i class="bi ${todoChevron}" id="chevron_todo_turn_${turnId}" style="font-size: 10px;"></i>
-                                    <span>${tIdx === 0 ? '初始化任务清单' : '更新任务清单'} · ${completedCount}/${turnSteps.length} 已完成</span>
+                                    <span>任务清单</span>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="mono-tag" style="font-size: 10px;">${completedCount}/${turnSteps.length} 步骤就绪</span>
+                                    <span class="mono-tag" style="font-size: 10px;">${completedCount}/${turnSteps.length}</span>
                                     <span class="text-muted" style="font-size: 11px;" onclick="toggleStepsDrawer(event)" title="查看底层原生指令"><i class="bi bi-box-arrow-up-right"></i></span>
                                 </div>
                             </div>
                             <div class="stream-todo-body ${todoBodyClass}" id="body_todo_turn_${turnId}">
                                 <div class="stream-todo-diff-label">
                                     <span>与前序状态清单相比</span>
-                                    <span style="font-size: 10px;">(点击单步可联动右侧抽屉)</span>
+                                    
                                 </div>
                                 ${todoItemsHtml}
                             </div>
@@ -13132,7 +13123,7 @@ function renderChatStream(sessionData) {
                                 <i class="bi bi-shield-check text-success fs-5"></i>
                                 <span class="fw-semibold">测试验证达成，等待人工验收封板</span>
                             </div>
-                            <span class="badge bg-info-subtle text-info border border-info-subtle">待验收 (Ready for Review)</span>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">待验收</span>
                         </div>
                         <div class="text-muted small mb-3">
                             AI 智能体已执行完成本轮端侧规划与断言校验。请核验证据与交付物，满意后可验收通过并归档；若有不满意处，点击要求返工输入修改项，智能体将原地继承现场继续修正。
@@ -14139,7 +14130,7 @@ function renderChatStream(sessionData) {
                     resetDevicePos();
                 }
                 const fpsLabel = document.getElementById("floatingDeviceFps");
-                if (fpsLabel) fpsLabel.innerText = "显存直读 · 拖拽/点击就绪";
+                if (fpsLabel) fpsLabel.innerText = "直连";
                 runPipStreamLoop();
             } else {
                 pip.style.display = "none";
@@ -14534,12 +14525,15 @@ function renderChatStream(sessionData) {
                                 <div class="stream-thought-shimmer-card">
                                     <div class="d-flex align-items-center gap-2 mb-2">
                                         <span class="hud-status-dot pulsing"></span>
-                                        <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">AI 正在深度推演增量测试链路 (原地接续)...</span>
+                                        <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">增量意图推演中...</span>
                                         <span class="ms-auto font-mono text-sub" id="optTimerA_${tempThId}" style="font-size: 11px;">0.0s</span>
                                     </div>
                                     <div class="shimmer-bar mb-2"></div>
-                                    <div class="stream-thought-body p-0 border-0" style="font-size: 12px; color: var(--text-sub);">
-                                        <div class="mb-1"><strong>业务意图增量解析：</strong><span>解析追加指令【${escapeHtml(goal)}】，动态重规划执行分支...</span></div>
+                                    <div class="stream-thought-body p-0 border-0">
+                                        <div class="thought-flow-point d-flex align-items-start gap-2 mb-1" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                            <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                            <span>解析追加指令【${escapeHtml(goal)}】，动态重规划执行分支...</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -14621,14 +14615,23 @@ function renderChatStream(sessionData) {
                             <div class="stream-thought-shimmer-card">
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <span class="hud-status-dot pulsing"></span>
-                                    <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">AI 正在感知真机环境并深度推演测试链路...</span>
+                                    <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">深度推演端侧测试链路...</span>
                                     <span class="ms-auto font-mono text-sub" id="optTimerB_count" style="font-size: 11px;">0.0s</span>
                                 </div>
                                 <div class="shimmer-bar mb-2"></div>
-                                <div class="stream-thought-body p-0 border-0" style="font-size: 12px; color: var(--text-sub);">
-                                    <div class="mb-1"><strong>端侧环境感知与起点确认：</strong><span>物理真机已在线，正在感知端侧前台状态并推演起跑点...</span></div>
-                                    <div class="mb-1"><strong>业务意图推演：</strong><span>深度解析测试目标【${escapeHtml(goal)}】，正在构建最优差量执行路径...</span></div>
-                                    <div class="mb-1"><strong>入口寻路策略：</strong><span>动态规划业务核心频道与控件巡航策略...</span></div>
+                                <div class="stream-thought-body p-0 border-0">
+                                    <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                        <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                        <span>物理真机已在线，正在感知端侧前台状态并推演起跑点...</span>
+                                    </div>
+                                    <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                        <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                        <span>深度解析测试目标【${escapeHtml(goal)}】，构建最优差量执行路径...</span>
+                                    </div>
+                                    <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                        <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                        <span>动态规划业务核心频道与控件巡航策略...</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -15128,7 +15131,7 @@ function renderChatStream(sessionData) {
                         <div class="model-item-option model-item-locked" onclick="openSettingsModal('google'); closeAllPopovers();" title="需先在设置中完成 Google 官方授权即可解锁此系列模型" style="opacity: 0.72; cursor: pointer; border-left: 2px solid #f59e0b;">
                             <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 84%;">
                                 <i class="bi bi-shield-lock text-warning" style="font-size: 11px;"></i>
-                                <span class="text-truncate text-muted" style="font-size: 11px;">未授权 Google 账号 (点击前往授权)</span>
+                                <span class="text-truncate text-muted" style="font-size: 11px;">未授权 Google 账号</span>
                             </div>
                             <span style="font-size: 9.5px; color: var(--text-primary);"><i class="bi bi-box-arrow-up-right"></i></span>
                         </div>
@@ -15441,7 +15444,7 @@ function renderChatStream(sessionData) {
             // 动态响应输入框 placeholder，确保用户输入时心智高度明确当前待测对象
             const taskInputTa = document.getElementById("taskInputText");
             if (taskInputTa && (!taskInputTa.value || taskInputTa.value.trim() === "")) {
-                taskInputTa.placeholder = `针对「${rawName}」描述自动化测试目标，如：冷启动应用，测试登录并断言进入首页（Enter 发送，Shift+Enter 换行）...`;
+                taskInputTa.placeholder = `针对「${rawName}」输入测试目标...`;
             }
         }
 
@@ -15695,7 +15698,7 @@ function renderChatStream(sessionData) {
                                 <div class="text-muted mt-1" style="font-size: 11px;">请通过 USB 数据线连接手机，并在开发者选项中打开【USB 调试】。</div>
                             </div>
                         `;
-                        if (devHint) devHint.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>未连接真机 (请连接 USB 并开启调试)</span>`;
+                        if (devHint) devHint.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>未连接真机</span>`;
                         return;
                     }
                 }
@@ -15750,7 +15753,7 @@ function renderChatStream(sessionData) {
                                     <div class="text-truncate">
                                         <div class="d-flex align-items-center gap-2 flex-wrap">
                                             <span class="fw-bold" style="font-size: 13px; color: var(--text-main);">${safeLabel}</span>
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px;">真机直调免传包</span>
+                                            
                                             ${isSelected ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 10px;">当前待测</span>' : ''}
                                             <span class="cursor-pointer text-muted small" onclick="editAppCustomLabel('${safePkg}', '${safeLabel}')" title="自定义应用显示名称" style="font-size: 11px;">
                                                 <i class="bi bi-pencil-square"></i>
@@ -15849,7 +15852,7 @@ function renderChatStream(sessionData) {
             if (devHint) {
                 devHint.innerHTML = targetDevId ? 
                     `<span class="text-success"><i class="bi bi-phone me-1"></i>目标真机: <strong>${escapeHtml(targetDevId)}</strong></span>` : 
-                    `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>未连接真机 (请连接 USB 并开启调试)</span>`;
+                    `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>未连接真机</span>`;
             }
 
             try {
@@ -16360,7 +16363,7 @@ function renderChatStream(sessionData) {
                 <div class="modal-header border-bottom" style="border-color: var(--border-subtle) !important;">
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-box-seam text-primary fs-5"></i>
-                        <h6 class="modal-title fw-bold mb-0">全景测试交付物与存证清单 (Deliverables Hub)</h6>
+                        <h6 class="modal-title fw-bold mb-0">测试交付物与存证</h6>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -16496,7 +16499,7 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-grid-3x3-gap text-success fs-5"></i>
                         <div>
-                            <span class="fw-semibold" style="font-size: 15px; color: var(--text-main);">多机型视觉差异与对齐对比看板 (Visual Diff Matrix)</span>
+                            <span class="fw-semibold" style="font-size: 15px; color: var(--text-main);">多机型视觉对比</span>
                             <span class="badge bg-success-subtle text-success border border-success-subtle ms-2" style="font-size: 10px;">Phase 4 兼容质量引擎</span>
                         </div>
                     </div>
