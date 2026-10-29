@@ -156,12 +156,12 @@ class AITestAgent:
             logger.debug(f"同步工作记忆跳过: {e}")
 
 
-    def _execute_credential_injection(self, acc: str, pwd: str, screen_info: Dict[str, Any]) -> bool:
+    def _execute_credential_injection(self, acc: str, pwd: str, screen_info: Dict[str, Any], goal: str = "") -> bool:
         """
         确定性端侧凭证自动注入流水线 (DSH Credential Injection Pipeline)
         真实模拟用户物理操作：切换密码登录 -> 自动选组织/公司 -> 勾选协议 -> 填手机号/登录码 -> 填密码 -> 提交登录
         """
-        logger.info(f"🔑 [DSH 凭证自动注入] 开始对真机执行账号 [{acc}] 真实登录注入流水线...")
+        logger.info(f"🔑 [DSH 凭证自动注入] 开始对真机执行账号 [{acc}] 真实登录注入流水线 (goal={goal})...")
         self._notify_status({
             "step": 0,
             "action": "自动登录注入",
@@ -170,16 +170,20 @@ class AITestAgent:
 
         elements = screen_info.get("elements", [])
 
-        # 1. 检查是否在验证码登录模式，若有'密码登录'/'账号密码登录'切换按钮，先切换
-        for el in elements:
-            t = (el.get("text") or el.get("content_desc") or "").strip()
-            if any(k in t for k in ["用密码登录", "密码登录", "账号密码登录"]):
-                logger.info(f"点击切换到密码登录模式: {t}")
-                self.executor._locate_and_click(el, None)
-                time.sleep(0.6)
-                screen_info = ScreenParser.get_screen_summary(self.driver)
-                elements = screen_info.get("elements", [])
-                break
+        # 1. 检查是否在验证码登录模式
+        # ⚠️ 严苛保护：若测试目标为验证码/短信登录测试，或未提供有效密码，绝对禁止强行切换到密码登录！
+        from ai_engine.verifier import TaskVerifier
+        is_verify_intent = TaskVerifier.is_testing_auth_or_captcha(goal) or any(k in goal for k in ["验证码", "短信", "机器人检测", "滑块", "防刷"])
+        if pwd and not is_verify_intent:
+            for el in elements:
+                t = (el.get("text") or el.get("content_desc") or "").strip()
+                if any(k in t for k in ["用密码登录", "密码登录", "账号密码登录"]):
+                    logger.info(f"点击切换到密码登录模式: {t}")
+                    self.executor._locate_and_click(el, None)
+                    time.sleep(0.6)
+                    screen_info = ScreenParser.get_screen_summary(self.driver)
+                    elements = screen_info.get("elements", [])
+                    break
 
         # 2. 扫描定位关键组件：手机号/登录码框、密码框、协议框、登录按钮、公司选择框
         phone_el, pwd_el, agree_el, login_btn, company_el = None, None, None, None, None
@@ -193,10 +197,14 @@ class AITestAgent:
             if is_input:
                 edit_texts.append(el)
 
-            if not phone_el and any(k in t for k in ["手机号", "账号", "请输入手机", "请输入账号", "登录码", "合伙人", "工号"]):
+            # 排除页面标题与切换按钮等非输入控件 (例如顶部大标题"手机号登录")
+            is_title_or_btn = any(k in t for k in ["手机号登录", "密码登录", "用密码登录", "验证码登录", "立即登录", "快捷登录"])
+            if not phone_el and not is_title_or_btn and any(k in t for k in ["请输入手机", "请输入账号", "请输入合伙人", "手机号", "账号", "登录码", "合伙人", "工号"]):
                 phone_el = el
-            elif not pwd_el and any(k in t for k in ["密码", "请输入密码"]):
-                pwd_el = el
+            elif not pwd_el and any(k in t for k in ["请输入密码", "密码"]):
+                # 排除切换按钮、忘记密码等非输入框文本
+                if not any(k in t for k in ["密码登录", "用密码登录", "忘记密码", "切换", "验证码登录"]):
+                    pwd_el = el
             elif not agree_el and any(k in t for k in ["协议", "同意", "已阅读", "我已阅读"]):
                 agree_el = el
             elif not login_btn and any(k in t for k in ["登录", "进入", "下一步", "同意隐私并下一步"]):
@@ -205,13 +213,49 @@ class AITestAgent:
             elif not company_el and any(k in t for k in ["请选择您所在的公司", "选择公司", "所属公司"]):
                 company_el = el
 
-        # 智能兜底：若有自绘或占位符未暴露在文本中的空 EditText
-        if not phone_el and edit_texts:
-            phone_el = edit_texts[0]
-            logger.info(f"使用首个输入框作为账号目标: {phone_el.get('bounds')}")
-        if not pwd_el and len(edit_texts) >= 2:
-            pwd_el = edit_texts[1]
-            logger.info(f"使用次位输入框作为密码目标: {pwd_el.get('bounds')}")
+        # 智能匹配优先：若有明确标记为 is_input 的真实输入框列表
+        if edit_texts:
+            # 优先在真实输入框中挑选含有手机号/占位符的输入框
+            for ed in edit_texts:
+                ed_t = (ed.get("text") or ed.get("content_desc") or "").strip()
+                if any(k in ed_t for k in ["请输入手机", "手机号", "请输入账号", "账号", "登录码"]):
+                    phone_el = ed
+                    break
+            else:
+                if not phone_el:
+                    phone_el = edit_texts[0]
+                    logger.info(f"使用首个输入框作为账号目标: {phone_el.get('bounds')}")
+
+            if len(edit_texts) >= 2:
+                for ed in edit_texts[1:]:
+                    ed_t = (ed.get("text") or ed.get("content_desc") or "").strip()
+                    if any(k in ed_t for k in ["请输入密码", "密码"]):
+                        pwd_el = ed
+                        break
+                else:
+                    if not pwd_el:
+                        pwd_el = edit_texts[1]
+                        logger.info(f"使用次位输入框作为密码目标: {pwd_el.get('bounds')}")
+
+        # 🛡️ 账号与密码框严格防混淆与互斥校验（杜绝账号与密码被串打入同一个输入框）
+        if pwd_el:
+            pwd_text = (pwd_el.get("text") or pwd_el.get("content_desc") or "").strip()
+            if any(k in pwd_text for k in ["用密码登录", "密码登录", "忘记密码", "切换", "验证码登录"]):
+                logger.warning(f"⚠️ 识别到的密码候选元素实为模式切换按钮/链接 [{pwd_text}]，予以剔除")
+                pwd_el = None
+
+        if phone_el and pwd_el:
+            if phone_el == pwd_el:
+                logger.warning("⚠️ 账号与密码候选元素指向同一对象，取消密码输入")
+                pwd_el = None
+            else:
+                p_c = phone_el.get("center")
+                w_c = pwd_el.get("center")
+                if p_c and w_c:
+                    dy = abs(p_c[1] - w_c[1])
+                    if dy < 50:
+                        logger.warning(f"⚠️ 账号框与密码框垂直间距过小 (dy={dy}px)，判定为同一输入框，禁止填入密码")
+                        pwd_el = None
 
         # 3. 若有公司/组织选择下拉框，尝试轻触展开并选定默认公司
         if company_el:
@@ -316,6 +360,14 @@ class AITestAgent:
         2. 若未配置凭证，立即挂起任务流，向前端发出协同信号唤出【人机协同决策卡片】，AI 推理与步数时钟完全冻结；
         3. 若检测到同界面多次阻断，智能熔断防死循环，自动升级为【投屏手动接管引导】，支持一键放行！
         """
+        # 🎯 目标豁免检测 (Goal Immunity Guard):
+        # 若当前测试目标明确针对“验证码”、“短信”、“机器人检测”、“滑块验证”、“人机验证”、“图形验证”等，
+        # 则当前登录或验证码界面是测试目标本身 (Target under Test)，绝非流程阻断门禁，直接放行给 AI 规划器自主测试！
+        from ai_engine.verifier import TaskVerifier
+        if TaskVerifier.is_testing_auth_or_captcha(goal):
+            logger.info(f"🎯 [受测标的放行] 测试目标针对验证码/安全检测业务流程 ({goal})，跳过鉴权阻断人机协同")
+            return False
+
         texts = [e.get("text", "") or e.get("content_desc", "") for e in screen_info.get("elements", [])]
         combined = " ".join(texts)
 
@@ -358,7 +410,7 @@ class AITestAgent:
         # 若未达到熔断阈值且已预置凭证，尝试自动注入
         if self._hitl_attempts == 1 and cred and cred.get("account"):
             logger.info(f"🔑 [预设凭证生效] 检测到登录界面，命中 App [{app_key}] 预置测试账号 [{cred['account']}]，立即执行端侧自动注入流水线！")
-            injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info)
+            injected = self._execute_credential_injection(cred.get("account", ""), cred.get("password", ""), screen_info, goal=goal)
             if injected:
                 return True
             logger.warning(f"⚠️ [自动注入未能成功跳出] 界面可能需要滑块拼图、公司选择或人工确认，升级转入人机协同决策卡片！")
@@ -410,7 +462,7 @@ class AITestAgent:
                             acc = data.get("account", "").strip()
                             pwd = data.get("password", "").strip()
                             if acc:
-                                injected = self._execute_credential_injection(acc, pwd, screen_info)
+                                injected = self._execute_credential_injection(acc, pwd, screen_info, goal=goal)
                                 if injected:
                                     self._hitl_attempts = 0
                                     self._last_hitl_signature = None

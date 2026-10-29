@@ -242,7 +242,17 @@ class ActionExecutor:
         # 优先支持原生 ADB 坐标点击输入
         if el_info.get("center") and hasattr(self.driver, "execute_adb"):
             self._locate_and_click(el_info, None)
-            time.sleep(0.5)
+            time.sleep(0.3)
+
+            # 🛡️ 确定性清空输入框历史残留（防拼接/防账号密码串框）
+            # 移动光标至末尾并批量退格删除，确保输入框内容纯净
+            try:
+                self.driver.execute_adb(["shell", "input", "keyevent", "123"])  # KEYCODE_MOVE_END
+                self.driver.execute_adb(["shell", "input", "keyevent"] + ["67"] * 40)  # KEYCODE_DEL x 40
+            except Exception as e:
+                logger.debug(f"输入框退格清空跳过: {e}")
+
+            time.sleep(0.2)
 
             # 判断是否包含中文汉字
             if any(ord(c) > 127 for c in text):

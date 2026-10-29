@@ -31,6 +31,17 @@ class TaskVerifier:
     ]
 
     @classmethod
+    def is_testing_auth_or_captcha(cls, goal: str) -> bool:
+        """判断测试目标本身是否就是针对登录、验证码、安全验证或机器人检测"""
+        goal_lower = goal.lower()
+        test_auth_keywords = [
+            "测试登录", "验证登录", "登录流程", "注册账号", "登录功能", 
+            "登录页面", "验证码", "机器人检测", "滑块", "人机验证", 
+            "防刷", "短信登录", "验证码登录", "登录鉴权", "登录拦截"
+        ]
+        return any(kw in goal_lower for kw in test_auth_keywords)
+
+    @classmethod
     def detect_barrier(cls, screen_info: Dict[str, Any], goal: str) -> Optional[Dict[str, Any]]:
         """
         探测当前界面是否存在阻碍目标推进的屏障 (Authentication Barrier / System Barrier)
@@ -38,10 +49,9 @@ class TaskVerifier:
         """
         texts = [e.get("text", "") or e.get("content_desc", "") for e in screen_info.get("elements", [])]
         combined = " ".join([t for t in texts if t])
-        goal_lower = goal.lower()
 
-        # 若目标本身就是测试登录/注册，则不视为屏障
-        if any(kw in goal_lower for kw in ["测试登录", "验证登录", "登录流程", "注册账号"]):
+        # 若目标本身就是测试登录/验证码/安全检测，则不视为屏障
+        if cls.is_testing_auth_or_captcha(goal):
             return None
 
         # 1. 登录鉴权拦截探测
@@ -88,7 +98,7 @@ class TaskVerifier:
 
         # 1. 强力否决场景 A：真机界面正处于登录/注册阻断页，而用户目标需要进入深层业务
         is_on_login = any(kw in combined for kw in cls.LOGIN_BARRIER_KEYWORDS)
-        goal_is_not_login_test = not any(kw in goal_lower for kw in ["测试登录", "验证登录", "登录功能"])
+        goal_is_not_login_test = not cls.is_testing_auth_or_captcha(goal)
 
         if is_on_login and goal_is_not_login_test:
             reject_msg = (
