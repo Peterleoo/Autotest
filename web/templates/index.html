@@ -7314,12 +7314,13 @@
                                 <div class="d-flex align-items-center gap-2">
                                     <i class="bi bi-stars" style="color: var(--text-main); font-size: 14px;"></i>
                                     <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">智能用例推荐</span>
-                                    <div class="suggest-app-badge" id="currentSuggestAppBadge" title="当前生成用例的目标应用">
+                                    <div class="suggest-app-badge" id="currentSuggestAppBadge" title="当前生成用例的目标应用（点击切换）" onclick="toggleCustomPopover('appPopover', event)" style="cursor: pointer;">
                                         <i class="bi bi-box-seam" style="font-size: 11px;"></i>
                                         <span id="suggestTargetAppLabel">待测应用</span>
+                                        <i class="bi bi-chevron-down ms-0.5" style="font-size: 9px; opacity: 0.7;"></i>
                                     </div>
-                                    <button class="btn btn-sm py-0 px-2" style="font-size: 11px; color: var(--text-sub); border: 1px dashed var(--border-subtle); border-radius: 9999px;" onclick="openAppPackagesModal()" title="上传新应用 APK/IPA 或从应用库选择">
-                                        <i class="bi bi-upload me-1"></i>更换/上传应用
+                                    <button class="btn btn-sm py-0 px-2" style="font-size: 11px; color: var(--text-sub); border: 1px dashed var(--border-subtle); border-radius: 9999px;" onclick="toggleCustomPopover('appPopover', event)" title="选择真机已安装应用或上传本地 APK">
+                                        <i class="bi bi-phone me-1"></i>更换应用
                                     </button>
                                 </div>
                                 <!-- 旅程套件 vs 单点场景模式切换器 (Journey Synthesizer) -->
@@ -15427,7 +15428,12 @@ function renderChatStream(sessionData) {
             return null;
         }
 
-        // 刷新底栏胶囊与顶栏 App 信息
+        function getActiveAppCleanName() {
+            if (!currentActiveApp) return "待测应用";
+            return currentActiveApp.label || currentActiveApp.package || currentActiveApp.filename || "待测应用";
+        }
+
+        // 刷新底栏胶囊与顶栏 App 信息，保持智能用例推荐卡片与输入框底部 100% 对应统一
         async function updateAppPillUI() {
             const appLabelEl = document.getElementById("activeAppLabel");
             const topBarLabelEl = document.getElementById("topBarAppLabel");
@@ -15435,13 +15441,17 @@ function renderChatStream(sessionData) {
             const topBarDot = document.getElementById("topBarAppDot");
 
             const isDeviceDirect = (currentActiveApp.source === 'device' || !currentActiveApp.filename);
-            const rawName = currentActiveApp.label || currentActiveApp.package || currentActiveApp.filename || "待测应用";
+            const rawName = getActiveAppCleanName();
             const displayName = isDeviceDirect ? `${rawName} (真机)` : rawName;
 
             if (appLabelEl) appLabelEl.innerText = displayName;
             if (topBarLabelEl) topBarLabelEl.innerText = `待测应用: ${displayName}`;
             const toolbarAppLabelEl = document.getElementById("toolbarAppLabel");
             if (toolbarAppLabelEl) toolbarAppLabelEl.innerText = displayName;
+
+            // 🌟 核心统一：保持中央智能用例推荐头部的应用名称与底栏选择的应用严格对应
+            const suggestLabelEl = document.getElementById("suggestTargetAppLabel");
+            if (suggestLabelEl) suggestLabelEl.innerText = rawName;
 
             // 异步探测当前真机是否安装此应用
             const devId = getActiveTargetDeviceId();
@@ -15507,7 +15517,7 @@ function renderChatStream(sessionData) {
             updateAppPillUI();
             loadDeviceAppsDropdown();
             loadAppsDropdown();
-            refreshAppSuggestedCases(`${currentActiveApp.label} (已就绪)`);
+            refreshAppSuggestedCases(currentActiveApp.label, currentActiveApp.package);
             loadSettingsDeviceApps();
             loadApps();
         }
@@ -15566,6 +15576,7 @@ function renderChatStream(sessionData) {
                                     isInstalled: true
                                 };
                                 updateAppPillUI();
+                                refreshAppSuggestedCases(preferred.label, preferred.package);
                             }
                         }
                     } else if (!data.success) {
@@ -16320,19 +16331,21 @@ function renderChatStream(sessionData) {
             applyCaseGoal(suite.goal);
         }
 
-        async function refreshAppSuggestedCases(appName) {
-            if (appName) {
-                currentSuggestedAppName = appName;
-            }
+        async function refreshAppSuggestedCases(appName, packageName) {
+            const cleanName = appName || (typeof getActiveAppCleanName === "function" ? getActiveAppCleanName() : (currentActiveApp ? (currentActiveApp.label || "待测应用") : "待测应用"));
+            const targetPkg = packageName !== undefined ? packageName : (currentActiveApp ? (currentActiveApp.package || "") : "");
+            currentSuggestedAppName = cleanName;
+
             const labelEl = document.getElementById("suggestTargetAppLabel");
-            if (labelEl) labelEl.innerText = currentSuggestedAppName;
+            if (labelEl) labelEl.innerText = cleanName;
 
             const grid = document.getElementById("suggestCasesGrid");
             const btn = document.getElementById("btnRefreshSuggestCases");
             if (btn) btn.classList.add("rotating");
 
             try {
-                const res = await fetch(`/api/ai/suggest_cases?app_name=${encodeURIComponent(currentSuggestedAppName)}`);
+                const query = `app_name=${encodeURIComponent(cleanName)}&package_name=${encodeURIComponent(targetPkg)}`;
+                const res = await fetch(`/api/ai/suggest_cases?${query}`);
                 const data = await res.json();
                 window._suggestDataCache = data;
                 window._suggestedCasesCache = data.cases || [];
