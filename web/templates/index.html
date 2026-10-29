@@ -9793,23 +9793,20 @@
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi bi-shield-check text-success fs-5"></i>
-                                <span class="fw-semibold">测试验证达成，等待人工验收封板</span>
+                                <span class="fw-semibold">测试执行完成</span>
                             </div>
                             <span class="badge bg-info-subtle text-info border border-info-subtle">待验收</span>
                         </div>
-                        <div class="text-muted small mb-3">
-                            AI 智能体已执行完成本轮端侧规划与断言校验。请核验证据与交付物，满意后可验收通过并归档；若有不满意处，点击要求返工输入修改项，智能体将原地继承现场继续修正。
-                        </div>
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 pt-1">
                             <button class="btn btn-sm btn-outline-secondary" onclick="openDeliverablesModal('${sid}')">
-                                <i class="bi bi-box-seam me-1"></i> 查看交付物清单 (${delivCount})
+                                <i class="bi bi-box-seam me-1"></i>交付物清单 · ${delivCount}
                             </button>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-sm btn-outline-warning px-3" onclick="openReworkDialog('${sid}')">
-                                    <i class="bi bi-arrow-counterclockwise me-1"></i> 要求返工 (Rework)
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>要求返工
                                 </button>
                                 <button class="btn btn-sm btn-success px-4 fw-semibold" onclick="acceptSession('${sid}')">
-                                    <i class="bi bi-check-lg me-1"></i> 验收通过并归档
+                                    <i class="bi bi-check-lg me-1"></i>验收通过
                                 </button>
                             </div>
                         </div>
@@ -9984,15 +9981,15 @@
                     dotEl.style.background = "var(--status-green)";
                 }
                 if (pillEl) {
-                    pillEl.innerText = `${total}/${total} 达成`;
+                    pillEl.innerText = `${total}/${total}`;
                     pillEl.className = "hud-step-pill is-completed";
                     pillEl.removeAttribute("style");
                 }
                 if (titleEl) {
-                    titleEl.innerText = `全链路业务目标已闭环达成 · 100% 通过`;
+                    titleEl.innerText = `测试目标达成`;
                 }
                 if (progressBadge) {
-                    progressBadge.innerText = `${total}/${total} 全部完成`;
+                    progressBadge.innerText = `${total}/${total}`;
                     progressBadge.className = "hud-progress-badge";
                 }
             } else if (isFailed) {
@@ -10006,15 +10003,15 @@
                     dotEl.style.background = "var(--status-red)";
                 }
                 if (pillEl) {
-                    pillEl.innerText = `${stepNumStr} 未通过`;
+                    pillEl.innerText = `${stepNumStr}`;
                     pillEl.className = "hud-step-pill is-failed";
                     pillEl.removeAttribute("style");
                 }
                 if (titleEl) {
-                    titleEl.innerText = `执行受阻: ${failedStep.title || sessionData.error_message || '端侧业务动作中断'}`;
+                    titleEl.innerText = failedStep.title || sessionData.error_message || '端侧业务动作中断';
                 }
                 if (progressBadge) {
-                    progressBadge.innerText = `${completedCount}/${total} 受阻中断`;
+                    progressBadge.innerText = `${stepNumStr}`;
                     progressBadge.className = "hud-progress-badge is-failed";
                 }
             } else {
@@ -12102,7 +12099,7 @@
                             completedCount++;
                             signChar = '✓';
                             tagClass = 'completed';
-                            tagText = '已完成';
+                            tagText = '';
                         } else if (isRunning) {
                             signChar = '◐';
                             tagClass = 'running';
@@ -12136,7 +12133,7 @@
                                         ${(it.desc && it.desc !== it.title && !it.desc.startsWith(it.title)) ? `<span class="text-sub ms-1.5 opacity-75" style="font-size: 11px;">${escapeHtml(it.desc)}</span>` : ''}
                                     </span>
                                 </div>
-                                <span class="stream-todo-tag ${tagClass}">${tagText}</span>
+                                ${tagText ? `<span class="stream-todo-tag ${tagClass}">${tagText}</span>` : ""}
                             </div>
                         `;
                     });
@@ -12157,7 +12154,6 @@
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 10px;"></i>
                                 <span class="fw-medium">任务清单</span>
-                                ${isGoalAchieved ? '<span class="mono-pill" style="font-size: 9.5px; color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border); padding: 1px 6px;">100% 达成</span>' : ''}
                             </div>
                             <span class="mono-tag font-mono" style="font-size: 10.5px; opacity: 0.85;">${effCompleted}/${totalItems}</span>
                         </div>
@@ -12468,16 +12464,27 @@
                         iconHtml = '<i class="bi bi-file-earmark-code text-success"></i>';
                     }
 
+                    // 交付物名称自释规范化
+                    let cleanName = art.name || '';
+                    if (isReport || cleanName.includes('报告')) {
+                        cleanName = '测试交付物报告';
+                    } else if (isCode || cleanName.includes('回归') || cleanName.includes('脚本')) {
+                        cleanName = 'Python 回归脚本';
+                    } else if (isLog || cleanName.includes('日志')) {
+                        cleanName = '执行运行日志';
+                    } else if (cleanName.includes('截图') || cleanName.includes('动作') || cleanName.includes('证据')) {
+                        cleanName = '关键截图与动作链路';
+                    }
+
                     artifactsHtml += `
-                        <div class="summary-artifact-row" ${clickAction} title="点击展开查阅">
-                            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 85%;">
+                        <div class="summary-artifact-row" ${clickAction} title="点击查阅">
+                            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 90%;">
                                 ${iconHtml}
-                                <span class="artifact-label">${escapeHtml(art.name)}</span>
+                                <span class="artifact-label">${escapeHtml(cleanName)}</span>
                                 <span class="artifact-mono-pill">${escapeHtml(fName)}</span>
                             </div>
-                            <div class="d-flex align-items-center gap-1.5 text-muted" style="font-size: 11px;">
-                                <span>${badgeDesc}</span>
-                                <i class="bi bi-chevron-right" style="font-size: 9px; opacity: 0.5;"></i>
+                            <div class="d-flex align-items-center text-muted" style="font-size: 11px;">
+                                <i class="bi bi-chevron-right" style="font-size: 9px; opacity: 0.4;"></i>
                             </div>
                         </div>
                     `;
@@ -12995,7 +13002,7 @@ function renderChatStream(sessionData) {
                                     <span class="item-sign" style="font-size: 11px; width: 12px; text-align: center;">${signChar}</span>
                                     <span class="item-title text-truncate fw-medium">${escapeHtml(sTitle)} <span class="text-muted ms-1 fw-normal">${escapeHtml(sDesc)}</span></span>
                                 </div>
-                                <span class="stream-todo-tag ${tagClass}">${tagText}</span>
+                                ${tagText ? `<span class="stream-todo-tag ${tagClass}">${tagText}</span>` : ""}
                             </div>
                         `;
                     });
@@ -13134,23 +13141,20 @@ function renderChatStream(sessionData) {
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="bi bi-shield-check text-success fs-5"></i>
-                                <span class="fw-semibold">测试验证达成，等待人工验收封板</span>
+                                <span class="fw-semibold">测试执行完成</span>
                             </div>
                             <span class="badge bg-info-subtle text-info border border-info-subtle">待验收</span>
                         </div>
-                        <div class="text-muted small mb-3">
-                            AI 智能体已执行完成本轮端侧规划与断言校验。请核验证据与交付物，满意后可验收通过并归档；若有不满意处，点击要求返工输入修改项，智能体将原地继承现场继续修正。
-                        </div>
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 pt-1">
                             <button class="btn btn-sm btn-outline-secondary" onclick="openDeliverablesModal('${sessionData.session_id}')">
-                                <i class="bi bi-box-seam me-1"></i> 查看交付物清单 (${sessionData.deliverables?.length || 0})
+                                <i class="bi bi-box-seam me-1"></i>交付物清单 · ${sessionData.deliverables?.length || 0}
                             </button>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-sm btn-outline-warning px-3" onclick="openReworkDialog('${sessionData.session_id}')">
-                                    <i class="bi bi-arrow-counterclockwise me-1"></i> 要求返工 (Rework)
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>要求返工
                                 </button>
                                 <button class="btn btn-sm btn-success px-4 fw-semibold" onclick="acceptSession('${sessionData.session_id}')">
-                                    <i class="bi bi-check-lg me-1"></i> 验收通过并归档
+                                    <i class="bi bi-check-lg me-1"></i>验收通过
                                 </button>
                             </div>
                         </div>
