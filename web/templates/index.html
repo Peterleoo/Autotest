@@ -12628,18 +12628,22 @@
                     `;
                 });
 
-                // 🛡️ 标题文案净化：彻底消除重复的 "验证通过 验证通过 ✅"
-                let cleanTitle = blk.title ? String(blk.title) : `步骤 ${sId}`;
-                cleanTitle = cleanTitle.replace(/(?:验证通过|验证受阻|Step\s*\d+:?|\s*✅|\s*❌)+/g, '').trim();
-                cleanTitle = cleanTitle.replace(/^[:：\-—\s]+/, '').trim() || `步骤 ${sId}`;
-                const stepNodeHeading = `Step ${sId}: ${cleanTitle}`;
+                // 🛡️ 彻底剔除 Step/步骤/工步概念，全面采用纯粹业务意图标题
+                let cleanTitle = blk.title ? String(blk.title) : "";
+                cleanTitle = cleanTitle.replace(/^(?:Step\s*\d+|步骤\s*\d+|阶段\s*\d+|工步\s*\d+)[:：\s\-]*/i, '');
+                cleanTitle = cleanTitle.replace(/(?:验证通过|验证受阻|\s*✅|\s*❌)+/g, '').trim();
+                cleanTitle = cleanTitle.replace(/^[:：\-—\s]+/, '').trim();
+                if (!cleanTitle) {
+                    const firstAct = (acts.length > 0) ? acts[0] : null;
+                    cleanTitle = firstAct ? (firstAct.desc || firstAct.name || "端侧业务执行") : "端侧业务执行";
+                }
 
                 return `
                     <div class="stream-step-node" id="${blk.block_id}" data-step-id="${sId}">
                         <div class="stream-step-node-header d-flex align-items-center justify-content-between" onclick="toggleStreamStep('${blk.block_id}', '${sId}')">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="step-node-dot ${isRunning ? 'running' : (isFailed ? 'failed' : 'completed')}"></span>
-                                <span class="step-node-title fw-medium">${escapeHtml(stepNodeHeading)}</span>
+                                <span class="step-node-title fw-medium">${escapeHtml(cleanTitle)}</span>
                                 <span class="font-mono text-muted" style="font-size: 10.5px; opacity: 0.75;">· ${acts.length} 动作</span>
                             </div>
                             <div class="d-flex align-items-center gap-1.5">
@@ -13031,7 +13035,10 @@
 
         function buildStepExecutionCardHtml(st, sIdx, turnId, sessionData) {
             const stepNum = st.step_number || st.step_id || (sIdx + 1);
-            const stepTitle = st.title || st.name || `Step ${stepNum}`;
+            let rawTitle = st.title || st.name || "";
+            rawTitle = rawTitle.replace(/^(?:Step\s*\d+|步骤\s*\d+|阶段\s*\d+|工步\s*\d+)[:：\s\-]*/i, '');
+            rawTitle = rawTitle.replace(/(?:验证通过|验证受阻|\s*✅|\s*❌)+/g, '').trim();
+            const stepTitle = rawTitle.replace(/^[:：\-—\s]+/, '').trim() || "端侧业务执行";
             const stepDuration = st.duration || st.duration_ms ? `${st.duration || (st.duration_ms + 'ms')}` : '0.4s';
             const blockId = `step_exec_${turnId}_${stepNum}`;
 
