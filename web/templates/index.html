@@ -1462,6 +1462,20 @@
             border-color: var(--status-green-border);
             color: var(--status-green);
         }
+        .hud-step-pill.is-failed {
+            background: var(--status-red-bg);
+            border-color: var(--status-red-border);
+            color: var(--status-red);
+        }
+        .hud-progress-badge.is-failed {
+            background: var(--status-red-bg);
+            color: var(--status-red);
+            border-color: var(--status-red-border);
+        }
+        .dropup-item-row.failed {
+            background: var(--status-red-bg);
+            border: 1px solid var(--status-red-border);
+        }
         .hud-task-title {
             font-size: 11.5px;
             font-weight: 500;
@@ -1551,6 +1565,23 @@
             background: rgba(5, 150, 105, 0.08);
             border-color: rgba(5, 150, 105, 0.25);
             color: #059669;
+        }
+        body.theme-light .hud-step-pill.is-failed,
+        body[data-theme="light"] .hud-step-pill.is-failed {
+            background: rgba(220, 38, 38, 0.08);
+            border-color: rgba(220, 38, 38, 0.25);
+            color: #dc2626;
+        }
+        body.theme-light .hud-progress-badge.is-failed,
+        body[data-theme="light"] .hud-progress-badge.is-failed {
+            background: rgba(220, 38, 38, 0.08);
+            color: #dc2626;
+            border-color: rgba(220, 38, 38, 0.22);
+        }
+        body.theme-light .dropup-item-row.failed,
+        body[data-theme="light"] .dropup-item-row.failed {
+            background: rgba(220, 38, 38, 0.06);
+            border-color: rgba(220, 38, 38, 0.2);
         }
         body.theme-light .hud-task-title,
         body[data-theme="light"] .hud-task-title {
@@ -9920,12 +9951,14 @@
             const steps = sessionData.plan_steps;
             const total = steps.length;
             let completedCount = steps.filter(s => s.status === "COMPLETED" || s.status === "PASS").length;
+            let failedCount = steps.filter(s => s.status === "FAIL" || s.status === "FAILED").length;
             let runningIdx = steps.findIndex(s => s.status === "RUNNING");
             if (runningIdx === -1 && completedCount < total) {
                 runningIdx = completedCount;
             }
 
-            const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || completedCount === total);
+            const isSuccess = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || completedCount === total);
+            const isFailed = (sessionData.status === "FAILED" || failedCount > 0 || sessionData.is_success === false);
             
             hud.classList.remove("d-none");
 
@@ -9934,14 +9967,14 @@
             const titleEl = document.getElementById("hudTaskTitle");
             const progressBadge = document.getElementById("dropupProgressBadge");
 
-            if (isFinished) {
+            if (isSuccess) {
                 if (dotEl) {
                     dotEl.classList.remove("pulsing");
                     dotEl.style.background = "var(--status-green)";
                 }
                 if (pillEl) {
                     pillEl.innerText = `${total}/${total} 达成`;
-                    pillEl.classList.add("is-completed");
+                    pillEl.className = "hud-step-pill is-completed";
                     pillEl.removeAttribute("style");
                 }
                 if (titleEl) {
@@ -9949,6 +9982,29 @@
                 }
                 if (progressBadge) {
                     progressBadge.innerText = `${total}/${total} 全部完成`;
+                    progressBadge.className = "hud-progress-badge";
+                }
+            } else if (isFailed) {
+                // 🌟 修复：当测试受阻/失败时，胶囊与看板 100% 同步切换为失败状态，彻底消除撕裂！
+                const failedStep = steps.find(s => s.status === "FAIL" || s.status === "FAILED") || steps[runningIdx] || {};
+                const failedStepIdx = steps.findIndex(s => s.status === "FAIL" || s.status === "FAILED");
+                const stepNumStr = failedStepIdx >= 0 ? `${failedStepIdx + 1}/${total}` : `${completedCount}/${total}`;
+
+                if (dotEl) {
+                    dotEl.classList.remove("pulsing");
+                    dotEl.style.background = "var(--status-red)";
+                }
+                if (pillEl) {
+                    pillEl.innerText = `${stepNumStr} 未通过`;
+                    pillEl.className = "hud-step-pill is-failed";
+                    pillEl.removeAttribute("style");
+                }
+                if (titleEl) {
+                    titleEl.innerText = `执行受阻: ${failedStep.title || sessionData.error_message || '端侧业务动作中断'}`;
+                }
+                if (progressBadge) {
+                    progressBadge.innerText = `${completedCount}/${total} 受阻中断`;
+                    progressBadge.className = "hud-progress-badge is-failed";
                 }
             } else {
                 const curStepNum = Math.min(runningIdx + 1, total);
@@ -9959,7 +10015,7 @@
                 }
                 if (pillEl) {
                     pillEl.innerText = `${curStepNum}/${total}`;
-                    pillEl.classList.remove("is-completed");
+                    pillEl.className = "hud-step-pill";
                     pillEl.removeAttribute("style");
                 }
                 if (titleEl) {
@@ -9967,6 +10023,7 @@
                 }
                 if (progressBadge) {
                     progressBadge.innerText = `${completedCount}/${total} 进行中`;
+                    progressBadge.className = "hud-progress-badge";
                 }
             }
 
@@ -9976,22 +10033,49 @@
                 let itemsHtml = "";
                 steps.forEach((st, idx) => {
                     const isDone = (st.status === "COMPLETED" || st.status === "PASS");
+                    const isFail = (st.status === "FAIL" || st.status === "FAILED");
+                    const isCanceled = (st.status === "CANCELED");
                     const isRun = (st.status === "RUNNING");
                     const num = idx + 1;
-                    let iconHtml = isDone 
-                        ? '<i class="bi bi-check-circle-fill text-success" style="font-size: 12px;"></i>' 
-                        : (isRun ? '<span class="spinner-border spinner-border-sm text-primary" style="width: 10px; height: 10px;"></span>' : '<i class="bi bi-circle text-muted" style="font-size: 11px; opacity: 0.5;"></i>');
+                    
+                    let iconHtml = "";
+                    let rowClass = "";
+                    let statusText = "待执行";
+                    let titleColor = "var(--text-sub)";
+
+                    if (isDone) {
+                        iconHtml = '<i class="bi bi-check-circle-fill text-success" style="font-size: 12px;"></i>';
+                        statusText = "已完成";
+                        titleColor = "var(--text-main)";
+                    } else if (isFail) {
+                        iconHtml = '<i class="bi bi-x-circle-fill text-danger" style="font-size: 12px;"></i>';
+                        statusText = "未通过";
+                        rowClass = "failed";
+                        titleColor = "var(--status-red)";
+                    } else if (isCanceled) {
+                        iconHtml = '<i class="bi bi-dash-circle text-muted" style="font-size: 11px; opacity: 0.5;"></i>';
+                        statusText = "已取消";
+                        titleColor = "var(--text-dim, #71717a)";
+                    } else if (isRun) {
+                        iconHtml = '<span class="spinner-border spinner-border-sm text-primary" style="width: 10px; height: 10px;"></span>';
+                        rowClass = "running";
+                        statusText = "执行中";
+                        titleColor = "#3b82f6";
+                    } else {
+                        iconHtml = '<i class="bi bi-circle text-muted" style="font-size: 11px; opacity: 0.5;"></i>';
+                        statusText = "待执行";
+                    }
                     
                     itemsHtml += `
-                        <div class="dropup-item-row ${isRun ? 'running' : ''}">
+                        <div class="dropup-item-row ${rowClass}">
                             <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 82%;">
                                 ${iconHtml}
-                                <span class="fw-medium text-truncate" style="color: ${isDone ? 'var(--text-main)' : (isRun ? '#3b82f6' : 'var(--text-sub)')};">
+                                <span class="fw-medium text-truncate" style="color: ${titleColor};">
                                     Step ${num}: ${escapeHtml(st.title)}
                                 </span>
                             </div>
-                            <span style="font-size: 10px; font-family: var(--font-mono); opacity: 0.65;">
-                                ${isDone ? '已完成' : (isRun ? '执行中' : '待执行')}
+                            <span style="font-size: 10px; font-family: var(--font-mono); opacity: 0.75;">
+                                ${statusText}
                             </span>
                         </div>
                     `;
@@ -14346,6 +14430,33 @@ function renderChatStream(sessionData) {
                 return;
             }
 
+            // 🌟 智能应用防漏选兜底：若尚未选定包名，尝试根据测试意图秒级自适应关联，或弹出选择器
+            if ((!currentActiveApp.package || currentActiveApp.package === "") && (!currentActiveApp.filename || currentActiveApp.filename === "")) {
+                const devApps = cachedDeviceApps || [];
+                let matched = null;
+                if (/房|二手房|象盒/i.test(goal)) {
+                    matched = devApps.find(a => /象盒找房|找房/i.test(a.label || "") || a.package === "com.apicloud.A6995433058179");
+                }
+                if (!matched && devApps.length > 0) {
+                    matched = devApps.find(a => !/keyboard|输入法|gboard|clash|termux|magisk/i.test(a.package || ""));
+                }
+                if (matched) {
+                    switchActiveApp({
+                        source: "device",
+                        label: matched.label,
+                        package: matched.package,
+                        activity: matched.activity || "",
+                        version: "真机已安装",
+                        isInstalled: true
+                    });
+                } else {
+                    const pop = document.getElementById("appPopover");
+                    if (pop) pop.classList.add("show");
+                    alert("请在输入框左下角先选择目标【待测应用】（如象盒找房或上传 APK），再发起测试！");
+                    return;
+                }
+            }
+
             // 智能真机前置核验与一键安装补齐 (Preflight Guard)
             const activeDevId = getActiveTargetDeviceId();
             if (activeDevId && currentActiveApp && currentActiveApp.package) {
@@ -15397,6 +15508,23 @@ function renderChatStream(sessionData) {
                     const data = await res.json();
                     if (data.success && data.apps) {
                         cachedDeviceApps = data.apps;
+                        // 🌟 智能推导：当未绑定具体包名时，自动智能激活真机上的业务待测应用（如象盒找房）
+                        if ((!currentActiveApp.package || currentActiveApp.package === "") && (!currentActiveApp.filename || currentActiveApp.filename === "") && cachedDeviceApps.length > 0) {
+                            const preferred = cachedDeviceApps.find(a => /象盒找房|找房/i.test(a.label || "")) || 
+                                              cachedDeviceApps.find(a => !/keyboard|输入法|gboard|clash|termux|magisk/i.test(a.package || "")) || 
+                                              cachedDeviceApps[0];
+                            if (preferred) {
+                                currentActiveApp = {
+                                    source: "device",
+                                    label: preferred.label,
+                                    package: preferred.package,
+                                    activity: preferred.activity || "",
+                                    version: "真机已安装",
+                                    isInstalled: true
+                                };
+                                updateAppPillUI();
+                            }
+                        }
                     } else if (!data.success) {
                         container.innerHTML = `
                             <div class="p-3 text-center text-muted small">
