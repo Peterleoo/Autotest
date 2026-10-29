@@ -1709,8 +1709,8 @@
             display: block !important;
         }
         .popover-item {
-            padding: 7px 10px;
-            border-radius: 6px;
+            padding: 8px 10px;
+            border-radius: 8px;
             font-size: 12px;
             color: var(--text-sub);
             cursor: pointer;
@@ -1718,10 +1718,23 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            border: 1px solid transparent;
         }
-        .popover-item:hover, .popover-item.active {
+        .popover-item:hover {
             background-color: var(--bg-surface-hover);
             color: var(--text-main);
+        }
+        .popover-item.active {
+            background-color: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.2);
+            color: var(--text-main);
+        }
+        body.theme-light .popover-item:hover, body[data-theme="light"] .popover-item:hover {
+            background-color: #f1f5f9;
+        }
+        body.theme-light .popover-item.active, body[data-theme="light"] .popover-item.active {
+            background-color: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.25);
         }
 
         .app-tab-pill {
@@ -2987,19 +3000,23 @@
         }
 
         .app-card-item {
-            background-color: var(--bg-main);
-            border: 1px solid var(--border-subtle);
+            background-color: var(--bg-surface-elevated, rgba(255, 255, 255, 0.025));
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.07));
             border-radius: 10px;
-            padding: 12px 14px;
-            transition: all 0.2s ease;
+            padding: 11px 14px;
+            cursor: pointer;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
         }
         .app-card-item:hover {
-            border-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.18);
+            background-color: var(--bg-surface-hover, rgba(255, 255, 255, 0.05));
+            transform: translateY(-1px);
         }
         .app-card-item.active {
-            border-color: var(--accent-primary) !important;
-            background-color: var(--accent-subtle) !important;
-            box-shadow: 0 0 0 1px var(--accent-primary) !important;
+            border-color: rgba(16, 185, 129, 0.4) !important;
+            background-color: rgba(16, 185, 129, 0.04) !important;
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
         }
         body[data-theme="light"] .upload-dropzone {
             background-color: #f8fafc !important;
@@ -3007,15 +3024,67 @@
         body[data-theme="light"] .upload-dropzone:hover, body[data-theme="light"] .upload-dropzone.dragover {
             background-color: #eff6ff !important;
         }
-        body[data-theme="light"] .app-card-item {
+        body.theme-light .app-card-item, body[data-theme="light"] .app-card-item {
             background-color: #ffffff !important;
-            border-color: rgba(0, 0, 0, 0.08) !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            border-color: rgba(0, 0, 0, 0.07) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
-        body[data-theme="light"] .app-card-item.active {
-            background-color: var(--accent-subtle) !important;
-            border-color: var(--accent-primary) !important;
-            box-shadow: 0 0 0 1px var(--accent-primary) !important;
+        body.theme-light .app-card-item:hover, body[data-theme="light"] .app-card-item:hover {
+            border-color: rgba(0, 0, 0, 0.16) !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
+        }
+        body.theme-light .app-card-item.active, body[data-theme="light"] .app-card-item.active {
+            background-color: #ffffff !important;
+            border-color: rgba(16, 185, 129, 0.5) !important;
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3), 0 2px 8px rgba(16, 185, 129, 0.06);
+        }
+        .app-icon-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: var(--text-sub);
+            transition: all 0.15s ease;
+        }
+        body.theme-light .app-icon-avatar, body[data-theme="light"] .app-icon-avatar {
+            background: #f1f5f9;
+            border-color: rgba(0, 0, 0, 0.05);
+            color: #475569;
+        }
+        .app-card-item.active .app-icon-avatar {
+            background: rgba(16, 185, 129, 0.12);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.25);
+        }
+        .badge-active-target {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 500;
+            background: rgba(16, 185, 129, 0.12);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .app-select-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            opacity: 0;
+            transform: translateX(-4px);
+            transition: all 0.15s ease;
+        }
+        .app-card-item:hover .app-select-hint {
+            opacity: 1;
+            transform: translateX(0);
         }
 
         /* 对话流与主工作区前置节点诊断卡片 (Preflight Guide Card) */
@@ -7334,14 +7403,14 @@
                                 <i class="bi bi-chevron-down" style="font-size: 9px;"></i>
                             </div>
                             <div class="gpt-popover" id="appPopover" style="left: 0; width: 320px; padding: 10px;" onclick="event.stopPropagation()">
-                                <!-- 顶部：真机前台联动快捷条 -->
-                                <div class="p-1.5 mb-2 rounded border d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.22) !important;">
+                                <!-- 顶部：真机前台联动快捷条 (极简轻质感) -->
+                                <div class="p-1.5 mb-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.16);">
                                     <div class="d-flex align-items-center gap-1.5 text-truncate me-1" style="font-size: 11px;">
-                                        <i class="bi bi-lightning-charge-fill text-success" style="font-size: 12px;"></i>
+                                        <i class="bi bi-lightning-charge text-success" style="font-size: 12px;"></i>
                                         <span class="text-truncate" id="popoverForegroundAppHint">真机前台 App 联动</span>
                                     </div>
-                                    <button class="btn btn-xs btn-success py-0.5 px-2 fw-medium text-nowrap" style="font-size: 10.5px; border-radius: 9999px;" onclick="syncForegroundAppAsActive();" title="一键同步真机屏幕正打开的应用">
-                                        ⚡ 设为当前
+                                    <button class="btn btn-xs py-0.5 px-2 fw-medium text-nowrap" style="font-size: 10.5px; border-radius: 9999px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);" onclick="syncForegroundAppAsActive();" title="一键同步真机屏幕正打开的应用">
+                                        设为当前
                                     </button>
                                 </div>
 
@@ -7726,19 +7795,19 @@
 
                         <!-- 视图 1: 真机已安装应用管理 -->
                         <div id="settingsViewDeviceApps">
-                            <!-- 前台 App 快速捕获联动高光卡片 -->
-                            <div class="p-2.5 mb-3 rounded border d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.06); border-color: rgba(16, 185, 129, 0.25) !important;">
-                                <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
-                                    <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #10b981;">
-                                        <i class="bi bi-lightning-charge-fill" style="font-size: 16px;"></i>
+                            <!-- 前台 App 快速捕获联动卡片 (极简轻质感) -->
+                            <div class="p-2.5 mb-3 rounded d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.18);">
+                                <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                                    <div style="width: 32px; height: 32px; border-radius: 7px; background: rgba(16, 185, 129, 0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #10b981;">
+                                        <i class="bi bi-lightning-charge" style="font-size: 15px;"></i>
                                     </div>
                                     <div class="text-truncate">
                                         <div class="fw-semibold" style="font-size: 12px; color: var(--text-main);" id="settingsFgAppTitle">真机前台应用联动</div>
-                                        <div class="small text-muted text-truncate" style="font-size: 10.5px;" id="settingsFgAppDesc">点击右侧按钮，0.05 秒捕获手机屏幕正处于前台的 App 并设为待测</div>
+                                        <div class="text-muted text-truncate" style="font-size: 11px;" id="settingsFgAppDesc">检测屏幕前台应用并一键设为待测目标</div>
                                     </div>
                                 </div>
-                                <button class="btn btn-sm btn-success py-1 px-2.5 text-nowrap" style="font-size: 11.5px; border-radius: 6px;" onclick="syncForegroundAppAsActive(true)">
-                                    ⚡ 捕获前台并设为待测
+                                <button class="btn btn-sm py-1 px-2.5 text-nowrap fw-medium" style="font-size: 11px; border-radius: 6px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);" onclick="syncForegroundAppAsActive(true)">
+                                    <i class="bi bi-arrow-repeat me-1"></i>捕获并设为待测
                                 </button>
                             </div>
 
@@ -15557,18 +15626,15 @@ function renderChatStream(sessionData) {
                     }).replace(/'/g, "&apos;");
 
                     html += `
-                        <div class="popover-item ${isSelected ? 'active' : ''}" style="cursor: pointer;" onclick='switchActiveApp(${safeA}); closeAllPopovers();'>
+                        <div class="popover-item ${isSelected ? 'active' : ''}" onclick='switchActiveApp(${safeA}); closeAllPopovers();' title="点击切换至 ${escapeHtml(a.label)}">
                             <div class="d-flex align-items-center gap-2 text-truncate">
                                 <i class="bi bi-phone ${isSelected ? 'text-success' : 'text-muted'}" style="font-size: 13px;"></i>
-                                <div class="d-flex flex-column text-truncate" style="line-height: 1.25;">
-                                    <div class="d-flex align-items-center gap-1.5 text-truncate">
-                                        <span class="text-truncate fw-medium" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(a.label)}</span>
-                                        <span class="badge bg-success-subtle text-success py-0 px-1" style="font-size: 9px; line-height: 1.2;">直调</span>
-                                    </div>
+                                <div class="d-flex flex-column text-truncate" style="line-height: 1.3;">
+                                    <span class="text-truncate fw-medium" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(a.label)}</span>
                                     <span class="text-muted text-truncate" style="font-size: 10px;">${escapeHtml(a.package)}</span>
                                 </div>
                             </div>
-                            ${isSelected ? '<i class="bi bi-check2 text-success" style="font-size: 14px;"></i>' : ''}
+                            ${isSelected ? '<i class="bi bi-check2 text-success" style="font-size: 15px; font-weight: bold;"></i>' : ''}
                         </div>
                     `;
                 });
@@ -15701,7 +15767,7 @@ function renderChatStream(sessionData) {
                     .then(fgData => {
                         if (fgData && fgData.success && fgData.app && fgTitle && fgDesc) {
                             fgTitle.innerHTML = `真机当前前台：<span class="text-success">${escapeHtml(fgData.app.label)}</span>`;
-                            fgDesc.innerText = `包名: ${fgData.app.package} · 点击右侧按钮立即设为待测目标`;
+                            fgDesc.innerText = `包名: ${fgData.app.package}`;
                         }
                     }).catch(() => {});
 
@@ -15731,37 +15797,35 @@ function renderChatStream(sessionData) {
                     }).replace(/'/g, "&apos;");
 
                     html += `
-                        <div class="app-card-item ${isSelected ? 'active' : ''}" id="deviceAppCard_${idx}">
+                        <div class="app-card-item ${isSelected ? 'active' : ''}" id="deviceAppCard_${idx}" onclick='switchActiveApp(${safeA}); loadSettingsDeviceApps();' title="${isSelected ? '当前正在测试此应用' : '点击设为当前待测应用'}">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
-                                    <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(16, 185, 129, 0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #10b981;">
-                                        <i class="bi bi-phone" style="font-size: 20px;"></i>
+                                    <div class="app-icon-avatar">
+                                        <i class="bi bi-phone" style="font-size: 17px;"></i>
                                     </div>
                                     <div class="text-truncate">
-                                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                                            <span class="fw-bold" style="font-size: 13px; color: var(--text-main);">${safeLabel}</span>
-                                            
-                                            ${isSelected ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 10px;">当前待测</span>' : ''}
-                                            <span class="cursor-pointer text-muted small" onclick="editAppCustomLabel('${safePkg}', '${safeLabel}')" title="自定义应用显示名称" style="font-size: 11px;">
+                                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                            <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">${safeLabel}</span>
+                                            <span class="cursor-pointer text-muted" onclick="event.stopPropagation(); editAppCustomLabel('${safePkg}', '${safeLabel}')" title="自定义应用显示名称" style="font-size: 11px; opacity: 0.6;">
                                                 <i class="bi bi-pencil-square"></i>
                                             </span>
                                         </div>
-                                        <div class="d-flex align-items-center gap-2 text-muted mt-0.5" style="font-size: 11px;">
-                                            <span class="text-truncate" style="max-width: 240px;" title="${safePkg}">${safePkg}</span>
-                                            ${safeAct ? `<span>·</span><span class="text-truncate" style="max-width: 200px;" title="${safeAct}">${safeAct.split('.').pop()}</span>` : ''}
+                                        <div class="d-flex align-items-center gap-1.5 text-muted mt-0.5" style="font-size: 11px;">
+                                            <span class="text-truncate" style="max-width: 260px;" title="${safePkg}">${safePkg}</span>
+                                            ${safeAct ? `<span style="opacity: 0.4;">·</span><span class="text-truncate" style="max-width: 180px;" title="${safeAct}">${safeAct.split('.').pop()}</span>` : ''}
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                    ${!isSelected ? `
-                                        <button class="btn btn-sm btn-outline-success py-1 px-2.5" style="font-size: 11.5px; border-radius: 6px;" onclick='switchActiveApp(${safeA})'>
-                                            设为待测
-                                        </button>
+                                    ${isSelected ? `
+                                        <span class="badge-active-target">
+                                            <i class="bi bi-check2"></i>当前待测
+                                        </span>
                                     ` : `
-                                        <button class="btn btn-sm btn-outline-success py-1 px-2.5 disabled" style="font-size: 11.5px; border-radius: 6px;">
-                                            <i class="bi bi-check-lg me-1"></i>已就绪
-                                        </button>
+                                        <span class="app-select-hint">
+                                            设为待测 <i class="bi bi-arrow-right-short"></i>
+                                        </span>
                                     `}
                                 </div>
                             </div>
