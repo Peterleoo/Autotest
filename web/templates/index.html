@@ -14497,7 +14497,7 @@ function renderChatStream(sessionData) {
             }
         });
 
-        // 渲染 240px 极简毛玻璃 Micro HUD 内容
+        // 渲染极简高质感 Micro HUD 浮动状态卡片 (遵循 Linear / Raycast 范式与布局自释原则，杜绝信息冗余)
         function renderGlobalPreflightPopoverContent(data) {
             const body = document.getElementById("globalPreflightPopoverBody");
             if (!body) return;
@@ -14506,45 +14506,78 @@ function renderChatStream(sessionData) {
                 return;
             }
             const checks = data.checks || {};
-            const isReady = data.ready;
+            const isReady = Boolean(data.ready);
+
+            const aiReady = Boolean(checks.ai?.ready);
+            const aiName = checks.ai?.display_name || checks.ai?.provider || 'Gemini 3.8';
+            const aiBadge = aiReady ? '官方授权' : '未就绪';
+            const aiBadgeStyle = aiReady 
+                ? 'background: rgba(16, 185, 129, 0.12); color: #10b981;' 
+                : 'background: rgba(239, 68, 68, 0.12); color: #ef4444;';
+
+            const devReady = Boolean(checks.device?.ready);
+            const devCount = checks.device?.count || 0;
+            const devName = devCount > 0 ? (checks.device?.model || checks.device?.brand ? `${checks.device?.brand || ''} ${checks.device?.model || ''}`.trim() : '真机设备') : '无真机在线';
+            const devBadge = devCount > 0 ? `${devCount} 台在线` : '未连接';
+            const devBadgeStyle = devCount > 0 
+                ? 'background: rgba(16, 185, 129, 0.12); color: #10b981;' 
+                : 'background: rgba(245, 158, 11, 0.12); color: #f59e0b;';
+
+            const appReady = Boolean(checks.app?.current_app);
+            let appName = checks.app?.label || checks.app?.current_app || '待测应用';
+            if (appName.endsWith('.apk')) appName = appName.slice(0, -4);
+            const appBadge = appReady ? '已就绪' : '未装载';
+            const appBadgeStyle = appReady 
+                ? 'background: rgba(16, 185, 129, 0.12); color: #10b981;' 
+                : 'background: rgba(245, 158, 11, 0.12); color: #f59e0b;';
 
             let html = `
-                <div class="d-flex justify-content-between align-items-center mb-1.5 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
-                    <span class="small fw-semibold d-flex align-items-center gap-1" style="font-size: 11px; color: ${isReady ? 'var(--status-green)' : '#ef4444'};">
-                        <i class="bi ${isReady ? 'bi-shield-check' : 'bi-exclamation-triangle'}"></i>
-                        <span>${isReady ? '测试环境完全就绪' : '部分环境依赖未就绪'}</span>
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid var(--border-subtle);">
+                    <div class="d-flex align-items-center gap-1.5">
+                        <span class="rounded-circle d-inline-block" style="width: 7px; height: 7px; background: ${isReady ? '#10b981' : '#f59e0b'}; box-shadow: 0 0 6px ${isReady ? 'rgba(16, 185, 129, 0.6)' : 'rgba(245, 158, 11, 0.6)'};"></span>
+                        <span class="fw-semibold" style="font-size: 11.5px; color: var(--text-main); letter-spacing: -0.2px;">
+                            ${isReady ? '测试环境完全就绪' : '部分环境依赖未就绪'}
+                        </span>
+                    </div>
+                    <span class="text-muted" style="font-size: 11px; cursor: pointer; padding: 2px;" onclick="refreshPreflightStatus(true)" title="重新检测">
+                        <i class="bi bi-arrow-clockwise"></i>
                     </span>
-                    <span class="text-muted" style="font-size: 10px; cursor: pointer;" onclick="refreshPreflightStatus(true)" title="重新检测"><i class="bi bi-arrow-clockwise"></i></span>
                 </div>
+                
                 <div class="d-flex flex-column gap-1.5 py-1">
-                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px;">
-                        <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
-                            <span style="font-size: 7px; color: ${checks.ai?.ready ? 'var(--status-green)' : '#ef4444'};">●</span>
-                            <span class="text-muted">模型:</span>
-                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${escapeHtml(checks.ai?.display_name || checks.ai?.provider || 'Gemini 3.8')}</span>
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px; min-height: 22px;">
+                        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                            <i class="bi bi-stars" style="color: #6366f1; font-size: 11px; opacity: 0.9;"></i>
+                            <span class="text-truncate" style="color: var(--text-main); font-weight: 500;" title="${escapeHtml(aiName)}">${escapeHtml(aiName)}</span>
                         </div>
-                        <span style="font-size: 10px; color: var(--status-green);"><i class="bi bi-check2"></i></span>
+                        <span class="badge" style="font-size: 9.5px; font-weight: 500; border-radius: 4px; padding: 2px 6px; ${aiBadgeStyle}">${aiBadge}</span>
                     </div>
-                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px;">
-                        <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
-                            <span style="font-size: 7px; color: ${checks.device?.ready ? 'var(--status-green)' : '#f59e0b'};">●</span>
-                            <span class="text-muted">设备:</span>
-                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${checks.device?.count ? checks.device.count + ' 台真机在线' : '无真机在线'}</span>
+                    
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px; min-height: 22px;">
+                        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                            <i class="bi bi-phone" style="color: #3b82f6; font-size: 11px; opacity: 0.9;"></i>
+                            <span class="text-truncate" style="color: var(--text-main); font-weight: 500;" title="${escapeHtml(devName)}">${escapeHtml(devName)}</span>
                         </div>
-                        <span style="font-size: 10px; color: ${checks.device?.ready ? 'var(--status-green)' : 'var(--text-muted)'};">${checks.device?.ready ? '<i class="bi bi-check2"></i>' : '0台'}</span>
+                        <span class="badge" style="font-size: 9.5px; font-weight: 500; border-radius: 4px; padding: 2px 6px; ${devBadgeStyle}">${devBadge}</span>
                     </div>
-                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px;">
-                        <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
-                            <span style="font-size: 7px; color: ${checks.app?.current_app ? 'var(--status-green)' : '#f59e0b'};">●</span>
-                            <span class="text-muted">应用:</span>
-                            <span class="fw-medium text-truncate" style="color: var(--text-main);">${escapeHtml(checks.app?.current_app || '待测应用')}</span>
+                    
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px; min-height: 22px;">
+                        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                            <i class="bi bi-box-seam" style="color: #10b981; font-size: 11px; opacity: 0.9;"></i>
+                            <span class="text-truncate" style="color: var(--text-main); font-weight: 500;" title="${escapeHtml(appName)}">${escapeHtml(appName)}</span>
                         </div>
-                        <span style="font-size: 10px; color: var(--status-green);"><i class="bi bi-check2"></i></span>
+                        <span class="badge" style="font-size: 9.5px; font-weight: 500; border-radius: 4px; padding: 2px 6px; ${appBadgeStyle}">${appBadge}</span>
                     </div>
                 </div>
-                <div class="mt-1.5 pt-1 border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important;">
-                    <span class="text-muted" style="font-size: 9.5px;">管理模型/设备/应用</span>
-                    <span class="text-primary" style="font-size: 10px; cursor: pointer;" onclick="openSettingsModal()">系统设置 →</span>
+
+                <div class="pt-2 mt-1 d-flex justify-content-end align-items-center" style="border-top: 1px solid var(--border-subtle);">
+                    <span class="d-inline-flex align-items-center gap-1 text-muted small" 
+                          style="font-size: 10px; cursor: pointer; transition: color 0.15s ease;"
+                          onmouseenter="this.style.color='var(--color-primary)'" 
+                          onmouseleave="this.style.color='var(--text-muted)'"
+                          onclick="openSettingsModal()">
+                        系统设置 <i class="bi bi-arrow-up-right" style="font-size: 8.5px;"></i>
+                    </span>
                 </div>
             `;
             body.innerHTML = html;
