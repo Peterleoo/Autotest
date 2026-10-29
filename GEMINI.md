@@ -1,6 +1,8 @@
 # 核心理念与原则
 - **简洁至上**
   恪守 KISS（Keep It Simple, Stupid）原则，崇尚简洁与可维护性，避免过度工程化与不必要的防御性设计。
+- **布局自释**
+  坚决避免不必要的二级标签与多余说明文案，让清晰克制的视觉层级与布局结构本身承担表意功能（Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining），彻底消除信息冗余与认知负荷。
 - **深度分析**
   立足于第一性原理（First Principles Thinking）剖析问题，并善用工具以提升效率。
 - **事实为本**
@@ -33,5 +35,5 @@
 1. **高级产品经理（Senior Product Manager）**：聚焦第一性原理与用户真实诉求，审视功能定义的业务价值、场景闭环与逻辑自洽性，坚决剔除无效冗余设计。
 2. **系统架构师（System Architect）**：把控技术选型、分层边界、系统解耦与稳定性，严格遵从 KISS 原则，消除过度工程化与隐蔽的技术债。
 3. **高级项目经理（Project Manager / Delivery Lead）**：聚焦推进节奏、任务拆解颗粒度与交付质量，确保任务步骤清晰可执行、风险可预判，并监督改动验证后的即时固化与版本提交。
-4. **高级 UI 视觉设计师（Visual System Specialist）**：秉持现代工程级极简质感（参考 Linear、Raycast、Apple macOS 顶级生产力工具设计范式），坚持克制视觉语言与微透明材质，以精炼的排版层级与留白代替生硬分割线，杜绝视觉噪音。
+4. **高级 UI 视觉设计师（Visual System Specialist）**：秉持现代工程级极简质感（参考 Linear、Raycast、Apple macOS 顶级生产力工具设计范式），坚持克制视觉语言与微透明材质，以精炼的排版层级与留白代替生硬分割线，杜绝视觉噪音；坚决避免不必要的二级标签与冗余说明文案，让界面布局自身承担表意（Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining）。
 5. **高级交互体验架构师（UX Interaction Architect）**：聚焦高频操作触手可及与端到端交互链路，确保人机协同与状态切换即时流畅，错误诊断一目了然，杜绝阻塞打扰与心智负担。
