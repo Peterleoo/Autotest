@@ -266,7 +266,7 @@ class ActionExecutor:
 
                     # 激活免权限 UnicodeIME 输入法（真机已就绪）
                     self.driver.execute_adb(["shell", "ime", "enable", "io.appium.settings/.UnicodeIME"])
-                    self.driver.execute_adb(["shell", "ime", "set", "io.appium.settings/.UnicodeIME"])
+                    self.driver.execute_adb(["shell", "ime", "set", "io.appium.settings/.UnicodeIME"])\n                    # 等待 IME 切换完成，最多 3 秒\n                    timeout = time.time() + 3\n                    while time.time() < timeout:\n                        ime_status = self.driver.execute_adb(["shell", "ime", "list", "-s"]).decode('utf-8') if isinstance(self.driver.execute_adb(["shell", "ime", "list", "-s"]), bytes) else self.driver.execute_adb(["shell", "ime", "list", "-s"])\n                        if "io.appium.settings/.UnicodeIME" in ime_status:\n                            break\n                        time.sleep(0.2)\n                    else:\n                        raise RuntimeError("UnicodeIME 激活超时，输入中文失败")
                     utf7_encoded = _encode_imap_utf7(text)
                     logger.info(f"原生 ADB UnicodeIME 中文汉字极速上屏: '{text}' (RFC3501: {utf7_encoded})")
                     # 使用单引号包裹，防止 Android /system/bin/sh 将 & 误判为后台任务
