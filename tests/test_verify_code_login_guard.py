@@ -5,8 +5,9 @@
 
 import sys
 import unittest
+import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -14,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from ai_engine.verifier import TaskVerifier
 from ai_engine.test_agent import AITestAgent
 from ai_engine.action_executor import ActionExecutor
+from core.task_manager import TaskManager
 
 
 class TestVerifyCodeLoginGuard(unittest.TestCase):
@@ -56,7 +58,6 @@ class TestVerifyCodeLoginGuard(unittest.TestCase):
         mock_driver.execute_adb = MagicMock()
         agent = AITestAgent(driver=mock_driver, app_identifier="com.apicloud.A6995433058179")
 
-        # 模拟象盒找房真实的现场元素树
         mock_screen = {
             "elements": [
                 {"text": "手机号登录", "content_desc": "", "bounds": "[100,200][400,260]"},
@@ -66,7 +67,6 @@ class TestVerifyCodeLoginGuard(unittest.TestCase):
             ]
         }
 
-        # 拦截 locator_and_type 与 locate_and_click 观察入参
         clicked_texts = []
         typed_entries = []
 
@@ -83,7 +83,6 @@ class TestVerifyCodeLoginGuard(unittest.TestCase):
         agent.executor._locate_and_click = fake_click
         agent.executor._locate_and_type = fake_type
 
-        from unittest.mock import patch
         with patch("ai_engine.screen_parser.ScreenParser.get_screen_summary", return_value={"elements": []}), \
              patch("ai_engine.screen_parser.ScreenParser.wait_for_visual_settling", return_value=True):
             goal = "检测象盒找房的验证码登录页面的机器人检测功能是否正常，是否能绕过"
@@ -111,7 +110,6 @@ class TestVerifyCodeLoginGuard(unittest.TestCase):
         }
         executor._locate_and_type(el_info, "13800138000")
 
-        # 验证 execute_adb 调用序列中包含了退格与清空按键事件
         adb_calls = [c[0][0] for c in mock_driver.execute_adb.call_args_list]
         has_move_end = any(cmd == ["shell", "input", "keyevent", "123"] for cmd in adb_calls)
         has_del_sequence = any(cmd[:3] == ["shell", "input", "keyevent"] and "67" in cmd for cmd in adb_calls)
@@ -120,6 +118,126 @@ class TestVerifyCodeLoginGuard(unittest.TestCase):
         self.assertTrue(has_move_end, "必须先发送光标移至末尾事件 (123)")
         self.assertTrue(has_del_sequence, "必须发送批量退格清空事件 (67)")
         self.assertTrue(has_text_input, "必须准确填入目标文本")
+
+    def test_05_detect_login_screen_state_dynamically(self):
+        """测试 5: 自适应精准识别端侧真实登录形态 (SMS待填/手机号待获取/滑块拼图/账号密码)"""
+        # 场景 A: 短信验证码已发送 (包含重新获取倒计时与验证码输入框)
+        screen_sms = {
+            "elements": [
+                {"text": "验证码已发送至 188****8888"},
+                {"text": "请输入验证码", "is_input": True, "bounds": "[100,500][900,600]"},
+                {"text": "重新获取(58s)"}
+            ]
+        }
+        state, meta = AITestAgent._detect_login_screen_state(screen_sms)
+        self.assertEqual(state, "sms_code", "必须识别为短信验证码待填阶段！")
+
+        # 场景 B: 手机号验证码模式（尚未获取验证码）
+        screen_phone = {
+            "elements": [
+                {"text": "手机号快捷登录"},
+                {"text": "请输入手机号码", "is_input": True},
+                {"text": "获取验证码"}
+            ]
+        }
+        state, meta = AITestAgent._detect_login_screen_state(screen_phone)
+        self.assertEqual(state, "phone_wait_code", "必须识别为手机号待获取验证码阶段！")
+
+        # 场景 C: 图形滑块拼图/机器人检测
+        screen_slider = {
+            "elements": [
+                {"text": "安全验证"},
+                {"text": "请按住滑块，拖动完成拼图"}
+            ]
+        }
+        state, meta = AITestAgent._detect_login_screen_state(screen_slider)
+        self.assertEqual(state, "manual_takeover", "必须识别为投屏手动接管滑块拼图！")
+
+        # 场景 D: 传统账号密码
+        screen_pwd = {
+            "elements": [
+                {"text": "账号密码登录"},
+                {"text": "请输入账号", "is_input": True},
+                {"text": "请输入密码", "is_input": True}
+            ]
+        }
+        state, meta = AITestAgent._detect_login_screen_state(screen_pwd)
+        self.assertEqual(state, "credential", "必须识别为账号密码模式！")
+
+    def test_06_execute_phone_send_sms_flow(self):
+        """测试 6: 手机号阶段自动填入手机号、勾选协议并点击【获取验证码】"""
+        mock_driver = MagicMock()
+        agent = AITestAgent(driver=mock_driver, app_identifier="demo_app")
+
+        screen_info = {
+            "elements": [
+                {"text": "请输入手机号码", "is_input": True, "center": [540, 600]},
+                {"text": "我已阅读并同意服务协议", "center": [100, 800]},
+                {"text": "获取验证码", "center": [540, 700]}
+            ]
+        }
+
+        clicked = []
+        typed = []
+        agent.executor._locate_and_click = lambda el, c: clicked.append(el.get("text"))
+        agent.executor._locate_and_type = lambda el, t: typed.append((el.get("text"), t))
+
+        res = agent._execute_phone_send_sms("13912345678", screen_info)
+        self.assertTrue(res)
+        self.assertIn("我已阅读并同意服务协议", clicked)
+        self.assertIn("获取验证码", clicked)
+        self.assertEqual(typed, [("请输入手机号码", "13912345678")])
+
+    def test_07_execute_sms_code_injection_flow(self):
+        """测试 7: 短信验证码阶段精准定位验证码输入框，填入验证码并提交登录"""
+        mock_driver = MagicMock()
+        agent = AITestAgent(driver=mock_driver, app_identifier="demo_app")
+
+        screen_info = {
+            "elements": [
+                {"text": "请输入短信验证码", "is_input": True, "center": [540, 600]},
+                {"text": "确定登录", "center": [540, 800]}
+            ]
+        }
+
+        clicked = []
+        typed = []
+        agent.executor._locate_and_click = lambda el, c: clicked.append(el.get("text"))
+        agent.executor._locate_and_type = lambda el, t: typed.append((el.get("text"), t))
+
+        with patch("ai_engine.screen_parser.ScreenParser.get_screen_summary", return_value={"elements": [{"text": "个人中心"}]}), \
+             patch("ai_engine.screen_parser.ScreenParser.wait_for_visual_settling", return_value=True):
+            res = agent._execute_sms_code_injection("654321", screen_info)
+
+        self.assertTrue(res)
+        self.assertEqual(typed, [("请输入短信验证码", "654321")])
+        self.assertIn("确定登录", clicked)
+
+    def test_08_task_manager_resolve_decision_supports_sms_code(self):
+        """测试 8: TaskManager 正确处理并持久化短信验证码决策"""
+        mgr = TaskManager()
+        sid = "sess_unit_test_sms"
+        mgr.sessions[sid] = {
+            "session_id": sid,
+            "status": "WAITING_USER_INPUT",
+            "hitl_decision": {"mode": "sms_code"},
+            "devices": {"dev1": {"action": "", "logs": []}}
+        }
+
+        payload = {
+            "decision_type": "inject_sms",
+            "sms_code": "888999"
+        }
+        res = mgr.resolve_decision(sid, payload)
+        self.assertTrue(res)
+
+        decision_file = ROOT / "scratch" / f"decision_{sid}.json"
+        self.assertTrue(decision_file.exists())
+        data = json.loads(decision_file.read_text(encoding="utf-8"))
+        self.assertEqual(data["decision_type"], "inject_sms")
+        self.assertEqual(data["sms_code"], "888999")
+        try: decision_file.unlink()
+        except Exception: pass
 
 
 if __name__ == "__main__":

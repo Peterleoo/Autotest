@@ -10137,25 +10137,29 @@
                 gateEl.remove();
             }
 
-            // 🛡️ 人机协同登录决策卡片（挂起时呈现，具备死循环熔断与投屏接管自愈）
+            // 🛡️ 人机协同登录决策卡片（根据端侧实际物理状态自适应呈现：短信验证码 / 手机号待发送 / 账号密码 / 投屏接管）
             const hitl = sessionData.hitl_decision;
             const isWaitingHitl = (sessionData.status === "WAITING_USER_INPUT" || Boolean(hitl));
             let hitlEl = flow.querySelector(".hitl-decision-card");
             if (isWaitingHitl && hitl) {
                 const sid = sessionData.session_id || activeSessionId;
-                const isTakeover = (hitl.mode === "manual_takeover");
+                const mode = hitl.mode || "credential";
+                const isSmsCode = (mode === "sms_code");
+                const isPhoneInput = (mode === "phone_input");
+                const isTakeover = (mode === "manual_takeover");
                 const defaultAcc = hitl.preset_account || window._lastHitlAccount || "";
                 const defaultPwd = window._lastHitlPassword || "";
 
                 let takeoverBanner = "";
                 let heroActionHtml = "";
+                let formContentHtml = "";
 
                 if (isTakeover) {
                     takeoverBanner = `
                         <div class="alert alert-warning d-flex align-items-center gap-2 mb-3 py-2 px-3 border-0 shadow-sm" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-radius: 8px;">
                             <i class="bi bi-display fs-4"></i>
                             <div style="font-size: 12px; line-height: 1.5;">
-                                <strong style="font-size: 12.5px;">端侧需手动轻触介入：</strong>系统已自动尝试填入登录码，但目标应用需要进一步操作（如<strong>点击选择公司</strong>、<strong>滑块拼图</strong>或勾选协议）。请直接在<strong>右侧真机投屏</strong>中轻触完成，完成后点击下方绿色按钮即可无缝继续！
+                                <strong style="font-size: 12.5px;">端侧需手动介入：</strong>目标应用触发了<strong>图形滑块拼图</strong>、<strong>机器人安全验证</strong>或<strong>组织选择</strong>。请直接在<strong>右侧真机投屏</strong>中滑动完成，完成后点击下方绿色按钮即可无缝继续！
                             </div>
                         </div>
                     `;
@@ -10165,7 +10169,75 @@
                                 <i class="bi bi-check2-circle me-1.5 fs-6"></i> 我已在投屏/手机上完成操作，立即恢复自动化
                             </button>
                             <div class="text-muted small mt-1.5" style="font-size: 11px;">
-                                <i class="bi bi-info-circle me-1"></i>在右侧投屏轻触选择公司或通过验证后，点击此按钮秒级解除挂起
+                                <i class="bi bi-info-circle me-1"></i>在右侧投屏滑动拼图或通过验证后，点击此按钮秒级解除挂起
+                            </div>
+                        </div>
+                    `;
+                } else if (isSmsCode) {
+                    // 🚀 短信验证码已发送场景：极简表单，只呈现短信验证码输入框与提交按钮，消除一切账号密码杂音
+                    formContentHtml = `
+                        <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-semibold text-main" style="font-size: 12.5px;">
+                                    <i class="bi bi-chat-left-dots text-primary me-1.5"></i> 短信验证码
+                                </span>
+                                <span class="text-muted small" style="font-size: 11px;">查收手机短信并填入</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm" id="hitlSmsCodeInput_${sid}" placeholder="4 ~ 6 位短信验证码" maxlength="8" autofocus
+                                    style="background: var(--bg-card); font-size: 14px; font-weight: 600; letter-spacing: 3px; border-color: var(--border-subtle); color: var(--text-main); height: 38px;"
+                                    onkeydown="if(event.key==='Enter') submitHitlDecision('${sid}', 'inject_sms')">
+                                <button class="btn btn-sm btn-primary px-3 fw-semibold text-nowrap d-flex align-items-center" style="font-size: 12.5px; border-radius: 6px; height: 38px;" onclick="submitHitlDecision('${sid}', 'inject_sms')">
+                                    <i class="bi bi-arrow-right-circle-fill me-1.5"></i> 填入并登录
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else if (isPhoneInput) {
+                    // 🚀 手机号验证码模式（待获取验证码）场景：只呈现手机号输入框与获取验证码按钮
+                    formContentHtml = `
+                        <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-semibold text-main" style="font-size: 12.5px;">
+                                    <i class="bi bi-phone text-primary me-1.5"></i> 测试手机号
+                                </span>
+                                <span class="text-muted small" style="font-size: 11px;">系统将自动填入并点击获取验证码</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="请输入11位测试手机号" value="${escapeHtml(defaultAcc)}"
+                                    style="background: var(--bg-card); font-size: 13px; border-color: var(--border-subtle); color: var(--text-main); height: 38px;"
+                                    onkeydown="if(event.key==='Enter') submitHitlDecision('${sid}', 'inject_phone')">
+                                <button class="btn btn-sm btn-primary px-3 fw-semibold text-nowrap d-flex align-items-center" style="font-size: 12.5px; border-radius: 6px; height: 38px;" onclick="submitHitlDecision('${sid}', 'inject_phone')">
+                                    <i class="bi bi-send-fill me-1.5"></i> 获取验证码
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // 传统账号密码登录表单
+                    formContentHtml = `
+                        <div class="p-2.5 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); padding: 10px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-medium text-main" style="font-size: 12px;"><i class="bi bi-key me-1 text-primary"></i> 方式一：输入测试凭证（自动代填账号与密码）</span>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="手机号 / 账号 / 合伙人登录码" value="${escapeHtml(defaultAcc)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlPasswordInput_${sid}" placeholder="密码 (若页面无密码框可留空)" value="${escapeHtml(defaultPwd)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="form-check m-0">
+                                    <input class="form-check-input" type="checkbox" id="hitlRemember_${sid}" checked style="cursor: pointer;">
+                                    <label class="form-check-label text-muted" for="hitlRemember_${sid}" style="font-size: 11px; cursor: pointer;">
+                                        记住该 App 凭证 (存入 credentials.json 后续免打扰)
+                                    </label>
+                                </div>
+                                <button class="btn btn-sm btn-primary px-3 py-1 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'inject')">
+                                    <i class="bi bi-lightning-charge-fill me-1"></i> 立即自动注入并提交
+                                </button>
                             </div>
                         </div>
                     `;
@@ -10190,44 +10262,20 @@
                         </div>
 
                         ${heroActionHtml}
-                        
-                        <div class="p-2.5 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); padding: 10px;">
-                            <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="fw-medium text-main" style="font-size: 12px;"><i class="bi bi-key me-1 text-primary"></i> ${isTakeover ? '重新注入测试账号/登录码：' : '方式一：输入测试凭证（自动代填账号/登录码与密码）'}</span>
-                            </div>
-                            <div class="row g-2 mb-2">
-                                <div class="col-6">
-                                    <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="手机号 / 账号 / 合伙人登录码" value="${escapeHtml(defaultAcc)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
-                                </div>
-                                <div class="col-6">
-                                    <input type="text" class="form-control form-control-sm" id="hitlPasswordInput_${sid}" placeholder="密码 (若页面无密码框可留空)" value="${escapeHtml(defaultPwd)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
-                                </div>
-                            </div>
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div class="form-check m-0">
-                                    <input class="form-check-input" type="checkbox" id="hitlRemember_${sid}" checked style="cursor: pointer;">
-                                    <label class="form-check-label text-muted" for="hitlRemember_${sid}" style="font-size: 11px; cursor: pointer;">
-                                        记住该 App 凭证 (存入 credentials.json 后续免打扰)
-                                    </label>
-                                </div>
-                                <button class="btn btn-sm btn-primary px-3 py-1 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'inject')">
-                                    <i class="bi bi-lightning-charge-fill me-1"></i> ${isTakeover ? '再次尝试自动注入' : '立即自动注入并提交'}
-                                </button>
-                            </div>
-                        </div>
+                        ${formContentHtml}
 
                         ${!isTakeover ? `
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
                             <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px;">
                                 <i class="bi bi-display text-info"></i>
-                                <span>若需滑块拼图或选择公司：可直接在右侧真机镜像手动操作</span>
+                                <span>也可以直接在右侧真机投屏中轻触输入或滑动验证</span>
                             </div>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-sm btn-outline-secondary py-1" style="font-size: 11.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'skip')">
                                     <i class="bi bi-skip-forward me-1"></i> 尝试跳过
                                 </button>
                                 <button class="btn btn-sm btn-success py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
-                                    <i class="bi bi-check2-circle me-1"></i> 我已在手机上完成登录，继续
+                                    <i class="bi bi-check2-circle me-1"></i> 我已在手机上完成，继续
                                 </button>
                             </div>
                         </div>
@@ -11747,16 +11795,30 @@
             
             const accountInput = document.getElementById(`hitlAccountInput_${sessionId}`);
             const passwordInput = document.getElementById(`hitlPasswordInput_${sessionId}`);
+            const smsCodeInput = document.getElementById(`hitlSmsCodeInput_${sessionId}`);
             const rememberInput = document.getElementById(`hitlRemember_${sessionId}`);
             
             const account = accountInput ? accountInput.value.trim() : "";
             const password = passwordInput ? passwordInput.value.trim() : "";
+            const smsCode = smsCodeInput ? smsCodeInput.value.trim() : "";
             if (account) window._lastHitlAccount = account;
             if (password) window._lastHitlPassword = password;
             const remember = rememberInput ? rememberInput.checked : true;
             
-            if (decisionType === "inject" && !account) {
-                alert("请输入测试手机号/账号后再提交！");
+            if (decisionType === "inject_sms") {
+                if (!smsCode) {
+                    alert("请输入收到的短信验证码后再提交！");
+                    if (smsCodeInput) smsCodeInput.focus();
+                    return;
+                }
+            } else if (decisionType === "inject_phone") {
+                if (!account) {
+                    alert("请输入测试手机号后再提交！");
+                    if (accountInput) accountInput.focus();
+                    return;
+                }
+            } else if (decisionType === "inject" && !account && !smsCode) {
+                alert("请输入测试凭证后再提交！");
                 if (accountInput) accountInput.focus();
                 return;
             }
@@ -11779,6 +11841,7 @@
                         decision_type: decisionType,
                         account: account,
                         password: password,
+                        sms_code: smsCode,
                         remember: remember,
                         app_key: appKey
                     })
