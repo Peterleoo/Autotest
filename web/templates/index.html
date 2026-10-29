@@ -7128,22 +7128,26 @@
         }
 
     
-        /* ================= 融合心跳指示灯与纯文本测试就绪 ================= */
+        /* ================= 融合心跳指示灯与极简自释品牌 (Apple / Raycast 范式) ================= */
         .brand-status-trigger {
             display: inline-flex;
             align-items: center;
             cursor: pointer;
-            padding: 3px 7px 3px 5px;
-            margin-left: -5px;
+            padding: 4px 8px 4px 6px;
+            margin-left: -4px;
             border-radius: 8px;
-            transition: background 0.15s ease;
+            transition: all 0.15s ease;
             user-select: none;
+            border: 1px solid transparent;
         }
         .brand-status-trigger:hover {
             background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.08);
         }
+        body.theme-light .brand-status-trigger:hover,
         body[data-theme="light"] .brand-status-trigger:hover {
             background: rgba(0, 0, 0, 0.04);
+            border-color: rgba(0, 0, 0, 0.06);
         }
         .brand-pulse-dot {
             width: 7.5px;
@@ -7151,9 +7155,9 @@
             border-radius: 50%;
             display: inline-block;
             flex-shrink: 0;
-            margin-right: 7px;
-            background-color: var(--status-green, #22c55e);
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            margin-right: 8px;
+            background-color: var(--status-green, #10b981);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
             animation: pulse-green 2.2s infinite;
             transition: background-color 0.2s ease, box-shadow 0.2s ease;
         }
@@ -7162,17 +7166,12 @@
             box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
             animation: pulse-red 2.2s infinite;
         }
-        .header-ready-pure-text {
-            font-size: 11px;
-            font-weight: 500;
-            color: var(--status-green, #22c55e);
-            letter-spacing: 0.2px;
-            transition: color 0.2s ease;
-            line-height: 1;
-        }
-        .brand-pulse-dot.status-unready ~ .header-ready-pure-text,
-        .brand-status-trigger.status-unready .header-ready-pure-text {
-            color: #ef4444;
+        .brand-title {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: var(--text-main) !important;
+            letter-spacing: -0.2px !important;
+            line-height: 1 !important;
         }
 
 
@@ -7290,16 +7289,14 @@
 
     <!-- ======================= 全局通栏顶部条 (仅保留左侧品牌标识) ======================= -->
     <header class="app-top-chrome" id="appTopChrome">
-        <!-- 🌟 品牌与全局就绪指示器融合：单心跳圆点 + AUTOTEST AI · 测试就绪 (触碰/点击弹出 Micro HUD) -->
+        <!-- 🌟 极简自释品牌与全局就绪指示器 (Apple / Raycast 范式) -->
         <div class="brand-box brand-status-trigger" id="brandStatusTrigger"
              onmouseenter="handleBrandStatusHover(true)"
              onmouseleave="handleBrandStatusHover(false)"
              onclick="toggleBrandStatusPin(event)"
              title="测试环境已就绪 (悬停查看链路健康度，点击常驻)">
             <span class="brand-pulse-dot status-ready" id="brandPulseDot"></span>
-            <span class="fw-bold brand-title" style="font-size: 12.5px; letter-spacing: 0.5px; color: var(--text-main);">AUTOTEST AI</span>
-            <span class="brand-status-sep" style="opacity: 0.35; margin: 0 5px; font-size: 10px; color: var(--text-muted);">·</span>
-            <span id="headerReadyText" class="header-ready-pure-text">测试就绪</span>
+            <span class="brand-title">Autotest AI</span>
         </div>
 
         <!-- 🚀 右侧极简三件套 (仅保留投屏、主题、设置纯图标，无文字) -->
