@@ -1146,6 +1146,8 @@ class TaskManager:
         account = payload.get("account", "").strip()
         password = payload.get("password", "").strip()
         sms_code = payload.get("sms_code", "").strip()
+        inputs = payload.get("inputs") or {}
+        choice = payload.get("choice", "")
         remember = payload.get("remember", False)
         app_key = payload.get("app_key") or session.get("app_package") or session.get("app_label") or session.get("app_filename") or "demo_app"
 
@@ -1167,6 +1169,8 @@ class TaskManager:
             "account": account,
             "password": password,
             "sms_code": sms_code,
+            "inputs": inputs,
+            "choice": choice,
             "remember": remember
         }, ensure_ascii=False), encoding="utf-8")
 
@@ -1864,39 +1868,42 @@ class TaskManager:
                 m_mode = re.search(r"mode=([^&\s]+)", line)
                 mode = m_mode.group(1) if m_mode else "credential"
 
-                if mode == "sms_code":
-                    title = "人机协同 · 请输入短信验证码"
-                    desc = "端侧已向手机发送验证码，请查收真机短信并在下方填入验证码，或直接在右侧真机投屏输入完成："
-                    action_tip = "⏸️ 挂起中：等待输入短信验证码"
-                elif mode == "phone_input":
-                    title = "人机协同 · 请输入测试手机号"
-                    desc = "检测到应用处于短信验证码登录页，请输入测试手机号，系统将自动代填并点击获取验证码："
-                    action_tip = "⏸️ 挂起中：等待输入手机号"
-                elif mode == "manual_takeover":
-                    title = "人机协同 · 请在投屏手动完成"
-                    desc = "端侧需要进一步操作（如滑块拼图/验证码/选择公司）。请直接在右侧真机投屏中轻触完成，完成后点击【我已在投屏中完成】！"
-                    action_tip = "⏸️ 挂起中：请在投屏手动操作并点击已完成"
+                # 🚀 优先保护 AI 自主生成的结构化协同契约 (AI-Generated Schema)
+                if mode == "ai_generated" and session.get("hitl_decision") and session["hitl_decision"].get("type") == "ai_generated":
+                    action_tip = f"⏸️ 挂起中：等待完成协同 ({session['hitl_decision'].get('title', 'AI人机协助')})"
                 else:
-                    title = "人机协同 · 需要登录凭证"
-                    desc = "检测到目标应用进入账号密码/登录鉴权页，请提供测试账号密码，或在右侧投屏手动完成登录："
-                    action_tip = "⏸️ 挂起中：等待输入账号密码或投屏手动登录"
+                    if mode == "sms_code":
+                        title = "人机协同 · 请输入短信验证码"
+                        desc = "端侧已向手机发送验证码，请查收真机短信并在下方填入验证码，或直接在右侧真机投屏输入完成："
+                        action_tip = "⏸️ 挂起中：等待输入短信验证码"
+                    elif mode == "phone_input":
+                        title = "人机协同 · 请输入测试手机号"
+                        desc = "检测到应用处于短信验证码登录页，请输入测试手机号，系统将自动代填并点击获取验证码："
+                        action_tip = "⏸️ 挂起中：等待输入手机号"
+                    elif mode == "manual_takeover":
+                        title = "人机协同 · 请在投屏手动完成"
+                        desc = "端侧需要进一步操作（如滑块拼图/验证码/选择公司）。请直接在右侧真机投屏中轻触完成，完成后点击【我已在投屏中完成】！"
+                        action_tip = "⏸️ 挂起中：请在投屏手动操作并点击已完成"
+                    else:
+                        title = "人机协同 · 需要登录凭证"
+                        desc = "检测到目标应用进入账号密码/登录鉴权页，请提供测试账号密码，或在右侧投屏手动完成登录："
+                        action_tip = "⏸️ 挂起中：等待输入账号密码或投屏手动登录"
 
-                # 保留此前会话中用户已输入的账号，避免重复输入
-                prior_account = ""
-                if session.get("hitl_decision") and session["hitl_decision"].get("preset_account"):
-                    prior_account = session["hitl_decision"]["preset_account"]
-                elif existing_cred and existing_cred.get("account"):
-                    prior_account = existing_cred["account"]
+                    prior_account = ""
+                    if session.get("hitl_decision") and session["hitl_decision"].get("preset_account"):
+                        prior_account = session["hitl_decision"]["preset_account"]
+                    elif existing_cred and existing_cred.get("account"):
+                        prior_account = existing_cred["account"]
 
-                session["hitl_decision"] = {
-                    "type": "credential",
-                    "mode": mode,
-                    "app_key": app_key,
-                    "title": title,
-                    "desc": desc,
-                    "preset_account": prior_account,
-                    "timestamp": time.time()
-                }
+                    session["hitl_decision"] = {
+                        "type": "credential",
+                        "mode": mode,
+                        "app_key": app_key,
+                        "title": title,
+                        "desc": desc,
+                        "preset_account": prior_account,
+                        "timestamp": time.time()
+                    }
                 dev_state["action"] = action_tip
                 self._save_session(session["session_id"])
 

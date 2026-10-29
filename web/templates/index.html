@@ -10154,7 +10154,60 @@
                 let heroActionHtml = "";
                 let formContentHtml = "";
 
-                if (isTakeover) {
+                if (hitl.type === "ai_generated" || (hitl.fields && hitl.fields.length > 0)) {
+                    // 🌟 纯 AI 自主动态生成的人机协同 Generative UI
+                    const helpType = hitl.help_type || "input";
+                    const btnText = hitl.action_button_text || "提交并继续";
+
+                    if (helpType === "manual_takeover") {
+                        heroActionHtml = `
+                            <div class="p-3 rounded mb-3 text-center" style="background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.35); padding: 12px; border-radius: 8px;">
+                                <div class="text-sub small mb-2" style="font-size: 12px;">
+                                    ${escapeHtml(hitl.reason || '请直接在右侧真机投屏中完成轻触或滑动验证')}
+                                </div>
+                                <button class="btn btn-sm btn-success py-2 px-4 fw-semibold w-100 shadow-sm" style="font-size: 13px; border-radius: 8px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
+                                    <i class="bi bi-check2-circle me-1.5 fs-6"></i> ${escapeHtml(btnText)}
+                                </button>
+                            </div>
+                        `;
+                    } else if (helpType === "choice" && hitl.options && hitl.options.length > 0) {
+                        const optsHtml = hitl.options.map(opt => `
+                            <button class="btn btn-sm btn-outline-primary py-1.5 px-3 fw-medium text-nowrap rounded-pill" onclick="submitHitlChoice('${sid}', '${escapeHtml(opt)}')">
+                                <i class="bi bi-check-circle me-1"></i> ${escapeHtml(opt)}
+                            </button>
+                        `).join('');
+                        formContentHtml = `
+                            <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                                <div class="text-sub small mb-2 fw-medium" style="font-size: 11.5px;">请点击选择要进入的业务项：</div>
+                                <div class="d-flex flex-wrap gap-2">${optsHtml}</div>
+                            </div>
+                        `;
+                    } else {
+                        const fieldsHtml = (hitl.fields || []).map((f, idx) => `
+                            <div class="mb-2">
+                                ${f.label ? `<label class="form-label text-sub small mb-1" style="font-size: 11px;">${escapeHtml(f.label)}</label>` : ''}
+                                <input type="${f.type === 'password' ? 'password' : 'text'}"
+                                       class="form-control form-control-sm hitl-dynamic-field"
+                                       data-key="${escapeHtml(f.key || 'field_' + idx)}"
+                                       placeholder="${escapeHtml(f.placeholder || f.label || '')}"
+                                       ${idx === 0 ? 'autofocus' : ''}
+                                       style="background: var(--bg-card); font-size: 13px; border-color: var(--border-subtle); color: var(--text-main); height: 38px;"
+                                       onkeydown="if(event.key==='Enter') submitHitlDecision('${sid}', 'ai_submit')">
+                            </div>
+                        `).join('');
+
+                        formContentHtml = `
+                            <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                                ${fieldsHtml}
+                                <div class="d-flex justify-content-end mt-2">
+                                    <button class="btn btn-sm btn-primary px-3 py-1.5 fw-semibold d-flex align-items-center" style="font-size: 12.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'ai_submit')">
+                                        <i class="bi bi-send-fill me-1.5"></i> ${escapeHtml(btnText)}
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else if (isTakeover) {
                     takeoverBanner = `
                         <div class="alert alert-warning d-flex align-items-center gap-2 mb-3 py-2 px-3 border-0 shadow-sm" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-radius: 8px;">
                             <i class="bi bi-display fs-4"></i>
@@ -11789,14 +11842,28 @@
             }
         }
 
-        window.submitHitlDecision = async function(sessionId, decisionType) {
+        window.submitHitlChoice = function(sessionId, choiceVal) {
+            submitHitlDecision(sessionId, "ai_choice", { choice: choiceVal });
+        };
+
+        window.submitHitlDecision = async function(sessionId, decisionType, extraParams) {
             sessionId = sessionId || activeSessionId;
             if (!sessionId) return;
             
+            const cardEl = document.getElementById(`hitlDecisionCard_${sessionId}`);
             const accountInput = document.getElementById(`hitlAccountInput_${sessionId}`);
             const passwordInput = document.getElementById(`hitlPasswordInput_${sessionId}`);
             const smsCodeInput = document.getElementById(`hitlSmsCodeInput_${sessionId}`);
             const rememberInput = document.getElementById(`hitlRemember_${sessionId}`);
+
+            // 动态收集 AI 生成的表单字段
+            const dynamicInputs = {};
+            if (cardEl) {
+                cardEl.querySelectorAll(".hitl-dynamic-field").forEach(inp => {
+                    const k = inp.getAttribute("data-key");
+                    if (k) dynamicInputs[k] = inp.value.trim();
+                });
+            }
             
             const account = accountInput ? accountInput.value.trim() : "";
             const password = passwordInput ? passwordInput.value.trim() : "";
@@ -11834,17 +11901,20 @@
                 const curSess = (currentSessions || []).find(s => s.session_id === sessionId) || currentActiveSessionData || {};
                 const appKey = curSess.app_package || curSess.app_label || curSess.app_filename || "demo_app";
 
+                const payloadData = Object.assign({
+                    decision_type: decisionType,
+                    account: account,
+                    password: password,
+                    sms_code: smsCode,
+                    inputs: dynamicInputs,
+                    remember: remember,
+                    app_key: appKey
+                }, extraParams || {});
+
                 const resp = await fetch(`/api/sessions/${sessionId}/resolve_decision`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        decision_type: decisionType,
-                        account: account,
-                        password: password,
-                        sms_code: smsCode,
-                        remember: remember,
-                        app_key: appKey
-                    })
+                    body: JSON.stringify(payloadData)
                 });
                 const res = await resp.json();
                 if (res.success) {

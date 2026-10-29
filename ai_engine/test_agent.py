@@ -27,6 +27,28 @@ SYSTEM_PROMPT = """
 7. call_api: 接口测试/数据交互。例如 {"action": "call_api", "method": "POST", "endpoint": "/api/v1/login", "json": {"user":"a"}, "expected_status": 200}。
 8. assert_text: 文本断言。例如 {"action": "assert_text", "expected": "首页", "reason": "断言是否成功跳转"}。
 9. finish: 当测试目标已经全部达成且验证通过时返回。例如 {"action": "finish", "reason": "已完整走通登录流程并断言成功"}。
+10. request_human_help: 唤起人机协同协助（AI 自主发起，杜绝机械死板）。
+    - 触发时机：当端侧现实出现 AI 客观上无法自行推导或无法独立完成的实体屏障（例如：真机已下发短信验证码、手机银行/安全令牌、微信扫码授权、图形拼图滑块防刷认证、需要人类指定专属个人业务账号/门店/角色数据）时果断调用。
+    - 严禁滥用：若可以通过常规输入测试数据、点击返回或常规页面流转解决的问题，严禁调用该动作！
+    - 数据规范：
+      {
+        "action": "request_human_help",
+        "help_type": "input", // 可选: "input" (需要输入信息) | "manual_takeover" (需要投屏手动操作) | "choice" (单选列表)
+        "title": "人机协同 · 请输入短信验证码",
+        "reason": "当前页面已下发短信验证码，由于验证码发送到用户物理真机SIM卡上，AI无法凭空推导，需要人类协助提供",
+        "description": "请查收真机短信并在下方输入验证码：",
+        "fields": [
+          {
+            "key": "sms_code",
+            "label": "短信验证码",
+            "placeholder": "请输入 4~6 位短信验证码",
+            "type": "text",
+            "target_index": 5
+          }
+        ],
+        "options": ["选项1", "选项2"], // 仅当 help_type 为 choice 时提供
+        "action_button_text": "填入并继续"
+      }
 
 
 🔥 核心决策守则（严格遵守，严禁在 App 内盲目乱跳）：
@@ -745,6 +767,159 @@ class AITestAgent:
         logger.warning("⚠️ 等待人机协同超时 (1800s)，安全退出挂起")
         return False
 
+    def _handle_ai_requested_human_help(self, decision: Dict[str, Any], screen_info: Dict[str, Any], goal: str) -> bool:
+        """
+        处理由 AI 模型根据真机视觉现场自主动态生成的协同请求 (AI-Generated Dynamic HITL Engine)
+        """
+        title = decision.get("title") or "人机协同 · 需要人工协助"
+        reason = decision.get("reason") or decision.get("thought") or "AI 在当前真机界面遇到现实屏障，需要人类协助"
+        desc = decision.get("description") or reason
+        help_type = decision.get("help_type") or "input"
+        fields = decision.get("fields") or []
+        options = decision.get("options") or []
+        action_btn_text = decision.get("action_button_text") or "提交并继续"
+        
+        session_id = self.session_id or "default_session"
+        app_key = self.app_identifier or getattr(self.driver, "package_name", None) or "demo_app"
+
+        logger.info(f"🤝 [AI 自主发起协同] 类型: {help_type} | 标题: {title} | 原因: {reason}")
+        
+        # 组装结构化动态 payload
+        hitl_payload = {
+            "type": "ai_generated",
+            "help_type": help_type,
+            "mode": "ai_generated",
+            "title": title,
+            "desc": desc,
+            "reason": reason,
+            "fields": fields,
+            "options": options,
+            "action_button_text": action_btn_text,
+            "app_key": app_key,
+            "timestamp": time.time()
+        }
+
+        # 通过持久化会话同步到前端
+        from pathlib import Path
+        import json
+        sess_file = Path("data/sessions") / f"{session_id}.json"
+        if not sess_file.exists():
+            sess_file = Path("outputs/sessions") / f"{session_id}.json"
+        if sess_file.exists():
+            try:
+                s_data = json.loads(sess_file.read_text(encoding="utf-8"))
+                s_data["status"] = "WAITING_USER_INPUT"
+                s_data["hitl_decision"] = hitl_payload
+                sess_file.write_text(json.dumps(s_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"更新会话 HITL 状态异常: {e}")
+
+        # 发出控制台事件供 task_manager 实时捕获
+        print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}&mode=ai_generated&help_type={help_type}\n", flush=True)
+        self._notify_status({
+            "step": getattr(self, "step_count", 0),
+            "action": f"人机协同 ({help_type})",
+            "log": f"⏸️ {title}：{reason}"
+        })
+
+        decision_file = Path(__file__).resolve().parent.parent / "scratch" / f"decision_{session_id}.json"
+        if decision_file.exists():
+            try: decision_file.unlink()
+            except Exception: pass
+
+        # 深度安全挂起等待人工决策
+        wait_start = time.time()
+        while time.time() - wait_start < 1800:
+            if getattr(self, "_stop_requested", False):
+                logger.info("🛑 挂起期间收到外部终止指令")
+                return False
+
+            if decision_file.exists():
+                try:
+                    data = json.loads(decision_file.read_text(encoding="utf-8"))
+                    if data.get("status") == "RESOLVED":
+                        logger.info(f"✅ [AI 协同响应] 收到人工提交响应数据: {data}")
+                        decision_type = data.get("decision_type", "submit")
+                        
+                        if decision_type == "manual_done":
+                            logger.info("✅ 用户已在投屏手动完成操作，继续自动化")
+                            time.sleep(1.0)
+                        elif decision_type == "skip":
+                            logger.info("⏩ 用户选择跳过该步骤")
+                            try: self.driver.back()
+                            except Exception: pass
+                        else:
+                            # 提取用户提交的动态字段数据并自动映射上屏
+                            inputs = data.get("inputs") or {}
+                            for k, v in data.items():
+                                if k not in ["status", "decision_type", "remember", "app_key"] and k not in inputs:
+                                    inputs[k] = v
+
+                            for f in fields:
+                                f_key = f.get("key")
+                                val = str(inputs.get(f_key, "")).strip()
+                                if not val and f_key == "sms_code" and "sms_code" in inputs:
+                                    val = str(inputs["sms_code"]).strip()
+                                if not val:
+                                    continue
+                                
+                                target_el = None
+                                t_idx = f.get("target_index")
+                                if t_idx is not None:
+                                    for el in screen_info.get("elements", []):
+                                        if el.get("index") == t_idx:
+                                            target_el = el
+                                            break
+                                if not target_el:
+                                    for el in screen_info.get("elements", []):
+                                        el_t = (el.get("text") or el.get("content_desc") or "").strip()
+                                        if any(k in el_t for k in [f.get("label", ""), f.get("placeholder", ""), "验证码"]):
+                                            target_el = el
+                                            break
+
+                                if target_el:
+                                    logger.info(f"AI 协同字段 [{f_key}] 自动填入组件: {target_el.get('bounds')}")
+                                    self.executor._locate_and_type(target_el, val)
+                                    time.sleep(0.4)
+                                else:
+                                    logger.info(f"未找到目标组件，使用原生 ADB 直接填入字段 [{f_key}]: {val}")
+                                    try:
+                                        self.driver.execute_adb(["shell", "input", "text", val])
+                                        time.sleep(0.4)
+                                    except Exception:
+                                        pass
+
+                            selected_choice = data.get("choice")
+                            if selected_choice:
+                                for el in screen_info.get("elements", []):
+                                    el_t = (el.get("text") or el.get("content_desc") or "").strip()
+                                    if selected_choice in el_t:
+                                        logger.info(f"AI 协同点击选择项: {selected_choice}")
+                                        self.executor._locate_and_click(el, None)
+                                        time.sleep(0.6)
+                                        break
+
+                            # 点击登录/提交按钮
+                            time.sleep(0.4)
+                            for el in screen_info.get("elements", []):
+                                el_t = (el.get("text") or el.get("content_desc") or "").strip()
+                                if any(k in el_t for k in ["登录", "进入", "确定", "下一步", "完成", "提交"]):
+                                    if not any(k in el_t for k in ["手机号登录", "密码登录", "切换", "获取验证码", "验证码登录"]):
+                                        logger.info(f"自动点击协同后提交按钮: {el_t}")
+                                        self.executor._locate_and_click(el, None)
+                                        time.sleep(1.5)
+                                        break
+
+                        try: decision_file.unlink()
+                        except Exception: pass
+                        return True
+                except Exception as e:
+                    logger.warning(f"读取 AI 协同决策文件异常: {e}")
+            time.sleep(1.0)
+
+        logger.warning("⚠️ 等待 AI 人机协同超时 (1800s)")
+        return False
+
     def _ensure_home_context_if_needed(self, goal: str, screen_info: Dict[str, Any]):
         """若测试目标要求在首页或搜索，但当前检测到处于委托服务等二级页面，执行自动自愈返回"""
         if any(k in goal for k in ["首页", "搜索", "找房", "二手房", "新房", "租房"]):
@@ -1020,6 +1195,13 @@ class AITestAgent:
                     "log": f"❌ 模型决策异常: {err_msg}"
                 })
                 break
+
+            # 🚀 AI 自主发起的人机协同请求 (AI-Generated Dynamic HITL)
+            if decision.get("action") == "request_human_help":
+                resolved = self._handle_ai_requested_human_help(decision, screen_info, goal)
+                if resolved:
+                    screen_info = ScreenParser.get_screen_summary(self.driver)
+                continue
 
             # 4. 🚀 借鉴 DeepSeek Harness (DSH)：通过独立 TaskVerifier 门禁审查 finish 请求
             if decision.get("action") == "finish":
