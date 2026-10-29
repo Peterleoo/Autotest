@@ -538,6 +538,7 @@ class TaskManager:
             "devices": devices_data,
             "report_url": s.get("report_url", ""),
             "timeline_blocks": s.get("timeline_blocks", []),
+            "attachments": s.get("attachments", []),
             "hitl_decision": s.get("hitl_decision")
         }
 
@@ -554,7 +555,8 @@ class TaskManager:
         app_package: Optional[str] = None,
         app_label: Optional[str] = None,
         app_activity: Optional[str] = None,
-        app_id: Optional[str] = None
+        app_id: Optional[str] = None,
+        attachments: Optional[List[Dict[str, Any]]] = None
     ) -> str:
         """
         创建一个新任务会话并分发给一个或多个目标设备并发执行，支持自动放行与人工审批确认
@@ -585,18 +587,30 @@ class TaskManager:
         init_status = "PLANNING" if is_auto else "AWAITING_APPROVAL"
 
         # 🚀 0ms 极速首包响应：初始轻量思考态，端侧截屏与大模型推演沉降至后台工作线程，告别网络阻塞
+        bullets = [
+            {"tag": "端侧环境感知与起点确认", "content": "物理真机已在线，正在感知端侧前台状态并推演起跑点..."},
+            {"tag": "业务意图推演", "content": f"深度解析测试目标【{goal}】，正在构建最优差量执行路径..."}
+        ]
+        if attachments:
+            doc_att = [a for a in attachments if a.get("is_doc")]
+            img_att = [a for a in attachments if a.get("is_image")]
+            if doc_att:
+                doc_names = "、".join([d.get("name") or d.get("filename", "文档") for d in doc_att])
+                bullets.append({"tag": "多模态需求资产对齐", "content": f"已成功挂载需求文档【{doc_names}】，完成测试规约结构化提取"})
+            if img_att:
+                bullets.append({"tag": "视觉设计参考对齐", "content": f"已载入 {len(img_att)} 张参考设计/缺陷截图，比对端侧页面关键视图特征"})
+        bullets.extend([
+            {"tag": "入口寻路策略", "content": "动态规划业务核心频道与控件巡航策略..."},
+            {"tag": "断言与防抖策略", "content": "制定视图核验与表单响应防抖预案..."}
+        ])
+
         initial_thinking = {
             "duration": "推演中...",
-            "bullets": [
-                {"tag": "端侧环境感知与起点确认", "content": "物理真机已在线，正在感知端侧前台状态并推演起跑点..."},
-                {"tag": "业务意图推演", "content": f"深度解析测试目标【{goal}】，正在构建最优差量执行路径..."},
-                {"tag": "入口寻路策略", "content": "动态规划业务核心频道与控件巡航策略..."},
-                {"tag": "断言与防抖策略", "content": "制定视图核验与表单响应防抖预案..."}
-            ]
+            "bullets": bullets
         }
 
         init_timeline = [
-            TimelineManager.create_user_block(goal, turn_id=0),
+            TimelineManager.create_user_block(goal, turn_id=0, attachments=attachments),
             TimelineManager.create_thought_block("推演中...", initial_thinking["bullets"], turn_id=0)
         ]
 
@@ -662,8 +676,9 @@ class TaskManager:
             "target_devices": device_ids,
             "thinking": initial_thinking,
             "clarification": None,
+            "attachments": attachments or [],
             "messages": [
-                {"role": "user", "content": goal, "timestamp": datetime.now().strftime("%H:%M:%S")}
+                {"role": "user", "content": goal, "attachments": attachments or [], "timestamp": datetime.now().strftime("%H:%M:%S")}
             ],
             "turns": [init_turn],
             "fact_memory": init_fact,
@@ -840,7 +855,7 @@ class TaskManager:
             self.executor.submit(self._device_worker, session_id, dev_id, session["goal"], session["case_name"], session["test_mode"])
         return True
 
-    def append_session_message(self, session_id: str, message: str, provider: Optional[str] = None, model: Optional[str] = None) -> Dict[str, Any]:
+    def append_session_message(self, session_id: str, message: str, provider: Optional[str] = None, model: Optional[str] = None, attachments: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
         在已有会话中追加新一轮测试意图 (Turn)，保持会话记忆与事实状态机，原地接续执行
         """
@@ -861,11 +876,18 @@ class TaskManager:
         session["messages"].append({
             "role": "user",
             "content": message,
+            "attachments": attachments or [],
             "timestamp": now_str
         })
+        if attachments:
+            if "attachments" not in session:
+                session["attachments"] = []
+            session["attachments"].extend(attachments)
 
         new_turn_id = len(turns) + 1
         new_turn = MemoryManager.create_turn(new_turn_id, message)
+        if attachments:
+            new_turn["attachments"] = attachments
         
         turn_steps = [
             {
@@ -893,7 +915,7 @@ class TaskManager:
         if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
             session["timeline_blocks"] = []
         session["timeline_blocks"].append(
-            TimelineManager.create_user_block(message, turn_id=new_turn_id)
+            TimelineManager.create_user_block(message, turn_id=new_turn_id, attachments=attachments)
         )
         session["timeline_blocks"].append(
             TimelineManager.create_thought_block(
@@ -1812,7 +1834,13 @@ class TaskManager:
                     pass
 
     def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float, turn_id: int = 1):
-        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
+        doc_texts = [a.get("extracted_text", "") for a in session.get("attachments", []) if a.get("extracted_text")]
+        if doc_texts:
+            combined_docs = "\n".join(doc_texts)
+            composite_goal = f"{goal}\n\n[关联需求规约参考]:\n{combined_docs[:1200]}"
+        else:
+            composite_goal = goal
+        cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", composite_goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
         if session.get("app_filename"):
             cmd.extend(["--app", session["app_filename"]])
         if session.get("app_package"):

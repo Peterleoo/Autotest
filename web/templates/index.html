@@ -5184,6 +5184,150 @@
             word-break: break-word;
         }
 
+        /* ==================== 多模态需求资产组件 (Antigravity 范式) ==================== */
+        .attachment-tray {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px 2px 12px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        .attachment-tray::-webkit-scrollbar {
+            display: none;
+        }
+        .attachment-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px 3px 6px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 11px;
+            color: var(--text-main);
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        body[data-theme="light"] .attachment-pill,
+        body.theme-light .attachment-pill {
+            background: #f1f5f9;
+            border-color: #e2e8f0;
+        }
+        .attachment-pill:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+        .attachment-pill-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .attachment-pill-name {
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        .attachment-pill-size {
+            font-size: 10px;
+            color: var(--text-sub);
+            opacity: 0.8;
+        }
+        .attachment-pill-remove {
+            cursor: pointer;
+            opacity: 0.55;
+            padding: 0 2px;
+            font-size: 12px;
+            line-height: 1;
+            transition: opacity 0.15s;
+        }
+        .attachment-pill-remove:hover {
+            opacity: 1;
+            color: #ef4444;
+        }
+
+        /* 输入框拖拽呼吸高亮 */
+        .gpt-input-box.drag-over {
+            border-color: #6366f1 !important;
+            background: rgba(99, 102, 241, 0.035) !important;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+        }
+
+        /* 消息流内附件渲染 (Timeline) */
+        .stream-attachments-wrap {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        body[data-theme="light"] .stream-attachments-wrap,
+        body.theme-light .stream-attachments-wrap {
+            border-top-color: rgba(0, 0, 0, 0.08);
+        }
+        .stream-attachment-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 4px 10px 4px 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 11.5px;
+            text-decoration: none !important;
+            color: var(--text-main);
+            transition: all 0.15s ease;
+        }
+        body[data-theme="light"] .stream-attachment-card,
+        body.theme-light .stream-attachment-card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .stream-attachment-card:hover {
+            border-color: #6366f1;
+            transform: translateY(-1px);
+        }
+        .stream-attachment-image-card {
+            position: relative;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            cursor: zoom-in;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        body[data-theme="light"] .stream-attachment-image-card,
+        body.theme-light .stream-attachment-image-card {
+            border-color: #cbd5e1;
+        }
+        .stream-attachment-image-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+        }
+        .stream-attachment-img {
+            width: 84px;
+            height: 60px;
+            object-fit: cover;
+            display: block;
+        }
+        .stream-attachment-img-badge {
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            font-size: 9px;
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
         /* 2. 思维推演微胶囊 (Thinking Capsule & Drawer) */
         .stream-thought-box {
             margin-bottom: 12px;
@@ -7718,17 +7862,25 @@
                 </div>
 
                 <!-- 输入框上方常驻任务卡 (Pinned Bottom Task Capsule，参考主流 Agent 架构) -->
-                <div class="gpt-input-box">
+                <div class="gpt-input-box" id="gptInputBox">
+                <!-- 需求附件微胶囊托盘 (Antigravity 范式) -->
+                <div id="inputAttachmentTray" class="attachment-tray d-none"></div>
                 <!-- 具身工作记忆与活跃实体快捷胶囊 (DeepSeek Harness + Muse) -->
                 <div id="workingMemoryCapsuleBar" class="d-none working-memory-capsule-bar"></div>
                 <!-- 自适应多行文本输入框 -->
 
 
-                <textarea id="taskInputText" class="gpt-textarea" rows="1" placeholder="输入测试目标或追加指令..." oninput="onInputTextChange()"></textarea>
+                <textarea id="taskInputText" class="gpt-textarea" rows="1" placeholder="输入测试目标或追加指令，支持 Ctrl+V 粘贴截图 / 拖入用例文档..." oninput="onInputTextChange()"></textarea>
 
                 <!-- 胶囊底部工具栏 -->
                 <div class="gpt-toolbar">
                     <div class="d-flex align-items-center gap-2">
+                        <!-- 极简别针附件上传按钮 (Antigravity 范式) -->
+                        <button class="pill-btn attachment-btn px-2 me-0.5" type="button" id="btnAttachmentTrigger" onclick="triggerAttachmentSelect(event)" title="添加需求文档或设计截图 (.md, .txt, .docx, .pdf, 图片)">
+                            <i class="bi bi-paperclip" style="font-size: 13px;"></i>
+                        </button>
+                        <input type="file" id="attachmentFileInput" multiple accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.md,.txt,.json" class="d-none" onchange="handleAttachmentFileInput(event)">
+
                         <!-- 待测应用选择胶囊 (带真机安装状态指示灯，点击呼出轻量切换小弹窗) -->
                         <div class="position-relative" id="pillAppWrapper">
                             <div class="pill-btn" onclick="toggleCustomPopover('appPopover', event)" title="选择真机已安装应用或本地 APK">
@@ -11076,7 +11228,7 @@
                 }
             } else {
                 if (inputTa && inputTa.placeholder.includes("【未连真机】")) {
-                    inputTa.placeholder = "描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）...";
+                    inputTa.placeholder = "输入测试目标或追加指令，支持 Ctrl+V 粘贴截图 / 拖入用例文档...";
                 }
                 if (btnSend) {
                     btnSend.classList.remove("btn-send-disabled");
@@ -12456,6 +12608,7 @@
 
         function buildBlockHtml(blk, sessionData) {
             if (blk.type === "user_message") {
+                const attsHtml = (Array.isArray(blk.attachments) && blk.attachments.length > 0) ? buildAttachmentsPreviewHtml(blk.attachments) : '';
                 return `
                     <div class="stream-user-row" id="${blk.block_id}">
                         <div class="stream-user-prompt">
@@ -12466,6 +12619,7 @@
                             <div class="stream-user-prompt-content">
                                 ${escapeHtml(blk.content || '')}
                             </div>
+                            ${attsHtml}
                         </div>
                     </div>
                 `;
@@ -14999,6 +15153,10 @@ function renderChatStream(sessionData) {
             btn.classList.add("btn-send-pulse");
             btn.innerHTML = `<span class="spinner-grow spinner-grow-sm" style="width: 10px; height: 10px;"></span>`;
 
+            // 提取当前挂载的多模态需求资产并立即清空托盘
+            const attachmentsToSend = [...currentAttachments];
+            clearAttachments();
+
             try {
                 // 分支 A: 如果当前已有处于激活状态的会话，执行单任务连续对话（打断/修正/追加意图），不新建会话
                 if (activeSessionId) {
@@ -15006,6 +15164,9 @@ function renderChatStream(sessionData) {
                     formData.append("message", goal);
                     formData.append("provider", currentActiveProvider);
                     formData.append("model", currentActiveModel);
+                    if (attachmentsToSend.length > 0) {
+                        formData.append("attachments", JSON.stringify(attachmentsToSend));
+                    }
 
                     // 🚀 对标 DeepSeek / Linear 交互机制：0ms 乐观上屏 (Optimistic UI)
                     const flow = document.getElementById("messagesFlow");
@@ -15016,10 +15177,18 @@ function renderChatStream(sessionData) {
                     if (flow) {
                         const emptyBox = document.getElementById("emptyStateBox");
                         if (emptyBox) emptyBox.classList.add("d-none");
+                        const attsOptHtml = attachmentsToSend.length > 0 ? buildAttachmentsPreviewHtml(attachmentsToSend) : '';
                         const userRowHtml = `
                             <div class="stream-user-row" id="${tempBlockId}">
-                                <div class="stream-user-bubble">
-                                    ${escapeHtml(goal)}
+                                <div class="stream-user-prompt">
+                                    <div class="stream-user-prompt-meta">
+                                        <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
+                                        <span>用户目标</span>
+                                    </div>
+                                    <div class="stream-user-prompt-content">
+                                        ${escapeHtml(goal)}
+                                    </div>
+                                    ${attsOptHtml}
                                 </div>
                             </div>
                             <div class="stream-thought-box" id="${tempThId}">
@@ -15106,10 +15275,18 @@ function renderChatStream(sessionData) {
                 let optTimerB = null;
 
                 if (flow) {
+                    const attsOptHtml = attachmentsToSend.length > 0 ? buildAttachmentsPreviewHtml(attachmentsToSend) : '';
                     const userRowHtml = `
                         <div class="stream-user-row" id="${tempUserBlockId}">
-                            <div class="stream-user-bubble">
-                                ${escapeHtml(goal)}
+                            <div class="stream-user-prompt">
+                                <div class="stream-user-prompt-meta">
+                                    <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
+                                    <span>用户目标</span>
+                                </div>
+                                <div class="stream-user-prompt-content">
+                                    ${escapeHtml(goal)}
+                                </div>
+                                ${attsOptHtml}
                             </div>
                         </div>
                         <div class="stream-thought-box" id="${tempThoughtBlockId}">
@@ -15158,6 +15335,9 @@ function renderChatStream(sessionData) {
                 const formData = new FormData();
                 formData.append("goal", goal);
                 formData.append("devices", selectedDevIds.join(","));
+                if (attachmentsToSend.length > 0) {
+                    formData.append("attachments", JSON.stringify(attachmentsToSend));
+                }
                 formData.append("test_mode", "real");
                 formData.append("approval_mode", currentApprovalMode);
                 formData.append("case_name", "matrix_flow");
@@ -17147,6 +17327,205 @@ async function replaySolidifiedCase(safeRef, btnEl) {
             const bs = bootstrap.Modal.getOrCreateInstance(modalEl);
             bs.show();
         }
+
+        /* ==================== 多模态需求资产交互逻辑 (Antigravity 范式) ==================== */
+        let currentAttachments = [];
+
+        function triggerAttachmentSelect(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const fileInput = document.getElementById("attachmentFileInput");
+            if (fileInput) fileInput.click();
+        }
+
+        async function handleAttachmentFileInput(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            await uploadAndAttachFiles(Array.from(files));
+            e.target.value = "";
+        }
+
+        async function uploadAndAttachFiles(fileList) {
+            if (!fileList || fileList.length === 0) return;
+            const tray = document.getElementById("inputAttachmentTray");
+            if (tray) tray.classList.remove("d-none");
+
+            // 0ms 乐观添加占位微胶囊
+            const tempIds = [];
+            fileList.forEach(file => {
+                const tempId = "att_temp_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+                tempIds.push(tempId);
+                const tempPill = document.createElement("div");
+                tempPill.className = "attachment-pill";
+                tempPill.id = tempId;
+                tempPill.innerHTML = `
+                    <span class="spinner-border spinner-border-sm text-primary" style="width: 10px; height: 10px; border-width: 1.5px;"></span>
+                    <span class="attachment-pill-name">${escapeHtml(file.name || '上传中...')}</span>
+                `;
+                if (tray) tray.appendChild(tempPill);
+            });
+
+            try {
+                const formData = new FormData();
+                fileList.forEach(file => formData.append("files", file));
+                const res = await fetch("/api/upload", { method: "POST", body: formData });
+                const data = await res.json();
+
+                // 移除临时占位
+                tempIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.remove();
+                });
+
+                if (data && data.success && Array.isArray(data.files)) {
+                    data.files.forEach(fMeta => {
+                        currentAttachments.push(fMeta);
+                    });
+                    renderAttachmentTray();
+                } else {
+                    alert((data && data.message) ? data.message : "附件上传失败");
+                }
+            } catch (err) {
+                console.error("上传多模态需求资产异常:", err);
+                tempIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.remove();
+                });
+                alert("附件上传网络连接异常，请重试");
+            }
+        }
+
+        function renderAttachmentTray() {
+            const tray = document.getElementById("inputAttachmentTray");
+            if (!tray) return;
+            if (!currentAttachments || currentAttachments.length === 0) {
+                tray.innerHTML = "";
+                tray.classList.add("d-none");
+                return;
+            }
+            tray.classList.remove("d-none");
+            let html = "";
+            currentAttachments.forEach((att, idx) => {
+                let iconOrThumb = "";
+                if (att.is_image) {
+                    iconOrThumb = `<img src="${att.url}" class="attachment-pill-thumb" alt="" />`;
+                } else if (att.suffix === ".docx" || att.suffix === ".doc") {
+                    iconOrThumb = `<i class="bi bi-file-earmark-word text-primary" style="font-size: 13px;"></i>`;
+                } else if (att.suffix === ".pdf") {
+                    iconOrThumb = `<i class="bi bi-file-earmark-pdf text-danger" style="font-size: 13px;"></i>`;
+                } else {
+                    iconOrThumb = `<i class="bi bi-file-earmark-text text-info" style="font-size: 13px;"></i>`;
+                }
+                const displayName = att.filename || "需求附件";
+                const displaySize = att.size || "";
+                html += `
+                    <div class="attachment-pill" title="${escapeHtml(displayName)} (${displaySize})">
+                        ${iconOrThumb}
+                        <span class="attachment-pill-name">${escapeHtml(displayName)}</span>
+                        <span class="attachment-pill-size">${escapeHtml(displaySize)}</span>
+                        <span class="attachment-pill-remove" onclick="removeAttachment(${idx}, event)" title="移除此附件">×</span>
+                    </div>
+                `;
+            });
+            tray.innerHTML = html;
+        }
+
+        function removeAttachment(idx, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            currentAttachments.splice(idx, 1);
+            renderAttachmentTray();
+        }
+
+        function clearAttachments() {
+            currentAttachments = [];
+            renderAttachmentTray();
+        }
+
+        function buildAttachmentsPreviewHtml(attachments) {
+            if (!Array.isArray(attachments) || attachments.length === 0) return "";
+            let itemsHtml = "";
+            attachments.forEach(att => {
+                const displayName = att.filename || "需求附件";
+                const displaySize = att.size || "";
+                if (att.is_image) {
+                    itemsHtml += `
+                        <div class="stream-attachment-image-card" onclick="zoomSnapshot('${att.url}', '${escapeHtml(displayName)}')" title="点击全屏放大预览截图">
+                            <img src="${att.url}" class="stream-attachment-img" alt="${escapeHtml(displayName)}" />
+                            <span class="stream-attachment-img-badge">${escapeHtml(displaySize || 'IMG')}</span>
+                        </div>
+                    `;
+                } else {
+                    let iconClass = "bi-file-earmark-text text-info";
+                    if (att.suffix === ".docx" || att.suffix === ".doc") iconClass = "bi-file-earmark-word text-primary";
+                    else if (att.suffix === ".pdf") iconClass = "bi-file-earmark-pdf text-danger";
+
+                    itemsHtml += `
+                        <a href="${att.url}" target="_blank" class="stream-attachment-card" title="查看/下载附件 ${escapeHtml(displayName)}">
+                            <i class="bi ${iconClass}" style="font-size: 14px;"></i>
+                            <span class="stream-attachment-name" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(displayName)}</span>
+                            <span class="text-sub font-mono" style="font-size: 10px; opacity: 0.85;">${escapeHtml(displaySize)}</span>
+                            <i class="bi bi-box-arrow-up-right ms-1 text-sub" style="font-size: 10px;"></i>
+                        </a>
+                    `;
+                }
+            });
+            return `<div class="stream-attachments-wrap">${itemsHtml}</div>`;
+        }
+
+        // 初始化多模态事件监听 (Ctrl+V 粘贴截图 / 拖拽释放文档)
+        document.addEventListener("DOMContentLoaded", function() {
+            const taskInputEl = document.getElementById("taskInputText");
+            if (taskInputEl) {
+                taskInputEl.addEventListener("paste", async function(e) {
+                    const clipboard = e.clipboardData;
+                    if (!clipboard || !clipboard.items) return;
+                    const imageFiles = [];
+                    for (let i = 0; i < clipboard.items.length; i++) {
+                        const item = clipboard.items[i];
+                        if (item.type && item.type.indexOf("image") !== -1) {
+                            const blob = item.getAsFile();
+                            if (blob) {
+                                const filename = `paste_img_${Date.now()}_${i+1}.png`;
+                                const file = new File([blob], filename, { type: blob.type || "image/png" });
+                                imageFiles.push(file);
+                            }
+                        }
+                    }
+                    if (imageFiles.length > 0) {
+                        e.preventDefault();
+                        await uploadAndAttachFiles(imageFiles);
+                    }
+                });
+            }
+
+            const gptBoxEl = document.getElementById("gptInputBox");
+            if (gptBoxEl) {
+                gptBoxEl.addEventListener("dragover", function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    gptBoxEl.classList.add("drag-over");
+                });
+                gptBoxEl.addEventListener("dragleave", function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    gptBoxEl.classList.remove("drag-over");
+                });
+                gptBoxEl.addEventListener("drop", async function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    gptBoxEl.classList.remove("drag-over");
+                    const dt = e.dataTransfer;
+                    if (dt && dt.files && dt.files.length > 0) {
+                        await uploadAndAttachFiles(Array.from(dt.files));
+                    }
+                });
+            }
+        });
     </script>
 
 </body>

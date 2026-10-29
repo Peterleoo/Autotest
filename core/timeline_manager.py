@@ -10,13 +10,14 @@ class TimelineManager:
     """
 
     @staticmethod
-    def create_user_block(content: str, turn_id: int = 0) -> Dict[str, Any]:
+    def create_user_block(content: str, turn_id: int = 0, attachments: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         return {
             "block_id": f"blk_user_{turn_id}_{uuid.uuid4().hex[:6]}",
             "type": "user_message",
             "turn_id": turn_id,
             "status": "COMPLETED",
             "content": content,
+            "attachments": attachments or [],
             "timestamp": datetime.now().strftime("%H:%M:%S")
         }
 

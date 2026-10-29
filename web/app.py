@@ -14,7 +14,8 @@ logger = logging.getLogger("WebApp")
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks, Body
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+import uuid
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -31,6 +32,11 @@ from core.report_generator import ReportGenerator, REPORTS_DIR
 from core.task_manager import TaskManager
 from core.auth_manager import AuthManager
 from core.screen_stream_hub import screen_stream_hub
+from core.document_extractor import DocumentExtractor
+
+# 多模态需求资产上传与缓存目录
+UPLOADS_DIR = BASE_DIR / "data" / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Autotest Web Console", description="移动端 AI 自动化测试操作平台")
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
@@ -682,6 +688,57 @@ async def upload_app_package(file: UploadFile = File(...)):
         }
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "message": f"上传失败: {str(e)}"})
+
+@app.post("/api/upload")
+async def upload_requirement_attachment(files: List[UploadFile] = File(...)):
+    """
+    多模态测试需求资产上传中心 (Antigravity 范式)
+    支持文档 (.docx, .pdf, .md, .txt, .json) 与视觉参考图 (.png, .jpg, .jpeg, .webp)
+    内置轻量零依赖文本提取与元数据构建
+    """
+    try:
+        uploaded_results = []
+        for f in files:
+            if not f.filename:
+                continue
+            orig_name = f.filename
+            safe_stem = re.sub(r"[^\w\.-]", "_", Path(orig_name).stem)[:40]
+            ext = Path(orig_name).suffix.lower()
+            unique_name = f"up_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}_{safe_stem}{ext}"
+            dest_file = UPLOADS_DIR / unique_name
+            content = await f.read()
+            dest_file.write_bytes(content)
+            
+            meta = DocumentExtractor.get_file_metadata(str(dest_file), original_filename=orig_name)
+            uploaded_results.append(meta)
+        return {"success": True, "files": uploaded_results}
+    except Exception as e:
+        logger.error(f"上传多模态需求资产失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"上传失败: {str(e)}"})
+
+@app.get("/api/uploads/{filename}")
+async def get_uploaded_attachment(filename: str):
+    """安全获取已上传的多模态需求文档或测试截图"""
+    if ".." in filename or "/" in filename or "\\" in filename:
+        return JSONResponse(status_code=400, content={"error": "非法文件名"})
+    file_path = UPLOADS_DIR / filename
+    if not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "附件未找到"})
+    
+    suffix = file_path.suffix.lower()
+    media_map = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".pdf": "application/pdf",
+        ".txt": "text/plain; charset=utf-8",
+        ".md": "text/markdown; charset=utf-8",
+        ".json": "application/json"
+    }
+    media_type = media_map.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
 
 ALL_SUGGESTED_CASES = [
     {
@@ -1718,12 +1775,23 @@ async def create_task_session(
     app_package: Optional[str] = Form(None),
     app_label: Optional[str] = Form(None),
     app_activity: Optional[str] = Form(None),
-    app_id: Optional[str] = Form(None)
+    app_id: Optional[str] = Form(None),
+    attachments: Optional[str] = Form(None)
 ):
-    """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型"""
+    """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型与多模态需求附件"""
     device_ids = []
     if devices and devices != "auto":
         device_ids = [d.strip() for d in devices.split(",") if d.strip()]
+    
+    parsed_attachments = None
+    if attachments:
+        try:
+            parsed_attachments = json.loads(attachments)
+            if not isinstance(parsed_attachments, list):
+                parsed_attachments = None
+        except Exception:
+            parsed_attachments = None
+
     session_id = task_mgr.create_session(
         goal=goal,
         device_ids=device_ids,
@@ -1736,7 +1804,8 @@ async def create_task_session(
         app_package=app_package,
         app_label=app_label,
         app_activity=app_activity,
-        app_id=app_id
+        app_id=app_id,
+        attachments=parsed_attachments
     )
     return {"success": True, "session_id": session_id, "message": "测试会话已创建"}
 
@@ -1815,11 +1884,21 @@ async def append_session_message(
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
     app_label: Optional[str] = Form(None),
-    app_activity: Optional[str] = Form(None)
+    app_activity: Optional[str] = Form(None),
+    attachments: Optional[str] = Form(None)
 ):
-    """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，支持动态切换模型"""
+    """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，支持动态切换模型与多模态附件"""
     try:
-        res = task_mgr.append_session_message(session_id, message, provider=provider, model=model)
+        parsed_attachments = None
+        if attachments:
+            try:
+                parsed_attachments = json.loads(attachments)
+                if not isinstance(parsed_attachments, list):
+                    parsed_attachments = None
+            except Exception:
+                parsed_attachments = None
+
+        res = task_mgr.append_session_message(session_id, message, provider=provider, model=model, attachments=parsed_attachments)
         return res
     except Exception as e:
         return JSONResponse(status_code=400, content={"success": False, "message": str(e)})

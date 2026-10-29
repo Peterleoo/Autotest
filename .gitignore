@@ -83,3 +83,6 @@ Thumbs.db
 # ==============================================================================
 tests/solidified/xianghe_zhaofang/
 apps/credentials.json
+
+data/uploads/*
+!data/uploads/.gitkeep
