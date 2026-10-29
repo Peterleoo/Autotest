@@ -7118,49 +7118,68 @@
 
         .antigravity-action-tile, .agent-tool-row {
             width: 100%;
-            border-radius: 6px;
+            border-radius: 5px;
             background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.055);
+            border: 1px solid rgba(255, 255, 255, 0.045);
             overflow: hidden;
             cursor: pointer;
-            transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+            transition: all 0.12s ease;
             user-select: none;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }
         body[data-theme="light"] .antigravity-action-tile,
         body[data-theme="light"] .agent-tool-row,
         body.theme-light .antigravity-action-tile,
         body.theme-light .agent-tool-row {
-            background: #ffffff;
-            border-color: rgba(0, 0, 0, 0.07);
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            background: rgba(0, 0, 0, 0.015);
+            border-color: rgba(0, 0, 0, 0.04);
+            box-shadow: none !important;
         }
         .antigravity-action-tile:hover, .agent-tool-row:hover {
             background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.1);
         }
         body[data-theme="light"] .antigravity-action-tile:hover,
         body[data-theme="light"] .agent-tool-row:hover,
         body.theme-light .antigravity-action-tile:hover,
         body.theme-light .agent-tool-row:hover {
-            background: #f8fafc;
-            border-color: rgba(0, 0, 0, 0.12);
+            background: rgba(0, 0, 0, 0.035);
+            border-color: rgba(0, 0, 0, 0.08);
         }
         .antigravity-action-tile.running, .agent-tool-row.action-running {
-            border-color: rgba(99, 102, 241, 0.4);
-            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+            background: rgba(99, 102, 241, 0.05) !important;
+            border-color: rgba(99, 102, 241, 0.35) !important;
+            box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15);
         }
         .antigravity-action-tile.warn, .agent-tool-row.tool-row-warn {
-            border-color: rgba(239, 68, 68, 0.35);
-            background: rgba(239, 68, 68, 0.04);
+            border-color: rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.03);
         }
 
         .action-tile-main, .tool-row-main {
-            height: 34px;
-            padding: 0 10px;
+            height: 31px;
+            padding: 0 8px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+        }
+        .action-terminal-note {
+            color: var(--text-muted);
+            font-size: 10px;
+            margin-bottom: 2px;
+            opacity: 0.8;
+            word-break: break-word;
+        }
+        .step-thinking-inline {
+            font-size: 11px;
+            color: var(--text-sub);
+            padding: 1px 4px;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: baseline;
+            gap: 5px;
+            line-height: 1.45;
+            opacity: 0.85;
         }
         .action-tile-icon, .tool-action-icon {
             font-size: 11.5px;
@@ -10041,17 +10060,7 @@
                                 window._streamThoughtState[blk.block_id] = true;
                             }
                         }
-                        // 🛡️ 单项操作详情展开保护（点击行查看参数与反馈详情不被重置）
-                        if (blk.type === "step_execution" || blk.type === "step_result") {
-                            existingEl.querySelectorAll(".antigravity-action-tile, .agent-tool-row").forEach(row => {
-                                const detail = row.querySelector(".action-tile-drawer, .tool-row-detail");
-                                if (detail && !detail.classList.contains("d-none") && row.dataset.actIdx !== undefined) {
-                                    window._actionDetailState = window._actionDetailState || {};
-                                    window._actionDetailState[`${blk.block_id}_act_${row.dataset.actIdx}`] = true;
-                                    if (existingEl.id) window._actionDetailState[`${existingEl.id}_act_${row.dataset.actIdx}`] = true;
-                                }
-                            });
-                        }
+                        // 🛡️ 遵循生命周期自动流转：仅保持用户显式手动展开的动作，绝不把上轮运行态反向锁死为永久展开！
                         if (blk.type === "todo_list") {
                             const curTodoBody = existingEl.querySelector(".stream-todo-body");
                             if (curTodoBody && !curTodoBody.classList.contains("d-none")) {
@@ -10085,10 +10094,12 @@
                 }
             }
 
-            // 🛡️ 待验收门禁卡片（仅在 READY_FOR_REVIEW 时呈现，保障测试达成后直观验收）
+            // 🛡️ 待验收门禁决策：若交付物主卡片 (test-result-summary-card) 已存在，已合二为一自释闭环，彻底移除独立的冗余门禁卡片
             const isReadyForReview = (sessionData.status === "READY_FOR_REVIEW");
+            const hasSummaryInDom = (summaryCards.length > 0);
             let gateEl = flow.querySelector(".review-gate-card");
-            if (isReadyForReview) {
+            if (isReadyForReview && !hasSummaryInDom) {
+                // 仅在无主交付物卡片的极罕见降级场景保留兜底
                 const sid = sessionData.session_id || activeSessionId;
                 const delivCount = Array.isArray(sessionData.deliverables) ? sessionData.deliverables.length : 4;
                 const gateHtml = `
@@ -10117,12 +10128,10 @@
                 `;
                 if (!gateEl) {
                     flow.insertAdjacentHTML("beforeend", gateHtml);
-                } else {
-                    if (gateEl.innerHTML !== gateHtml) {
-                        const tempDiv = document.createElement("div");
-                        tempDiv.innerHTML = gateHtml;
-                        gateEl.replaceWith(tempDiv.firstElementChild);
-                    }
+                } else if (gateEl.innerHTML !== gateHtml) {
+                    const tempDiv = document.createElement("div");
+                    tempDiv.innerHTML = gateHtml;
+                    gateEl.replaceWith(tempDiv.firstElementChild);
                 }
             } else if (gateEl) {
                 gateEl.remove();
@@ -12239,6 +12248,8 @@
         window._userExplicitStepState = window._userExplicitStepState || {};
         window._actionDetailState = window._actionDetailState || {};
 
+        window._userExplicitActionState = window._userExplicitActionState || {};
+
         function toggleActionDetail(el, event) {
             if (event) event.stopPropagation();
             const detail = el.querySelector(".action-tile-drawer, .tool-row-detail");
@@ -12252,7 +12263,7 @@
             const box = el.closest(".stream-step-node, .agent-trace-box");
             if (box && el.dataset && el.dataset.actIdx !== undefined) {
                 const k = box.id + "_act_" + el.dataset.actIdx;
-                window._actionDetailState[k] = !isHidden;
+                window._userExplicitActionState[k] = !isHidden;
             }
         }
 
@@ -12440,7 +12451,8 @@
             if (blk.type === "step_execution" || blk.type === "step_result") {
                 const acts = blk.actions || [];
                 const isRunning = (blk.status === "RUNNING");
-                const isSessionSuccess = (sessionData.is_success !== false) && (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || sessionData.status === "PASS");
+                const isSessionFinished = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || sessionData.status === "PASS");
+                const isSessionSuccess = (sessionData.is_success !== false) && isSessionFinished;
                 const isFailed = !isSessionSuccess && (blk.status === "FAILED" || blk.status === "FAIL");
                 
                 if (acts.length === 0 && !isRunning && !isFailed) {
@@ -12449,11 +12461,18 @@
 
                 window._userExplicitStepState = window._userExplicitStepState || {};
                 const sId = blk.step_id || 1;
+                
+                // 🛡️ 终极生命周期折叠状态机：
+                // 1. 若大师显式手动点击过该步骤，100% 尊重大师显式意图
+                // 2. 若整个测试会话已完成达成 (isSessionFinished)，历史步骤一律 100% 自动折叠！
+                // 3. 执行中会话：只有正在运行的步骤展开，已完成的步骤自动折叠收拢！
                 let isExpanded = false;
                 if (window._userExplicitStepState[blk.block_id] !== undefined) {
                     isExpanded = window._userExplicitStepState[blk.block_id];
                 } else if (window._userExplicitStepState["step_" + sId] !== undefined) {
                     isExpanded = window._userExplicitStepState["step_" + sId];
+                } else if (isSessionFinished) {
+                    isExpanded = false;
                 } else {
                     isExpanded = (isRunning || isFailed);
                 }
@@ -12466,15 +12485,18 @@
                     displayDuration = '0.8s';
                 }
 
-                // 步骤内单行 Thinking
+                // 弱化沉浸式思维链
                 let thinkingHtml = "";
                 const thinkingObj = blk.thinking || {};
-                const thinkingText = (typeof thinkingObj === 'string') ? thinkingObj : (thinkingObj.content || thinkingObj.situation || "");
+                let thinkingText = (typeof thinkingObj === 'string') ? thinkingObj : (thinkingObj.content || thinkingObj.situation || "");
                 if (thinkingText) {
+                    // 若包含大段判断，截取核心
+                    thinkingText = thinkingText.replace(/【当前界面判断】[：:]\s*/g, '');
+                    if (thinkingText.length > 80) thinkingText = thinkingText.slice(0, 78) + '...';
                     thinkingHtml = `
-                        <div class="d-flex align-items-center gap-1.5 mb-1 px-1 text-muted" style="font-size: 11px;">
-                            <span class="thought-pulse-dot" style="width: 4.5px; height: 4.5px; background: #6366f1;"></span>
-                            <span class="font-mono" style="opacity: 0.85;">${escapeHtml(thinkingText)}</span>
+                        <div class="step-thinking-inline font-mono">
+                            <span style="color: #6366f1; opacity: 0.7;">//</span>
+                            <span>${escapeHtml(thinkingText)}</span>
                         </div>
                     `;
                 }
@@ -12496,21 +12518,40 @@
                     if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
                         iconHtml = '<i class="bi bi-hand-index"></i>';
                         verb = "点击";
+                    } else if (/按键|key|back|home/i.test(rawName) || /press_key|back/i.test(act.type || '') || /按键/i.test(rawTarget)) {
+                        iconHtml = '<i class="bi bi-keyboard"></i>';
+                        verb = "按键";
                     } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
                         iconHtml = '<i class="bi bi-eye"></i>';
                         verb = "视觉感知";
                     } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
-                        iconHtml = '<i class="bi bi-keyboard"></i>';
-                        verb = "文本键入";
+                        iconHtml = '<i class="bi bi-input-cursor-text"></i>';
+                        verb = "键入";
                     } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
                         iconHtml = '<i class="bi bi-arrow-down-up"></i>';
-                        verb = "滑动手势";
+                        verb = "滑动";
                     } else if (/等待|wait/i.test(rawName) || /wait/i.test(act.type || '')) {
                         iconHtml = '<i class="bi bi-hourglass-split"></i>';
                         verb = "等待";
                     } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
                         iconHtml = '<i class="bi bi-shield-check text-success"></i>';
-                        verb = "断言校验";
+                        verb = "校验";
+                    }
+
+                    // 动宾提炼：防止几十个字塞爆单行
+                    let distilledTarget = rawTarget;
+                    let intentionNote = "";
+                    if (rawTarget.length > 18) {
+                        intentionNote = rawTarget;
+                        for (const kw of ['返回键', '返回', '主界面', '主页', '搜索框', '搜索', '微信', '登录', '确定', '取消', '引导页', '轮播图', '隐私弹窗']) {
+                            if (rawTarget.includes(kw)) {
+                                distilledTarget = kw;
+                                break;
+                            }
+                        }
+                        if (distilledTarget.length > 16) {
+                            distilledTarget = rawTarget.slice(0, 14) + '...';
+                        }
                     }
 
                     let paramHtml = "";
@@ -12518,12 +12559,25 @@
                         paramHtml = `<span class="action-tile-param">${escapeHtml(act.param)}</span>`;
                     }
 
+                    // 🛡️ 动作抽屉展开自动机：
+                    // 正在执行的动作自动展开 Terminal 抽屉！已完成的动作自动关闭收叠！
                     const actDetailKey = `${blk.block_id}_act_${actIdx}`;
-                    const isDetailOpen = window._actionDetailState && window._actionDetailState[actDetailKey] === true;
+                    let isDetailOpen = false;
+                    if (window._userExplicitActionState && window._userExplicitActionState[actDetailKey] !== undefined) {
+                        isDetailOpen = window._userExplicitActionState[actDetailKey];
+                    } else if (isRunningAct) {
+                        isDetailOpen = true; // 正在执行自动展开!
+                    } else {
+                        isDetailOpen = false; // 已完成自动折叠收拢!
+                    }
+
                     const costTimeHtml = rawCostTime ? `<span class="font-mono text-muted" style="font-size: 10px;">${escapeHtml(rawCostTime)}</span>` : '';
 
                     // 控制台抽屉内容
                     let drawerContent = "";
+                    if (intentionNote) {
+                        drawerContent += `<div class="action-terminal-note font-mono">// 意图: ${escapeHtml(intentionNote)}</div>`;
+                    }
                     if (codeSnippet) {
                         drawerContent += `
                             <div class="action-terminal-command">
@@ -12544,7 +12598,7 @@
                         drawerContent = `
                             <div class="action-terminal-output text-muted">
                                 <span class="terminal-arrow">↳</span>
-                                <span>底层通道响应正常</span>
+                                <span>真机通道响应正常</span>
                             </div>
                         `;
                     }
@@ -12556,15 +12610,15 @@
                                     <span class="action-tile-icon">${iconHtml}</span>
                                     <span class="action-tile-verb">${escapeHtml(verb)}</span>
                                     <span class="action-tile-sep">·</span>
-                                    <span class="action-tile-target text-truncate">${escapeHtml(rawTarget)}</span>
+                                    <span class="action-tile-target text-truncate">${escapeHtml(distilledTarget)}</span>
                                     ${paramHtml}
                                 </div>
                                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
                                     ${costTimeHtml}
                                     <span class="action-tile-status">
-                                        ${isRunningAct ? '<span class="action-mini-spinner"></span>' : (isFailedAct ? '<i class="bi bi-x-circle text-danger" style="font-size: 11.5px;"></i>' : '<i class="bi bi-check2 text-success" style="font-size: 12.5px;"></i>')}
+                                        ${isRunningAct ? '<span class="action-mini-spinner"></span>' : (isFailedAct ? '<i class="bi bi-x-circle text-danger" style="font-size: 11px;"></i>' : '<i class="bi bi-check2 text-success" style="font-size: 12px;"></i>')}
                                     </span>
-                                    <i class="bi bi-chevron-down action-tile-chevron" style="font-size: 8.5px; opacity: 0.45;"></i>
+                                    <i class="bi bi-chevron-down action-tile-chevron" style="font-size: 8px; opacity: 0.45; transform: ${isDetailOpen ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
                                 </div>
                             </div>
                             <div class="action-tile-drawer ${isDetailOpen ? '' : 'd-none'}">
@@ -12574,14 +12628,18 @@
                     `;
                 });
 
-                const stepTitle = blk.title ? blk.title : `步骤 ${sId}`;
+                // 🛡️ 标题文案净化：彻底消除重复的 "验证通过 验证通过 ✅"
+                let cleanTitle = blk.title ? String(blk.title) : `步骤 ${sId}`;
+                cleanTitle = cleanTitle.replace(/(?:验证通过|验证受阻|Step\s*\d+:?|\s*✅|\s*❌)+/g, '').trim();
+                cleanTitle = cleanTitle.replace(/^[:：\-—\s]+/, '').trim() || `步骤 ${sId}`;
+                const stepNodeHeading = `Step ${sId}: ${cleanTitle}`;
 
                 return `
                     <div class="stream-step-node" id="${blk.block_id}" data-step-id="${sId}">
                         <div class="stream-step-node-header d-flex align-items-center justify-content-between" onclick="toggleStreamStep('${blk.block_id}', '${sId}')">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="step-node-dot ${isRunning ? 'running' : (isFailed ? 'failed' : 'completed')}"></span>
-                                <span class="step-node-title fw-medium">${escapeHtml(stepTitle)}</span>
+                                <span class="step-node-title fw-medium">${escapeHtml(stepNodeHeading)}</span>
                                 <span class="font-mono text-muted" style="font-size: 10.5px; opacity: 0.75;">· ${acts.length} 动作</span>
                             </div>
                             <div class="d-flex align-items-center gap-1.5">
@@ -12624,6 +12682,8 @@
                 const sid = blk.session_id || sessionData.session_id || activeSessionId;
                 const isBlocked = (blk.status === "BLOCKED" || sessionData.status === "BLOCKED");
                 const isPass = (blk.status === "PASS" && !isBlocked);
+                const isReviewState = (sessionData.status === "READY_FOR_REVIEW");
+                const isCompletedState = (sessionData.status === "COMPLETED");
                 const verdictClass = isPass ? "verdict-pass" : (isBlocked ? "verdict-blocked" : "verdict-fail");
                 const verdictBadgeText = isPass ? "全链路达成" : (isBlocked ? "业务受阻 / 待补前置" : "未达成");
                 const verdictBadgeColor = isPass ? "var(--status-green)" : (isBlocked ? "#f59e0b" : "#ef4444");
@@ -12773,12 +12833,17 @@
 
                 return `
                     <div class="test-result-summary-card ${verdictClass}" id="${blk.block_id}">
-                        <!-- 顶层单行裁定抬头与聚合指标 (极简自释) -->
+                        <!-- 顶层单行裁定抬头与聚合指标 (极简自释 + 状态合一) -->
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="mono-pill ${isPass ? 'pass-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isPass ? 'PASS' : 'FAIL'}</span>
                                 <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>
                                 <span style="color: var(--status-green); font-size: 11px; font-family: var(--font-mono);"><i class="bi bi-shield-check"></i> 0 异常</span>
+                                ${isReviewState ? `
+                                    <span class="badge" style="background: rgba(14, 165, 233, 0.12); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.25); font-size: 10px; font-weight: 500; border-radius: 4px; padding: 2px 7px;">待验收</span>
+                                ` : (isCompletedState ? `
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); font-size: 10px; font-weight: 500; border-radius: 4px; padding: 2px 7px;">已验收</span>
+                                ` : '')}
                             </div>
                             <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
                                 ${blk.timestamp ? `<span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp)}</span>` : ''}
@@ -12798,7 +12863,7 @@
                         <!-- 极简细线留白 -->
                         <div class="summary-divider"></div>
 
-                        <!-- 底部工具栏 (主路径优先 + Linear 风格工具坞) -->
+                        <!-- 底部一体化工具与决策坞 (主路径优先 + 验收流转闭环) -->
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-0.5">
                             <div class="d-flex align-items-center gap-2">
                                 <button class="btn-linear-primary" onclick="openReportInRightDrawer('${sid}')" title="在右侧检视窗口展开 Markdown 全景测试报告">
@@ -12821,15 +12886,26 @@
                                     </button>
                                 `}
                             </div>
-                            <div class="d-flex align-items-center gap-1.5">
-                                <button class="btn-linear-ghost" onclick="replaySolidifiedCase('${escapeHtml(solidFile)}')" title="脱机秒级重放该用例">
-                                    <i class="bi bi-play-fill text-success"></i>
-                                    <span>秒级回测</span>
-                                </button>
-                                <button class="btn-linear-ghost" onclick="copyMarkdownReport('${sid}')" title="复制完整 Markdown 报告至剪贴板">
-                                    <i class="bi bi-clipboard"></i>
-                                    <span>复制</span>
-                                </button>
+                            <div class="d-flex align-items-center gap-2">
+                                ${isReviewState ? `
+                                    <button class="btn-linear-secondary text-warning" onclick="openReworkDialog('${sid}')" title="指出具体修正事项打回返工" style="border-color: rgba(245, 158, 11, 0.35);">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                        <span>要求返工</span>
+                                    </button>
+                                    <button class="btn-linear-primary" onclick="acceptSession('${sid}')" title="正式验收通过本次自动化测试交付物并封板归档" style="background: #10b981; color: #ffffff; border-color: #10b981; box-shadow: 0 1px 4px rgba(16, 185, 129, 0.35);">
+                                        <i class="bi bi-check-lg"></i>
+                                        <span>验收通过</span>
+                                    </button>
+                                ` : `
+                                    <button class="btn-linear-ghost" onclick="replaySolidifiedCase('${escapeHtml(solidFile)}')" title="脱机秒级重放该用例">
+                                        <i class="bi bi-play-fill text-success"></i>
+                                        <span>秒级回测</span>
+                                    </button>
+                                    <button class="btn-linear-ghost" onclick="copyMarkdownReport('${sid}')" title="复制完整 Markdown 报告至剪贴板">
+                                        <i class="bi bi-clipboard"></i>
+                                        <span>复制</span>
+                                    </button>
+                                `}
                             </div>
                         </div>
                     </div>
@@ -12853,6 +12929,8 @@
                 }
                 const sid = blk.session_id || sessionData.session_id || activeSessionId;
                 const isSolidified = !!sessionData.is_solidified;
+                const isReviewState = (sessionData.status === "READY_FOR_REVIEW");
+                const isCompletedState = (sessionData.status === "COMPLETED");
                 
                 // 从报告内容或 sessionData 中提取精炼信息 (2~3 行摘要)
                 let passRate = "100%";
@@ -13122,25 +13200,7 @@ function renderChatStream(sessionData) {
             if (emptyBox) emptyBox.classList.add("d-none");
             flow.classList.remove("d-none");
 
-            // 🛡️ 状态守卫：在全量重构 innerHTML 之前，先扫描当前 DOM 中所有展开的容器与单项操作，把展开状态固化，严禁轮询重置
-            flow.querySelectorAll(".agent-trace-box").forEach(box => {
-                const bId = box.id;
-                const sId = box.dataset.stepId;
-                const body = box.querySelector(".agent-trace-body");
-                if (body && !body.classList.contains("d-none")) {
-                    window._streamStepState = window._streamStepState || {};
-                    if (bId) window._streamStepState[bId] = true;
-                    if (sId) window._streamStepState["step_" + sId] = true;
-                }
-                // 动作内单项操作详情展开保护
-                box.querySelectorAll(".agent-tool-row").forEach(row => {
-                    const detail = row.querySelector(".tool-row-detail");
-                    if (detail && !detail.classList.contains("d-none") && row.dataset.actIdx !== undefined) {
-                        window._actionDetailState = window._actionDetailState || {};
-                        if (bId) window._actionDetailState[`${bId}_act_${row.dataset.actIdx}`] = true;
-                    }
-                });
-            });
+            // 🛡️ 状态守卫：遵循生命周期自动折叠，仅保留用户显式手动展开的记录
 
             // 任务清单与推演展开状态保护
             flow.querySelectorAll(".stream-todo-card").forEach(todo => {
@@ -13416,9 +13476,11 @@ function renderChatStream(sessionData) {
                 `;
             });
 
-            // 3. 待验收门禁高光卡片 (仅在 READY_FOR_REVIEW 时展现)
+            // 3. 待验收门禁决策 (已无缝融合进主交付物卡片，避免两个卡片上下割裂)
             let reviewGateHtml = "";
-            if (isReadyForReview) {
+            const hasSummaryBlock = (sessionData.timeline_blocks || []).some(b => b.type === "test_summary");
+            if (isReadyForReview && !hasSummaryBlock) {
+                // 仅在无主交付物卡片的极罕见降级场景保留兜底展现
                 reviewGateHtml = `
                     <div class="review-gate-card">
                         <div class="d-flex align-items-center justify-content-between mb-2">
