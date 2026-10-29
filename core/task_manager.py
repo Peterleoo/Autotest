@@ -1647,10 +1647,16 @@ class TaskManager:
         cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name, "--device", device_id, "--turn-id", str(turn_id)]
         if session.get("app_filename"):
             cmd.extend(["--app", session["app_filename"]])
+        if session.get("app_package"):
+            cmd.extend(["--package", session["app_package"]])
         if session.get("provider"):
             cmd.extend(["--provider", session["provider"]])
         if session.get("session_id"):
             cmd.extend(["--session-id", session["session_id"]])
+        # 子进程 stdout 被管道接管，必须显式声明 UTF-8，否则 Windows 默认 GBK 会因 emoji 日志崩溃
+        child_env = os.environ.copy()
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env["PYTHONUTF8"] = "1"
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -1658,6 +1664,7 @@ class TaskManager:
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=child_env,
             cwd=str(BASE_DIR),
             bufsize=1
         )

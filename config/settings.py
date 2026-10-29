@@ -8,24 +8,29 @@ load_dotenv(BASE_DIR / ".env")
 
 # 自动检测并注入 Android SDK 环境变量（跨平台用户目录与多路径自适应寻址）
 home = Path.home()
-candidate_sdks = [
-    Path(os.environ.get("ANDROID_HOME", "")),
-    Path(os.environ.get("ANDROID_SDK_ROOT", "")),
+candidate_sdks = []
+for env_key in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+    env_val = os.environ.get(env_key, "").strip()
+    if env_val:
+        candidate_sdks.append(Path(env_val))
+candidate_sdks.extend([
     home / "AppData/Local/Android/Sdk",
     home / "Android/Sdk",
     Path("/usr/local/share/android-sdk"),
     Path("/opt/android-sdk")
-]
+])
 for sdk in candidate_sdks:
-    if str(sdk) and sdk.exists():
-        if "ANDROID_HOME" not in os.environ:
-            os.environ["ANDROID_HOME"] = str(sdk)
-        if "ANDROID_SDK_ROOT" not in os.environ:
-            os.environ["ANDROID_SDK_ROOT"] = str(sdk)
-        pt_dir = str(sdk / "platform-tools")
-        if pt_dir not in os.environ.get("PATH", ""):
-            os.environ["PATH"] = pt_dir + os.pathsep + os.environ.get("PATH", "")
-        break
+    # 必须是真实 SDK 目录，避免空环境变量被 Path("") 解析成 "." 后误命中
+    if not sdk.is_dir():
+        continue
+    if not ((sdk / "platform-tools").is_dir() or (sdk / "build-tools").is_dir()):
+        continue
+    os.environ["ANDROID_HOME"] = str(sdk)
+    os.environ["ANDROID_SDK_ROOT"] = str(sdk)
+    pt_dir = str(sdk / "platform-tools")
+    if pt_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = pt_dir + os.pathsep + os.environ.get("PATH", "")
+    break
 
 class Settings:
     # 基础目录

@@ -85,7 +85,7 @@ class VisionOCR:
                 "-File", str(HELPER_PS1),
                 "-ImagePath", tmp_path
             ]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
             if res.returncode == 0 and res.stdout.strip():
                 raw_json = res.stdout.strip()
                 # 提取 JSON 部分

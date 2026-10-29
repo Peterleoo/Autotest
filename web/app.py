@@ -4,15 +4,17 @@ import sys
 import time
 import json
 import shutil
+import socket
 import logging
 import subprocess
 import threading
 import asyncio
 from datetime import datetime
+from urllib.parse import urlparse
 
 logger = logging.getLogger("WebApp")
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks, Body
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -54,6 +56,18 @@ async def index(request: Request):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+def _is_appium_available(timeout: float = 0.5) -> bool:
+    """探测 Appium 服务是否真实可连通，避免把未接入的 iOS 占位节点当成可用真机。"""
+    try:
+        parsed = urlparse(settings.APPIUM_SERVER_URL)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or (443 if parsed.scheme == "https" else 4723)
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
 
 # ================= 优化：设备列表内存级低开销缓存 (5秒 TTL，杜绝高频 ADB 子进程与物理点击探针) =================
 _DEVICE_CACHE = {"timestamp": 0.0, "data": None}
@@ -105,13 +119,16 @@ async def get_devices(probe: bool = False, force: bool = False):
     except Exception as e:
         pass
 
-    ios_node = {
-        "id": "remote-ios",
-        "model": settings.IOS_DEVICE_NAME,
-        "platform": "iOS",
-        "version": settings.IOS_PLATFORM_VERSION,
-        "status": f"局域网 Mac: {settings.APPIUM_SERVER_URL}"
-    }
+    # iOS 节点仅在 Appium 服务真实可连通时才对外暴露，避免占位设备被误选为目标真机
+    ios_node = None
+    if _is_appium_available():
+        ios_node = {
+            "id": "remote-ios",
+            "model": settings.IOS_DEVICE_NAME,
+            "platform": "iOS",
+            "version": settings.IOS_PLATFORM_VERSION,
+            "status": f"局域网 Mac: {settings.APPIUM_SERVER_URL}"
+        }
 
     result = {"android_devices": devices, "ios_node": ios_node}
     _DEVICE_CACHE["timestamp"] = now
@@ -1615,6 +1632,20 @@ async def create_task_session(
     device_ids = []
     if devices and devices != "auto":
         device_ids = [d.strip() for d in devices.split(",") if d.strip()]
+    if "remote-ios" in device_ids and not _is_appium_available():
+        device_ids = [d for d in device_ids if d != "remote-ios"]
+        if not device_ids:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "所选 iOS 节点未接入：本机 Appium 未启动，请改选 Android 真机后重试。"}
+            )
+    if app_filename:
+        app_filename = Path(app_filename).name
+        if not (settings.APPS_DIR / app_filename).exists():
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": f"所选待测应用不存在：{app_filename}，请重新上传或选择应用包。"}
+            )
     session_id = task_mgr.create_session(
         goal=goal,
         device_ids=device_ids,
@@ -2289,11 +2320,18 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             }
         
         cmd = [sys.executable, "-u", "run_ai_test.py", "--goal", goal, "--name", case_name]
+        # 子进程输出统一 UTF-8，避免 Windows 管道默认 GBK 导致 emoji 日志崩溃 / 中文乱码
+        child_env = os.environ.copy()
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env["PYTHONUTF8"] = "1"
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=child_env,
             cwd=str(BASE_DIR),
             bufsize=1
         )

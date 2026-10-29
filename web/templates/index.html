@@ -14246,11 +14246,12 @@ function renderChatStream(sessionData) {
 
         // ================= 12. 待测应用库、真机安装管理与状态联动 =================
         let currentActiveApp = {
-            filename: "demo_app.apk",
-            label: "示例待测应用",
-            package: "com.example.app",
-            version: "1.0.0",
-            size: "0 MB",
+            filename: "",
+            label: "未选择应用",
+            package: "",
+            activity: "",
+            version: "",
+            size: "",
             isInstalled: false
         };
         let cachedAppList = [];
@@ -14355,6 +14356,7 @@ function renderChatStream(sessionData) {
                 filename: appObj.filename,
                 label: appObj.label || appObj.filename,
                 package: appObj.package,
+                activity: appObj.activity || "",
                 version: appObj.version || "1.0",
                 size: appObj.size || "",
                 isInstalled: false
@@ -14425,6 +14427,34 @@ function renderChatStream(sessionData) {
                 const res = await fetch("/api/apps");
                 const data = await res.json();
                 cachedAppList = data.apps || [];
+
+                // 校正当前待测应用：失效则自动选第一个；存在则同步最新包名/Activity，杜绝沿用 demo_app.apk
+                const matchedApp = cachedAppList.find(a => currentActiveApp && a.filename === currentActiveApp.filename);
+                if (!matchedApp && cachedAppList.length > 0) {
+                    const first = cachedAppList[0];
+                    currentActiveApp = {
+                        filename: first.filename,
+                        label: first.label || first.filename,
+                        package: first.package || "",
+                        activity: first.activity || "",
+                        version: first.version || "1.0",
+                        size: first.size || "",
+                        isInstalled: false
+                    };
+                    try { localStorage.setItem("autotest_active_app", JSON.stringify(currentActiveApp)); } catch (e) {}
+                    if (typeof updateAppPillUI === "function") updateAppPillUI();
+                } else if (matchedApp) {
+                    currentActiveApp = {
+                        ...currentActiveApp,
+                        filename: matchedApp.filename,
+                        label: matchedApp.label || matchedApp.filename,
+                        package: matchedApp.package || currentActiveApp.package,
+                        activity: matchedApp.activity || currentActiveApp.activity,
+                        version: matchedApp.version || currentActiveApp.version,
+                        size: matchedApp.size || currentActiveApp.size
+                    };
+                    try { localStorage.setItem("autotest_active_app", JSON.stringify(currentActiveApp)); } catch (e) {}
+                }
 
                 if (countBadge) countBadge.innerText = `${cachedAppList.length} 个安装包`;
 

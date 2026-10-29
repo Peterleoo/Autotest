@@ -364,7 +364,7 @@ class AITestAgent:
                     dev_info = device_knowledge_mgr.get_device_fingerprint(dev_id or "")
 
                     # 抓取最近底层 logcat
-                    res_log = subprocess.run([device_knowledge_mgr.adb_bin, "-s", dev_id, "logcat", "-d", "-t", "40"], capture_output=True, text=True, timeout=3) if dev_id else None
+                    res_log = subprocess.run([device_knowledge_mgr.adb_bin, "-s", dev_id, "logcat", "-d", "-t", "40"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3) if dev_id else None
                     log_text = res_log.stdout if res_log else ""
 
                     # 优先匹配已知机型知识，无记录则 AI 自动学习并保存

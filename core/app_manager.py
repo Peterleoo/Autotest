@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import subprocess
 import logging
 from pathlib import Path
@@ -19,7 +20,6 @@ class AppManager:
 
     def _find_adb(self) -> str:
         """解析 adb 路径，优先环境变量，其次检查 SDK 常见路径"""
-        import shutil
         adb_in_path = shutil.which("adb")
         if adb_in_path:
             return adb_in_path
@@ -64,12 +64,33 @@ class AppManager:
                 logger.warning(f"aapt 解析失败: {e}")
         return info
 
+    def get_installed_apk_size(self, package: str, device_id: Optional[str] = None) -> int:
+        """获取真机上已安装 APK 的字节大小，用于判断设备现装包是否就是所选安装包。"""
+        try:
+            base = [self.adb_bin]
+            if device_id:
+                base.extend(["-s", device_id])
+            res = subprocess.run(base + ["shell", "pm", "path", package], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
+            remote_path = ""
+            for line in (res.stdout or "").splitlines():
+                if line.startswith("package:"):
+                    remote_path = line[len("package:"):].strip()
+                    break
+            if not remote_path:
+                return 0
+            res2 = subprocess.run(base + ["shell", "stat", "-c", "%s", remote_path], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
+            return int((res2.stdout or "0").strip() or 0)
+        except Exception:
+            return 0
+
     def find_target_app(self, app_name: Optional[str] = None) -> Optional[Path]:
-        """从 apps 目录定位安装包"""
+        """从 apps 目录定位安装包；显式指定但不存在时绝不静默回退到其他包"""
         if app_name:
             target = self.apps_dir / app_name
             if target.exists():
                 return target
+            logger.warning(f"指定安装包不存在: {app_name}")
+            return None
 
         ext = ".apk" if self.platform == "android" else ".ipa"
         found = list(self.apps_dir.glob(f"*{ext}"))

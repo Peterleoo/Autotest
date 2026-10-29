@@ -64,7 +64,7 @@ class NativeADBDriver:
 
     def _detect_device(self):
         try:
-            res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
             lines = res.stdout.strip().split("\n")[1:]
         except Exception as e:
             raise ConnectionError(f"无法执行 ADB 获取设备列表: {e}")
@@ -89,7 +89,7 @@ class NativeADBDriver:
                     logger.warning(f"设备 [{self.device_id}] 处于 offline 状态，尝试执行 adb reconnect...")
                     subprocess.run([self.adb_bin, "reconnect", "offline"], capture_output=True, timeout=5)
                     time.sleep(1)
-                    res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, timeout=5)
+                    res = subprocess.run([self.adb_bin, "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
                     for l in res.stdout.strip().split("\n")[1:]:
                         p = l.split()
                         if len(p) >= 2 and p[0] == self.device_id and p[1] == "device":
@@ -130,7 +130,7 @@ class NativeADBDriver:
         if self.device_id:
             full_cmd.extend(["-s", self.device_id])
         full_cmd.extend(cmd_args)
-        return subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
+        return subprocess.run(full_cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
     @property
     def page_source(self) -> str:
