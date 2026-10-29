@@ -1323,14 +1323,21 @@ class TaskManager:
 
         if is_fg and scene == "APP_DETAIL_PAGE":
             steps_def.append(("从当前房源详情页返回", "检测到当前停留在历史房源详情页，优先点击左上角返回或按返回键归位至列表/首页"))
+        elif is_fg and scene == "APP_SEARCH_PAGE":
+            steps_def.append(("从当前搜索页退回首页", "检测到当前应用停留在搜索页面，优先按返回键或点击取消退回首页主界面"))
         elif is_fg and scene == "APP_LIST_PAGE":
             # 当前已经处于房源列表，过滤掉目标中可能存在的重复'进入列表/点击二手房'子句
             def _is_nav_clause(c_text: str) -> bool:
                 c_clean_nav = re.sub(r"['\"“”‘’\s]", "", c_text)
                 return any(k in c_clean_nav for k in ["二手房入口", "进入二手房", "点击二手房", "进入列表", "打开二手房", "二手房列表"])
             clauses = [c for c in clauses if not _is_nav_clause(c)]
-        elif is_fg and scene in ["APP_HOME_PAGE", "APP_RUNNING"]:
-            # 应用已在首页/前台，无需冷启动
+        elif is_fg and scene in ["APP_HOME_PAGE"]:
+            # 应用已在首页，无需冷启动
+            pass
+        elif is_fg and scene == "APP_RUNNING":
+            # 若应用在前台但非主界面，且任务目标需要从首页开始
+            if any(k in goal for k in ["首页", "二手房", "新房", "租房", "穿透", "Tab", "导航", "冷启动", "委托"]):
+                steps_def.append(("退回应用首页", "检测到当前应用处于非主屏分支界面，优先按返回键归位至首页"))
             pass
         elif is_fg and scene == "APP_LOGIN_BARRIER":
             steps_def.append(("前置登录拦截自愈", "检测到端侧弹出登录授权浮层，自动勾选协议并填充白名单测试号放行"))
