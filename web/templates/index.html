@@ -2547,36 +2547,173 @@
             letter-spacing: 0.5px !important;
             padding: 6px 10px 4px !important;
         }
+        .settings-modal-content {
+            border-radius: 14px !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55) !important;
+            overflow: hidden !important;
+            background: #14151b !important;
+        }
+        body.theme-light .settings-modal-content,
+        body[data-theme="light"] .settings-modal-content {
+            background: #ffffff !important;
+            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12) !important;
+        }
+        .settings-sidebar {
+            width: 220px !important;
+            background-color: rgba(255, 255, 255, 0.015) !important;
+            border-right: 1px solid var(--border-subtle) !important;
+            padding: 14px 10px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            flex-shrink: 0 !important;
+        }
+        body.theme-light .settings-sidebar,
+        body[data-theme="light"] .settings-sidebar {
+            background-color: #f8fafc !important;
+            border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
+        }
         .settings-nav-item {
             display: flex !important;
             align-items: center !important;
-            gap: 10px !important;
-            padding: 8px 12px !important;
-            border-radius: 6px !important;
+            gap: 9px !important;
+            padding: 7px 11px !important;
+            border-radius: 8px !important;
             color: var(--text-sub) !important;
             font-size: 12.5px !important;
             font-weight: 500 !important;
             cursor: pointer !important;
             transition: all 0.15s ease !important;
             border: 1px solid transparent !important;
-            border-left: 2.5px solid transparent !important;
         }
         .settings-nav-item:hover {
-            background-color: var(--bg-surface-hover, rgba(255, 255, 255, 0.04)) !important;
+            background-color: rgba(255, 255, 255, 0.04) !important;
             color: var(--text-main) !important;
         }
+        body.theme-light .settings-nav-item:hover,
+        body[data-theme="light"] .settings-nav-item:hover {
+            background-color: rgba(0, 0, 0, 0.04) !important;
+        }
         .settings-nav-item.active {
-            background-color: rgba(255, 255, 255, 0.07) !important;
+            background-color: rgba(255, 255, 255, 0.08) !important;
             color: var(--text-main) !important;
             font-weight: 600 !important;
-            border-color: transparent !important;
-            border-left: 2.5px solid #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.06) !important;
         }
         body.theme-light .settings-nav-item.active,
         body[data-theme="light"] .settings-nav-item.active {
-            background-color: rgba(0, 0, 0, 0.05) !important;
+            background-color: #ffffff !important;
             color: #0f172a !important;
-            border-left: 2.5px solid #09090b !important;
+            border-color: rgba(0, 0, 0, 0.08) !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        }
+        .btn-fidelity-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #10b981;
+            color: #ffffff !important;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-fidelity-primary:hover {
+            background: #059669;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+        }
+        .btn-fidelity-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main) !important;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-fidelity-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--border-hover);
+        }
+        body.theme-light .btn-fidelity-secondary,
+        body[data-theme="light"] .btn-fidelity-secondary {
+            background: #ffffff;
+            border-color: rgba(0, 0, 0, 0.12);
+            color: #1e293b !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+        body.theme-light .btn-fidelity-secondary:hover,
+        body[data-theme="light"] .btn-fidelity-secondary:hover {
+            background: #f8fafc;
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+        .onboarding-hero-card {
+            background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.025));
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.07));
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            transition: all 0.2s ease;
+        }
+        body.theme-light .onboarding-hero-card,
+        body[data-theme="light"] .onboarding-hero-card {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        }
+        .onboarding-steps-track {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .onboarding-step-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            padding: 3px 10px;
+            border-radius: 9999px;
+        }
+        body.theme-light .onboarding-step-pill,
+        body[data-theme="light"] .onboarding-step-pill {
+            background: #f8fafc;
+            border-color: rgba(0, 0, 0, 0.06);
+            color: #475569;
+        }
+        .google-feature-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            color: var(--text-sub);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+        body.theme-light .google-feature-chip,
+        body[data-theme="light"] .google-feature-chip {
+            background: #f8fafc;
+            border-color: rgba(0, 0, 0, 0.06);
+            color: #334155;
         }
         .settings-sidebar-footer {
             margin-top: auto !important;
@@ -7860,62 +7997,52 @@
                             <div>
                                 <div class="settings-section-title d-flex align-items-center gap-2">
                                     <i class="bi bi-google" style="color: #4285F4;"></i>
-                                    <span>Google 官方 OAuth 授权中心</span>
+                                    <span>Google 官方授权中心</span>
                                 </div>
-                                <div class="settings-section-desc">直连 Google 官方账号凭据，解锁原生 Gemini 多模态视觉感知与深度推理。授权后方可在【AI 模型服务】与底栏中选择 Google 官方模型。</div>
+                                <div class="settings-section-desc">直连 Google 官方账号凭据，解锁 Gemini 原生端侧视觉感知与深度推理。</div>
                             </div>
-                            <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" style="font-size: 11px; border-radius: 6px;" onclick="loadAntigravityStatus(true)">
-                                <i class="bi bi-arrow-clockwise me-1"></i>刷新状态
+                            <button class="btn-fidelity-action" onclick="loadAntigravityStatus(true)" title="刷新授权状态">
+                                <i class="bi bi-arrow-clockwise"></i>
+                                <span>刷新</span>
                             </button>
                         </div>
 
-                        <!-- Google 官方专属 OAuth 高光卡片 -->
+                        <!-- Google 官方专属 OAuth 卡片 -->
                         <div class="fidelity-oauth-card mb-3" id="googleOauthBox">
-                            <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                            <div class="d-flex align-items-center gap-3 overflow-hidden me-2">
                                 <div class="fidelity-google-icon-box"><i class="bi bi-google"></i></div>
                                 <div class="text-truncate">
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <span class="fw-semibold" style="font-size: 13px; color: var(--text-main); white-space: nowrap;">Google Antigravity 官方账号凭据</span>
+                                        <span class="fw-semibold" style="font-size: 13px; color: var(--text-main); white-space: nowrap;">Google Antigravity 官方账号</span>
                                         <span class="mono-tag" id="agAuthStatusBadge" style="font-size: 9.5px; padding: 1px 7px;">
                                             检测中...
                                         </span>
                                     </div>
-                                    <div class="text-truncate" style="font-size: 11.5px; color: var(--text-muted); margin-top: 3px;" id="agAuthEmail">
+                                    <div class="text-truncate" style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="agAuthEmail">
                                         正在查询绑定 Google 账户...
                                     </div>
                                 </div>
                             </div>
-                            <!-- 重新授权 / 立即授权 按钮 -->
+                            <!-- 授权按钮 -->
                             <button class="btn-fidelity-reauth" id="btnAgLogin" onclick="triggerAntigravityLogin()">
-                                <i class="bi bi-box-arrow-up-right"></i>
-                                <span>立即连接 Google 账号</span>
+                                <i class="bi bi-box-arrow-up-right me-1"></i>
+                                <span>连接 Google 账号</span>
                             </button>
                         </div>
 
-                        <!-- 授权特权与解锁模型说明卡片 -->
-                        <div class="p-3 rounded border" style="background: rgba(255, 255, 255, 0.015); border-color: var(--border-subtle) !important;">
-                            <div class="fw-medium mb-2" style="font-size: 12px; color: var(--text-main);">
-                                <i class="bi bi-stars text-warning me-1.5"></i>授权特权与解锁能力
+                        <!-- 极简已解锁能力微徽标行 (纯粹微标签，剔除说教长文) -->
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <div class="google-feature-chip">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 11px;"></i>
+                                <span>端侧原生多模态视觉直读</span>
                             </div>
-                            <div class="d-flex flex-column gap-2" style="font-size: 11px; color: var(--text-sub); line-height: 1.55;">
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="bi bi-check-circle-fill text-success mt-0.5" style="font-size: 10px;"></i>
-                                    <div><strong>端侧物理视觉直读</strong>：高精识别 Android 原生控件层级与微小文案，置信度达 98.5%+。</div>
-                                </div>
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="bi bi-check-circle-fill text-success mt-0.5" style="font-size: 10px;"></i>
-                                    <div><strong>解锁官方多模态全系模型</strong>：授权后可在模型下拉框中直接切换 <code>gemini-3.8-flash-high</code>、<code>gemini-2.5-flash</code>、<code>gemini-2.5-pro</code>。</div>
-                                </div>
-                                <div class="d-flex align-items-start gap-2">
-                                    <i class="bi bi-check-circle-fill text-success mt-0.5" style="font-size: 10px;"></i>
-                                    <div><strong>即插即用安全凭据</strong>：基于系统内置安全 OAuth2 通道，无明文泄露风险。</div>
-                                </div>
+                            <div class="google-feature-chip">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 11px;"></i>
+                                <span>Gemini 3.8 / 2.5 全系多模态模型</span>
                             </div>
-                            <div class="mt-3 pt-2.5 border-top d-flex justify-content-between align-items-center" style="border-color: var(--border-subtle) !important;">
-                                <span class="text-muted" style="font-size: 10.5px;">完成授权后，请前往【AI 模型服务】或底栏切换至 Google 模型</span>
-                                <button class="btn btn-sm btn-primary py-0.5 px-2.5" style="font-size: 11px; border-radius: 6px;" onclick="switchSettingsTab('models')">
-                                    前往模型服务 →
-                                </button>
+                            <div class="google-feature-chip">
+                                <i class="bi bi-shield-check text-primary" style="font-size: 12px;"></i>
+                                <span>系统级 OAuth2 安全沙箱</span>
                             </div>
                         </div>
                     </div>
@@ -7926,10 +8053,10 @@
                                 <div class="settings-section-title">AI 推理服务商与可用模型</div>
                                 <div class="settings-section-desc">默认支持 DeepSeek 与 Google 授权，支持接入第三方/自定义网关。</div>
                             </div>
-                            <div class="btn-fidelity-fetch" onclick="addNewThirdPartyProvider()" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed rgba(255, 255, 255, 0.2); color: #d4d4d8;">
+                            <button type="button" class="btn-fidelity-secondary" onclick="addNewThirdPartyProvider()">
                                 <i class="bi bi-plus-lg"></i>
-                                <span>添加第三方模型服务</span>
-                            </div>
+                                <span>添加自定义服务商</span>
+                            </button>
                         </div>
 
                         <!-- 服务商并列选择卡片 -->
@@ -7943,7 +8070,7 @@
                                     </span>
                                     <span class="provider-badge-tag default-tag">默认内置</span>
                                 </div>
-                                <div style="font-size: 10.5px; color: #71717a; margin-top: 4px;">生效模型: <code id="deepseekActiveDisplay" style="color: #34d399;">deepseek-chat</code></div>
+                                <div style="font-size: 10.5px; color: #71717a; margin-top: 4px;">生效模型: <code id="deepseekActiveDisplay" style="color: var(--status-green, #10b981);">deepseek-chat</code></div>
                             </div>
 
                             <!-- 2. Google 官方 (专属授权凭据驱动) -->
@@ -7993,7 +8120,7 @@
 
                             <!-- 动态拉取在线模型条 -->
                             <div class="fidelity-fetch-bar">
-                                <div class="d-flex align-items-center gap-2" style="font-size: 11.5px; color: #34d399;">
+                                <div class="d-flex align-items-center gap-2" style="font-size: 11.5px; color: var(--status-green, #10b981);">
                                     <i class="bi bi-cloud-check-fill"></i>
                                     <span id="fetchModelsStatusText">可向服务商接口在线探测并拉取最新可用模型</span>
                                 </div>
@@ -8025,7 +8152,7 @@
                                     <!-- 自由输入追加型号 (如 deepseek-v4.0, deepseek-v4.1) -->
                                     <div class="d-flex gap-2">
                                         <input type="text" id="customModelInput" class="fidelity-input" style="flex: 1;" placeholder="输入自定义型号...">
-                                        <button class="btn btn-sm btn-outline-light" type="button" onclick="addCustomModelTag()" style="white-space: nowrap; font-size: 11px; border-radius: 6px;">
+                                        <button class="btn-fidelity-secondary py-1 px-2.5" type="button" onclick="addCustomModelTag()" style="white-space: nowrap; font-size: 11px;">
                                             <i class="bi bi-plus me-1"></i>添加型号
                                         </button>
                                     </div>
@@ -8035,14 +8162,14 @@
                             <!-- 隐藏的 select 用于向下兼容 -->
                             <select id="modelSelect" class="d-none"></select>
 
-                            <div class="d-flex justify-content-between align-items-center pt-3 border-top" style="border-color: rgba(255, 255, 255, 0.06) !important;">
-                                <button type="button" class="btn btn-sm btn-outline-light" onclick="testConnectionAction()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); color: #d4d4d8; font-size: 12px; padding: 6px 14px; border-radius: 6px;">
-                                    <i class="bi bi-lightning-charge me-1" style="color: #10b981;"></i>
+                            <div class="d-flex justify-content-between align-items-center pt-3 border-top" style="border-color: var(--border-subtle) !important;">
+                                <button type="button" class="btn-fidelity-secondary" onclick="testConnectionAction()">
+                                    <i class="bi bi-lightning-charge text-success"></i>
                                     <span>测试连通性</span>
                                 </button>
-                                <button type="button" class="btn btn-sm fw-semibold" onclick="saveModelConfigModal()" style="background: #10b981; border: none; color: #052e16; font-size: 12px; padding: 6px 18px; border-radius: 6px;">
-                                    <i class="bi bi-check2 me-1"></i>
-                                    <span>保存配置并设为当前生效</span>
+                                <button type="button" class="btn-fidelity-primary" onclick="saveModelConfigModal()">
+                                    <i class="bi bi-check2"></i>
+                                    <span>保存配置并生效</span>
                                 </button>
                             </div>
                         </div>
@@ -8134,53 +8261,48 @@
                     </div>
                     <!-- Guide panel end -->
 
-                    <!-- 右侧内容面板 5: 新手引导 -->
+                    <!-- 右侧内容面板 5: 新手引导 (重构为聚焦行动卡片) -->
                     <div class="settings-content-area d-none" id="panelSettingsGuide">
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <div>
                                 <div class="settings-section-title">新手引导与交互向导</div>
-                                <div class="settings-section-desc">通过交互式聚光灯向导，快速了解系统核心操作流程与人机协同。</div>
+                                <div class="settings-section-desc">通过交互式聚光灯向导，快速熟悉自动化测试核心操作与人机协同。</div>
                             </div>
                             <span class="badge rounded-pill bg-secondary-subtle text-secondary" id="tourStatusBadge" style="font-size: 11px;">检测状态中...</span>
                         </div>
 
-                        <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
-                            <!-- 步骤流程卡片 -->
-                            <div style="background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
-                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">1</span>
-                                    <span><strong>真机状态确认：</strong>物理真机 USB 连接并开启开发者调试，杜绝仿真；</span>
+                        <div class="onboarding-hero-card mb-3">
+                            <div class="d-flex align-items-start gap-3">
+                                <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); display: flex; align-items: center; justify-content: center; color: #3b82f6; font-size: 20px; flex-shrink: 0;">
+                                    <i class="bi bi-compass"></i>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
-                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">2</span>
-                                    <span><strong>待测应用选定：</strong>点击工具栏胶囊呼出小弹窗快速切换待测包，或进入管理上传；</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
-                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">3</span>
-                                    <span><strong>推理模型选择：</strong>支持 DeepSeek、Hermes 本地模型或 Google Antigravity；</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
-                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">4</span>
-                                    <span><strong>意图下发与规划：</strong>自然语言输入测试目标，实时推演与多轮对话执行；</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-main);">
-                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: var(--accent-subtle); border: 1px solid var(--border-medium); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;">5</span>
-                                    <span><strong>投屏与人机协同：</strong>遇登录鉴权自动弹出决策卡，支持凭证注入与手动接管。</span>
+                                <div>
+                                    <div class="fw-semibold" style="font-size: 13.5px; color: var(--text-main);">交互式聚光灯向导 (Interactive Tour)</div>
+                                    <div class="text-muted mt-1" style="font-size: 11.5px; line-height: 1.5;">系统将以聚光灯高亮指引您了解真机调试、模型推演与测试意图下发的标准业务流程。</div>
+                                    <div class="onboarding-steps-track">
+                                        <div class="onboarding-step-pill">
+                                            <i class="bi bi-phone"></i>
+                                            <span>真机就绪</span>
+                                        </div>
+                                        <i class="bi bi-arrow-right text-muted" style="font-size: 10px; opacity: 0.5;"></i>
+                                        <div class="onboarding-step-pill">
+                                            <i class="bi bi-cpu"></i>
+                                            <span>模型推演</span>
+                                        </div>
+                                        <i class="bi bi-arrow-right text-muted" style="font-size: 10px; opacity: 0.5;"></i>
+                                        <div class="onboarding-step-pill">
+                                            <i class="bi bi-play-circle"></i>
+                                            <span>执行协同</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-
-                            <!-- 调试与启动操作区 -->
-                            <div class="d-flex align-items-center gap-2">
-                                <button class="btn-fidelity-action" onclick="launchTourFromSettings()">
-                                    <i class="bi bi-play-circle-fill"></i>
-                                    <span>启动聚光灯新手向导</span>
+                            <div class="d-flex flex-column align-items-end gap-2 flex-shrink-0">
+                                <button class="btn-fidelity-primary" onclick="launchTourFromSettings()">
+                                    <i class="bi bi-play-fill" style="font-size: 14px;"></i>
+                                    <span>启动向导</span>
                                 </button>
-                                <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" onclick="resetTourGuideStatus()" style="font-size: 11.5px; border-radius: 6px;">
-                                    <i class="bi bi-arrow-counterclockwise me-1"></i>重置引导状态 (调试)
-                                </button>
-                            </div>
-                            <div class="text-muted" style="font-size: 11px;">
-                                💡 提示：重置引导后，下次打开或点击启动即可重新体验完整聚光灯流程；向导过程中支持随时点击“跳过”或按 ESC 退出。
+                                <span class="text-muted" style="font-size: 11px; cursor: pointer; text-decoration: underline;" onclick="resetTourGuideStatus()" title="清除完成标记以便重新体验">重置状态</span>
                             </div>
                         </div>
                     </div>
