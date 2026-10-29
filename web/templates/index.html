@@ -413,107 +413,8 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* 主对话区动态推荐用例组件 */
-        .app-suggest-box {
-            background-color: var(--bg-surface-elevated);
-            border: none;
-            border-radius: 12px;
-            padding: 16px;
-            margin-top: 14px;
-            width: 100%;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-            transition: all 0.2s ease;
-        }
-        .app-suggest-box:hover {
-            border-color: var(--border-hover);
-        }
-        .suggest-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: none;
-        }
-        .suggest-app-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background-color: var(--bg-main);
-            border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated);
-            border-radius: 9999px;
-            padding: 2px 10px;
-            font-size: 11.5px;
-            font-weight: 500;
-            color: var(--text-main);
-        }
-        .suggest-refresh-btn {
-            background: transparent;
-            border: 1px solid var(--border-subtle);
-            color: var(--text-sub);
-            border-radius: 9999px;
-            padding: 3px 10px;
-            font-size: 11.5px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-        .suggest-refresh-btn:hover {
-            background-color: var(--bg-surface-hover);
-            color: var(--text-main);
-            border-color: var(--border-hover);
-        }
-        .suggest-refresh-btn.rotating i {
-            animation: spinOnce 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
         @keyframes spinOnce {
             100% { transform: rotate(360deg); }
-        }
-        .suggest-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-        @media (max-width: 768px) {
-            .suggest-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        .suggest-card-item {
-            background-color: var(--bg-main);
-            border: none;
-            border-radius: 8px;
-            padding: 10px 12px;
-            cursor: pointer;
-            text-align: left;
-            transition: all 0.15s ease;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .suggest-card-item:hover {
-            background-color: var(--bg-surface-hover);
-            border-color: var(--border-hover);
-            transform: translateY(-1px);
-        }
-        .suggest-card-title {
-            font-size: 12.5px;
-            font-weight: 600;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .suggest-card-desc {
-            font-size: 11px;
-            color: var(--text-sub);
-            line-height: 1.45;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
         }
 
         /* 单色微型胶囊 (Monochrome Tags) */
@@ -6322,51 +6223,66 @@
             box-shadow: 0 2px 5px rgba(0, 122, 255, 0.12);
         }
 
-        /* 2. 模式 A (AI测试视图): 智能推荐紧凑双列微卡片 */
+        /* 2. 模式 A (AI测试视图): 极简智能测试推荐模板网格 (Linear / Raycast 范式) */
         .app-suggest-box {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 12px;
-            padding: 12px 14px;
-            margin-top: 10px;
+            background: transparent;
+            border: none;
+            padding: 4px 0 0 0;
+            margin-top: 6px;
             width: 100%;
-            transition: all 0.2s ease;
         }
         body.theme-light .app-suggest-box, body[data-theme="light"] .app-suggest-box {
-            background: rgba(0, 0, 0, 0.02);
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            background: transparent;
+            border: none;
         }
         .suggest-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 0;
+            margin-bottom: 12px;
+            padding: 0 2px;
             border-bottom: none;
+        }
+        .suggest-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            letter-spacing: 0.2px;
         }
         .suggest-app-badge {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
             border-radius: 9999px;
-            padding: 2px 9px;
+            padding: 2px 8px;
             font-size: 11px;
             font-weight: 500;
             color: var(--text-main);
+            transition: all 0.15s ease;
         }
         body.theme-light .suggest-app-badge, body[data-theme="light"] .suggest-app-badge {
-            background: #ffffff;
+            background: #f8fafc;
             border: 1px solid rgba(0, 0, 0, 0.08);
-            color: #09090b;
+            color: #0f172a;
+        }
+        .suggest-app-badge:hover {
+            border-color: var(--border-hover, rgba(255, 255, 255, 0.2));
+            background: rgba(255, 255, 255, 0.07);
+        }
+        body.theme-light .suggest-app-badge:hover, body[data-theme="light"] .suggest-app-badge:hover {
+            border-color: rgba(0, 0, 0, 0.15);
+            background: #f1f5f9;
         }
         .suggest-refresh-btn {
             background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
             color: var(--text-sub);
             border-radius: 9999px;
-            padding: 2px 9px;
+            padding: 3px 9px;
             font-size: 11px;
             display: inline-flex;
             align-items: center;
@@ -6381,57 +6297,135 @@
         }
         .suggest-refresh-btn:hover {
             color: var(--text-main);
-            border-color: var(--border-hover);
+            border-color: var(--border-hover, rgba(255, 255, 255, 0.2));
+            background: rgba(255, 255, 255, 0.05);
+        }
+        body.theme-light .suggest-refresh-btn:hover, body[data-theme="light"] .suggest-refresh-btn:hover {
+            background: #f1f5f9;
+            border-color: rgba(0, 0, 0, 0.16);
+            color: #0f172a;
+        }
+        .suggest-refresh-btn.rotating i {
+            animation: spinOnce 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .suggest-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 10px;
+            width: 100%;
         }
-        .suggest-card-item {
-            background: #14151c;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 9px 12px;
+        /* 推荐测试模板卡片 (Template Action Card) */
+        .suggest-template-card {
+            background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.025));
+            border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.07));
+            border-radius: 10px;
+            padding: 12px 14px;
             cursor: pointer;
-            text-align: left;
-            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-        }
-        body.theme-light .suggest-card-item, body[data-theme="light"] .suggest-card-item {
-            background: #ffffff;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-        }
-        .suggest-card-item:hover {
-            background: #1a1c26;
-            border-color: rgba(0, 122, 255, 0.5);
-            transform: translateY(-1px);
-            box-shadow: 0 3px 10px rgba(0, 122, 255, 0.12);
-        }
-        body.theme-light .suggest-card-item:hover, body[data-theme="light"] .suggest-card-item:hover {
-            background: #ffffff;
-            border-color: rgba(0, 0, 0, 0.22);
-            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
-        }
-        .suggest-card-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-main);
+            position: relative;
+            user-select: none;
+            transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+                        border-color 0.18s ease,
+                        background-color 0.18s ease,
+                        box-shadow 0.18s ease;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 12px;
         }
-        .suggest-card-desc {
+        body.theme-light .suggest-template-card, body[data-theme="light"] .suggest-template-card {
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.07);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+        .suggest-template-card:hover {
+            background: var(--bg-surface-hover, rgba(255, 255, 255, 0.05));
+            border-color: rgba(255, 255, 255, 0.18);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+        }
+        body.theme-light .suggest-template-card:hover, body[data-theme="light"] .suggest-template-card:hover {
+            background: #ffffff;
+            border-color: rgba(0, 0, 0, 0.15);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+        }
+        .suggest-template-card:active {
+            transform: translateY(0) scale(0.99);
+        }
+        /* 左侧微质感图标容器 */
+        .suggest-icon-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+            transition: all 0.18s ease;
+        }
+        body.theme-light .suggest-icon-box, body[data-theme="light"] .suggest-icon-box {
+            background: #f1f5f9;
+            border-color: rgba(0, 0, 0, 0.05);
+            color: #1e293b;
+        }
+        .suggest-template-card:hover .suggest-icon-box {
+            background: rgba(255, 255, 255, 0.08);
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.3);
+        }
+        body.theme-light .suggest-template-card:hover .suggest-icon-box {
+            background: #e2e8f0;
+            color: #0284c7;
+            border-color: rgba(2, 132, 199, 0.3);
+        }
+        /* 标题与描述 */
+        .suggest-template-info {
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .suggest-template-title {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-main);
+            line-height: 1.35;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        body.theme-light .suggest-template-title, body[data-theme="light"] .suggest-template-title {
+            color: #0f172a;
+        }
+        .suggest-template-desc {
             font-size: 11px;
-            color: var(--text-dim);
+            color: var(--text-muted);
             line-height: 1.4;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
             overflow: hidden;
+        }
+        body.theme-light .suggest-template-desc, body[data-theme="light"] .suggest-template-desc {
+            color: #64748b;
+        }
+        /* 右侧自释箭头 */
+        .suggest-card-arrow {
+            flex-shrink: 0;
+            font-size: 12px;
+            color: var(--text-muted);
+            opacity: 0;
+            transform: translate(-3px, 3px);
+            transition: all 0.18s ease;
+        }
+        .suggest-template-card:hover .suggest-card-arrow {
+            opacity: 0.9;
+            transform: translate(0, 0);
+            color: var(--text-main);
+        }
+        body.theme-light .suggest-template-card:hover .suggest-card-arrow {
+            color: #0f172a;
         }
 
         /* 3. 底部悬浮控制台 (Floating Glass Dock: 像素级 780px 与上方推荐卡片绝对居中对齐) */
@@ -7045,58 +7039,7 @@
             background: var(--bg-surface-hover, rgba(255,255,255,0.06));
         }
 
-        /* 业务旅程套件 (Journey Suites - Linear / Raycast 范式) */
-        .journey-suite-card {
-            background: var(--bg-surface-elevated, rgba(255,255,255,0.03));
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 12px 14px;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .journey-suite-card:hover {
-            border-color: rgba(16, 185, 129, 0.4);
-            background: var(--bg-surface-hover, rgba(255,255,255,0.06));
-            transform: translateY(-1px);
-        }
-        .journey-badge {
-            font-size: 10px;
-            font-weight: 600;
-            padding: 2px 8px;
-            border-radius: 9999px;
-        }
-        .badge-activation {
-            background: rgba(59, 130, 246, 0.12);
-            color: #3b82f6;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-        }
-        .badge-core {
-            background: rgba(16, 185, 129, 0.12);
-            color: #10b981;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-        .badge-edge {
-            background: rgba(245, 158, 11, 0.12);
-            color: #f59e0b;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-        .journey-stages-track {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            flex-wrap: wrap;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .journey-stage-step {
-            background: rgba(255, 255, 255, 0.04);
-            padding: 1px 6px;
-            border-radius: 4px;
-            border: 1px solid var(--border-subtle);
-        }
+        /* 业务旅程与单点场景样式已收敛合并至极简测试推荐模板 .suggest-template-card */
 
     
         /* 多机型视觉差异对比看板 (Phase 4 Matrix) */
@@ -7308,31 +7251,20 @@
                     <!-- 新任务空状态：中央智能测试用例推荐网格与真机就绪看板 -->
                     <div class="empty-state-box" id="emptyStateBox">
 
-                        <!-- 动态智能用例推荐组件 (上传应用后动态生成推荐用例 + 🔄 换一批刷新) -->
+                        <!-- 动态智能用例推荐组件 (极简推荐测试模板 + 🔄 换一批刷新) -->
                         <div class="app-suggest-box" id="appSuggestBox">
                             <div class="suggest-header">
                                 <div class="d-flex align-items-center gap-2">
-                                    <i class="bi bi-stars" style="color: var(--text-main); font-size: 14px;"></i>
-                                    <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">智能用例推荐</span>
+                                    <span class="suggest-section-title">
+                                        <i class="bi bi-stars me-1.5" style="font-size: 12px;"></i>推荐测试模板
+                                    </span>
                                     <div class="suggest-app-badge" id="currentSuggestAppBadge" title="当前生成用例的目标应用（点击切换）" onclick="toggleCustomPopover('appPopover', event)" style="cursor: pointer;">
-                                        <i class="bi bi-box-seam" style="font-size: 11px;"></i>
+                                        <i class="bi bi-box-seam" style="font-size: 10px;"></i>
                                         <span id="suggestTargetAppLabel">待测应用</span>
                                         <i class="bi bi-chevron-down ms-0.5" style="font-size: 9px; opacity: 0.7;"></i>
                                     </div>
-                                    <button class="btn btn-sm py-0 px-2" style="font-size: 11px; color: var(--text-sub); border: 1px dashed var(--border-subtle); border-radius: 9999px;" onclick="toggleCustomPopover('appPopover', event)" title="选择真机已安装应用或上传本地 APK">
-                                        <i class="bi bi-phone me-1"></i>更换应用
-                                    </button>
                                 </div>
-                                <!-- 旅程套件 vs 单点场景模式切换器 (Journey Synthesizer) -->
-                                <div class="d-flex align-items-center gap-1 p-0.5 rounded" style="background: var(--bg-surface-elevated, rgba(255,255,255,0.05)); border: 1px solid var(--border-subtle); border-radius: 9999px;">
-                                    <button type="button" class="btn btn-xs py-0.5 px-2 fw-medium suggest-mode-pill active" id="btnModeJourney" onclick="switchSuggestMode('journey')" style="font-size: 11px; border-radius: 9999px; border: none; background: rgba(16, 185, 129, 0.15); color: #10b981;">
-                                        <i class="bi bi-signpost-2 me-1"></i>业务旅程
-                                    </button>
-                                    <button type="button" class="btn btn-xs py-0.5 px-2 fw-medium suggest-mode-pill" id="btnModeSingle" onclick="switchSuggestMode('single')" style="font-size: 11px; border-radius: 9999px; border: none; background: transparent; color: var(--text-muted);">
-                                        <i class="bi bi-lightning-charge me-1"></i>单点用例
-                                    </button>
-                                </div>
-                                <button class="suggest-refresh-btn" id="btnRefreshSuggestCases" onclick="refreshAppSuggestedCases()" title="换一批不同业务场景测试用例">
+                                <button class="suggest-refresh-btn" id="btnRefreshSuggestCases" onclick="refreshAppSuggestedCases()" title="换一批不同业务场景测试模板">
                                     <i class="bi bi-arrow-clockwise"></i>
                                     <span>换一批</span>
                                 </button>
@@ -7340,7 +7272,7 @@
                             <!-- 动态用例卡片网格 -->
                             <div class="suggest-grid" id="suggestCasesGrid">
                                 <div class="p-3 text-center text-muted w-100 col-span-2" style="grid-column: 1 / -1; font-size: 12px;">
-                                    <span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span> 正在根据待测应用生成智能推荐用例...
+                                    <span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span> 正在根据待测应用生成推荐测试模板...
                                 </div>
                             </div>
                         </div>
@@ -15349,7 +15281,11 @@ function renderChatStream(sessionData) {
 
         function applyCaseGoal(goal) {
             fillPrompt(goal);
-            bootstrap.Modal.getInstance(document.getElementById("suggestedCasesModal")).hide();
+            const modalEl = document.getElementById("suggestedCasesModal");
+            if (modalEl && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
         }
 
         // ================= 12. 待测应用库、真机直调与状态联动 =================
@@ -16233,95 +16169,62 @@ function renderChatStream(sessionData) {
             }
         }
 
-        window._suggestMode = window._suggestMode || 'journey';
         window._suggestDataCache = null;
 
-        function switchSuggestMode(mode) {
-            window._suggestMode = mode;
-            const btnJ = document.getElementById("btnModeJourney");
-            const btnS = document.getElementById("btnModeSingle");
-            if (btnJ && btnS) {
-                if (mode === 'journey') {
-                    btnJ.style.background = 'rgba(16, 185, 129, 0.15)';
-                    btnJ.style.color = '#10b981';
-                    btnS.style.background = 'transparent';
-                    btnS.style.color = 'var(--text-muted)';
-                } else {
-                    btnS.style.background = 'rgba(16, 185, 129, 0.15)';
-                    btnS.style.color = '#10b981';
-                    btnJ.style.background = 'transparent';
-                    btnJ.style.color = 'var(--text-muted)';
-                }
+        function getSuggestTemplateIcon(suite, idx) {
+            const sid = (suite.id || '').toLowerCase();
+            const title = (suite.title || '').toLowerCase();
+            if (sid.includes('onboarding') || title.includes('初访') || title.includes('启动') || title.includes('激活')) {
+                return 'bi-rocket-takeoff';
             }
-            if (window._suggestDataCache) {
-                renderSuggestContent(window._suggestDataCache);
-            } else {
-                refreshAppSuggestedCases();
+            if (sid.includes('core') || title.includes('核心') || title.includes('主线') || title.includes('转化') || title.includes('搜索')) {
+                return 'bi-compass';
             }
+            if (sid.includes('edge') || title.includes('防御') || title.includes('异常') || title.includes('逆向') || title.includes('容错')) {
+                return 'bi-shield-check';
+            }
+            const fallbackIcons = ['bi-rocket-takeoff', 'bi-compass', 'bi-shield-check', 'bi-lightning-charge'];
+            return fallbackIcons[idx % fallbackIcons.length];
         }
 
         function renderSuggestContent(data) {
             const grid = document.getElementById("suggestCasesGrid");
             if (!grid) return;
 
-            if (window._suggestMode === 'journey') {
-                const suites = data.journey_suites || [];
-                if (suites.length === 0) {
-                    grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无端到端旅程套件，可切换单点用例模式</div>`;
-                    return;
-                }
-                grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(280px, 1fr))";
-                let html = "";
-                suites.forEach((s, sIdx) => {
-                    let stagesHtml = "";
-                    (s.stages || []).forEach((st, stIdx) => {
-                        stagesHtml += `<span class="journey-stage-step">${stIdx + 1}. ${escapeHtml(st)}</span>`;
-                        if (stIdx < (s.stages.length - 1)) stagesHtml += `<span style="opacity: 0.4;">➔</span>`;
-                    });
-
-                    html += `
-                        <div class="journey-suite-card" onclick="pickJourneySuite(${sIdx})">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="journey-badge ${s.badge_class || 'badge-core'}">${escapeHtml(s.badge)}</span>
-                                    <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">${escapeHtml(s.title)}</span>
-                                </div>
-                                <span class="text-success" style="font-size: 11px; font-weight: 500;">一键载入旅程 <i class="bi bi-arrow-right-short"></i></span>
-                            </div>
-                            <div class="text-muted text-truncate" style="font-size: 11.5px; line-height: 1.5;" title="${escapeHtml(s.summary)}">
-                                ${escapeHtml(s.summary)}
-                            </div>
-                            <div class="journey-stages-track mt-1">
-                                ${stagesHtml}
-                            </div>
-                        </div>
-                    `;
-                });
-                grid.innerHTML = html;
-            } else {
-                const cases = data.cases || [];
-                grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(240px, 1fr))";
-                if (cases.length === 0) {
-                    grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无可推荐用例，可直接在下方输入框描述意图</div>`;
-                    return;
-                }
-                let html = "";
-                cases.forEach((c, idx) => {
-                    const levelClass = c.level === 'P0' ? 'mono-tag-active' : '';
-                    html += `
-                        <div class="suggest-card-item" onclick="pickSuggestedCase(${idx})">
-                            <div class="suggest-card-title">
-                                <span class="mono-tag ${levelClass}" style="font-size: 9px;">${c.level || 'P1'}</span>
-                                <span class="text-truncate" style="font-size: 12px;">${escapeHtml(c.title)}</span>
-                            </div>
-                            <div class="suggest-card-desc" title="${escapeHtml(c.goal)}">
-                                ${escapeHtml(c.goal)}
-                            </div>
-                        </div>
-                    `;
-                });
-                grid.innerHTML = html;
+            const suites = data.journey_suites || [];
+            const cases = data.cases || [];
+            
+            // 优先展示高价值端到端场景模板，若无则回退展示单点精选用例
+            const isSuites = suites.length > 0;
+            const items = isSuites ? suites : cases;
+            if (items.length === 0) {
+                grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无可推荐模板，可直接在下方输入框描述测试意图</div>`;
+                return;
             }
+
+            let html = "";
+            items.forEach((item, idx) => {
+                const icon = isSuites ? getSuggestTemplateIcon(item, idx) : 'bi-lightning-charge';
+                const title = item.title || '测试场景模板';
+                const desc = item.summary || item.goal || '';
+                const clickHandler = isSuites ? `pickJourneySuite(${idx})` : `pickSuggestedCase(${idx})`;
+
+                html += `
+                    <div class="suggest-template-card" onclick="${clickHandler}" title="点击一键载入测试意图">
+                        <div class="suggest-icon-box">
+                            <i class="bi ${icon}"></i>
+                        </div>
+                        <div class="suggest-template-info">
+                            <div class="suggest-template-title">${escapeHtml(title)}</div>
+                            <div class="suggest-template-desc" title="${escapeHtml(desc)}">${escapeHtml(desc)}</div>
+                        </div>
+                        <div class="suggest-card-arrow">
+                            <i class="bi bi-arrow-up-right"></i>
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
         }
 
         function pickJourneySuite(idx) {
