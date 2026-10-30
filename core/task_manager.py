@@ -516,7 +516,7 @@ class TaskManager:
                 has_fail = True
             devices_data[dev_id] = {
                 "device_id": dev_id,
-                "model": dev_info["model"],
+                "model": dev_info.get("model", "Android 真机"),
                 "platform": plat,
                 "status": dev_info.get("status", "IDLE"),
                 "step": dev_info.get("step", 0),
@@ -545,7 +545,7 @@ class TaskManager:
             "thinking": s.get("thinking", {}),
             "clarification": s.get("clarification"),
             "platforms": list(platforms) if platforms else ["Android"],
-            "created_at": s["created_at"],
+            "created_at": s.get("created_at", datetime.now().strftime("%H:%M:%S")),
             "test_mode": s.get("test_mode", "real"),
             "provider": s.get("provider", "hermes"),
             "model": s.get("model", "deepseek-flash"),
@@ -554,7 +554,10 @@ class TaskManager:
             "report_url": s.get("report_url", ""),
             "timeline_blocks": s.get("timeline_blocks", []),
             "attachments": s.get("attachments", []),
-            "hitl_decision": s.get("hitl_decision")
+            "hitl_decision": s.get("hitl_decision"),
+            "is_systemic_suite": s.get("is_systemic_suite", False),
+            "suite_data": s.get("suite_data"),
+            "keep_state": s.get("keep_state", True)
         }
 
     def create_session(
@@ -2043,8 +2046,9 @@ class TaskManager:
         stage_has_action = False
         pending_act = None
 
-        # 启动时将第一个节点标记为 RUNNING
-        self._advance_session_step(session, 0)
+        # 启动时将第一个节点标记为 RUNNING (系统级用例套件由 suite runner 统一精确驱动)
+        if not session.get("is_systemic_suite"):
+            self._advance_session_step(session, 0)
 
         for raw_line in proc.stdout:
             line = raw_line.rstrip("\r\n")
@@ -2121,9 +2125,9 @@ class TaskManager:
                 dev_state["max_steps"] = max_s
                 dev_state["action"] = f"第 {cur_s} 轮手势交互"
 
-            # 0. 捕获 AI 动态步骤进展与重规划协议 (Embodied Dynamic Re-planning)
+            # 0. 捕获 AI 动态步骤进展与重规划协议 (仅在非系统套件模式下动态重置步骤)
             m_prog = re.search(r"📋 \[STEP_PROGRESS\]:\s*advance_to=(\d+)", line)
-            if m_prog:
+            if m_prog and not session.get("is_systemic_suite"):
                 tgt_s = int(m_prog.group(1))
                 new_idx = max(0, min(tgt_s - 1, max(0, len(session.get("plan_steps", [])) - 1)))
                 if new_idx > cur_idx:
@@ -2187,7 +2191,7 @@ class TaskManager:
                 plan_steps = session.get("plan_steps", [])
                 total_plan_steps = len(plan_steps)
 
-                if stage_has_action and cur_idx < total_plan_steps - 1:
+                if not session.get("is_systemic_suite") and stage_has_action and cur_idx < total_plan_steps - 1:
                     next_step = plan_steps[cur_idx + 1]
                     next_keywords = [w for w in re.findall(r"[一-龥]{2,}", next_step.get("title", "") + next_step.get("desc", "")) if len(w) >= 2]
                     
@@ -2500,65 +2504,67 @@ class TaskManager:
                 logger.warning("🛡️ [事实核验] 识别到测试在引导页/开屏阶段即受阻，卡点严格锁定在 Step 1，拒绝虚报前置通过")
 
         # 精确单点收敛：若成功则未跑步骤略过(SKIPPED)，若失败仅当前步报错(FAIL)
-        self._finish_pipeline(session, cur_idx, is_success=is_success, final_error=session.get("error_message") or last_error_line)
+        # 系统套件由 _systemic_suite_runner 统一进行全链路断言汇聚与报告输出
+        if not session.get("is_systemic_suite"):
+            self._finish_pipeline(session, cur_idx, is_success=is_success, final_error=session.get("error_message") or last_error_line)
 
-        # 🚀 6 大测试维度全景结构化 Markdown 报告生成与落盘持久化
-        md_content, report_p = ReportGenerator.generate_markdown_report(
-            session=session,
-            dev_state=dev_state,
-            is_success=is_success,
-            raw_output="\n".join(all_output),
-            duration_sec=duration
-        )
-        report_url = f"/api/reports/{session['session_id']}/markdown"
-        dev_state["report_url"] = report_url
-        session["report_url"] = report_url
-        session["markdown_report"] = md_content
-        session["markdown_report_path"] = str(report_p.relative_to(BASE_DIR)).replace("\\", "/")
+            # 🚀 6 大测试维度全景结构化 Markdown 报告生成与落盘持久化
+            md_content, report_p = ReportGenerator.generate_markdown_report(
+                session=session,
+                dev_state=dev_state,
+                is_success=is_success,
+                raw_output="\n".join(all_output),
+                duration_sec=duration
+            )
+            report_url = f"/api/reports/{session['session_id']}/markdown"
+            dev_state["report_url"] = report_url
+            session["report_url"] = report_url
+            session["markdown_report"] = md_content
+            session["markdown_report_path"] = str(report_p.relative_to(BASE_DIR)).replace("\\", "/")
 
-        # 🚀 将 6 大维度结构化测试报告直接挂载进当前会话对话流 (Chat Stream)
-        if "messages" not in session or not isinstance(session["messages"], list):
-            session["messages"] = []
-        session["messages"].append({
-            "role": "assistant",
-            "content": md_content,
-            "timestamp": datetime.now().strftime("%H:%M:%S"),
-            "is_report": True,
-            "session_id": session["session_id"]
-        })
-        if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
-            session["timeline_blocks"] = []
-        turn_no = sum(1 for b in session["timeline_blocks"] if b.get("type") == "user_message")
-        session["timeline_blocks"].append(
-            TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
-        )
-        # 🚀 同步挂载测试全景总结卡片 (Test Summary Block)
-        # 若发生致命模型连通异常，先注入结构化故障诊断卡片
-        if not is_success and session.get("error_type") == "LLM_CONNECTION_ERROR":
+            # 🚀 将 6 大维度结构化测试报告直接挂载进当前会话对话流 (Chat Stream)
+            if "messages" not in session or not isinstance(session["messages"], list):
+                session["messages"] = []
+            session["messages"].append({
+                "role": "assistant",
+                "content": md_content,
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "is_report": True,
+                "session_id": session["session_id"]
+            })
+            if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+                session["timeline_blocks"] = []
+            turn_no = sum(1 for b in session["timeline_blocks"] if b.get("type") == "user_message")
             session["timeline_blocks"].append(
-                TimelineManager.create_fault_diagnosis_block(
-                    fail_step_title="AI 模型决策推演",
-                    current_situation=f"大模型推理通道无法连通：{session.get('error_message', '')}",
-                    suggestion="建议检查外网代理，或在【设置】中切换为 DeepSeek 或其他模型，配置有效 Key 后重试",
-                    turn_id=max(0, turn_no - 1)
+                TimelineManager.create_report_block(md_content, session["session_id"], turn_id=max(0, turn_no - 1))
+            )
+            # 🚀 同步挂载测试全景总结卡片 (Test Summary Block)
+            # 若发生致命模型连通异常，先注入结构化故障诊断卡片
+            if not is_success and session.get("error_type") == "LLM_CONNECTION_ERROR":
+                session["timeline_blocks"].append(
+                    TimelineManager.create_fault_diagnosis_block(
+                        fail_step_title="AI 模型决策推演",
+                        current_situation=f"大模型推理通道无法连通：{session.get('error_message', '')}",
+                        suggestion="建议检查外网代理，或在【设置】中切换为 DeepSeek 或其他模型，配置有效 Key 后重试",
+                        turn_id=max(0, turn_no - 1)
+                    )
+                )
+
+            session["timeline_blocks"].append(
+                TimelineManager.create_test_summary_block(
+                    session_id=session["session_id"],
+                    goal=session.get("goal") or session.get("title", ""),
+                    is_success=is_success,
+                    duration=f"{round(duration, 1)}s",
+                    steps_summary="全链路业务闭环达成" if is_success else "测试未达成预期",
+                    deliverables=session.get("deliverables"),
+                    is_solidified=session.get("is_solidified", False),
+                    solidified_filename=session.get("solidified_filename", ""),
+                    turn_id=max(0, turn_no - 1),
+                    error_message=session.get("error_message", ""),
+                    error_type=session.get("error_type", "")
                 )
             )
-
-        session["timeline_blocks"].append(
-            TimelineManager.create_test_summary_block(
-                session_id=session["session_id"],
-                goal=session.get("goal") or session.get("title", ""),
-                is_success=is_success,
-                duration=f"{round(duration, 1)}s",
-                steps_summary="全链路业务闭环达成" if is_success else "测试未达成预期",
-                deliverables=session.get("deliverables"),
-                is_solidified=session.get("is_solidified", False),
-                solidified_filename=session.get("solidified_filename", ""),
-                turn_id=max(0, turn_no - 1),
-                error_message=session.get("error_message", ""),
-                error_type=session.get("error_type", "")
-            )
-        )
 
     def _run_ios_pipeline(self, session: dict, dev_state: dict, goal: str, case_name: str, start_t: float):
         """iOS 真机/节点测试执行流程，按 plan_steps 逐节点推进与高亮"""
@@ -2898,6 +2904,35 @@ class TaskManager:
 
         suite_title = suite_data.get("suite_title") or "系统级端到端测试套件"
 
+        # 统一生成用例套件的标准执行步骤与推演元数据
+        plan_steps = []
+        for idx, c in enumerate(cases):
+            prio = c.get("priority", "P1")
+            mod = c.get("module", "业务流程")
+            title = c.get("title", f"用例 {idx+1}")
+            plan_steps.append({
+                "step_id": idx + 1,
+                "step_number": idx + 1,
+                "title": f"[{prio}] {mod}: {title}",
+                "desc": f"目标: {c.get('goal', '')} | 断言: {c.get('assert_rule', '')}",
+                "status": "RUNNING" if idx == 0 else "READY",
+                "case_id": c.get("id", f"tc-{idx+1:02d}"),
+                "depends_on": c.get("depends_on", "")
+            })
+
+        bullets = [
+            {"tag": "系统测试套件装配", "content": f"已载入【{suite_title}】，共选定 {len(cases)} 项端到端业务用例"},
+            {"tag": "状态现场继承策略", "content": "【现场串联】已开启：用例间保持应用现场不冷启，直接接续执行" if keep_state else "【独立冷启动】：每项用例执行前重启应用保持纯净环境"},
+            {"tag": "执行链路规划", "content": " ➔ ".join([c.get("title", f"用例{i+1}")[:10] for i, c in enumerate(cases[:3])])}
+        ]
+
+        init_thinking = {
+            "duration": "推演中...",
+            "bullets": bullets
+        }
+
+        user_goal = f"执行系统级测试套件【{suite_title}】（共 {len(cases)} 项用例，现场串联: {'开启' if keep_state else '关闭'}）"
+
         # 若未指定 session_id，或会话不存在，新建一个系统级测试会话
         session = self.sessions.get(session_id) if session_id else None
         if not session:
@@ -2912,34 +2947,6 @@ class TaskManager:
                     device_ids = ["mock_device"]
 
             session_id = f"sess_suite_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
-
-            plan_steps = []
-            for idx, c in enumerate(cases):
-                prio = c.get("priority", "P1")
-                mod = c.get("module", "业务流程")
-                title = c.get("title", f"用例 {idx+1}")
-                plan_steps.append({
-                    "step_id": idx + 1,
-                    "step_number": idx + 1,
-                    "title": f"[{prio}] {mod}: {title}",
-                    "desc": f"目标: {c.get('goal', '')} | 断言: {c.get('assert_rule', '')}",
-                    "status": "RUNNING" if idx == 0 else "READY",
-                    "case_id": c.get("id", f"tc-{idx+1:02d}"),
-                    "depends_on": c.get("depends_on", "")
-                })
-
-            bullets = [
-                {"tag": "系统测试套件装配", "content": f"已载入【{suite_title}】，共选定 {len(cases)} 项端到端业务用例"},
-                {"tag": "状态现场继承策略", "content": "【现场串联】已开启：用例间保持应用现场不冷启，直接接续执行" if keep_state else "【独立冷启动】：每项用例执行前重启应用保持纯净环境"},
-                {"tag": "执行链路规划", "content": " ➔ ".join([c.get("title", f"用例{i+1}")[:10] for i, c in enumerate(cases[:3])])}
-            ]
-
-            init_thinking = {
-                "duration": "推演中...",
-                "bullets": bullets
-            }
-
-            user_goal = f"执行系统级测试套件【{suite_title}】（共 {len(cases)} 项用例，现场串联: {'开启' if keep_state else '关闭'}）"
 
             init_timeline = [
                 TimelineManager.create_user_block(user_goal, turn_id=0),
@@ -3027,6 +3034,40 @@ class TaskManager:
             session["is_systemic_suite"] = True
             session["suite_data"] = suite_data
             session["keep_state"] = keep_state
+            session["status"] = "RUNNING"
+            session["goal"] = user_goal
+            session["plan_steps"] = plan_steps
+            turn_no = len(session.get("turns", [])) + 1
+            session.setdefault("messages", []).append({
+                "role": "user",
+                "content": user_goal,
+                "timestamp": datetime.now().strftime("%H:%M:%S")
+            })
+            session.setdefault("timeline_blocks", []).extend([
+                TimelineManager.create_user_block(user_goal, turn_id=turn_no),
+                TimelineManager.create_thought_block("0.5s", bullets, turn_id=turn_no),
+                TimelineManager.create_todo_block(plan_steps, turn_id=turn_no)
+            ])
+            session.setdefault("turns", []).append({
+                "turn_id": turn_no,
+                "user_message": user_goal,
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "thinking": init_thinking,
+                "plan_steps": plan_steps,
+                "actions": [],
+                "conclusion": "",
+                "status": "RUNNING"
+            })
+            for dev_id, d in session.get("devices", {}).items():
+                d["status"] = "RUNNING"
+                d["step"] = 0
+                d["max_steps"] = len(cases) * 5
+                d["action"] = f"启动系统套件执行: {cases[0].get('title')}"
+                d["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 载入系统级测试套件，开始串联执行...")
+                d["report_url"] = ""
+                d["success"] = None
+                d["duration"] = "0s"
+                d["start_time"] = time.time()
             self._save_session(session_id)
 
         # 启动后台串联执行线程
@@ -3073,6 +3114,7 @@ class TaskManager:
 
             # 推进当前步骤状态
             self._advance_session_step(session, idx, default_title=f"执行用例 {step_id}: {case_title}", default_desc=case_goal)
+            dev_state["step"] = (idx + 1) * 5 - 2
             dev_state["action"] = f"正在执行用例 {step_id}/{len(cases)}: {case_title}"
             dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ▶️ 开始执行用例 [{step_id}/{len(cases)}]: {case_title}")
             self._save_session(session_id)
@@ -3112,7 +3154,8 @@ class TaskManager:
                 "cost": round(time.time() - case_start_t, 1)
             })
 
-            # 更新当前步骤状态
+            # 更新当前步骤状态与设备进度
+            dev_state["step"] = (idx + 1) * 5
             if case_success:
                 self._update_session_step(session, idx, status="COMPLETED", detail=f"用例断言达成 (耗时 {round(time.time() - case_start_t, 1)}s)")
                 dev_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ 用例 [{step_id}/{len(cases)}] 验证通过: {case_title}")
@@ -3126,6 +3169,7 @@ class TaskManager:
 
         # 全部用例串联执行完毕
         total_duration = time.time() - start_t
+        dev_state["step"] = len(cases) * 5
         dev_state["duration"] = f"{round(total_duration, 1)}s"
         dev_state["status"] = "PASS" if overall_success else "FAIL"
         dev_state["success"] = overall_success

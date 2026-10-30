@@ -772,7 +772,8 @@ async def synthesize_test_suite(request: Request):
         model = data.get("model")
 
         # 1. 尝试从 filename 或 doc_path 提取文本
-        resolved_filename = filename or (Path(doc_path).name if doc_path else "需求文档")
+        orig_filename = data.get("doc_filename") or data.get("original_filename")
+        resolved_filename = orig_filename or filename or (Path(doc_path).name if doc_path else "需求文档")
         if not doc_text:
             target_p = None
             if filename:
@@ -784,7 +785,8 @@ async def synthesize_test_suite(request: Request):
 
             if target_p and target_p.exists():
                 doc_text = DocumentExtractor.extract_text(str(target_p))
-                resolved_filename = target_p.name
+                if not orig_filename:
+                    resolved_filename = target_p.name
 
         suite = TestSpecSynthesizer.synthesize_from_doc(
             doc_text=doc_text,

@@ -256,6 +256,117 @@ class TestTestSpecSynthesizer(unittest.TestCase):
         self.assertTrue(run_data["success"])
         self.assertIn("session_id", run_data)
 
+    def test_07_normalize_robustness_markdown_and_list(self):
+        """测试 7: 校验多形态容错解析 (Markdown代码块包裹、纯数组输入与别名字段)"""
+        # 1. 模拟 LLM 返回 Markdown 代码块包裹的纯文本 JSON
+        markdown_json = """```json
+        {
+            "suite_title": "房源核心交易测试套件",
+            "test_cases": [
+                {
+                    "title": "业主委托放盘",
+                    "module": "房源发布",
+                    "priority": "P0",
+                    "goal": "进入委托发布页面填写房源信息",
+                    "assert_rule": "提交后列表出现对应委托记录",
+                    "depends_on": ""
+                }
+            ]
+        }
+        ```"""
+        parsed = TestSpecSynthesizer._normalize_and_validate(markdown_json, "PRD.docx")
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["suite_title"], "房源核心交易测试套件")
+        self.assertEqual(len(parsed["cases"]), 1)
+        self.assertEqual(parsed["cases"][0]["assert_rule"], "提交后列表出现对应委托记录")
+
+        # 2. 模拟 LLM 直接返回纯数组
+        raw_list = [
+            {"title": "快速搜索", "priority": "P1", "goal": "输入关键词并回车", "assert_rule": "返回有效结果"}
+        ]
+        parsed_list = TestSpecSynthesizer._normalize_and_validate(raw_list, "SearchSpec.md")
+        self.assertIsNotNone(parsed_list)
+        self.assertEqual(len(parsed_list["cases"]), 1)
+        self.assertEqual(parsed_list["cases"][0]["title"], "快速搜索")
+
+    def test_08_run_systemic_suite_on_existing_session(self):
+        """测试 8: 在已有激活会话中继续执行系统级测试套件 (Session Reuse & State Reset)"""
+        # 先创建一个普通会话
+        session_id = "test_sess_reuse_001"
+        self.mgr.sessions[session_id] = {
+            "session_id": session_id,
+            "title": "先前单次测试",
+            "status": "COMPLETED",
+            "plan_steps": [{"step_id": 1, "title": "旧单步任务", "status": "COMPLETED"}],
+            "devices": {
+                "mock_device_reuse": {
+                    "device_id": "mock_device_reuse",
+                    "model": "Mock Device",
+                    "platform": "Android",
+                    "status": "PASS",
+                    "step": 5,
+                    "max_steps": 5,
+                    "logs": ["已完成先前测试"]
+                }
+            },
+            "timeline_blocks": [],
+            "turns": []
+        }
+
+        suite_data = {
+            "suite_title": "在已有会话追加执行套件",
+            "cases": [
+                {"id": "tc-01", "title": "追加用例1", "priority": "P0", "goal": "用例1", "assert_rule": "断言1"},
+                {"id": "tc-02", "title": "追加用例2", "priority": "P1", "goal": "用例2", "assert_rule": "断言2"}
+            ]
+        }
+
+        res = self.mgr.run_systemic_suite(
+            session_id=session_id,
+            suite_data=suite_data,
+            keep_state=True
+        )
+        self.assertTrue(res["success"])
+        sess = self.mgr.get_session(session_id)
+        # 会话状态应重置为 RUNNING，且步骤应更新为 2 个新用例步骤
+        self.assertEqual(sess["status"], "RUNNING")
+        self.assertEqual(len(sess["plan_steps"]), 2)
+        self.assertTrue(sess.get("is_systemic_suite"))
+        self.assertEqual(sess["devices"]["mock_device_reuse"]["status"], "RUNNING")
+
+        # 等待后台执行完成
+        for _ in range(50):
+            sess = self.mgr.get_session(session_id)
+            if sess and sess.get("status") in ["READY_FOR_REVIEW", "COMPLETED"]:
+                break
+            time.sleep(0.1)
+        self.assertEqual(sess["status"], "READY_FOR_REVIEW")
+        self.assertTrue(sess.get("is_success"))
+
+    def test_09_synthesize_endpoint_with_doc_filename(self):
+        """测试 9: 验证 POST /api/test_suite/synthesize 支持 doc_filename 保持用户可读标题"""
+        data = asyncio.run(synthesize_test_suite({
+            "doc_text": "这是一个测试系统的需求文档，包含注册与充值流程。",
+            "filename": "up_1030_173000_1a2b_PRD.docx",
+            "doc_filename": "业务需求规格说明书_v2.0.docx"
+        }))
+        self.assertTrue(data["success"])
+        suite = data["suite"]
+        # 文档名与标题均严禁泄露内部时间戳随机前缀
+        self.assertEqual(suite["doc_filename"], "业务需求规格说明书_v2.0.docx")
+        self.assertNotIn("up_1030", suite["suite_title"])
+        self.assertNotIn("up_1030", suite["doc_filename"])
+
+        # 验证极简兜底模式下准确使用 doc_filename 作为套件标题
+        fallback_data = asyncio.run(synthesize_test_suite({
+            "doc_text": "",
+            "filename": "up_1030_fallback.docx",
+            "doc_filename": "核心资产管理说明书.docx"
+        }))
+        self.assertTrue(fallback_data["success"])
+        self.assertIn("核心资产管理说明书", fallback_data["suite"]["suite_title"])
+        self.assertEqual(fallback_data["suite"]["doc_filename"], "核心资产管理说明书.docx")
+
 
 if __name__ == "__main__":
     unittest.main()

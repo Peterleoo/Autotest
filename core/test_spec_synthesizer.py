@@ -111,18 +111,52 @@ class TestSpecSynthesizer:
 
     @classmethod
     def _normalize_and_validate(cls, data: Any, doc_name: str) -> Optional[Dict[str, Any]]:
-        """清洗、归一化与校验 AI 返回的用例数据"""
-        if not isinstance(data, dict):
+        """清洗、归一化与校验 AI 返回的用例数据，具备多形态容错解析能力"""
+        # 1. 兼容字符串形态（包括包含 Markdown ```json ... ``` 代码块的原始返回）
+        if isinstance(data, str):
+            try:
+                clean = re.sub(r"^```(?:json)?\s*", "", data.strip(), flags=re.MULTILINE)
+                clean = re.sub(r"\s*```$", "", clean, flags=re.MULTILINE).strip()
+                m = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", clean)
+                if m:
+                    data = json.loads(m.group(1))
+                else:
+                    data = json.loads(clean)
+            except Exception:
+                return None
+
+        cases_raw: List[Any] = []
+        suite_title_custom = ""
+
+        # 2. 兼容直接返回用例数组形态
+        if isinstance(data, list):
+            cases_raw = data
+            suite_obj = {}
+        elif isinstance(data, dict):
+            suite_obj = data
+            if "test_suite" in data:
+                if isinstance(data["test_suite"], dict):
+                    suite_obj = data["test_suite"]
+                elif isinstance(data["test_suite"], list):
+                    cases_raw = data["test_suite"]
+            elif "suite" in data:
+                if isinstance(data["suite"], dict):
+                    suite_obj = data["suite"]
+                elif isinstance(data["suite"], list):
+                    cases_raw = data["suite"]
+
+            if not cases_raw:
+                cases_raw = (
+                    suite_obj.get("cases") or 
+                    suite_obj.get("test_cases") or 
+                    suite_obj.get("testcases") or 
+                    suite_obj.get("items") or 
+                    []
+                )
+            suite_title_custom = suite_obj.get("suite_title") or suite_obj.get("title") or ""
+        else:
             return None
 
-        # 尝试兼容包裹层
-        suite_obj = data
-        if "test_suite" in data and isinstance(data["test_suite"], dict):
-            suite_obj = data["test_suite"]
-        elif "suite" in data and isinstance(data["suite"], dict):
-            suite_obj = data["suite"]
-
-        cases_raw = suite_obj.get("cases") or []
         if not isinstance(cases_raw, list) or len(cases_raw) == 0:
             return None
 
@@ -154,7 +188,8 @@ class TestSpecSynthesizer:
         if not normalized_cases:
             return None
 
-        suite_title = suite_obj.get("suite_title") or f"{Path(doc_name).stem} · 系统级测试套件"
+        stem = Path(doc_name).stem if doc_name else "需求说明"
+        suite_title = suite_title_custom or f"{stem} · 系统级测试套件"
 
         return {
             "suite_title": suite_title,

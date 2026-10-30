@@ -7836,6 +7836,40 @@
             border-radius: 3px;
             white-space: nowrap;
         }
+        .case-assert-tag {
+            font-size: 10.5px;
+            color: var(--text-sub);
+            display: inline-flex;
+            align-items: center;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 4px;
+            padding: 1px 6px;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+        .case-assert-text {
+            outline: none;
+            cursor: text;
+            border-radius: 2px;
+            padding: 0 2px;
+        }
+        .case-assert-text:hover {
+            background: rgba(16, 185, 129, 0.12);
+        }
+        .case-assert-text:focus {
+            background: var(--bg-surface-elevated);
+            color: var(--text-main);
+            box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.35);
+        }
+        .suite-case-row.dragging {
+            opacity: 0.45;
+            background: var(--bg-surface-elevated);
+            border: 1px dashed rgba(99, 102, 241, 0.5);
+        }
+        .suite-case-row.drag-over {
+            border-top: 2px solid #6366f1;
+        }
         .case-actions {
             display: flex;
             align-items: center;
@@ -15583,6 +15617,17 @@ function renderChatStream(sessionData) {
             const attachmentsToSend = [...currentAttachments];
             clearAttachments();
 
+            // 智能感知：若挂载了需求文档且用户输入提炼/编排/生成套件意图，直接调起 Suite Builder Generative UI
+            const docAtt = attachmentsToSend.find(a => a.is_doc);
+            if (docAtt && /提炼|套件|编排|suite|生成用例|用例生成|用例集/i.test(goal)) {
+                btn.disabled = false;
+                btn.classList.remove("btn-send-pulse");
+                btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
+                input.value = "";
+                await generateSuiteFromAttachment(docAtt.saved_name, docAtt.filename);
+                return;
+            }
+
             try {
                 // 分支 A: 如果当前已有处于激活状态的会话，执行单任务连续对话（打断/修正/追加意图），不新建会话
                 if (activeSessionId) {
@@ -18018,7 +18063,7 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                 const depHtml = c.depends_on ? `<span class="case-dep-tag" title="执行前无需重启，直接继承上一条现场状态"><i class="bi bi-link-45deg"></i> ${escapeHtml(c.depends_on)}</span>` : "";
 
                 rowsHtml += `
-                    <div class="suite-case-row ${isChecked ? '' : 'disabled'}" data-id="${caseId}">
+                    <div class="suite-case-row ${isChecked ? '' : 'disabled'}" data-id="${caseId}" data-assert="${escapeHtml(c.assert_rule || '')}" draggable="true">
                         <span class="case-handle" title="按住拖拽排序"><i class="bi bi-grip-vertical"></i></span>
                         <input type="checkbox" class="case-select-checkbox" ${isChecked ? 'checked' : ''} onchange="updateSuiteCardSummary(this)">
                         <div class="case-content">
@@ -18028,7 +18073,8 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                                 <span class="editable-field" contenteditable="true" spellcheck="false" title="点击可直接编辑用例标题">${escapeHtml(c.title || '')}</span>
                             </div>
                             <div class="case-sub-line">
-                                <span class="case-goal-text" contenteditable="true" spellcheck="false" title="点击可微调操作目标与入参">${escapeHtml(c.goal || '')}</span>
+                                <span class="case-goal-text" contenteditable="true" spellcheck="false" title="点击微调业务目标与入参">${escapeHtml(c.goal || '')}</span>
+                                <span class="case-assert-tag" title="点击微调断言验证规则"><i class="bi bi-shield-check text-success" style="font-size: 11px;"></i><span class="case-assert-text" contenteditable="true" spellcheck="false" title="点击编辑断言规则">${escapeHtml(c.assert_rule || '断言页面状态正常且关键元素可见')}</span></span>
                                 ${depHtml}
                             </div>
                         </div>
@@ -18083,6 +18129,47 @@ async function replaySolidifiedCase(safeRef, btnEl) {
             `;
         }
 
+        function initSuiteCardDragAndDrop(card) {
+            const list = card.querySelector(".suite-case-list");
+            if (!list || list._dndInit) return;
+            list._dndInit = true;
+
+            let draggedItem = null;
+
+            list.addEventListener("dragstart", function(e) {
+                const row = e.target.closest(".suite-case-row");
+                if (!row) return;
+                if (e.target.isContentEditable || e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") {
+                    e.preventDefault();
+                    return;
+                }
+                draggedItem = row;
+                row.classList.add("dragging");
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", row.getAttribute("data-id") || "");
+            });
+
+            list.addEventListener("dragend", function(e) {
+                if (draggedItem) {
+                    draggedItem.classList.remove("dragging");
+                    draggedItem = null;
+                }
+                list.querySelectorAll(".suite-case-row").forEach(r => r.classList.remove("drag-over"));
+                updateSuiteCardSummary(card);
+            });
+
+            list.addEventListener("dragover", function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                const targetRow = e.target.closest(".suite-case-row");
+                if (targetRow && targetRow !== draggedItem) {
+                    const rect = targetRow.getBoundingClientRect();
+                    const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                    list.insertBefore(draggedItem, next ? targetRow.nextSibling : targetRow);
+                }
+            });
+        }
+
         function renderSuiteBuilderCard(suiteData, containerId) {
             const html = renderSuiteBuilderHtml(suiteData);
             let targetEl = containerId ? document.getElementById(containerId) : null;
@@ -18091,13 +18178,15 @@ async function replaySolidifiedCase(safeRef, btnEl) {
             }
             if (targetEl) {
                 targetEl.insertAdjacentHTML("beforeend", html);
+                const lastCard = targetEl.querySelector(".suite-builder-card:last-child");
+                if (lastCard) initSuiteCardDragAndDrop(lastCard);
                 targetEl.scrollTop = targetEl.scrollHeight;
             }
             return html;
         }
 
         function updateSuiteCardSummary(el) {
-            const card = el.closest(".suite-builder-card");
+            const card = (el && el.classList && el.classList.contains("suite-builder-card")) ? el : (el ? el.closest(".suite-builder-card") : null);
             if (!card) return;
             const rows = card.querySelectorAll(".suite-case-row");
             let total = rows.length;
@@ -18149,6 +18238,9 @@ async function replaySolidifiedCase(safeRef, btnEl) {
             const list = card.querySelector(".suite-case-list");
             const newRow = document.createElement("div");
             newRow.className = "suite-case-row";
+            newRow.setAttribute("draggable", "true");
+            newRow.setAttribute("data-id", `tc-${Date.now().toString(36).substring(4)}`);
+            newRow.setAttribute("data-assert", "断言页面状态正常且关键元素可见");
             newRow.innerHTML = `
                 <span class="case-handle" title="按住拖拽排序"><i class="bi bi-grip-vertical"></i></span>
                 <input type="checkbox" class="case-select-checkbox" checked onchange="updateSuiteCardSummary(this)">
@@ -18159,7 +18251,8 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                         <span class="editable-field" contenteditable="true" spellcheck="false">新测试用例标题（点击编辑）</span>
                     </div>
                     <div class="case-sub-line">
-                        <span class="case-goal-text" contenteditable="true" spellcheck="false">输入具体测试目标与校验断言规则...</span>
+                        <span class="case-goal-text" contenteditable="true" spellcheck="false">输入具体测试目标与交互步骤...</span>
+                        <span class="case-assert-tag" title="点击微调断言验证规则"><i class="bi bi-shield-check text-success" style="font-size: 11px;"></i><span class="case-assert-text" contenteditable="true" spellcheck="false">断言页面状态正常且关键元素可见</span></span>
                     </div>
                 </div>
                 <div class="case-actions">
@@ -18169,6 +18262,7 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                 </div>
             `;
             list.appendChild(newRow);
+            initSuiteCardDragAndDrop(card);
             updateSuiteCardSummary(card);
             const editEl = newRow.querySelector(".editable-field");
             if (editEl) editEl.focus();
@@ -18194,6 +18288,8 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                 const caseTitle = titleField ? titleField.innerText.trim() : `用例 ${idx+1}`;
                 const goalField = r.querySelector(".case-goal-text");
                 const caseGoal = goalField ? goalField.innerText.trim() : caseTitle;
+                const assertField = r.querySelector(".case-assert-text");
+                const caseAssert = assertField ? assertField.innerText.trim() : (r.getAttribute("data-assert") || "断言页面状态正常且关键元素可见");
                 const depEl = r.querySelector(".case-dep-tag");
                 const dependsOn = depEl ? depEl.innerText.replace(/[\\n\\r]+/g, '').trim() : "";
 
@@ -18203,7 +18299,7 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                     module: mod,
                     priority: prio,
                     goal: caseGoal,
-                    assert_rule: "验证页面状态正常且断言达成",
+                    assert_rule: caseAssert,
                     depends_on: dependsOn,
                     checked: isChecked
                 });
@@ -18306,7 +18402,10 @@ async function replaySolidifiedCase(safeRef, btnEl) {
             }
         }
 
+        let isGeneratingSuite = false;
         async function generateSuiteFromAttachment(savedFilename, origFilename, event) {
+            if (isGeneratingSuite) return;
+            isGeneratingSuite = true;
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -18348,7 +18447,9 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({
                         filename: savedFilename,
-                        doc_filename: origFilename
+                        doc_filename: origFilename,
+                        provider: (typeof currentActiveProvider !== 'undefined' ? currentActiveProvider : null),
+                        model: (typeof currentActiveModel !== 'undefined' ? currentActiveModel : null)
                     })
                 });
                 const data = await res.json();
@@ -18364,6 +18465,8 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                 const loadEl = document.getElementById("loading_" + tempPromptId);
                 if (loadEl) loadEl.remove();
                 alert("智能提炼用例套件网络连接异常: " + err.message);
+            } finally {
+                isGeneratingSuite = false;
             }
         }
     </script>
