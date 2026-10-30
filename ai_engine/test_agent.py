@@ -1,6 +1,7 @@
 import time
 import json
 import logging
+import hashlib
 import subprocess
 from typing import Optional, List, Dict, Any
 from appium import webdriver
@@ -987,6 +988,7 @@ class AITestAgent:
         step_count = 0
         execution_success = False
         consecutive_unchanged_screens = 0
+        last_screen_fingerprint = None
         final_block_reason = ""
         force_vision = False
 
@@ -1005,6 +1007,21 @@ class AITestAgent:
             )
             perception_mode = screen_info.get("perception_mode", PerceptionMode.FULL_VISION)
             el_count = len(screen_info.get("elements", []))
+
+            # 计算跨模式屏幕指纹，精准追踪连续无变动与死锁
+            current_screen_fp = hashlib.md5(screen_info.get("element_summary_text", "").encode("utf-8")).hexdigest()
+            ocr_cached = screen_info.get("ocr_cached", False)
+            if ocr_cached or (last_screen_fingerprint is not None and current_screen_fp == last_screen_fingerprint):
+                consecutive_unchanged_screens += 1
+            else:
+                consecutive_unchanged_screens = 0
+            last_screen_fingerprint = current_screen_fp
+
+            # 🛡️ 连续未进展时自动升格为视觉攻坚 (Auto-Escalation on Stagnation)
+            if consecutive_unchanged_screens >= 2 and not force_vision:
+                logger.warning(f"⚠️ 检测到界面连续 {consecutive_unchanged_screens} 步无变动(连续未进展)，自动升格为 FULL_VISION 视觉多模态攻坚...")
+                force_vision = True
+                perception_mode = PerceptionMode.FULL_VISION
 
             # 🛡️ 步骤前置：检查并触发人机协同登录凭证门禁 (DeepSeek Harness 步数冻结)
             # 若处于登录拦截状态，安全挂起等待用户决策；挂起期间 step_count 绝不累加
@@ -1045,15 +1062,20 @@ class AITestAgent:
                 "log": f"--- [Step {step_count}/{max_steps}] {perception_log} ---"
             })
 
-            ocr_cached = screen_info.get("ocr_cached", False)
-            if ocr_cached:
-                consecutive_unchanged_screens += 1
-                ocr_log = f"⚡ [OCR缓存命中] 屏幕指纹高度一致，0 耗时复用视觉元素 ({el_count} 个)"
-                ocr_action = "OCR 缓存复用"
+            # 事实为本：根据真实执行的感知链路诚实上报状态与复用详情
+            if perception_mode == PerceptionMode.HIERARCHY_TEXT:
+                if consecutive_unchanged_screens > 0:
+                    status_log = f"⚡ [UI树指纹一致] 原生控件树连续稳定无变动 ({el_count} 个控件)"
+                    status_action = "UI树指纹复用"
+                else:
+                    status_log = f"⚡ 原生 UI 控件树极速解析就绪: {el_count} 个有效控件"
+                    status_action = "UI树解析完成"
+            elif ocr_cached:
+                status_log = f"⚡ [OCR缓存命中] 屏幕指纹高度一致，0 耗时复用视觉元素 ({el_count} 个)"
+                status_action = "OCR 缓存复用"
             else:
-                consecutive_unchanged_screens = 0
-                ocr_log = f"视觉 OCR 成功提取屏幕文字元素: {el_count} 个"
-                ocr_action = "OCR 解析完成"
+                status_log = f"视觉 OCR 成功提取屏幕文字元素: {el_count} 个"
+                status_action = "OCR 解析完成"
 
             # 🛡️ 智能防死锁与设备自学习诊断 (Anti-Deadlock & Self-Learning)
             if consecutive_unchanged_screens >= 3:
@@ -1087,8 +1109,8 @@ class AITestAgent:
 
             self._notify_status({
                 "step": step_count,
-                "action": ocr_action,
-                "log": ocr_log
+                "action": status_action,
+                "log": status_log
             })
 
             # 第一步进行上下文自愈探测
@@ -1119,10 +1141,12 @@ class AITestAgent:
                         self.executor._locate_and_click(el, None)
                         time.sleep(1.0)
                         break
-                screen_info = ScreenParser.get_screen_summary(self.driver)
-
-                # 重新获取一次
-                screen_info = ScreenParser.get_screen_summary(self.driver)
+                screen_info = ScreenParser.get_screen_summary(
+                    self.driver,
+                    skip_ocr_if_rich=True,
+                    goal=goal,
+                    force_vision=force_vision
+                )
 
             # 检测是否陷入上下滑动震荡循环 (Anti-Oscillation Guard)
             recent_swipes = [h.get("action") for h in self.executor.action_history[-3:] if h.get("action") == "swipe"]
@@ -1330,8 +1354,9 @@ class AITestAgent:
                     "log": f"⚠️ 步骤执行反馈: {step_res['message']} (AI 将在下一步启用视觉多模态攻坚自适应纠偏)"
                 })
             else:
-                # 动作执行成功后，恢复常规分层感知自适应
-                force_vision = False
+                # 动作执行成功后，若无停滞死锁则恢复常规分层感知自适应
+                if consecutive_unchanged_screens < 2:
+                    force_vision = False
                 self._notify_status({
                     "step": step_count,
                     "action": "执行成功",

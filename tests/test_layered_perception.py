@@ -264,3 +264,121 @@ def test_test_agent_auto_escalation_to_vision_on_action_failure():
     assert len(calls) == 2
     assert calls[0].kwargs.get("image_base64") is None
     assert calls[1].kwargs.get("image_base64") is not None
+
+
+def test_test_agent_auto_escalation_on_stagnant_screen():
+    """验证即使动作执行返回成功，若屏幕连续多步无任何变动(死锁/停滞)，自动升格为视觉攻坚"""
+    mock_driver = MagicMock()
+    mock_driver.get_screenshot_as_base64.return_value = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    mock_driver.page_source = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+    <hierarchy rotation="0">
+        <android.widget.FrameLayout bounds="[0,0][1080,2400]">
+            <android.widget.TextView text="应用首页" bounds="[100,100][400,200]" clickable="false" />
+            <android.widget.TextView text="二手房" bounds="[100,300][300,400]" clickable="true" />
+            <android.widget.TextView text="租房" bounds="[400,300][600,400]" clickable="true" />
+            <android.widget.TextView text="我的" bounds="[700,300][900,400]" clickable="true" />
+        </android.widget.FrameLayout>
+    </hierarchy>
+    """
+
+    agent = AITestAgent(driver=mock_driver)
+    agent.llm = MagicMock()
+    agent.llm.client = MagicMock()
+    agent.llm.model_name = "test-model"
+
+    # 连续点击有效元素（执行成功），但页面完全没有变化（停滞）
+    agent.llm.chat_decision.side_effect = [
+        {"thought": "第1步点击二手房", "action": "tap", "target_index": 2, "reason": "进入房源"},
+        {"thought": "第2步再次点击二手房", "action": "tap", "target_index": 2, "reason": "重试点击"},
+        {"thought": "第3步视觉攻坚并完成", "action": "finish", "reason": "已完成"}
+    ]
+
+    with patch("ai_engine.verifier.TaskVerifier.verify_finish_claim", return_value=(True, "验证通过", {})):
+        agent.run_goal("测试停滞自动升格", max_steps=3)
+
+    calls = agent.llm.chat_decision.call_args_list
+    assert len(calls) == 3
+    # 第 1 步：原生充沛纯文本
+    assert calls[0].kwargs.get("image_base64") is None
+    # 第 2 步：第 1 步后画面未变动，consecutive_unchanged=1，仍为纯文本
+    assert calls[1].kwargs.get("image_base64") is None
+    # 第 3 步：第 2 步后画面仍未变动，consecutive_unchanged=2，触发停滞升格，必须传 image_base64！
+    assert calls[2].kwargs.get("image_base64") is not None
+
+
+def test_is_hierarchy_rich_filters_systemui_elements():
+    """验证空白页面仅包含系统状态栏 (com.android.systemui) 时不会被误判为丰富"""
+    elements = [
+        {"index": 1, "text": "12:00", "desc": "", "clickable": False, "is_input": False, "resource_id": "com.android.systemui:id/clock"},
+        {"index": 2, "text": "100%", "desc": "", "clickable": False, "is_input": False, "resource_id": "com.android.systemui:id/battery"},
+        {"index": 3, "text": "中国移动", "desc": "", "clickable": False, "is_input": False, "resource_id": "com.android.systemui:id/carrier"},
+        {"index": 4, "text": "", "desc": "", "clickable": False, "is_input": False, "resource_id": "com.android.systemui:id/status_bar"},
+    ]
+    assert ScreenParser.is_hierarchy_rich(elements) is False
+
+
+def test_is_hierarchy_rich_bidirectional_goal_matching():
+    """验证双向目标关键词匹配：当目标关键词是元素文本子串时亦能精准识别"""
+    elements = [
+        {"index": 1, "text": "推荐精装二手房", "desc": "", "clickable": True, "is_input": False, "class": "TextView"},
+        {"index": 2, "text": "品质新房精选", "desc": "", "clickable": True, "is_input": False, "class": "TextView"},
+        {"index": 3, "text": "搜索", "desc": "", "clickable": True, "is_input": False, "class": "Button"},
+    ]
+    # 目标为短词“二手房”，元素为长词“推荐精装二手房”
+    assert ScreenParser.is_hierarchy_rich(elements, goal="二手房") is True
+
+
+def test_hierarchy_text_factual_reporting_no_false_ocr_notification():
+    """验证 HIERARCHY_TEXT 极速短路时，上报日志与事件绝不虚报视觉 OCR"""
+    mock_driver = MagicMock()
+    mock_driver.get_screenshot_as_base64.return_value = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    mock_driver.page_source = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+    <hierarchy rotation="0">
+        <android.widget.FrameLayout bounds="[0,0][1080,2400]">
+            <android.widget.TextView text="应用首页" bounds="[100,100][400,200]" clickable="false" />
+            <android.widget.TextView text="二手房" bounds="[100,300][300,400]" clickable="true" />
+            <android.widget.TextView text="租房" bounds="[400,300][600,400]" clickable="true" />
+            <android.widget.TextView text="我的" bounds="[700,300][900,400]" clickable="true" />
+        </android.widget.FrameLayout>
+    </hierarchy>
+    """
+
+    notifications = []
+    agent = AITestAgent(driver=mock_driver, status_callback=lambda data: notifications.append(data))
+    agent.llm = MagicMock()
+    agent.llm.client = MagicMock()
+    agent.llm.model_name = "test-model"
+    agent.llm.chat_decision.return_value = {"thought": "完成", "action": "finish", "reason": "完成测试"}
+
+    with patch("ai_engine.verifier.TaskVerifier.verify_finish_claim", return_value=(True, "验证通过", {})):
+        agent.run_goal("查看首页二手房", max_steps=1)
+
+    # 检查所有上报事件，绝不包含“视觉 OCR 成功提取”虚假日志
+    ocr_reports = [n for n in notifications if "视觉 OCR 成功提取" in n.get("log", "")]
+    assert len(ocr_reports) == 0
+    # 并且上报了原生 UI 树极速解析就绪
+    ui_reports = [n for n in notifications if "原生 UI 控件树极速解析就绪" in n.get("log", "")]
+    assert len(ui_reports) == 1
+
+
+def test_get_screen_summary_shortcuts_visual_settling_when_hierarchy_rich():
+    """验证当原生 UI 树充沛时，get_screen_summary 跳过耗时的 wait_for_visual_settling 循环"""
+    mock_driver = MagicMock()
+    mock_driver.get_screenshot_as_base64.return_value = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    mock_driver.page_source = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+    <hierarchy rotation="0">
+        <android.widget.FrameLayout bounds="[0,0][1080,2400]">
+            <android.widget.TextView text="应用首页" bounds="[100,100][400,200]" clickable="false" />
+            <android.widget.TextView text="二手房" bounds="[100,300][300,400]" clickable="true" />
+            <android.widget.TextView text="租房" bounds="[400,300][600,400]" clickable="true" />
+            <android.widget.TextView text="我的" bounds="[700,300][900,400]" clickable="true" />
+        </android.widget.FrameLayout>
+    </hierarchy>
+    """
+
+    with patch("ai_engine.screen_parser.ScreenParser.wait_for_visual_settling") as mock_settle:
+        res = ScreenParser.get_screen_summary(mock_driver, wait_settling=True, skip_ocr_if_rich=True)
+        # 即使 wait_settling=True，原生 UI 树丰富时短路直接返回，不进入多帧防抖循环！
+        mock_settle.assert_not_called()
+        assert res["perception_mode"] == PerceptionMode.HIERARCHY_TEXT
+
