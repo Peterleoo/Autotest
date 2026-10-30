@@ -711,6 +711,11 @@ class AITestAgent:
             if decision_file.exists():
                 try:
                     data = json.loads(decision_file.read_text(encoding="utf-8"))
+                    if data.get("status") in ["CANCELLED", "STOPPED"] or data.get("decision_type") in ["cancel", "stop", "abort"]:
+                        logger.info("🛑 [人机协同响应] 收到用户终止指令，立即退出人机协同等待")
+                        try: decision_file.unlink()
+                        except Exception: pass
+                        return False
                     if data.get("status") == "RESOLVED":
                         decision_type = data.get("decision_type", "inject")
                         logger.info(f"✅ [人机协同响应] 收到用户人工决策: {decision_type}，开始解除挂起...")
@@ -837,6 +842,11 @@ class AITestAgent:
             if decision_file.exists():
                 try:
                     data = json.loads(decision_file.read_text(encoding="utf-8"))
+                    if data.get("status") in ["CANCELLED", "STOPPED"] or data.get("decision_type") in ["cancel", "stop", "abort"]:
+                        logger.info("🛑 [AI 协同响应] 收到用户终止指令，立即退出协同等待")
+                        try: decision_file.unlink()
+                        except Exception: pass
+                        return False
                     if data.get("status") == "RESOLVED":
                         logger.info(f"✅ [AI 协同响应] 收到人工提交响应数据: {data}")
                         decision_type = data.get("decision_type", "submit")

@@ -10130,6 +10130,12 @@
                 if (data.success) {
                     currentSessionStatus = "STOPPED";
                     updateStopButtonState("STOPPED");
+                    if (currentActiveSessionData) {
+                        currentActiveSessionData.status = "STOPPED";
+                        currentActiveSessionData.hitl_decision = null;
+                    }
+                    const hitlCard = document.querySelector(".hitl-decision-card");
+                    if (hitlCard) hitlCard.remove();
 
                     // 立即清除当前活跃会话在左侧列表的转圈状态并刷新
                     const targetSess = currentSessions.find(s => s.session_id === activeSessionId);
@@ -10166,6 +10172,16 @@
                 flow.innerHTML = "";
                 window._renderedSessionId = sessionData.session_id;
                 window._renderedBlockIds = new Set();
+            }
+
+            // 🛡️ 彻底消除双重发送/渲染：在渲染后端权威 timeline_blocks 前，安全清理所有临时乐观节点
+            const tempNodes = flow.querySelectorAll(".optimistic-temp-node, [id^='temp_user_'], [id^='temp_th_'], [data-temp-node='true']");
+            if (tempNodes.length > 0) {
+                if (window._optimisticTimers && window._optimisticTimers.length > 0) {
+                    window._optimisticTimers.forEach(t => clearInterval(t));
+                    window._optimisticTimers = [];
+                }
+                tempNodes.forEach(node => node.remove());
             }
 
             // 🛡️ 步骤卡片与总结卡片防重免疫：同一 step_id 或同一 test_summary 界面上只保留最新容器！
@@ -10380,8 +10396,11 @@
                             <button class="btn btn-sm btn-success py-2 px-4 fw-semibold w-100 shadow-sm" style="font-size: 13px; border-radius: 8px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
                                 <i class="bi bi-check2-circle me-1.5 fs-6"></i> 我已在投屏/手机上完成操作，立即恢复自动化
                             </button>
-                            <div class="text-muted small mt-1.5" style="font-size: 11px;">
-                                <i class="bi bi-info-circle me-1"></i>在右侧投屏滑动拼图或通过验证后，点击此按钮秒级解除挂起
+                            <div class="d-flex align-items-center justify-content-between mt-2 pt-1 px-1" style="font-size: 11px;">
+                                <span class="text-muted"><i class="bi bi-info-circle me-1"></i>在右侧投屏滑动拼图或通过验证后，点击此按钮秒级解除挂起</span>
+                                <button class="btn btn-sm btn-link text-danger text-decoration-none p-0 d-flex align-items-center gap-1" style="font-size: 11px; opacity: 0.85;" onclick="stopSessionById('${sid}')">
+                                    <i class="bi bi-stop-circle"></i>终止任务
+                                </button>
                             </div>
                         </div>
                     `;
@@ -10478,9 +10497,11 @@
 
                         ${!isTakeover ? `
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
-                            <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px;">
-                                <i class="bi bi-display text-info"></i>
-                                <span>也可以直接在右侧真机投屏中轻触输入或滑动验证</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn btn-sm btn-outline-danger py-1 px-2.5 d-flex align-items-center gap-1" style="font-size: 11px; border-radius: 6px; opacity: 0.85;" onclick="stopSessionById('${sid}')" title="终止当前任务">
+                                    <i class="bi bi-stop-circle"></i> 终止任务
+                                </button>
+                                <span class="text-muted d-none d-md-inline" style="font-size: 11px;">也可在真机投屏中直接操作</span>
                             </div>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-sm btn-outline-secondary py-1" style="font-size: 11.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'skip')">
@@ -12099,6 +12120,43 @@
             }
         };
 
+        window.stopSessionById = async function(sessionId) {
+            sessionId = sessionId || activeSessionId;
+            if (!sessionId) return;
+            const cardEl = document.getElementById(`hitlDecisionCard_${sessionId}`);
+            if (cardEl) {
+                cardEl.style.opacity = "0.6";
+                cardEl.style.pointerEvents = "none";
+            }
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/stop`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    currentSessionStatus = "STOPPED";
+                    updateStopButtonState("STOPPED");
+                    if (cardEl) cardEl.remove();
+                    if (currentActiveSessionData) {
+                        currentActiveSessionData.status = "STOPPED";
+                        currentActiveSessionData.hitl_decision = null;
+                    }
+                    await loadSessions();
+                    await pollCurrentSession();
+                } else {
+                    alert(data.message || "终止任务失败");
+                    if (cardEl) {
+                        cardEl.style.opacity = "1";
+                        cardEl.style.pointerEvents = "auto";
+                    }
+                }
+            } catch (e) {
+                console.error("终止任务异常:", e);
+                if (cardEl) {
+                    cardEl.style.opacity = "1";
+                    cardEl.style.pointerEvents = "auto";
+                }
+            }
+        };
+
         async function acceptSession(sessionId) {
             if (!confirm("确认正式验收通过本次自动化测试交付物并封板归档？")) return;
             try {
@@ -12614,6 +12672,17 @@
         }
 
         function buildBlockHtml(blk, sessionData) {
+            if (blk.type === "system_notice" || blk.type === "system_termination") {
+                return `
+                    <div class="stream-system-notice-row my-2.5 text-center" id="${blk.block_id}">
+                        <div class="d-inline-flex align-items-center gap-1.5 px-3 py-1 rounded-pill" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); font-size: 11.5px; color: var(--text-sub);">
+                            <i class="bi bi-stop-circle text-danger" style="font-size: 11.5px;"></i>
+                            <span>${escapeHtml(blk.content || '用户已主动终止测试任务')}</span>
+                            ${blk.timestamp ? `<span class="ms-1 font-mono text-muted" style="font-size: 10px;">${escapeHtml(blk.timestamp)}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
             if (blk.type === "user_message") {
                 const attsHtml = (Array.isArray(blk.attachments) && blk.attachments.length > 0) ? buildAttachmentsPreviewHtml(blk.attachments) : '';
                 return `
@@ -15219,7 +15288,7 @@ function renderChatStream(sessionData) {
                         if (emptyBox) emptyBox.classList.add("d-none");
                         const attsOptHtml = attachmentsToSend.length > 0 ? buildAttachmentsPreviewHtml(attachmentsToSend) : '';
                         const userRowHtml = `
-                            <div class="stream-user-row" id="${tempBlockId}">
+                            <div class="stream-user-row optimistic-temp-node" id="${tempBlockId}" data-temp-node="true">
                                 <div class="stream-user-prompt">
                                     <div class="stream-user-prompt-meta">
                                         <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
@@ -15231,7 +15300,7 @@ function renderChatStream(sessionData) {
                                     ${attsOptHtml}
                                 </div>
                             </div>
-                            <div class="stream-thought-box" id="${tempThId}">
+                            <div class="stream-thought-box optimistic-temp-node" id="${tempThId}" data-temp-node="true">
                                 <div class="stream-thought-shimmer-card">
                                     <div class="d-flex align-items-center gap-2 mb-2">
                                         <span class="hud-status-dot pulsing"></span>
@@ -15259,6 +15328,8 @@ function renderChatStream(sessionData) {
                                 el.textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s";
                             }
                         }, 100);
+                        window._optimisticTimers = window._optimisticTimers || [];
+                        window._optimisticTimers.push(optTimerA);
                     }
 
                     input.value = "";
@@ -15266,15 +15337,33 @@ function renderChatStream(sessionData) {
 
                     const res = await fetch(`/api/sessions/${activeSessionId}/message`, { method: "POST", body: formData });
                     const data = await res.json();
-                    if (optTimerA) clearInterval(optTimerA);
+                    if (optTimerA) {
+                        clearInterval(optTimerA);
+                        if (window._optimisticTimers) {
+                            window._optimisticTimers = window._optimisticTimers.filter(t => t !== optTimerA);
+                        }
+                    }
+
+                    // 立即安全移除发送时乐观插入的临时节点，权威数据交由后端真实 timeline 渲染
+                    const tempEl = document.getElementById(tempBlockId);
+                    if (tempEl) tempEl.remove();
+                    const tempTh = document.getElementById(tempThId);
+                    if (tempTh) tempTh.remove();
 
                     if (data.success) {
-                        // 标记该会话重新进入实时执行，清除旧结论状态
-                        liveRunningSessions.add(activeSessionId);
-                        localStorage.removeItem("conclusion_shown_" + activeSessionId);
-                        delete window._conclusionTypewriterState[activeSessionId];
+                        if (data.stopped) {
+                            currentSessionStatus = "STOPPED";
+                            updateStopButtonState("STOPPED");
+                            const hitlCard = document.querySelector(".hitl-decision-card");
+                            if (hitlCard) hitlCard.remove();
+                        } else {
+                            // 标记该会话重新进入实时执行，清除旧结论状态
+                            liveRunningSessions.add(activeSessionId);
+                            localStorage.removeItem("conclusion_shown_" + activeSessionId);
+                            delete window._conclusionTypewriterState[activeSessionId];
+                        }
 
-                        // 🚀 核心自愈：重新激活轮询定时器，杜绝因旧状态导致轮询停止！
+                        // 重新激活轮询定时器，杜绝因旧状态导致轮询停止
                         if (!sessionPollTimer) {
                             sessionPollTimer = setInterval(pollCurrentSession, 1200);
                         }
@@ -15282,10 +15371,6 @@ function renderChatStream(sessionData) {
                         loadSessions();
                         ensurePipScreenOpen();
                     } else {
-                        const tempEl = document.getElementById(tempBlockId);
-                        if (tempEl) tempEl.remove();
-                        const tempTh = document.getElementById(tempThId);
-                        if (tempTh) tempTh.remove();
                         alert(data.message || "追加测试指令失败");
                     }
                     return;
@@ -15317,7 +15402,7 @@ function renderChatStream(sessionData) {
                 if (flow) {
                     const attsOptHtml = attachmentsToSend.length > 0 ? buildAttachmentsPreviewHtml(attachmentsToSend) : '';
                     const userRowHtml = `
-                        <div class="stream-user-row" id="${tempUserBlockId}">
+                        <div class="stream-user-row optimistic-temp-node" id="${tempUserBlockId}" data-temp-node="true">
                             <div class="stream-user-prompt">
                                 <div class="stream-user-prompt-meta">
                                     <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
@@ -15329,7 +15414,7 @@ function renderChatStream(sessionData) {
                                 ${attsOptHtml}
                             </div>
                         </div>
-                        <div class="stream-thought-box" id="${tempThoughtBlockId}">
+                        <div class="stream-thought-box optimistic-temp-node" id="${tempThoughtBlockId}" data-temp-node="true">
                             <div class="stream-thought-shimmer-card">
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <span class="hud-status-dot pulsing"></span>
@@ -15366,6 +15451,8 @@ function renderChatStream(sessionData) {
                             el.textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s";
                         }
                     }, 100);
+                    window._optimisticTimers = window._optimisticTimers || [];
+                    window._optimisticTimers.push(optTimerB);
                 }
 
                 // 立即清空输入框并收拢
@@ -15392,7 +15479,16 @@ function renderChatStream(sessionData) {
                 // 🚀 后端极速首包响应 (<50ms)
                 const res = await fetch("/api/sessions/create", { method: "POST", body: formData });
                 const data = await res.json();
-                if (optTimerB) clearInterval(optTimerB);
+                if (optTimerB) {
+                    clearInterval(optTimerB);
+                    if (window._optimisticTimers) {
+                        window._optimisticTimers = window._optimisticTimers.filter(t => t !== optTimerB);
+                    }
+                }
+                const tempUserEl = document.getElementById(tempUserBlockId);
+                if (tempUserEl) tempUserEl.remove();
+                const tempThEl = document.getElementById(tempThoughtBlockId);
+                if (tempThEl) tempThEl.remove();
 
                 if (data.success && data.session_id) {
                     liveRunningSessions.add(data.session_id);

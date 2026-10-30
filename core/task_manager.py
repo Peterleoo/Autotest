@@ -175,6 +175,19 @@ class TaskManager:
         session["status"] = "STOPPED"
         session["is_success"] = False
         session["error_message"] = "用户主动终止了测试任务"
+        session["hitl_decision"] = None
+
+        # 3. 彻底释放并中断底层人机协同等待
+        try:
+            decision_file = BASE_DIR / "scratch" / f"decision_{session_id}.json"
+            decision_file.parent.mkdir(parents=True, exist_ok=True)
+            decision_file.write_text(json.dumps({
+                "status": "CANCELLED",
+                "decision_type": "cancel",
+                "reason": "用户主动终止了测试任务"
+            }, ensure_ascii=False), encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"写入协同取消文件异常: {e}")
 
         steps = session.get("plan_steps", [])
         for st in steps:
@@ -858,11 +871,123 @@ class TaskManager:
     def append_session_message(self, session_id: str, message: str, provider: Optional[str] = None, model: Optional[str] = None, attachments: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
         在已有会话中追加新一轮测试意图 (Turn)，保持会话记忆与事实状态机，原地接续执行
+        集成 Intent Gate 意图拦截、HITL 协同桥接与情境差量动态规划
         """
         session = self.sessions.get(session_id)
         if not session:
             raise ValueError(f"会话不存在: {session_id}")
 
+        clean_msg = message.strip()
+
+        # -------------------------------------------------------------
+        # 1. 意图拦截中枢 (Intent Gate)：精准识别控制指令 (停止/终止/取消/退出/结束/stop/cancel/quit)
+        # -------------------------------------------------------------
+        STOP_COMMAND_PATTERN = re.compile(
+            r"^\s*(?:立即|马上|强制)?\s*(停止|终止|取消|退出|结束|stop|cancel|quit|abort|exit)\s*(?:当前)?\s*(任务|测试|执行|会话|流程)?[!！。.]*\s*$",
+            re.IGNORECASE
+        )
+        if STOP_COMMAND_PATTERN.match(clean_msg):
+            logger.info(f"🛑 [Intent Gate] 拦截到用户主动控制指令【{clean_msg}】，立即安全熔断会话 [{session_id}]")
+            self.stop_session(session_id)
+            session["hitl_decision"] = None
+            try:
+                decision_file = BASE_DIR / "scratch" / f"decision_{session_id}.json"
+                decision_file.parent.mkdir(parents=True, exist_ok=True)
+                decision_file.write_text(json.dumps({
+                    "status": "CANCELLED",
+                    "decision_type": "cancel",
+                    "reason": "用户主动终止了测试任务"
+                }, ensure_ascii=False), encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"写入协同取消文件异常: {e}")
+
+            if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+                session["timeline_blocks"] = []
+            turns = MemoryManager.ensure_session_turns(session)
+            new_turn_id = len(turns) + 1
+            session["timeline_blocks"].append(
+                TimelineManager.create_user_block(clean_msg, turn_id=new_turn_id, attachments=attachments)
+            )
+            session["timeline_blocks"].append(
+                TimelineManager.create_system_notice_block("用户已主动终止测试任务", turn_id=new_turn_id)
+            )
+            self._save_session(session_id)
+            return {
+                "success": True,
+                "stopped": True,
+                "session_id": session_id,
+                "message": "用户已主动终止测试任务"
+            }
+
+        # -------------------------------------------------------------
+        # 2. 协同联动 (HITL Collaborative Bridge)：若任务处于挂起等待状态，将输入智能衔接为决策数据
+        # -------------------------------------------------------------
+        hitl = session.get("hitl_decision")
+        is_waiting_hitl = (session.get("status") == "WAITING_USER_INPUT" or bool(hitl))
+        if is_waiting_hitl and hitl:
+            mode = hitl.get("mode", "credential")
+            logger.info(f"🤝 [HITL Bridge] 检测到人机协同挂起 (mode={mode})，尝试将输入【{clean_msg}】智能衔接为决策数据")
+
+            # 2.1 用户表达手动完成
+            if clean_msg in ["已完成", "完成了", "完成", "好了", "搞定", "done", "manual_done"]:
+                self.resolve_decision(session_id, {"decision_type": "manual_done"})
+                return {"success": True, "resolved_hitl": True, "decision_type": "manual_done", "message": "已确认完成并恢复自动化"}
+
+            # 2.2 用户表达跳过
+            if clean_msg in ["跳过", "skip"]:
+                self.resolve_decision(session_id, {"decision_type": "skip"})
+                return {"success": True, "resolved_hitl": True, "decision_type": "skip", "message": "已跳过该步骤并恢复自动化"}
+
+            # 2.3 短信验证码模式：匹配 4~8 位数字
+            if mode == "sms_code":
+                sms_match = re.search(r"\b(\d{4,8})\b", clean_msg)
+                if sms_match:
+                    code = sms_match.group(1)
+                    self.resolve_decision(session_id, {
+                        "decision_type": "inject_sms",
+                        "sms_code": code
+                    })
+                    return {"success": True, "resolved_hitl": True, "decision_type": "inject_sms", "message": f"已自动将短信验证码【{code}】衔接注入"}
+
+            # 2.4 手机号待发送模式：匹配 11 位以 1 开头的手机号
+            elif mode == "phone_input":
+                phone_match = re.search(r"\b(1\d{10})\b", clean_msg)
+                if phone_match:
+                    phone = phone_match.group(1)
+                    self.resolve_decision(session_id, {
+                        "decision_type": "inject_phone",
+                        "account": phone
+                    })
+                    return {"success": True, "resolved_hitl": True, "decision_type": "inject_phone", "message": f"已自动将手机号【{phone}】衔接注入"}
+
+            # 2.5 账号密码登录凭据模式
+            elif mode == "credential":
+                parts = clean_msg.split()
+                if len(parts) >= 2:
+                    acc, pwd = parts[0], parts[1]
+                else:
+                    acc, pwd = clean_msg, ""
+                self.resolve_decision(session_id, {
+                    "decision_type": "inject",
+                    "account": acc,
+                    "password": pwd
+                })
+                return {"success": True, "resolved_hitl": True, "decision_type": "inject", "message": "已自动将账号凭据衔接注入"}
+
+            # 2.6 AI 自主生成的人机协同字段
+            elif hitl.get("type") == "ai_generated" or (hitl.get("fields") and len(hitl.get("fields", [])) > 0):
+                fields = hitl.get("fields", [])
+                if len(fields) == 1:
+                    f_key = fields[0].get("key", "input")
+                    self.resolve_decision(session_id, {
+                        "decision_type": "ai_submit",
+                        "inputs": {f_key: clean_msg}
+                    })
+                    return {"success": True, "resolved_hitl": True, "decision_type": "ai_submit", "message": "已自动将输入参数衔接注入"}
+
+        # -------------------------------------------------------------
+        # 3. 正常测试意图追加 (Turn)：动态差量规划，移除死板伪模板
+        # -------------------------------------------------------------
         if provider:
             session["provider"] = provider
         if model:
@@ -875,7 +1000,7 @@ class TaskManager:
             session["messages"] = []
         session["messages"].append({
             "role": "user",
-            "content": message,
+            "content": clean_msg,
             "attachments": attachments or [],
             "timestamp": now_str
         })
@@ -885,51 +1010,60 @@ class TaskManager:
             session["attachments"].extend(attachments)
 
         new_turn_id = len(turns) + 1
-        new_turn = MemoryManager.create_turn(new_turn_id, message)
+        new_turn = MemoryManager.create_turn(new_turn_id, clean_msg)
         if attachments:
             new_turn["attachments"] = attachments
-        
-        turn_steps = [
-            {
+
+        # 动态情境规划：根据端侧状态与意图子句拆解，绝不使用死板的 2 步伪模板
+        dev_ctx = {"is_foreground": True, "scene_type": "APP_RUNNING"}
+        raw_steps = self._decompose_plan_steps(clean_msg, is_auto=True, device_context=dev_ctx)
+        turn_steps = []
+        for idx, s in enumerate(raw_steps):
+            turn_steps.append({
+                "step_id": idx + 1,
+                "step_number": idx + 1,
+                "title": s.get("title", f"步骤 {idx+1}"),
+                "desc": s.get("desc", ""),
+                "status": "RUNNING" if idx == 0 else "PENDING"
+            })
+        if not turn_steps:
+            turn_steps = [{
                 "step_id": 1,
-                "title": f"解析与定位：{message[:14]}",
-                "desc": f"继承前序界面事实状态，理解【{message}】并定位交互元素",
+                "step_number": 1,
+                "title": f"执行追加意图：{clean_msg[:14]}",
+                "desc": f"响应用户追加测试诉求【{clean_msg}】并执行端侧断言",
                 "status": "RUNNING"
-            },
-            {
-                "step_id": 2,
-                "title": f"执行与断言：{message[:14]}",
-                "desc": "派发端侧交互动作并校验界面转场与业务数据反馈",
-                "status": "PENDING"
-            }
-        ]
+            }]
+
         new_turn["plan_steps"] = turn_steps
         turns.append(new_turn)
 
+        previous_steps = list(session.get("plan_steps", []))
         session["plan_steps"] = turn_steps
         session["status"] = "RUNNING"
         session["is_success"] = None
         session["error_message"] = None
 
-        # 🚀 对标 DeepSeek 连续对话机制：即时向对话流注入新轮次用户提问、思考态与任务清单
+        # 向对话流注入新轮次用户提问、思考态与任务清单
         if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
             session["timeline_blocks"] = []
         session["timeline_blocks"].append(
-            TimelineManager.create_user_block(message, turn_id=new_turn_id, attachments=attachments)
+            TimelineManager.create_user_block(clean_msg, turn_id=new_turn_id, attachments=attachments)
         )
+        step_titles_str = "、".join([s["title"] for s in turn_steps[:3]])
         session["timeline_blocks"].append(
             TimelineManager.create_thought_block(
-                duration="1.2s",
+                duration="0.8s",
                 bullets=[
-                    {"tag": "意图深度解析", "content": f"深入理解本轮追加测试诉求【{message[:24]}】"},
-                    {"tag": "现场就地继承", "content": "继承前序端侧已达成状态，原地规划增量执行路径，跳过重复冷启动"}
+                    {"tag": "意图深度解析", "content": f"深入理解本轮追加测试诉求【{clean_msg[:24]}】"},
+                    {"tag": "动态规划路径", "content": f"就地继承前序端侧状态，规划差量执行阶段：{step_titles_str}"}
                 ],
                 turn_id=new_turn_id,
                 is_done=False
             )
         )
         session["timeline_blocks"].append(
-            TimelineManager.create_todo_block(turn_steps, turn_id=new_turn_id)
+            TimelineManager.create_todo_block(turn_steps, previous_steps=previous_steps, turn_id=new_turn_id)
         )
 
         # 为各设备记录日志

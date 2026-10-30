@@ -314,7 +314,7 @@ class MemoryManager:
             status = "已达成" if t.get("status") in ["COMPLETED", "READY_FOR_REVIEW"] else "受阻"
             if not concl:
                 concl = f"完成 {len(t.get('plan_steps', []))} 步界面操作"
-            history_lines.append(f"  [{tid}] “{msg[:14]}” ➔ {status}: {concl[:40]}")
+            history_lines.append(f"  [Turn {tid}] “{msg[:14]}” ➔ {status}: {concl[:40]}")
 
         return "• 多轮演进链 (Previous Turns):\n" + "\n".join(history_lines)
 

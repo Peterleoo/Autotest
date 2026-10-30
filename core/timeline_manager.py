@@ -22,6 +22,17 @@ class TimelineManager:
         }
 
     @staticmethod
+    def create_system_notice_block(content: str, turn_id: int = 0) -> Dict[str, Any]:
+        return {
+            "block_id": f"blk_notice_{turn_id}_{uuid.uuid4().hex[:6]}",
+            "type": "system_notice",
+            "turn_id": turn_id,
+            "status": "COMPLETED",
+            "content": content,
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        }
+
+    @staticmethod
     def create_thought_block(duration: str, bullets: List[Dict[str, str]], turn_id: int = 0, is_done: bool = True) -> Dict[str, Any]:
         return {
             "block_id": f"blk_thought_{turn_id}_{uuid.uuid4().hex[:6]}",
