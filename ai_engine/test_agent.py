@@ -7,7 +7,7 @@ from appium import webdriver
 
 from core.llm_client import LLMClient
 from core.api_client import APIClient
-from ai_engine.screen_parser import ScreenParser
+from ai_engine.screen_parser import ScreenParser, PerceptionMode
 from ai_engine.action_executor import ActionExecutor
 from core.app_lessons_manager import app_lessons_mgr
 from ai_engine.verifier import TaskVerifier
@@ -988,34 +988,63 @@ class AITestAgent:
         execution_success = False
         consecutive_unchanged_screens = 0
         final_block_reason = ""
+        force_vision = False
 
         while step_count < max_steps:
             if getattr(self, "_stop_requested", False):
                 logger.info("🛑 收到外部主动终止信号，安全退出执行循环")
                 break
 
-            # 1. 感知当前真机屏幕与元素 (动作后启用转场自适应静默门禁 Visual Settling Guard)
-            screen_info = ScreenParser.get_screen_summary(self.driver, wait_settling=(step_count > 0))
+            # 1. 感知当前真机屏幕与元素 (分层感知三级火箭架构: 原生UI树短路 -> 端侧OCR补齐 -> 视觉模型攻坚)
+            screen_info = ScreenParser.get_screen_summary(
+                self.driver,
+                wait_settling=(step_count > 0),
+                skip_ocr_if_rich=True,
+                goal=goal,
+                force_vision=force_vision
+            )
+            perception_mode = screen_info.get("perception_mode", PerceptionMode.FULL_VISION)
+            el_count = len(screen_info.get("elements", []))
 
             # 🛡️ 步骤前置：检查并触发人机协同登录凭证门禁 (DeepSeek Harness 步数冻结)
             # 若处于登录拦截状态，安全挂起等待用户决策；挂起期间 step_count 绝不累加
             hitl_resolved = self._check_and_prompt_hitl_credential(screen_info, goal)
             if hitl_resolved:
                 # 决策完成恢复后，就地复验屏幕状态
-                screen_info = ScreenParser.get_screen_summary(self.driver)
+                screen_info = ScreenParser.get_screen_summary(
+                    self.driver,
+                    skip_ocr_if_rich=True,
+                    goal=goal,
+                    force_vision=force_vision
+                )
+                perception_mode = screen_info.get("perception_mode", PerceptionMode.FULL_VISION)
+                el_count = len(screen_info.get("elements", []))
 
             # 只有离开阻断状态后，才正式递增有效探索步骤
             step_count += 1
             # 实时沉淀当前真机屏幕实体与工作记忆 (Muse 范式)
             self._sync_working_memory(screen_info)
             logger.info(f"\n--- [Step {step_count}/{max_steps}] 感知界面与决策 ---")
+
+            # 📢 分层感知动态标记与状态上报
+            if perception_mode == PerceptionMode.HIERARCHY_TEXT:
+                perception_log = f"⚡ [分层感知·极速短路] 原生UI树信息充沛({el_count}个控件)，跳过视觉图片上传，采用纯文本毫秒级决策"
+                perception_action = "UI树纯文本短路"
+            elif perception_mode == PerceptionMode.OCR_TEXT:
+                perception_log = f"📝 [分层感知·OCR补齐] 原生UI树稀疏，端侧本地OCR成功补齐文字({el_count}个控件)，采用轻量纯文本决策"
+                perception_action = "OCR纯文本决策"
+            else:
+                perception_log = f"👁️ [分层感知·视觉攻坚] 检测到自绘/图形界面或升格攻坚，启用多模态视觉模型"
+                perception_action = "多模态视觉攻坚"
+
+            logger.info(perception_log)
             self._notify_status({
                 "step": step_count,
                 "max_steps": max_steps,
-                "action": "视觉截屏感知",
-                "log": f"--- [Step {step_count}/{max_steps}] 正在捕获屏幕并进行视觉 OCR 识别 ---"
+                "action": perception_action,
+                "log": f"--- [Step {step_count}/{max_steps}] {perception_log} ---"
             })
-            el_count = len(screen_info.get("elements", []))
+
             ocr_cached = screen_info.get("ocr_cached", False)
             if ocr_cached:
                 consecutive_unchanged_screens += 1
@@ -1152,11 +1181,13 @@ class AITestAgent:
 
 请分析当前界面，并给出你的下一步测试动作决策（纯 JSON）。
 """
-            # 3. 大模型决策（支持传入当前截屏进行多模态视觉理解）
+            # 3. 大模型决策（分层感知：若为 HIERARCHY_TEXT 或 OCR_TEXT，只传结构化元素树文本；FULL_VISION 传原图）
+            image_to_send = screen_info["image_b64"] if perception_mode == PerceptionMode.FULL_VISION else None
+            thought_desc = "以纯文本极速模式分析界面" if image_to_send is None else "结合多模态视觉感知分析界面"
             self._notify_status({
                 "step": step_count,
                 "action": "AI 意图推演",
-                "log": f"AI 模型 ({self.llm.model_name}) 正在结合视觉感知分析界面并规划下一步..."
+                "log": f"AI 模型 ({self.llm.model_name}) 正在{thought_desc}并规划下一步..."
             })
             try:
                 # 🛡️ 步骤级弹窗感知与自愈小闭环 (Step Healing)
@@ -1172,12 +1203,18 @@ class AITestAgent:
                     logger.info(f"🛡️ [步骤自愈] 探测到界面临时遮罩浮层【{d_text}】，派发轻量关闭手势原地恢复...")
                     self.executor.tap_element(found_dismiss_el)
                     time.sleep(1.0)
-                    screen_info = ScreenParser.get_screen_summary(self.driver)
+                    screen_info = ScreenParser.get_screen_summary(
+                        self.driver,
+                        skip_ocr_if_rich=True,
+                        goal=goal,
+                        force_vision=force_vision
+                    )
+                    image_to_send = screen_info["image_b64"] if screen_info.get("perception_mode") == PerceptionMode.FULL_VISION else None
 
                 decision = self.llm.chat_decision(
                     system_prompt=SYSTEM_PROMPT,
                     user_prompt=user_prompt,
-                    image_base64=screen_info["image_b64"],
+                    image_base64=image_to_send,
                     memory_context=memory_context
                 )
                 thought = decision.get('thought', '')
@@ -1198,6 +1235,11 @@ class AITestAgent:
             except Exception as e:
                 err_msg = str(e)
                 logger.error(f"❌ 模型决策异常: {err_msg}")
+                # 若纯文本模式报错，且尚未升级视觉，先尝试升级到视觉攻坚重试该步
+                if image_to_send is None and not force_vision:
+                    logger.warning(f"⚠️ 纯文本决策遇到异常 ({err_msg})，自动升格到 FULL_VISION 视觉模型攻坚重试...")
+                    force_vision = True
+                    continue
                 final_block_reason = f"大模型决策调用异常: {err_msg}"
                 self._notify_status({
                     "step": step_count,
@@ -1210,7 +1252,12 @@ class AITestAgent:
             if decision.get("action") == "request_human_help":
                 resolved = self._handle_ai_requested_human_help(decision, screen_info, goal)
                 if resolved:
-                    screen_info = ScreenParser.get_screen_summary(self.driver)
+                    screen_info = ScreenParser.get_screen_summary(
+                        self.driver,
+                        skip_ocr_if_rich=True,
+                        goal=goal,
+                        force_vision=force_vision
+                    )
                 continue
 
             # 4. 🚀 借鉴 DeepSeek Harness (DSH)：通过独立 TaskVerifier 门禁审查 finish 请求
@@ -1223,19 +1270,28 @@ class AITestAgent:
                 )
                 if not is_valid:
                     logger.warning(f"🛡️ [DSH 核验门禁一票否决]: {verifier_msg}")
+                    # 门禁驳回后强制下一步启用视觉，让 AI 仔细核验界面
+                    force_vision = True
                     self._notify_status({
                         "step": step_count,
                         "action": "门禁驳回",
                         "log": f"🛡️ [DSH Verifier 门禁驳回]: {verifier_msg}"
                     })
                     # 强力纠偏：将否决原因作为不可辩驳的事实注入下一轮模型推理上下文
+                    if not hasattr(self, "memory_context") or not isinstance(self.memory_context, list):
+                        self.memory_context = []
                     self.memory_context.append(f"【系统严格核验门禁一票否决】：你发起的 finish 已被驳回！原因：{verifier_msg}。当前未达成最终目标，严禁擅自宣布成功！请根据界面真实情况继续推进业务或排除阻断！")
                     
                     # 若属于登录阻断，立即触发自动登录注入门禁
                     if barrier_info and barrier_info.get("type") == "LOGIN_BARRIER":
                         resolved = self._check_and_prompt_hitl_credential(screen_info, goal)
                         if resolved:
-                            screen_info = ScreenParser.get_screen_summary(self.driver)
+                            screen_info = ScreenParser.get_screen_summary(
+                                self.driver,
+                                skip_ocr_if_rich=True,
+                                goal=goal,
+                                force_vision=force_vision
+                            )
                     continue
 
                 # 仅当独立 Verifier 审核通过，才批准完成
@@ -1255,19 +1311,27 @@ class AITestAgent:
                 retry_count += 1
                 logger.warning(f"🔄 动作执行微重试 ({retry_count}/2)... 重新捕获界面并防抖重试")
                 time.sleep(1.0)
-                screen_info = ScreenParser.get_screen_summary(self.driver)
+                screen_info = ScreenParser.get_screen_summary(
+                    self.driver,
+                    skip_ocr_if_rich=True,
+                    goal=goal,
+                    force_vision=force_vision
+                )
                 step_res = self.executor.execute(decision, screen_info["elements"])
                 if step_res.get("success", False):
                     logger.info("✅ 动作经防抖微重试执行成功！")
                     break
             if not step_res["success"]:
-                logger.warning(f"步骤执行失败: {step_res['message']}，将让 AI 在下一步自适应纠偏")
+                logger.warning(f"步骤执行失败: {step_res['message']}，将让 AI 在下一步自适应纠偏并启用视觉攻坚")
+                force_vision = True
                 self._notify_status({
                     "step": step_count,
                     "action": "执行轻微警告",
-                    "log": f"⚠️ 步骤执行反馈: {step_res['message']} (AI 将在下一步自适应纠偏)"
+                    "log": f"⚠️ 步骤执行反馈: {step_res['message']} (AI 将在下一步启用视觉多模态攻坚自适应纠偏)"
                 })
             else:
+                # 动作执行成功后，恢复常规分层感知自适应
+                force_vision = False
                 self._notify_status({
                     "step": step_count,
                     "action": "执行成功",
