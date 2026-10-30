@@ -7632,8 +7632,315 @@
             object-fit: contain;
             border-radius: 4px;
             cursor: zoom-in;
+        /* ================= 需求驱动用例编排套件 (Suite Builder Card) ================= */
+        .suite-builder-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            margin: 12px 0;
+            transition: all 0.2s ease;
         }
-
+        .suite-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-surface-elevated);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .suite-meta-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .suite-doc-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2.5px 7px;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.12);
+            color: #6366f1;
+            border: 1px solid rgba(99, 102, 241, 0.25);
+        }
+        .suite-title-text {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text-main);
+            letter-spacing: -0.2px;
+        }
+        .suite-toggles-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .clean-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-sub);
+            cursor: pointer;
+            user-select: none;
+        }
+        .clean-switch input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #10b981;
+        }
+        .suite-case-list {
+            padding: 4px 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .suite-case-row {
+            display: flex;
+            align-items: flex-start;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            transition: background 0.12s ease;
+            position: relative;
+        }
+        .suite-case-row:last-child {
+            border-bottom: none;
+        }
+        .suite-case-row:hover {
+            background: var(--bg-surface-hover);
+        }
+        .suite-case-row.disabled {
+            opacity: 0.45;
+        }
+        .case-handle {
+            color: var(--text-muted);
+            cursor: grab;
+            font-size: 12px;
+            margin-right: 10px;
+            margin-top: 3px;
+            user-select: none;
+            opacity: 0.4;
+            transition: opacity 0.15s ease;
+        }
+        .suite-case-row:hover .case-handle {
+            opacity: 1;
+        }
+        .case-select-checkbox {
+            margin-top: 3.5px;
+            margin-right: 10px;
+            cursor: pointer;
+            accent-color: var(--status-green, #10b981);
+        }
+        .case-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .case-main-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+            flex-wrap: wrap;
+        }
+        .case-priority-badge {
+            font-size: 9.5px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            padding: 1px 5px;
+            border-radius: 3px;
+            line-height: 1.2;
+        }
+        .priority-p0 {
+            background: rgba(239, 68, 68, 0.14);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+        .priority-p1 {
+            background: rgba(245, 158, 11, 0.14);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+        .priority-p2 {
+            background: rgba(59, 130, 246, 0.14);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+        .case-module-tag {
+            font-size: 10.5px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .editable-field {
+            font-size: 12.5px;
+            font-weight: 550;
+            color: var(--text-main);
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 1px 4px;
+            margin-left: -4px;
+            cursor: text;
+            transition: all 0.15s ease;
+            outline: none;
+        }
+        .editable-field:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border-subtle);
+        }
+        body.theme-light .editable-field:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+        .editable-field:focus {
+            background: var(--bg-surface-elevated);
+            border-color: var(--border-hover);
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+        }
+        .case-sub-line {
+            font-size: 11px;
+            color: var(--text-sub);
+            line-height: 1.5;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 2px;
+            flex-wrap: wrap;
+        }
+        .case-goal-text {
+            color: var(--text-sub);
+            cursor: text;
+            border-radius: 4px;
+            padding: 1px 4px;
+            margin-left: -4px;
+            transition: all 0.15s ease;
+            outline: none;
+            border: 1px solid transparent;
+        }
+        .case-goal-text:hover {
+            border-color: var(--border-subtle);
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .case-goal-text:focus {
+            background: var(--bg-surface-elevated);
+            border-color: var(--border-hover);
+        }
+        .case-dep-tag {
+            font-size: 9.5px;
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 1px 5px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+        .case-actions {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            margin-left: 12px;
+            margin-top: 2px;
+            opacity: 0.3;
+            transition: opacity 0.15s ease;
+        }
+        .suite-case-row:hover .case-actions {
+            opacity: 1;
+        }
+        .case-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 3px 5px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.12s ease;
+        }
+        .case-action-btn:hover {
+            color: var(--text-main);
+            background: var(--bg-surface-hover);
+        }
+        .case-action-btn.btn-delete:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.12);
+        }
+        .suite-footer {
+            padding: 10px 16px;
+            border-top: 1px solid var(--border-subtle);
+            background: var(--bg-surface-elevated);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .footer-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .btn-add-case {
+            font-size: 11px;
+            color: var(--text-sub);
+            background: transparent;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+        }
+        .btn-add-case:hover {
+            color: var(--text-main);
+            background: var(--bg-surface-hover);
+        }
+        .footer-summary {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .footer-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-secondary-action {
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--text-sub);
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-secondary-action:hover {
+            color: var(--text-main);
+            border-color: var(--border-medium);
+            background: var(--bg-surface-hover);
+        }
+        .btn-primary-run {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--accent-on-primary, #000);
+            background: var(--accent-primary, #fff);
+            border: 1px solid transparent;
+            padding: 5px 12px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-primary-run:hover {
+            opacity: 0.9;
+            transform: translateY(-0.5px);
+        }
     </style>
 
 </head>
@@ -12679,6 +12986,9 @@
         }
 
         function buildBlockHtml(blk, sessionData) {
+            if (blk.type === "suite_builder") {
+                return renderSuiteBuilderHtml(blk.suite_data || blk.suite || {}, blk.block_id);
+            }
             if (blk.type === "system_notice" || blk.type === "system_termination") {
                 return `
                     <div class="stream-system-notice-row my-2.5 text-center" id="${blk.block_id}">
@@ -17571,11 +17881,20 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                 }
                 const displayName = att.filename || "需求附件";
                 const displaySize = att.size || "";
+                let actionBtn = "";
+                if (att.is_doc) {
+                    actionBtn = `
+                        <span class="attachment-pill-action" onclick="generateSuiteFromAttachment('${escapeHtml(att.saved_name || '')}', '${escapeHtml(displayName)}', event)" title="基于此需求文档智能提炼系统用例套件 (Suite Builder)" style="cursor: pointer; padding: 1px 6px; border-radius: 9999px; background: rgba(99, 102, 241, 0.15); color: #818cf8; font-size: 10px; font-weight: 500; margin-left: 4px;">
+                            <i class="bi bi-magic me-1"></i>提炼套件
+                        </span>
+                    `;
+                }
                 html += `
                     <div class="attachment-pill" title="${escapeHtml(displayName)} (${displaySize})">
                         ${iconOrThumb}
                         <span class="attachment-pill-name">${escapeHtml(displayName)}</span>
                         <span class="attachment-pill-size">${escapeHtml(displaySize)}</span>
+                        ${actionBtn}
                         <span class="attachment-pill-remove" onclick="removeAttachment(${idx}, event)" title="移除此附件">×</span>
                     </div>
                 `;
@@ -17677,6 +17996,376 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                 });
             }
         });
+
+        // ================= 需求驱动用例编排套件 (Suite Builder Generative UI) =================
+
+        function renderSuiteBuilderHtml(suiteData, cardId) {
+            const cId = cardId || ("suite_builder_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+            const suiteTitle = escapeHtml(suiteData.suite_title || "需求驱动系统测试用例编排套件");
+            const docName = escapeHtml(suiteData.doc_filename || "需求规格说明书");
+            const cases = Array.isArray(suiteData.cases) ? suiteData.cases : [];
+            const keepState = suiteData.keep_state !== false;
+
+            let rowsHtml = "";
+            cases.forEach((c, idx) => {
+                const caseId = escapeHtml(c.id || `tc-${idx+1}`);
+                const isChecked = c.checked !== false;
+                const prio = (c.priority || "P1").toUpperCase();
+                let prioClass = "priority-p1";
+                if (prio === "P0") prioClass = "priority-p0";
+                else if (prio === "P2") prioClass = "priority-p2";
+
+                const depHtml = c.depends_on ? `<span class="case-dep-tag" title="执行前无需重启，直接继承上一条现场状态"><i class="bi bi-link-45deg"></i> ${escapeHtml(c.depends_on)}</span>` : "";
+
+                rowsHtml += `
+                    <div class="suite-case-row ${isChecked ? '' : 'disabled'}" data-id="${caseId}">
+                        <span class="case-handle" title="按住拖拽排序"><i class="bi bi-grip-vertical"></i></span>
+                        <input type="checkbox" class="case-select-checkbox" ${isChecked ? 'checked' : ''} onchange="updateSuiteCardSummary(this)">
+                        <div class="case-content">
+                            <div class="case-main-line">
+                                <span class="case-priority-badge ${prioClass}">${escapeHtml(prio)}</span>
+                                <span class="case-module-tag">${escapeHtml(c.module || '业务模块')}</span>
+                                <span class="editable-field" contenteditable="true" spellcheck="false" title="点击可直接编辑用例标题">${escapeHtml(c.title || '')}</span>
+                            </div>
+                            <div class="case-sub-line">
+                                <span class="case-goal-text" contenteditable="true" spellcheck="false" title="点击可微调操作目标与入参">${escapeHtml(c.goal || '')}</span>
+                                ${depHtml}
+                            </div>
+                        </div>
+                        <div class="case-actions">
+                            <button class="case-action-btn" title="上移" onclick="moveSuiteRow(this, -1)"><i class="bi bi-arrow-up"></i></button>
+                            <button class="case-action-btn" title="下移" onclick="moveSuiteRow(this, 1)"><i class="bi bi-arrow-down"></i></button>
+                            <button class="case-action-btn btn-delete" title="移除此项" onclick="deleteSuiteRow(this)"><i class="bi bi-trash3"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const checkedCount = cases.filter(c => c.checked !== false).length;
+            const estMinutes = (checkedCount * 0.45).toFixed(1);
+
+            return `
+                <div class="suite-builder-card" id="${cId}" data-doc="${docName}">
+                    <div class="suite-header">
+                        <div class="suite-meta-left">
+                            <span class="suite-doc-badge">
+                                <i class="bi bi-file-earmark-text"></i> ${docName}
+                            </span>
+                            <span class="suite-title-text">${suiteTitle}</span>
+                        </div>
+                        <div class="suite-toggles-right">
+                            <label class="clean-switch" title="上一项用例执行成功后，保持应用现场不重启，直接串联执行下一项">
+                                <input type="checkbox" class="suite-keep-context" ${keepState ? 'checked' : ''}>
+                                <span>保持现场串联执行</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="suite-case-list">
+                        ${rowsHtml}
+                    </div>
+                    <div class="suite-footer">
+                        <div class="footer-left">
+                            <button class="btn-add-case" onclick="addNewSuiteCustomRow(this)">
+                                <i class="bi bi-plus-lg"></i> 添加自定义用例
+                            </button>
+                            <span class="footer-summary">已选择 ${checkedCount} / ${cases.length} 项用例 (预计执行 ${estMinutes} 分钟)</span>
+                        </div>
+                        <div class="footer-right">
+                            <button class="btn-secondary-action" onclick="saveCardAsSuite(this)" title="固化到项目用例库中，随时一键复跑">
+                                <i class="bi bi-bookmark-check me-1"></i> 保存为套件
+                            </button>
+                            <button class="btn-primary-run" onclick="triggerCardSystemicRun(this)">
+                                <i class="bi bi-play-fill" style="font-size: 13px;"></i> 执行选中的系统测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSuiteBuilderCard(suiteData, containerId) {
+            const html = renderSuiteBuilderHtml(suiteData);
+            let targetEl = containerId ? document.getElementById(containerId) : null;
+            if (!targetEl) {
+                targetEl = document.getElementById("streamFlow") || document.getElementById("timelineList");
+            }
+            if (targetEl) {
+                targetEl.insertAdjacentHTML("beforeend", html);
+                targetEl.scrollTop = targetEl.scrollHeight;
+            }
+            return html;
+        }
+
+        function updateSuiteCardSummary(el) {
+            const card = el.closest(".suite-builder-card");
+            if (!card) return;
+            const rows = card.querySelectorAll(".suite-case-row");
+            let total = rows.length;
+            let checked = 0;
+            rows.forEach(r => {
+                const cb = r.querySelector(".case-select-checkbox");
+                if (cb && cb.checked) {
+                    checked++;
+                    r.classList.remove("disabled");
+                } else {
+                    r.classList.add("disabled");
+                }
+            });
+            const summary = card.querySelector(".footer-summary");
+            if (summary) {
+                const estMin = (checked * 0.45).toFixed(1);
+                summary.innerText = `已选择 ${checked} / ${total} 项用例 (预计执行 ${estMin} 分钟)`;
+            }
+        }
+
+        function moveSuiteRow(btn, dir) {
+            const row = btn.closest(".suite-case-row");
+            if (!row) return;
+            const card = btn.closest(".suite-builder-card");
+            if (dir === -1 && row.previousElementSibling) {
+                row.parentNode.insertBefore(row, row.previousElementSibling);
+            } else if (dir === 1 && row.nextElementSibling) {
+                row.parentNode.insertBefore(row.nextElementSibling, row);
+            }
+            if (card) updateSuiteCardSummary(card);
+        }
+
+        function deleteSuiteRow(btn) {
+            const row = btn.closest(".suite-case-row");
+            if (!row) return;
+            const card = btn.closest(".suite-builder-card");
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(10px)';
+            row.style.transition = 'all 0.15s ease';
+            setTimeout(() => {
+                row.remove();
+                if (card) updateSuiteCardSummary(card);
+            }, 150);
+        }
+
+        function addNewSuiteCustomRow(btn) {
+            const card = btn.closest(".suite-builder-card");
+            if (!card) return;
+            const list = card.querySelector(".suite-case-list");
+            const newRow = document.createElement("div");
+            newRow.className = "suite-case-row";
+            newRow.innerHTML = `
+                <span class="case-handle" title="按住拖拽排序"><i class="bi bi-grip-vertical"></i></span>
+                <input type="checkbox" class="case-select-checkbox" checked onchange="updateSuiteCardSummary(this)">
+                <div class="case-content">
+                    <div class="case-main-line">
+                        <span class="case-priority-badge priority-p1">P1</span>
+                        <span class="case-module-tag">自定义模块</span>
+                        <span class="editable-field" contenteditable="true" spellcheck="false">新测试用例标题（点击编辑）</span>
+                    </div>
+                    <div class="case-sub-line">
+                        <span class="case-goal-text" contenteditable="true" spellcheck="false">输入具体测试目标与校验断言规则...</span>
+                    </div>
+                </div>
+                <div class="case-actions">
+                    <button class="case-action-btn" title="上移" onclick="moveSuiteRow(this, -1)"><i class="bi bi-arrow-up"></i></button>
+                    <button class="case-action-btn" title="下移" onclick="moveSuiteRow(this, 1)"><i class="bi bi-arrow-down"></i></button>
+                    <button class="case-action-btn btn-delete" title="移除此项" onclick="deleteSuiteRow(this)"><i class="bi bi-trash3"></i></button>
+                </div>
+            `;
+            list.appendChild(newRow);
+            updateSuiteCardSummary(card);
+            const editEl = newRow.querySelector(".editable-field");
+            if (editEl) editEl.focus();
+        }
+
+        function collectSuiteCardData(cardEl) {
+            const titleEl = cardEl.querySelector(".suite-title-text");
+            const suiteTitle = titleEl ? titleEl.innerText.trim() : "系统测试套件";
+            const docName = cardEl.getAttribute("data-doc") || "";
+            const keepCtxEl = cardEl.querySelector(".suite-keep-context");
+            const keepState = keepCtxEl ? keepCtxEl.checked : true;
+
+            const cases = [];
+            const rows = cardEl.querySelectorAll(".suite-case-row");
+            rows.forEach((r, idx) => {
+                const cb = r.querySelector(".case-select-checkbox");
+                const isChecked = cb ? cb.checked : true;
+                const prioEl = r.querySelector(".case-priority-badge");
+                const prio = prioEl ? prioEl.innerText.trim() : "P1";
+                const modEl = r.querySelector(".case-module-tag");
+                const mod = modEl ? modEl.innerText.trim() : "业务模块";
+                const titleField = r.querySelector(".editable-field");
+                const caseTitle = titleField ? titleField.innerText.trim() : `用例 ${idx+1}`;
+                const goalField = r.querySelector(".case-goal-text");
+                const caseGoal = goalField ? goalField.innerText.trim() : caseTitle;
+                const depEl = r.querySelector(".case-dep-tag");
+                const dependsOn = depEl ? depEl.innerText.replace(/[\\n\\r]+/g, '').trim() : "";
+
+                cases.push({
+                    id: r.getAttribute("data-id") || `tc-${idx+1}`,
+                    title: caseTitle,
+                    module: mod,
+                    priority: prio,
+                    goal: caseGoal,
+                    assert_rule: "验证页面状态正常且断言达成",
+                    depends_on: dependsOn,
+                    checked: isChecked
+                });
+            });
+
+            return {
+                suite_title: suiteTitle,
+                doc_filename: docName,
+                keep_state: keepState,
+                cases: cases
+            };
+        }
+
+        async function saveCardAsSuite(btn) {
+            const card = btn.closest(".suite-builder-card");
+            if (!card) return;
+            const suiteData = collectSuiteCardData(card);
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;"></span> 正在存盘...`;
+
+            try {
+                const res = await fetch("/api/test_suite/save", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({suite_data: suiteData})
+                });
+                const data = await res.json();
+                if (data && data.success) {
+                    btn.innerHTML = `<i class="bi bi-check-lg text-success me-1"></i> 已保存至用例库`;
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }, 2500);
+                } else {
+                    alert((data && data.message) ? data.message : "保存套件失败");
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            } catch (err) {
+                alert("保存套件网络异常: " + err.message);
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+
+        async function triggerCardSystemicRun(btn) {
+            const card = btn.closest(".suite-builder-card");
+            if (!card) return;
+            const suiteData = collectSuiteCardData(card);
+            const checkedCases = suiteData.cases.filter(c => c.checked);
+            if (checkedCases.length === 0) {
+                alert("请至少勾选 1 项测试用例后再执行！");
+                return;
+            }
+
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width:11px;height:11px;"></span> 正在调度真机...`;
+
+            try {
+                const devId = (typeof getPipTargetDeviceId === 'function' ? getPipTargetDeviceId() : null) || 'auto';
+                const res = await fetch("/api/test_suite/run", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        session_id: window.currentSessionId || null,
+                        suite_data: {
+                            suite_title: suiteData.suite_title,
+                            doc_filename: suiteData.doc_filename,
+                            keep_state: suiteData.keep_state,
+                            cases: checkedCases,
+                            device_ids: devId ? [devId] : []
+                        },
+                        keep_state: suiteData.keep_state
+                    })
+                });
+                const data = await res.json();
+                if (data && data.success) {
+                    btn.innerHTML = `🚀 系统级测试已启动`;
+                    if (data.session_id) {
+                        window.currentSessionId = data.session_id;
+                        if (typeof pollCurrentSession === "function") {
+                            await pollCurrentSession();
+                        }
+                    }
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }, 3000);
+                } else {
+                    alert((data && data.message) ? data.message : "执行系统测试失败");
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            } catch (err) {
+                alert("执行系统测试网络异常: " + err.message);
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+
+        async function generateSuiteFromAttachment(savedFilename, origFilename, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const flow = document.getElementById("streamFlow") || document.getElementById("timelineList");
+            const tempPromptId = "temp_suite_prompt_" + Date.now();
+            if (flow) {
+                flow.insertAdjacentHTML("beforeend", `
+                    <div class="stream-user-row" id="${tempPromptId}">
+                        <div class="stream-user-prompt">
+                            <div class="stream-user-prompt-meta">
+                                <i class="bi bi-file-earmark-text"></i>
+                                <span>需求文档驱动提炼</span>
+                            </div>
+                            <div class="stream-user-prompt-content">
+                                请阅读需求文档《${escapeHtml(origFilename)}》，智能提炼端到端系统测试用例套件并启动编排。
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stream-thought-box" id="loading_${tempPromptId}">
+                        <div class="stream-thought-pill">
+                            <span class="thought-pulse-dot pulsing"></span>
+                            <span class="fw-medium font-mono" style="font-size: 11px;">Suite Synthesizer Thinking...</span>
+                        </div>
+                        <div class="stream-thought-drawer">
+                            <div class="d-flex align-items-center gap-2" style="font-size: 11.5px; color: var(--text-sub);">
+                                <span class="spinner-border spinner-border-sm text-primary" style="width: 10px; height: 10px; border-width: 1.5px;"></span>
+                                <span>大模型正在语义解析需求规格说明书，构建多模块测试用例与状态现场串联图谱...</span>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                flow.scrollTop = flow.scrollHeight;
+            }
+
+            try {
+                const res = await fetch("/api/test_suite/synthesize", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        filename: savedFilename,
+                        doc_filename: origFilename
+                    })
+                });
+                const data = await res.json();
+                const loadEl = document.getElementById("loading_" + tempPromptId);
+                if (loadEl) loadEl.remove();
+
+                if (data && data.success && data.suite) {
+                    renderSuiteBuilderCard(data.suite);
+                } else {
+                    alert((data && data.message) ? data.message : "提炼套件失败");
+                }
+            } catch (err) {
+                const loadEl = document.getElementById("loading_" + tempPromptId);
+                if (loadEl) loadEl.remove();
+                alert("智能提炼用例套件网络连接异常: " + err.message);
+            }
+        }
     </script>
 
 </body>

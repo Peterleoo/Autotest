@@ -33,6 +33,7 @@ from core.task_manager import TaskManager
 from core.auth_manager import AuthManager
 from core.screen_stream_hub import screen_stream_hub
 from core.document_extractor import DocumentExtractor
+from core.test_spec_synthesizer import TestSpecSynthesizer
 
 # 多模态需求资产上传与缓存目录
 UPLOADS_DIR = BASE_DIR / "data" / "uploads"
@@ -739,6 +740,113 @@ async def get_uploaded_attachment(filename: str):
     }
     media_type = media_map.get(suffix, "application/octet-stream")
     return FileResponse(file_path, media_type=media_type)
+
+# ================= 需求文档驱动用例智能生成与自由编排套件 (Suite Builder) API =================
+
+@app.post("/api/test_suite/synthesize")
+async def synthesize_test_suite(request: Request):
+    """
+    根据上传的需求文档提取文本并智能生成系统级测试用例套件 (Suite Builder)
+    支持 json payload 或 form 提交:
+    - filename: 已上传在 data/uploads/ 下的文件名
+    - doc_path: 服务器文件绝对路径或相对路径
+    - doc_text: 纯文本需求
+    - provider / model: 可选模型覆盖
+    """
+    try:
+        data = {}
+        if isinstance(request, dict):
+            data = request
+        else:
+            content_type = request.headers.get("content-type", "")
+            if "application/json" in content_type:
+                data = await request.json()
+            else:
+                form = await request.form()
+                data = dict(form)
+
+        filename = data.get("filename", "")
+        doc_path = data.get("doc_path", "")
+        doc_text = data.get("doc_text", "")
+        provider = data.get("provider")
+        model = data.get("model")
+
+        # 1. 尝试从 filename 或 doc_path 提取文本
+        resolved_filename = filename or (Path(doc_path).name if doc_path else "需求文档")
+        if not doc_text:
+            target_p = None
+            if filename:
+                target_p = UPLOADS_DIR / filename
+                if not target_p.exists():
+                    target_p = BASE_DIR / "data" / "uploads" / filename
+            elif doc_path:
+                target_p = Path(doc_path)
+
+            if target_p and target_p.exists():
+                doc_text = DocumentExtractor.extract_text(str(target_p))
+                resolved_filename = target_p.name
+
+        suite = TestSpecSynthesizer.synthesize_from_doc(
+            doc_text=doc_text,
+            filename=resolved_filename,
+            provider=provider,
+            model=model
+        )
+        return {"success": True, "suite": suite}
+    except Exception as e:
+        logger.error(f"智能提炼测试套件失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"提炼测试套件失败: {str(e)}"})
+
+
+@app.post("/api/test_suite/run")
+async def run_systemic_test_suite(payload: Dict[str, Any] = Body(...)):
+    """
+    接收编排后的用例列表与配置，创建/接续系统级测试任务
+    """
+    try:
+        session_id = payload.get("session_id")
+        suite_data = payload.get("suite_data")
+        if not suite_data and "cases" in payload:
+            suite_data = payload
+
+        keep_state = payload.get("keep_state", True)
+        res = task_mgr.run_systemic_suite(
+            session_id=session_id,
+            suite_data=suite_data,
+            keep_state=keep_state
+        )
+        return res
+    except Exception as e:
+        logger.error(f"启动系统级用例套件失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"启动套件失败: {str(e)}"})
+
+
+@app.post("/api/test_suite/save")
+async def save_test_suite_endpoint(payload: Dict[str, Any] = Body(...)):
+    """
+    保存用例套件至持久化目录 (data/test_suites/)
+    """
+    try:
+        suite_data = payload.get("suite_data") if "suite_data" in payload else payload
+        res = task_mgr.save_test_suite(suite_data)
+        return {"success": True, "suite_id": res.get("suite_id"), "suite": res, "message": "套件已成功保存至项目用例库！"}
+    except Exception as e:
+        logger.error(f"保存测试套件失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"保存套件失败: {str(e)}"})
+
+
+@app.get("/api/test_suites")
+async def list_test_suites_endpoint():
+    """
+    获取所有已保存的系统测试套件列表
+    """
+    try:
+        suites = task_mgr.list_test_suites()
+        return {"success": True, "suites": suites, "total": len(suites)}
+    except Exception as e:
+        logger.error(f"获取测试套件列表失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"获取套件列表失败: {str(e)}"})
+
 
 ALL_SUGGESTED_CASES = [
     {
