@@ -8003,7 +8003,7 @@
                         </button>
 
                         <!-- 原型规范的大圆形高对比度发送按钮 -->
-                        <button class="btn-send-round gpt-send-btn" id="btnSendTask" onclick="submitNewTask()" title="发送执行 (Enter)">
+                        <button class="btn-send-round gpt-send-btn" id="btnSendTask" onclick="sendMessage()" title="发送执行 (Enter)">
                             <i class="bi bi-arrow-up" style="font-size: 14px; font-weight: bold;"></i>
                         </button>
                     </div>
@@ -10719,12 +10719,19 @@
             updateStopButtonState();
         }
 
-        document.getElementById("taskInputText").addEventListener("keydown", function(e) {
+        function handleChatKey(e) {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                submitNewTask();
+                sendMessage();
             }
-        });
+        }
+        function sendMessage() {
+            return submitNewTask();
+        }
+        window.handleChatKey = handleChatKey;
+        window.sendMessage = sendMessage;
+
+        document.getElementById("taskInputText").addEventListener("keydown", handleChatKey);
 
         function fillPrompt(text) {
             const textarea = document.getElementById("taskInputText");
@@ -15356,6 +15363,14 @@ function renderChatStream(sessionData) {
                             updateStopButtonState("STOPPED");
                             const hitlCard = document.querySelector(".hitl-decision-card");
                             if (hitlCard) hitlCard.remove();
+                        } else if (data.resolved_hitl) {
+                            // 协同桥接秒级响应：立即消除顶层挂起卡片
+                            const hitlCard = document.querySelector(".hitl-decision-card");
+                            if (hitlCard) hitlCard.remove();
+                            if (currentActiveSessionData) {
+                                currentActiveSessionData.hitl_decision = null;
+                            }
+                            liveRunningSessions.add(activeSessionId);
                         } else {
                             // 标记该会话重新进入实时执行，清除旧结论状态
                             liveRunningSessions.add(activeSessionId);

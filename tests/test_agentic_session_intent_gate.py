@@ -43,10 +43,10 @@ class TestAgenticSessionIntentGate(unittest.TestCase):
 
     def test_01_intent_gate_intercepts_stop_command(self):
         """测试 1: 意图拦截中枢精准拦截停止/终止指令并安全熔断"""
-        stop_keywords = ["停止", "终止", "取消", "stop", "cancel", "退出", "结束"]
+        stop_keywords = ["停止", "终止", "取消", "stop", "cancel", "退出", "结束", "停", "别测了", "别跑了", "请停止当前测试", "终止任务"]
         
         for kw in stop_keywords:
-            sid = f"test_stop_{kw}_{int(time.time()*1000)}"
+            sid = f"test_stop_{int(time.time()*1000)}"
             self.mgr.sessions[sid] = {
                 "session_id": sid,
                 "title": f"测试 {kw}",
@@ -109,67 +109,75 @@ class TestAgenticSessionIntentGate(unittest.TestCase):
         self.assertEqual(dec_data["status"], "CANCELLED")
 
     def test_03_hitl_bridge_sms_code(self):
-        """测试 3: 短信验证码挂起状态下，输入框直接输入验证码智能桥接"""
-        self.mgr.sessions[self.test_sid]["status"] = "WAITING_USER_INPUT"
-        self.mgr.sessions[self.test_sid]["hitl_decision"] = {
-            "mode": "sms_code",
-            "title": "人机协同 · 请输入短信验证码"
-        }
+        """测试 3: 短信验证码挂起状态下，纯数字与中文上下文智能桥接并注入时间线"""
+        for code_input in ["882910", "验证码是882910", "我的验证码882910"]:
+            self.mgr.sessions[self.test_sid]["status"] = "WAITING_USER_INPUT"
+            self.mgr.sessions[self.test_sid]["hitl_decision"] = {
+                "mode": "sms_code",
+                "title": "人机协同 · 请输入短信验证码"
+            }
 
-        res = self.mgr.append_session_message(self.test_sid, "882910")
-        self.assertTrue(res.get("success"))
-        self.assertTrue(res.get("resolved_hitl"))
-        self.assertEqual(res.get("decision_type"), "inject_sms")
+            res = self.mgr.append_session_message(self.test_sid, code_input)
+            self.assertTrue(res.get("success"))
+            self.assertTrue(res.get("resolved_hitl"))
+            self.assertEqual(res.get("decision_type"), "inject_sms")
 
-        sess = self.mgr.sessions[self.test_sid]
-        self.assertEqual(sess["status"], "RUNNING")
-        self.assertIsNone(sess.get("hitl_decision"))
+            sess = self.mgr.sessions[self.test_sid]
+            self.assertEqual(sess["status"], "RUNNING")
+            self.assertIsNone(sess.get("hitl_decision"))
 
-        dec_file = ROOT / "scratch" / f"decision_{self.test_sid}.json"
-        self.assertTrue(dec_file.exists())
-        data = json.loads(dec_file.read_text(encoding="utf-8"))
-        self.assertEqual(data["decision_type"], "inject_sms")
-        self.assertEqual(data["sms_code"], "882910")
+            dec_file = ROOT / "scratch" / f"decision_{self.test_sid}.json"
+            self.assertTrue(dec_file.exists())
+            data = json.loads(dec_file.read_text(encoding="utf-8"))
+            self.assertEqual(data["decision_type"], "inject_sms")
+            self.assertEqual(data["sms_code"], "882910")
+
+            # 验证时间线记录完整性（包含 user_message 与 system_notice）
+            blocks = sess.get("timeline_blocks", [])
+            self.assertTrue(any(b.get("type") == "user_message" and code_input in b.get("content", "") for b in blocks))
+            self.assertTrue(any(b.get("type") == "system_notice" and "882910" in b.get("content", "") for b in blocks))
 
     def test_04_hitl_bridge_phone_input(self):
-        """测试 4: 手机号待发送挂起状态下，输入框输入手机号智能桥接"""
-        self.mgr.sessions[self.test_sid]["status"] = "WAITING_USER_INPUT"
-        self.mgr.sessions[self.test_sid]["hitl_decision"] = {
-            "mode": "phone_input",
-            "title": "人机协同 · 请输入测试手机号"
-        }
+        """测试 4: 手机号待发送挂起状态下，纯号码与中文上下文智能桥接并注入时间线"""
+        for phone_input in ["13912345678", "手机号是13912345678"]:
+            self.mgr.sessions[self.test_sid]["status"] = "WAITING_USER_INPUT"
+            self.mgr.sessions[self.test_sid]["hitl_decision"] = {
+                "mode": "phone_input",
+                "title": "人机协同 · 请输入测试手机号"
+            }
 
-        res = self.mgr.append_session_message(self.test_sid, "13912345678")
-        self.assertTrue(res.get("success"))
-        self.assertTrue(res.get("resolved_hitl"))
-        self.assertEqual(res.get("decision_type"), "inject_phone")
+            res = self.mgr.append_session_message(self.test_sid, phone_input)
+            self.assertTrue(res.get("success"))
+            self.assertTrue(res.get("resolved_hitl"))
+            self.assertEqual(res.get("decision_type"), "inject_phone")
 
-        sess = self.mgr.sessions[self.test_sid]
-        self.assertEqual(sess["status"], "RUNNING")
-        self.assertIsNone(sess.get("hitl_decision"))
+            sess = self.mgr.sessions[self.test_sid]
+            self.assertEqual(sess["status"], "RUNNING")
+            self.assertIsNone(sess.get("hitl_decision"))
 
-        dec_file = ROOT / "scratch" / f"decision_{self.test_sid}.json"
-        self.assertTrue(dec_file.exists())
-        data = json.loads(dec_file.read_text(encoding="utf-8"))
-        self.assertEqual(data["decision_type"], "inject_phone")
-        self.assertEqual(data["account"], "13912345678")
+            dec_file = ROOT / "scratch" / f"decision_{self.test_sid}.json"
+            self.assertTrue(dec_file.exists())
+            data = json.loads(dec_file.read_text(encoding="utf-8"))
+            self.assertEqual(data["decision_type"], "inject_phone")
+            self.assertEqual(data["account"], "13912345678")
 
     def test_05_hitl_bridge_manual_done_and_skip(self):
-        """测试 5: 人机协同挂起状态下，输入'已完成'或'跳过'智能识别"""
-        self.mgr.sessions[self.test_sid]["status"] = "WAITING_USER_INPUT"
-        self.mgr.sessions[self.test_sid]["hitl_decision"] = {
-            "mode": "manual_takeover",
-            "title": "人机协同 · 请在投屏手动完成"
-        }
+        """测试 5: 人机协同挂起状态下，输入'已完成'、'我完成了'、'搞定了'或'跳过'智能识别"""
+        for done_phrase in ["已完成", "我完成了", "搞定了"]:
+            self.mgr.sessions[self.test_sid]["status"] = "WAITING_USER_INPUT"
+            self.mgr.sessions[self.test_sid]["hitl_decision"] = {
+                "mode": "manual_takeover",
+                "title": "人机协同 · 请在投屏手动完成"
+            }
 
-        res = self.mgr.append_session_message(self.test_sid, "已完成")
-        self.assertTrue(res.get("success"))
-        self.assertEqual(res.get("decision_type"), "manual_done")
+            res = self.mgr.append_session_message(self.test_sid, done_phrase)
+            self.assertTrue(res.get("success"))
+            self.assertEqual(res.get("decision_type"), "manual_done")
 
-        dec_file = ROOT / "scratch" / f"decision_{self.test_sid}.json"
-        self.assertTrue(dec_file.exists())
-        data = json.loads(dec_file.read_text(encoding="utf-8"))
-        self.assertEqual(data["decision_type"], "manual_done")
+            dec_file = ROOT / "scratch" / f"decision_{self.test_sid}.json"
+            self.assertTrue(dec_file.exists())
+            data = json.loads(dec_file.read_text(encoding="utf-8"))
+            self.assertEqual(data["decision_type"], "manual_done")
 
     def test_06_dynamic_planning_removes_hardcoded_fake_template(self):
         """测试 6: 正常追加测试意图时，动态差量拆解，彻底移除硬编码 2 步伪模板"""
@@ -197,7 +205,7 @@ class TestAgenticSessionIntentGate(unittest.TestCase):
         self.assertIn("动态规划路径", bullet_tags)
 
     def test_07_frontend_contract_integrity(self):
-        """测试 7: 前端契约完整性（临时乐观节点清理标记、终止任务按钮及Notice组件）"""
+        """测试 7: 前端契约完整性（临时乐观节点清理标记、终止任务按钮、Notice组件及sendMessage/handleChatKey）"""
         index_html_path = ROOT / "web" / "templates" / "index.html"
         self.assertTrue(index_html_path.exists())
         html_content = index_html_path.read_text(encoding="utf-8")
@@ -218,6 +226,12 @@ class TestAgenticSessionIntentGate(unittest.TestCase):
         # 4. 人机协同卡片必须暴露终止任务操作与 stopSessionById
         self.assertIn("stopSessionById", html_content)
         self.assertIn("终止任务", html_content)
+
+        # 5. 必须声明并挂载规范的 sendMessage 与 handleChatKey 方法
+        self.assertIn("function handleChatKey", html_content)
+        self.assertIn("function sendMessage", html_content)
+        self.assertIn("window.sendMessage = sendMessage", html_content)
+        self.assertIn("window.handleChatKey = handleChatKey", html_content)
 
 if __name__ == "__main__":
     unittest.main()

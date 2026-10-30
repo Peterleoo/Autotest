@@ -868,6 +868,32 @@ class TaskManager:
             self.executor.submit(self._device_worker, session_id, dev_id, session["goal"], session["case_name"], session["test_mode"])
         return True
 
+    def _record_bridged_turn(self, session: Dict[str, Any], clean_msg: str, notice_msg: str, attachments: Optional[List[Dict[str, Any]]] = None):
+        """记录人机协同智能桥接在时间线和会话上下文中的事实轨迹"""
+        try:
+            turns = MemoryManager.ensure_session_turns(session)
+            turn_id = len(turns) + 1
+            if "timeline_blocks" not in session or not isinstance(session["timeline_blocks"], list):
+                session["timeline_blocks"] = []
+            session["timeline_blocks"].append(
+                TimelineManager.create_user_block(clean_msg, turn_id=turn_id, attachments=attachments)
+            )
+            session["timeline_blocks"].append(
+                TimelineManager.create_system_notice_block(notice_msg, turn_id=turn_id)
+            )
+            now_str = datetime.now().strftime("%H:%M:%S")
+            if "messages" not in session or not isinstance(session["messages"], list):
+                session["messages"] = []
+            session["messages"].append({
+                "role": "user",
+                "content": clean_msg,
+                "attachments": attachments or [],
+                "timestamp": now_str
+            })
+            self._save_session(session.get("session_id", ""))
+        except Exception as e:
+            logger.warning(f"记录协同桥接轨迹异常: {e}")
+
     def append_session_message(self, session_id: str, message: str, provider: Optional[str] = None, model: Optional[str] = None, attachments: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
         在已有会话中追加新一轮测试意图 (Turn)，保持会话记忆与事实状态机，原地接续执行
@@ -883,7 +909,7 @@ class TaskManager:
         # 1. 意图拦截中枢 (Intent Gate)：精准识别控制指令 (停止/终止/取消/退出/结束/stop/cancel/quit)
         # -------------------------------------------------------------
         STOP_COMMAND_PATTERN = re.compile(
-            r"^\s*(?:立即|马上|强制)?\s*(停止|终止|取消|退出|结束|stop|cancel|quit|abort|exit)\s*(?:当前)?\s*(任务|测试|执行|会话|流程)?[!！。.]*\s*$",
+            r"^\s*(?:立即|马上|强制|请)?\s*(停止|终止|取消|退出|结束|停|停下|停下来|别测了|别跑了|stop|cancel|quit|abort|exit)\s*(?:当前)?\s*(任务|测试|执行|会话|流程)?[!！。.]*\s*$",
             re.IGNORECASE
         )
         if STOP_COMMAND_PATTERN.match(clean_msg):
@@ -929,35 +955,43 @@ class TaskManager:
             logger.info(f"🤝 [HITL Bridge] 检测到人机协同挂起 (mode={mode})，尝试将输入【{clean_msg}】智能衔接为决策数据")
 
             # 2.1 用户表达手动完成
-            if clean_msg in ["已完成", "完成了", "完成", "好了", "搞定", "done", "manual_done"]:
+            if re.search(r"^(?:我)?(?:已|已经)?(?:完成|完成了|弄好|搞定|做完|处理完|好了|搞定了)[!！。.]*$", clean_msg) or clean_msg.lower() in ["done", "manual_done", "finished"]:
                 self.resolve_decision(session_id, {"decision_type": "manual_done"})
+                notice_msg = "人机协同：已确认手动完成并恢复自动化推进"
+                self._record_bridged_turn(session, clean_msg, notice_msg, attachments)
                 return {"success": True, "resolved_hitl": True, "decision_type": "manual_done", "message": "已确认完成并恢复自动化"}
 
             # 2.2 用户表达跳过
-            if clean_msg in ["跳过", "skip"]:
+            if re.search(r"^(?:直接)?(?:跳过|略过)[!！。.]*$", clean_msg) or clean_msg.lower() in ["skip", "pass"]:
                 self.resolve_decision(session_id, {"decision_type": "skip"})
+                notice_msg = "人机协同：已跳过当前步骤并恢复自动化推进"
+                self._record_bridged_turn(session, clean_msg, notice_msg, attachments)
                 return {"success": True, "resolved_hitl": True, "decision_type": "skip", "message": "已跳过该步骤并恢复自动化"}
 
-            # 2.3 短信验证码模式：匹配 4~8 位数字
+            # 2.3 短信验证码模式：匹配 4~8 位数字（兼容中文上下文，不用 \\b 免受 Unicode 词分界影响）
             if mode == "sms_code":
-                sms_match = re.search(r"\b(\d{4,8})\b", clean_msg)
+                sms_match = re.search(r"(?<!\d)(\d{4,8})(?!\d)", clean_msg)
                 if sms_match:
                     code = sms_match.group(1)
                     self.resolve_decision(session_id, {
                         "decision_type": "inject_sms",
                         "sms_code": code
                     })
+                    notice_msg = f"人机协同：已自动衔接注入短信验证码【{code}】"
+                    self._record_bridged_turn(session, clean_msg, notice_msg, attachments)
                     return {"success": True, "resolved_hitl": True, "decision_type": "inject_sms", "message": f"已自动将短信验证码【{code}】衔接注入"}
 
-            # 2.4 手机号待发送模式：匹配 11 位以 1 开头的手机号
+            # 2.4 手机号待发送模式：匹配 11 位以 1 开头的手机号（兼容中文上下文）
             elif mode == "phone_input":
-                phone_match = re.search(r"\b(1\d{10})\b", clean_msg)
+                phone_match = re.search(r"(?<!\d)(1\d{10})(?!\d)", clean_msg)
                 if phone_match:
                     phone = phone_match.group(1)
                     self.resolve_decision(session_id, {
                         "decision_type": "inject_phone",
                         "account": phone
                     })
+                    notice_msg = f"人机协同：已自动衔接注入手机号【{phone}】"
+                    self._record_bridged_turn(session, clean_msg, notice_msg, attachments)
                     return {"success": True, "resolved_hitl": True, "decision_type": "inject_phone", "message": f"已自动将手机号【{phone}】衔接注入"}
 
             # 2.5 账号密码登录凭据模式
@@ -972,6 +1006,8 @@ class TaskManager:
                     "account": acc,
                     "password": pwd
                 })
+                notice_msg = f"人机协同：已自动衔接注入登录凭据【{acc}】"
+                self._record_bridged_turn(session, clean_msg, notice_msg, attachments)
                 return {"success": True, "resolved_hitl": True, "decision_type": "inject", "message": "已自动将账号凭据衔接注入"}
 
             # 2.6 AI 自主生成的人机协同字段
@@ -983,6 +1019,8 @@ class TaskManager:
                         "decision_type": "ai_submit",
                         "inputs": {f_key: clean_msg}
                     })
+                    notice_msg = f"人机协同：已自动衔接注入输入参数【{clean_msg}】"
+                    self._record_bridged_turn(session, clean_msg, notice_msg, attachments)
                     return {"success": True, "resolved_hitl": True, "decision_type": "ai_submit", "message": "已自动将输入参数衔接注入"}
 
         # -------------------------------------------------------------
