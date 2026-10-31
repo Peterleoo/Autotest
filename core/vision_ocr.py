@@ -85,9 +85,15 @@ class VisionOCR:
                 "-File", str(HELPER_PS1),
                 "-ImagePath", tmp_path
             ]
-            res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
-            if res.returncode == 0 and res.stdout.strip():
-                raw_json = res.stdout.strip()
+            res = subprocess.run(cmd, capture_output=True, timeout=20)
+            stdout_bytes = res.stdout or b""
+            if res.returncode == 0 and stdout_bytes.strip():
+                # Windows PowerShell 5 默认输出 GBK，PowerShell 7 通常输出 UTF-8，双通道兼容
+                try:
+                    raw_json = stdout_bytes.decode("utf-8-sig")
+                except UnicodeDecodeError:
+                    raw_json = stdout_bytes.decode("gb18030", errors="replace")
+                raw_json = raw_json.strip()
                 data = None
 
                 # PowerShell 的 ConvertTo-Json 在只有一条结果时会输出对象而不是数组，
@@ -140,7 +146,8 @@ class VisionOCR:
                 _LAST_OCR_RESULTS = elements
                 return elements, False
             else:
-                logger.warning(f"OCR 识别执行异常: {res.stderr}")
+                err_text = (res.stderr or b"").decode("utf-8", errors="replace")
+                logger.warning(f"OCR 识别执行异常: {err_text}")
         except Exception as e:
             logger.warning(f"视觉 OCR 识别失败: {e}")
         finally:

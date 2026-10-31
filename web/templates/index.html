@@ -6225,6 +6225,46 @@
             padding-top: 0;
             border-top: none;
         }
+        /* 聊天框图片/文档附件与拖拽上传 */
+        .chat-attachment-strip {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 4px 2px 0;
+        }
+        .chat-attachment-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            max-width: 260px;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.28);
+            color: var(--text-sub);
+            font-size: 10.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .chat-attachment-chip .remove {
+            cursor: pointer;
+            opacity: 0.7;
+            margin-left: 2px;
+        }
+        .chat-attachment-chip .remove:hover {
+            opacity: 1;
+            color: #ef4444;
+        }
+        .chat-attachment-status {
+            font-size: 10.5px;
+            line-height: 1.4;
+            color: var(--text-sub);
+        }
+        .gpt-input-box.drag-over {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25), 0 16px 36px rgba(0, 0, 0, 0.45) !important;
+        }
         /* 工具栏跑道微胶囊 */
         .pill-btn, .pill-ready-status, .model-select-pill {
             background: rgba(255, 255, 255, 0.06);
@@ -6901,7 +6941,7 @@
         <!-- ================= 3. 底部悬浮大胶囊 (集成模型切换与常驻任务卡) ================= -->
         <div class="gpt-input-area">
             <!-- 输入框上方常驻任务卡 (Pinned Bottom Task Capsule，参考主流 Agent 架构) -->
-            <div class="gpt-input-box">
+            <div class="gpt-input-box" id="gptInputBox">
                 <!-- 自适应多行文本输入框 -->
                                 <!-- Token 实时水位与上下文压缩条 (对标 PM-product Token 治理规范) -->
                 <div class="token-pressure-bar">
@@ -6914,11 +6954,25 @@
                     </button>
                 </div>
 
+                <div id="chatAttachmentStrip" class="chat-attachment-strip" style="display: none;">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <div id="chatAttachmentChips" class="d-flex flex-wrap gap-1"></div>
+                        <button class="btn btn-sm btn-link p-0 text-muted text-decoration-none" style="font-size: 10.5px;" onclick="clearChatAttachments()" title="清空附件">清空</button>
+                    </div>
+                    <div id="chatAttachmentStatus" class="chat-attachment-status"></div>
+                </div>
+                <input type="file" id="chatAttachmentInput" class="d-none" multiple accept=".pdf,.docx,.txt,.md,.markdown,.csv,.xlsx,.png,.jpg,.jpeg,.webp,.bmp" onchange="handleChatAttachmentSelect(event)">
+
                 <textarea id="taskInputText" class="gpt-textarea" rows="1" placeholder="描述自动化测试目标，如：冷启动应用，测试手机号短信验证码登录并断言进入首页（Enter 发送，Shift+Enter 换行）..." oninput="onInputTextChange()"></textarea>
 
                 <!-- 胶囊底部工具栏 -->
                 <div class="gpt-toolbar">
                     <div class="d-flex align-items-center gap-2">
+                        <!-- 图片/需求文档附件入口：解析后由模型拆解为多条测试用例 -->
+                        <button class="pill-btn" onclick="triggerChatAttachment()" title="上传图片或需求文档，模型自动拆解为多条测试用例">
+                            <i class="bi bi-paperclip" style="font-size: 11px;"></i>
+                            <span>文档/图片</span>
+                        </button>
                         <!-- 待测应用选择胶囊 (带真机安装状态指示灯，点击呼出轻量切换小弹窗) -->
                         <div class="position-relative" id="pillAppWrapper">
                             <div class="pill-btn" onclick="toggleCustomPopover('appPopover', event)" title="选择待测应用包或上传新 APK">
@@ -13799,6 +13853,10 @@ function renderChatStream(sessionData) {
                     models = currentSystemConfig.openai?.available_models || ["gpt-4o", "gpt-4o-mini", "custom"];
                 }
             }
+            // 保留服务端当前生效模型，避免下拉列表缺少该型号时被首个模型覆盖
+            if (provider === currentActiveProvider && currentActiveModel && !models.includes(currentActiveModel)) {
+                models = [currentActiveModel, ...models];
+            }
             renderModelOptionsFromList(models, currentActiveModel);
         }
 
@@ -13959,7 +14017,9 @@ function renderChatStream(sessionData) {
                 const data = await res.json();
                 currentSystemConfig = data;
                 currentActiveProvider = data.provider || "deepseek";
-                currentActiveModel = data.current_model || "deepseek-chat";
+                // 优先读取服务端当前生效模型；旧版接口未返回 current_model 时回退到对应服务商配置
+                const providerCfg = data[currentActiveProvider] || {};
+                currentActiveModel = data.current_model || data.model || providerCfg.model || "deepseek-chat";
 
                 // 1. 更新底部输入框模型胶囊文字
                 const label = document.getElementById("activeModelLabel");
@@ -14829,6 +14889,179 @@ function renderChatStream(sessionData) {
                 }, 500);
             }
         }
+
+        // ================= 14. 聊天框图片/文档附件：模型解析并拆解测试用例 =================
+        let pendingChatAttachments = [];
+        let chatAttachmentBusy = false;
+        const CHAT_ATTACHMENT_EXTS = [".pdf", ".docx", ".txt", ".md", ".markdown", ".csv", ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".bmp"];
+
+        function triggerChatAttachment() {
+            const input = document.getElementById("chatAttachmentInput");
+            if (input) input.click();
+        }
+
+        function handleChatAttachmentSelect(event) {
+            const files = Array.from(event.target.files || []);
+            event.target.value = "";
+            if (files.length) addChatAttachments(files);
+        }
+
+        function addChatAttachments(files) {
+            if (chatAttachmentBusy) {
+                alert("正在解析上一批附件，请稍候...");
+                return;
+            }
+            const accepted = [];
+            for (const file of files) {
+                const dot = file.name.lastIndexOf(".");
+                const ext = dot >= 0 ? file.name.slice(dot).toLowerCase() : "";
+                if (!CHAT_ATTACHMENT_EXTS.includes(ext)) {
+                    alert(`聊天框仅支持图片和文档（PDF/DOCX/TXT/MD/CSV/XLSX/图片）：\n${file.name}\nAPK/IPA 请通过“应用管理”上传。`);
+                    continue;
+                }
+                if (file.size > 20 * 1024 * 1024) {
+                    alert(`附件超过 20MB 限制：${file.name}`);
+                    continue;
+                }
+                accepted.push(file);
+            }
+            if (!accepted.length) return;
+            pendingChatAttachments = accepted.slice(0, 5);
+            renderChatAttachmentChips();
+            const status = document.getElementById("chatAttachmentStatus");
+            if (status) status.innerText = `已添加 ${pendingChatAttachments.length} 个附件，正在解析...`;
+            generateChatCasesFromAttachments();
+        }
+
+        function renderChatAttachmentChips() {
+            const strip = document.getElementById("chatAttachmentStrip");
+            const box = document.getElementById("chatAttachmentChips");
+            if (!strip || !box) return;
+            strip.style.display = pendingChatAttachments.length ? "flex" : "none";
+            box.innerHTML = pendingChatAttachments.map((file, idx) => `
+                <span class="chat-attachment-chip" title="${escapeHtml(file.name)}">
+                    <i class="bi ${/\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name) ? "bi-image" : "bi-file-earmark-text"}"></i>
+                    <span class="text-truncate">${escapeHtml(file.name)}</span>
+                    <span class="remove" onclick="removeChatAttachment(${idx})" title="移除">&times;</span>
+                </span>`).join("");
+        }
+
+        function removeChatAttachment(idx) {
+            if (chatAttachmentBusy) return;
+            pendingChatAttachments.splice(idx, 1);
+            renderChatAttachmentChips();
+            if (!pendingChatAttachments.length) {
+                const status = document.getElementById("chatAttachmentStatus");
+                if (status) status.innerText = "";
+            }
+        }
+
+        function clearChatAttachments() {
+            if (chatAttachmentBusy) return;
+            pendingChatAttachments = [];
+            renderChatAttachmentChips();
+            const status = document.getElementById("chatAttachmentStatus");
+            if (status) status.innerText = "";
+        }
+
+        async function generateChatCasesFromAttachments() {
+            if (chatAttachmentBusy || !pendingChatAttachments.length) return;
+            chatAttachmentBusy = true;
+            const status = document.getElementById("chatAttachmentStatus");
+            if (status) status.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px;"></span>正在提取附件内容并调用模型拆解测试用例...`;
+
+            const fd = new FormData();
+            pendingChatAttachments.forEach(file => fd.append("files", file, file.name));
+            const appLabel = (typeof currentActiveApp !== "undefined" && currentActiveApp && (currentActiveApp.label || currentActiveApp.filename)) || "待测应用";
+            fd.append("app_name", appLabel);
+            fd.append("instruction", (document.getElementById("taskInputText")?.value || "").trim());
+            if (typeof currentActiveProvider !== "undefined" && currentActiveProvider) fd.append("provider", currentActiveProvider);
+            if (typeof currentActiveModel !== "undefined" && currentActiveModel) fd.append("model", currentActiveModel);
+
+            try {
+                const res = await fetch("/api/ai/generate_cases_from_files", { method: "POST", body: fd });
+                let data = {};
+                try { data = await res.json(); } catch (e) { throw new Error(`HTTP ${res.status}`); }
+                if (!res.ok || !data.success) throw new Error(data.message || `HTTP ${res.status}`);
+                const cases = data.cases || [];
+                if (!cases.length) throw new Error("模型未返回有效测试用例");
+                renderGeneratedCases(cases, appLabel);
+                const fileCount = (data.files || pendingChatAttachments).length;
+                if (status) status.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>已解析 ${fileCount} 个附件，生成 ${cases.length} 条测试用例，点击卡片填入输入框</span>`;
+            } catch (e) {
+                if (status) status.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${escapeHtml(e.message || String(e))}</span>`;
+            } finally {
+                chatAttachmentBusy = false;
+            }
+        }
+
+        function renderGeneratedCases(cases, appLabel) {
+            window._suggestedCasesCache = cases;
+            const grid = document.getElementById("suggestCasesGrid");
+            if (grid) {
+                grid.innerHTML = cases.map((c, idx) => `
+                    <div class="suggest-card-item" onclick="pickSuggestedCase(${idx})">
+                        <div class="suggest-card-title">
+                            <span class="mono-tag ${c.level === "P0" ? "mono-tag-active" : ""}" style="font-size:9px;">${escapeHtml(c.level || "P1")}</span>
+                            <span class="text-truncate" style="font-size:12px;">${escapeHtml(c.title || "")}</span>
+                        </div>
+                        <div class="suggest-card-desc" title="${escapeHtml(c.goal || "")}">${escapeHtml(c.goal || "")}</div>
+                    </div>`).join("");
+            }
+
+            const modalList = document.getElementById("modalSuggestedList");
+            if (modalList) {
+                modalList.innerHTML = cases.map((c, idx) => `
+                    <div class="prompt-card" onclick="applyGeneratedCaseGoal(${idx})">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-semibold" style="font-size:12px;">${escapeHtml(c.module || "文档用例")}</span>
+                            <span class="mono-tag" style="font-size:9px;">${escapeHtml(c.level || "P1")}</span>
+                        </div>
+                        <div class="prompt-card-title">${escapeHtml(c.title || "")}</div>
+                        <div class="prompt-card-desc">${escapeHtml(c.goal || "")}</div>
+                    </div>`).join("");
+            }
+
+            const labelEl = document.getElementById("suggestTargetAppLabel");
+            if (labelEl) labelEl.innerText = `${appLabel || "待测应用"} · 附件生成`;
+            const modalEl = document.getElementById("suggestedCasesModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function applyGeneratedCaseGoal(idx) {
+            const c = (window._suggestedCasesCache || [])[idx];
+            if (!c) return;
+            fillPrompt(c.goal || c.title || "");
+            const modalEl = document.getElementById("suggestedCasesModal");
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+
+        function initChatAttachmentDropZone() {
+            const box = document.getElementById("gptInputBox");
+            if (!box || box._attachmentDnDBound) return;
+            box._attachmentDnDBound = true;
+            let depth = 0;
+            box.addEventListener("dragenter", (e) => {
+                e.preventDefault();
+                depth++;
+                box.classList.add("drag-over");
+            });
+            box.addEventListener("dragover", (e) => e.preventDefault());
+            box.addEventListener("dragleave", (e) => {
+                e.preventDefault();
+                depth = Math.max(0, depth - 1);
+                if (!depth) box.classList.remove("drag-over");
+            });
+            box.addEventListener("drop", (e) => {
+                e.preventDefault();
+                depth = 0;
+                box.classList.remove("drag-over");
+                const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+                if (files.length) addChatAttachments(files);
+            });
+        }
+        initChatAttachmentDropZone();
     </script>
     <!-- 全屏高亮聚光灯新手向导 (Spotlight Tour Overlay) -->
     <div class="tour-overlay" id="onboardingTourOverlay" style="display: none;">

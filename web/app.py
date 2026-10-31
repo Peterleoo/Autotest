@@ -33,6 +33,7 @@ from core.report_generator import ReportGenerator, REPORTS_DIR
 from core.task_manager import TaskManager
 from core.auth_manager import AuthManager
 from core.screen_stream_hub import screen_stream_hub
+from core.document_parser import extract_document, MAX_FILE_SIZE
 
 app = FastAPI(title="Autotest Web Console", description="移动端 AI 自动化测试操作平台")
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
@@ -733,6 +734,159 @@ async def suggest_cases(request: Request, app_name: Optional[str] = None):
     # 随机抽取 4 个不重复的业务用例
     sampled = random.sample(ALL_SUGGESTED_CASES, min(4, len(ALL_SUGGESTED_CASES)))
     return {"app_name": app_name, "cases": sampled}
+
+
+def _coerce_generated_cases(result: Any) -> List[Dict[str, Any]]:
+    """兼容模型返回对象 / 数组 / raw_content 三种形态，提取用例列表。"""
+    if isinstance(result, list):
+        return [c for c in result if isinstance(c, dict)]
+    if not isinstance(result, dict):
+        return []
+
+    for key in ("cases", "test_cases", "items", "data"):
+        value = result.get(key)
+        if isinstance(value, list):
+            return [c for c in value if isinstance(c, dict)]
+    if "title" in result and ("goal" in result or "steps" in result):
+        return [result]
+
+    raw = result.get("raw_content")
+    if isinstance(raw, str):
+        for left, right in (("[", "]"), ("{", "}")):
+            start, end = raw.find(left), raw.rfind(right) + 1
+            if start != -1 and end > start:
+                try:
+                    parsed = json.loads(raw[start:end])
+                except Exception:
+                    continue
+                if isinstance(parsed, list):
+                    return [c for c in parsed if isinstance(c, dict)]
+                if isinstance(parsed, dict):
+                    for key in ("cases", "test_cases", "items"):
+                        if isinstance(parsed.get(key), list):
+                            return [c for c in parsed[key] if isinstance(c, dict)]
+    return []
+
+
+def _normalize_generated_cases(raw_cases: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    cases, seen = [], set()
+    for item in raw_cases:
+        title = str(item.get("title") or item.get("name") or "").strip()
+        goal = str(item.get("goal") or item.get("steps") or "").strip()
+        if not title or not goal:
+            continue
+        key = f"{title}|{goal}"
+        if key in seen:
+            continue
+        seen.add(key)
+        level = str(item.get("level") or "P1").upper()
+        if "P0" in level:
+            level = "P0"
+        elif "P2" in level:
+            level = "P2"
+        else:
+            level = "P1"
+        cases.append({
+            "id": f"DOC-{len(cases) + 1:02d}",
+            "title": title[:100],
+            "module": str(item.get("module") or "文档解析").strip()[:50],
+            "level": level,
+            "goal": goal[:600],
+            "desc": str(item.get("desc") or item.get("description") or "").strip()[:600],
+            "precondition": str(item.get("precondition") or "").strip()[:300],
+        })
+    return cases[:8]
+
+
+@app.post("/api/ai/generate_cases_from_files")
+async def generate_cases_from_files(
+    files: List[UploadFile] = File(...),
+    app_name: str = Form(""),
+    instruction: str = Form(""),
+    provider: Optional[str] = Form(None),
+    model: Optional[str] = Form(None)
+):
+    """解析上传的图片/需求文档，调用大模型拆解为多条可执行测试用例。"""
+    if not files:
+        return JSONResponse(status_code=400, content={"success": False, "message": "请至少上传一个图片或文档附件"})
+    if len(files) > 5:
+        return JSONResponse(status_code=400, content={"success": False, "message": "一次最多上传 5 个附件"})
+
+    parsed_docs, failures = [], []
+    for upload in files:
+        filename = Path(upload.filename or "attachment").name
+        try:
+            raw = await upload.read()
+            if len(raw) > MAX_FILE_SIZE:
+                raise ValueError(f"文件超过 {MAX_FILE_SIZE // (1024 * 1024)}MB 限制")
+            parsed = await asyncio.to_thread(extract_document, filename, raw)
+            if not parsed.get("text", "").strip():
+                raise ValueError(parsed.get("warning") or "未提取到文字内容")
+            parsed_docs.append(parsed)
+        except Exception as e:
+            logger.warning(f"附件解析失败 [{filename}]: {e}")
+            failures.append({"filename": filename, "error": str(e)})
+
+    if not parsed_docs:
+        return JSONResponse(status_code=400, content={
+            "success": False,
+            "message": "附件解析失败：" + "；".join(f"{f['filename']}: {f['error']}" for f in failures),
+            "files": failures,
+        })
+
+    context_parts, used_chars = [], 0
+    for doc in parsed_docs:
+        block = f"### 附件：{doc['filename']}（{doc['kind']}）\n{doc['text']}"
+        if used_chars + len(block) > 50000:
+            block = block[:max(0, 50000 - used_chars)] + "\n...（后文已截断）"
+        context_parts.append(block)
+        used_chars += len(block)
+        if used_chars >= 50000:
+            break
+
+    system_prompt = (
+        "你是一名资深移动端测试架构师，擅长把 PRD、需求文档和界面截图转成可自动执行的端到端测试用例。\n"
+        "请严格以 json 对象输出，格式为："
+        "{\"cases\":[{\"title\":\"用例标题\",\"module\":\"业务模块\",\"level\":\"P0或P1或P2\","
+        "\"goal\":\"可直接执行的测试目标（包含入口、操作和明确断言）\",\"desc\":\"用例说明\","
+        "\"precondition\":\"前置条件\"}]}。\n"
+        "要求：\n"
+        "1. 生成 3-6 条用例，覆盖核心流程、字段校验、异常/权限和边界场景；\n"
+        "2. 每条 goal 必须单条可执行，包含入口、操作与明确断言，15 步内可完成；\n"
+        "3. 只依据附件中真实存在的业务，不得编造；\n"
+        "4. 使用简体中文，只输出 json，不要输出 Markdown 代码块。"
+    )
+    user_prompt = (
+        f"待测应用：{app_name or '待测应用'}\n"
+        f"用户的补充测试要求：{instruction.strip() or '无'}\n"
+        "请根据以下附件内容生成测试用例，并严格返回 json。\n\n"
+        "以下是附件内容：\n" + "\n\n".join(context_parts)
+    )
+
+    try:
+        llm = LLMClient(provider=provider or None, model=model or None)
+        # 不强制网关的 response_format=json_object，避免部分网关要求输入必须含小写 json 的限制
+        result = await asyncio.to_thread(llm.chat_decision, system_prompt, user_prompt, None, None, json_mode=False)
+        raw_cases = _coerce_generated_cases(result)
+        cases = _normalize_generated_cases(raw_cases)
+    except Exception as e:
+        logger.error(f"附件生成测试用例失败: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "message": f"模型解析失败: {e}"})
+
+    if not cases:
+        return JSONResponse(status_code=502, content={
+            "success": False,
+            "message": "模型未返回有效用例，请补充更明确的需求描述后重试",
+            "raw_preview": str(result)[:500] if 'result' in locals() else "",
+        })
+
+    return {
+        "success": True,
+        "app_name": app_name,
+        "files": [{k: d[k] for k in ("filename", "kind", "chars", "truncated")} for d in parsed_docs],
+        "failures": failures,
+        "cases": cases,
+    }
 
 METADATA_FILE = settings.SOLIDIFIED_DIR / "cases_metadata.json"
 

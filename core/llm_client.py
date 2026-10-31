@@ -103,12 +103,16 @@ class LLMClient:
         except Exception:
             return False
 
-    def chat_decision(self, system_prompt: str, user_prompt: str, image_base64: Optional[str] = None, memory_context: Optional[str] = None) -> Dict[str, Any]:
+    def chat_decision(self, system_prompt: str, user_prompt: str, image_base64: Optional[str] = None, memory_context: Optional[str] = None, json_mode: bool = True) -> Dict[str, Any]:
         """
         向大模型发送意图并获得 JSON 格式的测试动作决策
         """
         if not self.client:
             raise RuntimeError(f"模型客户端 [{self.provider}] 未就绪，请检查 API Key 与 Base URL 配置。")
+
+        # 部分网关强制 json_object 时要求输入消息中出现小写 "json"，此处统一兜底
+        if json_mode and "json" not in f"{system_prompt}\n{user_prompt}".lower():
+            system_prompt = f"{system_prompt}\n\n请严格以 json 格式输出。"
 
         # 🚀 自动装配连续会话记忆与端侧事实上下文 (Conversation Memory Injection)
         if memory_context and memory_context.strip():
@@ -201,7 +205,7 @@ class LLMClient:
                     model=self.model_name,
                     messages=messages,
                     temperature=ai_config.TEMPERATURE,
-                    response_format={"type": "json_object"} if "deepseek" not in self.model_name else None
+                    response_format={"type": "json_object"} if (json_mode and "deepseek" not in self.model_name) else None
                 )
                 raw_text = response.choices[0].message.content
             except Exception as e:
