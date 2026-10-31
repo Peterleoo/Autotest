@@ -29,6 +29,20 @@
           "solution": "1. 进入「设置」->「无障碍」，找到当前自动化测试服务（如 UiAutomator/Appium 相关），先关闭再重新开启，并允许受限设置；\n2. 进入「设置」->「应用」-> 找到测试服务应用，进入「电池」设置为「无限制」；\n3. 备用解决：在电脑终端执行 `adb shell setenforce 0` 将 SELinux 临时设为宽容模式，并执行 `adb reboot` 重启设备后重试。"
         }
       ]
+    },
+    "Hinova_MIZ-BD00": {
+      "brand": "Hinova",
+      "model": "MIZ-BD00",
+      "rom": "HarmonyOS/EMUI",
+      "records": [
+        {
+          "issue_key": "auto_1793065509_hinova",
+          "pattern": "permission denied|failed|error",
+          "title": "Hinova 手机系统手势/安全策略拦截",
+          "situation": "检测到 Hinova MIZ-BD00 拦截了自动化测试指令，底层手势或应用服务未能生效。",
+          "solution": "请检查手机【开发者选项】，开启与【USB 调试】、【安全设置】或【允许模拟点击】相关的全部权限开关。"
+        }
+      ]
     }
   },
   "brand_rules": {
