@@ -7681,6 +7681,8 @@
             object-fit: contain;
             border-radius: 4px;
             cursor: zoom-in;
+        }
+
         /* ================= 需求驱动用例编排套件 (Suite Builder Card) ================= */
         .suite-builder-card {
             background: var(--bg-surface);
@@ -8024,6 +8026,164 @@
             opacity: 0.9;
             transform: translateY(-0.5px);
         }
+
+        /* ================= 文档与应用不相关拦截卡片 (Doc-App Relevance Guard) ================= */
+        .doc-mismatch-card {
+            background: rgba(239, 68, 68, 0.04);
+            border: 1px solid rgba(239, 68, 68, 0.22);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 14px 0;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+        body[data-theme="light"] .doc-mismatch-card {
+            background: #fef2f2;
+            border-color: #fecaca;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.06);
+        }
+        .mismatch-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .mismatch-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 5px;
+            padding: 2px 8px;
+            letter-spacing: 0.3px;
+        }
+        .mismatch-score-pill {
+            font-size: 11px;
+            color: var(--text-sub);
+            font-family: var(--font-mono);
+        }
+        .mismatch-body {
+            font-size: 12.5px;
+            line-height: 1.6;
+            color: var(--text-main);
+        }
+        .mismatch-comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 4px 0;
+        }
+        @media (max-width: 640px) {
+            .mismatch-comparison-grid { grid-template-columns: 1fr; }
+        }
+        .mismatch-col {
+            background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.03));
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        body[data-theme="light"] .mismatch-col {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+        .mismatch-col-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .mismatch-col-val {
+            font-size: 12px;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+        .mismatch-col-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .mismatch-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-top: 4px;
+            border-top: 1px dashed rgba(239, 68, 68, 0.2);
+        }
+        .btn-mismatch-action {
+            font-size: 11.5px;
+            font-weight: 500;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-mismatch-switch {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+        }
+        .btn-mismatch-switch:hover {
+            border-color: var(--border-hover);
+            background: var(--bg-surface-hover);
+        }
+        .btn-mismatch-force {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #ef4444;
+        }
+        .btn-mismatch-force:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* ================= Suite Builder 白天模式专属优化 ================= */
+        body[data-theme="light"] .suite-builder-card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+        }
+        body[data-theme="light"] .suite-header {
+            background: #f8fafc;
+            border-bottom-color: #e2e8f0;
+        }
+        body[data-theme="light"] .suite-case-row {
+            border-bottom-color: #f1f5f9;
+        }
+        body[data-theme="light"] .suite-case-row:hover {
+            background: #f8fafc;
+        }
+        body[data-theme="light"] .suite-footer {
+            background: #f8fafc;
+            border-top-color: #e2e8f0;
+        }
+        body[data-theme="light"] .editable-field {
+            color: #0f172a;
+        }
+        body[data-theme="light"] .case-goal-text {
+            color: #475569;
+        }
+        body[data-theme="light"] .btn-primary-run {
+            background: #0f172a;
+            color: #ffffff;
+        }
+
     </style>
 
 </head>
@@ -13121,6 +13281,9 @@
         }
 
         function buildBlockHtml(blk, sessionData) {
+            if (blk.type === "doc_mismatch_guard") {
+                return renderDocMismatchGuardHtml(blk, sessionData);
+            }
             if (blk.type === "suite_builder") {
                 return renderSuiteBuilderHtml(blk.suite_data || blk.suite || {}, blk.block_id);
             }
@@ -18150,6 +18313,107 @@ async function replaySolidifiedCase(safeRef, btnEl) {
                 });
             }
         });
+
+                // ================= 需求规约业务契合度门禁卡片 (Doc-App Relevance Guard UI) =================
+
+        function renderDocMismatchGuardHtml(blk, sessionData) {
+            const blockId = blk.block_id || ("guard_" + (sessionData ? sessionData.session_id : Date.now()));
+            const docName = escapeHtml(blk.doc_name || "上传文档");
+            const appName = escapeHtml(blk.app_name || (sessionData ? (sessionData.app_label || sessionData.app_id || "待测应用") : "待测应用"));
+            const relInfo = blk.relevance_info || {};
+            const appDomain = escapeHtml(relInfo.app_domain || "未知业务领域");
+            const docDomain = escapeHtml(relInfo.doc_domain || "外部其他领域");
+            const score = relInfo.relevance_score || 15;
+            const reason = escapeHtml(relInfo.reason || `当前待测应用归属于「${appDomain}」，而上传的需求文档内容涉及「${docDomain}」，两者业务场景无交集。`);
+            const sessionId = sessionData ? sessionData.session_id : (window.currentSessionId || "");
+
+            return `
+                <div class="stream-system-notice-row my-3" id="${blockId}">
+                    <div class="doc-mismatch-card">
+                        <div class="mismatch-header">
+                            <span class="mismatch-tag">
+                                <i class="bi bi-shield-exclamation"></i> 规约与应用业务领域不匹配拦截
+                            </span>
+                            <span class="mismatch-score-pill">业务契合度：<strong style="color: #ef4444;">${score}%</strong></span>
+                        </div>
+                        <div class="mismatch-body">
+                            ${reason}
+                        </div>
+                        <div class="mismatch-comparison-grid">
+                            <div class="mismatch-col">
+                                <div class="mismatch-col-label"><i class="bi bi-file-earmark-text text-primary"></i> 上传文档业务画像</div>
+                                <div class="mismatch-col-val">${docName}</div>
+                                <div class="mismatch-col-sub">业务域：<strong>${docDomain}</strong></div>
+                            </div>
+                            <div class="mismatch-col">
+                                <div class="mismatch-col-label"><i class="bi bi-app-indicator text-warning"></i> 当前选定待测应用</div>
+                                <div class="mismatch-col-val">${appName}</div>
+                                <div class="mismatch-col-sub">业务域：<strong>${appDomain}</strong></div>
+                            </div>
+                        </div>
+                        <div class="mismatch-actions">
+                            <button class="btn-mismatch-action btn-mismatch-switch" onclick="focusAppSelector()" title="切换至与文档匹配的应用">
+                                <i class="bi bi-arrow-repeat"></i> 更换待测应用
+                            </button>
+                            <button class="btn-mismatch-action btn-mismatch-switch" onclick="focusChatUpload()" title="重新上传该应用对应的业务说明书">
+                                <i class="bi bi-upload"></i> 重新上传文档
+                            </button>
+                            <button class="btn-mismatch-action btn-mismatch-force" onclick="forceRunDocSuite('${sessionId}')" title="忽略警告，仍以此文档提炼用例并驱动当前应用测试">
+                                <i class="bi bi-play-circle"></i> 仍要强行测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function focusAppSelector() {
+            const el = document.getElementById("appSelect") || document.querySelector(".app-selector");
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.focus();
+            }
+            if (typeof showToast === "function") {
+                showToast("请在顶部应用选择区切换至对应应用后重新提交");
+            }
+        }
+
+        function focusChatUpload() {
+            const input = document.getElementById("fileInput");
+            if (input) {
+                input.click();
+            } else if (typeof showToast === "function") {
+                showToast("请在底部对话框重新上传与目标应用相关的测试文档");
+            }
+        }
+
+        async function forceRunDocSuite(sessionId) {
+            if (!sessionId) {
+                sessionId = window.currentSessionId;
+            }
+            if (!sessionId) {
+                if (typeof showToast === "function") showToast("无法获取当前会话 ID", "error");
+                return;
+            }
+            try {
+                const resp = await fetch(`/api/sessions/${sessionId}/force_run_doc_suite`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" }
+                });
+                const res = await resp.json();
+                if (res.success) {
+                    if (typeof showToast === "function") showToast("已强制放行，正在为您提炼用例并驱动真机测试...", "success");
+                    if (typeof fetchSessionDetails === "function") {
+                        fetchSessionDetails(sessionId);
+                    }
+                } else {
+                    if (typeof showToast === "function") showToast(res.message || "操作失败", "error");
+                }
+            } catch (e) {
+                console.error("forceRunDocSuite error:", e);
+                if (typeof showToast === "function") showToast("网络请求异常，请稍后重试", "error");
+            }
+        }
 
         // ================= 需求驱动用例编排套件 (Suite Builder Generative UI) =================
 

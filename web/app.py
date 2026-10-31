@@ -2006,6 +2006,15 @@ async def rename_session(session_id: str, payload: Dict[str, Any] = Body(...)):
     task_mgr._save_session_to_disk(session)
     return JSONResponse({"success": True, "title": new_title})
 
+@app.post("/api/sessions/{session_id}/force_run_doc_suite")
+async def force_run_doc_suite(session_id: str):
+    """用户在确认知情后，忽略相关性不匹配提示，强制按文档生成用例并在当前应用上执行"""
+    success = task_mgr.force_resume_doc_suite(session_id)
+    if not success:
+        return JSONResponse(status_code=400, content={"success": False, "message": "会话不存在或未找到文档附件"})
+    return {"success": True, "message": "已强制放行，正在为您提炼用例并驱动真机测试"}
+
+
 @app.post("/api/sessions/{session_id}/message")
 async def append_session_message(
     session_id: str,
