@@ -9769,22 +9769,56 @@
             });
         }
 
-        // 快捷入口 2: 打开底层端侧与系统日志全文
-        function openLogViewer(sessionId) {
+        // 快捷入口 2: 打开底层端侧与系统日志全文 (支持全貌拉取与异步高保真呈现)
+        async function openLogViewer(sessionId) {
             const sid = sessionId || activeSessionId;
+            if (!sid) return;
+
+            const tabId = 'log_' + sid;
+            // 立即在右侧抽屉开辟标签页并显示拉取进度
+            openViewerTab({
+                id: tabId,
+                title: `execution_${sid.slice(-6)}.log`,
+                type: 'log',
+                content: `[${new Date().toLocaleTimeString()}] 正在从真机与执行引擎拉取会话 [${sid}] 全量底层日志...\n`,
+                filename: `execution_${sid}.log`
+            });
+
+            // 优先调用后端专门的 raw_logs 纯文本接口，100% 还原真机 30+ 行原生底层执行全貌
+            try {
+                const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}/raw_logs`);
+                if (res.ok) {
+                    const fullRawText = await res.text();
+                    if (fullRawText && fullRawText.trim().length > 0) {
+                        const cur = (window.docViewerTabs || []).find(t => t.id === tabId);
+                        if (cur) {
+                            cur.content = fullRawText;
+                            if (window.activeViewerTabId === tabId) {
+                                renderViewerContent();
+                            }
+                        }
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn("拉取 raw_logs 接口失败，尝试降级读取客户端内存:", err);
+            }
+
+            // 兜底降级：解析内存中的 devices.logs 或 devices.new_logs
             let logsText = "";
             let sData = (currentActiveSessionData && currentActiveSessionData.session_id === sid) ? currentActiveSessionData : null;
             if (!sData) {
-                sData = currentSessions.find(s => s.session_id === sid);
+                sData = (currentSessions || []).find(s => s.session_id === sid);
             }
             if (sData && sData.devices) {
                 for (const devId in sData.devices) {
                     const dev = sData.devices[devId];
-                    if (dev && Array.isArray(dev.logs) && dev.logs.length > 0) {
+                    const devLogs = (dev && (dev.logs || dev.new_logs)) || [];
+                    if (Array.isArray(devLogs) && devLogs.length > 0) {
                         logsText += `================================================================================\n`;
-                        logsText += `📱 目标真机 [${dev.model || devId}] · 原生底层执行与自学习日志流\n`;
+                        logsText += `📱 目标真机 [${dev.model || devId}] · 原生底层执行与自学习日志流 (${devLogs.length} 行)\n`;
                         logsText += `================================================================================\n\n`;
-                        logsText += dev.logs.join("\n") + "\n\n";
+                        logsText += devLogs.join("\n") + "\n\n";
                     }
                 }
             }
@@ -9796,13 +9830,13 @@
                 logsText = `[${new Date().toLocaleTimeString()}] 会话 [${sid}] 暂无捕获到底层原始日志。`;
             }
 
-            openViewerTab({
-                id: 'log_' + sid,
-                title: `execution_${sid.slice(-6)}.log`,
-                type: 'log',
-                content: logsText,
-                filename: `execution_${sid}.log`
-            });
+            const cur = (window.docViewerTabs || []).find(t => t.id === tabId);
+            if (cur) {
+                cur.content = logsText;
+                if (window.activeViewerTabId === tabId) {
+                    renderViewerContent();
+                }
+            }
         }
 
         // 快捷入口 3: 打开固化自动化测试脚本源码
@@ -14520,12 +14554,20 @@ function renderChatStream(sessionData) {
                 });
                 const data = await res.json();
                 if (data.success) {
-                    alert(`🎉 用例已成功入库！\n🏷️ 自动分类：【${data.module}】\n🏷️ 用例标题：${data.title}\n📄 脚本文件：${data.filename}`);
-                    await pollCurrentSession();
-                    await loadSolidifiedCasesWorkspace();
-                    if (typeof loadSolidifiedCases === "function") {
-                        await loadSolidifiedCases();
+                    const titleText = data.title || "自动化回归用例";
+                    const modText = data.module || "业务通用";
+                    const isAlready = data.already_saved;
+                    alert(isAlready ? `ℹ️ 该用例已存在于本地库：\n🏷️ 分类：【${modText}】\n🏷️ 标题：${titleText}\n📄 脚本：${data.filename}` : `🎉 用例已成功入库！\n🏷️ 自动分类：【${modText}】\n🏷️ 用例标题：${titleText}\n📄 脚本文件：${data.filename}`);
+                    
+                    if (btn) {
+                        btn.className = "btn-linear-ghost text-success";
+                        btn.onclick = () => switchMainWorkspaceMode('local');
+                        btn.innerHTML = `<i class="bi bi-check-circle-fill"></i><span>已入库本地</span>`;
+                        btn.disabled = false;
                     }
+                    try { await pollCurrentSession(); } catch (err) {}
+                    try { await loadSolidifiedCasesWorkspace(); } catch (err) {}
+                    try { if (typeof loadSolidifiedCases === "function") await loadSolidifiedCases(); } catch (err) {}
                 } else {
                     alert(data.message || "保存本地用例失败");
                     if (btn) {

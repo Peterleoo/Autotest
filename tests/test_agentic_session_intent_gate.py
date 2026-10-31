@@ -38,6 +38,10 @@ class TestAgenticSessionIntentGate(unittest.TestCase):
         if dec_file.exists():
             try: dec_file.unlink()
             except Exception: pass
+        sess_file = ROOT / "data" / "sessions" / f"{self.test_sid}.json"
+        if sess_file.exists():
+            try: sess_file.unlink()
+            except Exception: pass
         if self.test_sid in self.mgr.sessions:
             del self.mgr.sessions[self.test_sid]
 
@@ -84,6 +88,10 @@ class TestAgenticSessionIntentGate(unittest.TestCase):
                 dec_f = ROOT / "scratch" / f"decision_{sid}.json"
                 if dec_f.exists():
                     try: dec_f.unlink()
+                    except Exception: pass
+                sf = ROOT / "data" / "sessions" / f"{sid}.json"
+                if sf.exists():
+                    try: sf.unlink()
                     except Exception: pass
                 if sid in self.mgr.sessions:
                     del self.mgr.sessions[sid]

@@ -79,6 +79,9 @@ class TaskManager:
         # 按文件修改时间正序加载，最新的放在最前
         files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         for p in files:
+            # 🛡️ 过滤单元测试产生的测试会话文件，杜绝污染正式界面任务列表
+            if p.name.startswith("test_") or p.name.startswith("sess_test_") or p.name.startswith("sess_unit_"):
+                continue
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     sess = json.load(f)
@@ -523,6 +526,7 @@ class TaskManager:
                 "max_steps": dev_info.get("max_steps", 10),
                 "action": dev_info.get("action", ""),
                 "new_logs": new_logs,
+                "logs": logs,
                 "total_logs": len(logs),
                 "report_url": dev_info.get("report_url", ""),
                 "duration": dev_info.get("duration", "0s"),
@@ -559,6 +563,72 @@ class TaskManager:
             "suite_data": s.get("suite_data"),
             "keep_state": s.get("keep_state", True)
         }
+
+    def get_session_raw_logs(self, session_id: str) -> str:
+        """获取指定会话的全量真实执行日志流"""
+        s = self.sessions.get(session_id)
+        if not s:
+            sess_file = SESSIONS_STORE_DIR / f"{session_id}.json"
+            if sess_file.exists():
+                try:
+                    with open(sess_file, "r", encoding="utf-8") as f:
+                        s = json.load(f)
+                except Exception:
+                    s = None
+        if not s:
+            return f"会话 [{session_id}] 不存在或未落盘。"
+
+        lines = []
+        sid = s.get("session_id", session_id)
+        goal = s.get("goal", "")
+        status = s.get("status", "UNKNOWN")
+        created = s.get("created_at", "")
+
+        lines.append("=" * 80)
+        lines.append(f"📱 自动化测试会话底层运行日志 · {sid}")
+        lines.append(f"🎯 业务目标: {goal}")
+        lines.append(f"📌 会话状态: {status} | 创建时间: {created}")
+        lines.append("=" * 80)
+        lines.append("")
+
+        dev_found = False
+        devices = s.get("devices", {})
+        if isinstance(devices, dict):
+            for dev_id, dev_info in devices.items():
+                if not isinstance(dev_info, dict):
+                    continue
+                logs = dev_info.get("logs") or []
+                if logs:
+                    dev_found = True
+                    model = dev_info.get("model", dev_id)
+                    lines.append(f"--- 目标真机 [{model}] · 原生底层执行与自学习日志流 ({len(logs)} 行) ---")
+                    for l in logs:
+                        lines.append(l)
+                    lines.append("")
+
+        if not dev_found:
+            tb = s.get("timeline_blocks") or []
+            has_steps = False
+            for b in tb:
+                if b.get("type") == "step_execution":
+                    has_steps = True
+                    s_title = b.get("title", "未命名步骤")
+                    lines.append(f"[{b.get('duration', '0s')}] ▶ 步骤推进: {s_title} ({b.get('status', '')})")
+                    for act in b.get("actions", []):
+                        lines.append(f"    ├─ [{act.get('type', 'action')}] {act.get('desc', '')} -> {act.get('observation', '')}")
+                    if b.get("assertion_result"):
+                        lines.append(f"    └─ [断言] {b.get('assertion_result')}")
+            if not has_steps:
+                thoughts = [b for b in tb if b.get("type") == "thought"]
+                for th in thoughts:
+                    for x in th.get("bullets", []):
+                        lines.append(f"[推演] {x.get('tag', '')}: {x.get('content', '')}")
+
+        if not lines or len(lines) <= 5:
+            from datetime import datetime
+            lines.append(f"[{datetime.now().strftime('%H:%M:%S')}] 会话 [{sid}] 暂无捕获到底层原始日志。")
+
+        return "\n".join(lines)
 
     def create_session(
         self,

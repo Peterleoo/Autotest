@@ -1274,17 +1274,30 @@ async def save_session_to_local_case(
     """
     session = task_mgr.sessions.get(session_id)
     if not session:
+        sess_file = settings.SESSIONS_STORE_DIR / f"{session_id}.json"
+        if sess_file.exists():
+            try:
+                with open(sess_file, "r", encoding="utf-8") as f:
+                    session = json.load(f)
+                    task_mgr.sessions[session_id] = session
+            except Exception:
+                pass
+    if not session:
         return {"success": False, "message": f"未找到对应测试会话: {session_id}"}
 
     # 若已固化，直接返回既有信息
     if session.get("is_solidified") and session.get("solidified_filename"):
         fn = session["solidified_filename"]
-        target = settings.SOLIDIFIED_DIR / fn
-        if target.exists():
+        aid = session.get("solidified_app_id") or resolve_session_app_id(session)
+        target = settings.SOLIDIFIED_DIR / aid / fn
+        if not target.exists():
+            target = settings.SOLIDIFIED_DIR / fn
+        if target.exists() or session.get("is_solidified"):
             return {
                 "success": True,
                 "already_saved": True,
                 "filename": fn,
+                "title": session.get("title") or session.get("goal") or "自动化回归测试用例",
                 "module": session.get("solidified_module", "业务通用"),
                 "message": f"该用例已存在于本地用例库【{session.get('solidified_module', '业务通用')}】中"
             }
@@ -1933,6 +1946,14 @@ async def clarify_task_session(session_id: str, account: str = Form(""), env: st
     inputs = {"account": account, "env": env}
     ok = task_mgr.clarify_session(session_id, inputs)
     return {"success": ok, "message": "前置参数已补充，测试流程继续流转"}
+
+@app.get("/api/sessions/{session_id}/raw_logs")
+async def get_session_raw_logs_endpoint(session_id: str):
+    """获取指定会话的全量真实底层执行日志文本 (支持全貌查看与原汁原味排查)"""
+    from fastapi.responses import PlainTextResponse
+    logs_text = task_mgr.get_session_raw_logs(session_id)
+    return PlainTextResponse(logs_text, media_type="text/plain; charset=utf-8")
+
 
 @app.get("/api/sessions/{session_id}")
 async def get_session_detail(session_id: str, offsets: Optional[str] = None):
