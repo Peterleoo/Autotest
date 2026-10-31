@@ -10699,7 +10699,25 @@
                             </div>
                         `;
                     } else {
-                        const fieldsHtml = (hitl.fields || []).map((f, idx) => `
+                        // 🛡️ 智能字段补齐兜底：若 AI 未明确指定 fields，根据意图智能派生输入框，杜绝空白卡片
+                        let effectiveFields = hitl.fields || [];
+                        if (effectiveFields.length === 0) {
+                            const isSmsHint = (hitl.mode === "sms_code") || 
+                                (hitl.title && hitl.title.includes("验证码")) || 
+                                (hitl.reason && hitl.reason.includes("验证码"));
+                            if (isSmsHint) {
+                                effectiveFields = [
+                                    { key: "sms_code", label: "短信验证码", placeholder: "请输入收到的 4~6 位短信验证码", type: "text" }
+                                ];
+                            } else {
+                                effectiveFields = [
+                                    { key: "account", label: "测试账号 / 手机号", placeholder: "请输入账号或手机号", type: "text" },
+                                    { key: "password", label: "密码", placeholder: "请输入登录密码", type: "password" }
+                                ];
+                            }
+                        }
+
+                        const fieldsHtml = effectiveFields.map((f, idx) => `
                             <div class="mb-2">
                                 ${f.label ? `<label class="form-label text-sub small mb-1" style="font-size: 11px;">${escapeHtml(f.label)}</label>` : ''}
                                 <input type="${f.type === 'password' ? 'password' : 'text'}"

@@ -64,7 +64,9 @@ SYSTEM_PROMPT = """
     - 针对新用户多页引导页/轮播图：严禁每滑一页就停下来重新截屏识别一次！只要定性为引导页，果断直接下发 {"action": "fast_forward_guide", "reason": "新用户引导页极速穿透直达首页"} 或 {"action": "swipe", "direction": "left", "repeat": 3}，一步到位直接翻到最后一页并进入应用首页！
     - 针对长列表浏览：若目标需浏览推荐列表或信息流，可直接使用 repeat 连续滑动（如 {"action": "swipe", "direction": "up", "repeat": 2}），一气呵成减少交互轮次。
     - 针对多轮具身与代词消解（DeepSeek Harness 规范）：若指令中包含“第2个/第2套/第二条/刚才那个”等代词，严格遵照注入的【代词消解】或【活跃列表实体】指示，直接定位并点击该条目或物理坐标，严禁退回桌面或重复重新搜索！
-    - 针对登录流程：若有协议勾选先点击协议勾选 -> 点击手机号输入框输入测试号码 -> 点击获取验证码/用密码登录 -> 验证跳转。
+    - 针对短信验证码登录流程两阶段铁律（时序严禁颠倒）：
+      1) 阶段一（未发码）：页面存在【获取验证码】且无倒计时，绝对禁止向用户索要短信验证码，也绝不要误认成账号密码登录！由系统自动代填手机号并点击获取验证码，或优先执行【输入手机号 -> 勾选协议 -> 点击获取验证码】；
+      2) 阶段二（已发码）：当且仅当页面出现物理倒计时（如“59s”、“重新获取(60)”）或提示已向手机发送短信时，才说明真机已下发验证码，方可唤起 request_human_help 索要短信验证码！
     - 针对非首页/误入搜索页自愈铁律：
       若测试目标或当前任务步骤要求在【首页】操作（如“冷启动并穿透至首页”、“点击二手房”、“进入委托服务”、“校验底部Tab导航”等），但当前真机屏幕停留在【搜索页面】（特征：顶部有搜索输入框/右侧有‘取消’文字/页面上有‘历史搜索’或‘热门搜索’）时，严禁原地报错或停滞！第一步必须果断点击【取消】文字（target_index）或下发返回键 {"action": "press_key", "key": "back"}，迅速退回到首页主界面，然后再执行后续首页目标！
     - 针对搜索流程：若当前不在首页（例如误入“委托服务”或“我的”页面），第一步必须先按返回键 {"action": "press_key", "key": "back"} 或点击底部【首页】Tab 回到主页；然后在主页顶部点击搜索框（带有“搜索”或“请输入小区名”）进入搜索页面；在搜索页面，可直接点击下方的【热门搜索】条目（如‘钰龙天下’、‘华润凤凰城’、‘星城国际’）或搜索联想条目，即可一键直达房源搜索结果列表；在房源列表中执行下拉滑动或文本断言（如包含‘万’、‘室’、‘m²’等房源信息），达成目标后果断调用 finish 完成测试！
@@ -118,6 +120,8 @@ class AITestAgent:
         self._has_prompted_credential = False
         self._hitl_attempts = 0
         self._last_hitl_signature = None
+        self._last_hitl_resolved_time = 0.0
+        self._hitl_cooldown_steps = 0
 
     def _notify_status(self, data: Dict[str, Any]):
         if self.status_callback:
@@ -183,8 +187,8 @@ class AITestAgent:
     def _detect_login_screen_state(cls, screen_info: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         """
         根据端侧事实视觉与控件树，深度识别当前登录界面的真实物理状态机分型：
-        - "sms_code": 短信验证码已发送，等待填入短信验证码
-        - "phone_wait_code": 手机号验证码模式，待填手机号并获取验证码
+        - "sms_code": 短信验证码已发送，等待填入短信验证码 (物理倒计时或明确发送提示)
+        - "phone_wait_code": 手机号验证码模式，尚未获取验证码 (存在获取验证码按钮且无倒计时)
         - "credential": 传统账号密码登录模式
         - "manual_takeover": 图形滑块拼图/生物识别/复杂人机验证
         """
@@ -197,31 +201,53 @@ class AITestAgent:
         if any(k in combined for k in captcha_keywords):
             return "manual_takeover", {"reason": "检测到图形滑块拼图或行为验证"}
 
-        # 2. 检测是否处于“短信验证码已发送，等待填入验证码”阶段 (sms_code)
+        # 2. 检测是否存在真实的倒计时（发码成功后的物理标志）
         import re
-        has_countdown = bool(re.search(r"重新获取\s*\(?\d+", combined) or re.search(r"\d{1,3}\s*[sS秒]", combined) or any(k in combined for k in ["后重发", "后重新获取", "重新发送("]))
-        has_sms_sent_hint = any(k in combined for k in ["验证码已发送", "已发送短信", "短信已发送", "已发送至", "请输入验证码", "请输入短信验证码"])
-        
-        # 寻找验证码输入控件
+        has_countdown = bool(
+            re.search(r"重新获取\s*\(?\d+", combined) or 
+            re.search(r"\b\d{1,3}\s*[sS秒]\b", combined) or 
+            re.search(r"\(\s*\d{1,3}\s*[sS秒]?\s*\)", combined) or
+            any(k in combined for k in ["后重发", "后重新获取", "重新发送(", "重新发送（"])
+        )
+        # 检测明确的服务端下发提示（排查“请输入短信验证码”等占位符，仅保留服务端确认文案）
+        has_sms_sent_hint = any(k in combined for k in ["验证码已发送", "已发送短信", "短信已发送", "已发送至", "已向手机发送"])
+
+        # 寻找获取验证码按钮
+        get_code_btn = None
+        for el in elements:
+            t = (el.get("text") or el.get("content_desc") or "").strip()
+            if any(k in t for k in ["获取验证码", "发送验证码"]):
+                get_code_btn = el
+                break
+
+        # 寻找验证码输入控件（排除按钮与Tab切换）
         sms_input_el = None
         for el in elements:
             t = (el.get("text") or el.get("content_desc") or "").strip()
-            if any(k in t for k in ["请输入验证码", "验证码", "短信验证码"]) and not any(k in t for k in ["获取验证码", "发送验证码", "重新获取", "用验证码登录"]):
+            if any(k in t for k in ["验证码", "短信验证码"]) and not any(k in t for k in ["获取验证码", "发送验证码", "重新获取", "用验证码登录", "验证码登录"]):
                 sms_input_el = el
                 break
 
-        if (has_countdown or has_sms_sent_hint) and (sms_input_el or any("验证码" in t for t in texts)):
+        # 检查是否存在明确的密码输入框
+        has_pwd_input = any(
+            any(k in (el.get("text") or el.get("content_desc") or "") for k in ["请输入密码", "密码"]) and 
+            not any(k in (el.get("text") or el.get("content_desc") or "") for k in ["用密码登录", "密码登录", "忘记密码", "切换", "账号密码登录"]) 
+            for el in elements
+        )
+
+        # 阶段二判断：倒计时或服务端发送成功提示存在 -> 判定为已发码 (sms_code)
+        if has_countdown or has_sms_sent_hint:
             return "sms_code", {"sms_input_el": sms_input_el, "has_countdown": has_countdown}
 
-        # 3. 检测是否处于“手机号验证码模式（尚未获取验证码）”阶段 (phone_wait_code)
-        has_get_code_btn = any(any(k in (el.get("text") or el.get("content_desc") or "") for k in ["获取验证码", "发送验证码"]) for el in elements)
-        # 检查是否存在密码输入框
-        has_pwd_input = any(any(k in (el.get("text") or el.get("content_desc") or "") for k in ["请输入密码", "密码"]) and not any(k in (el.get("text") or el.get("content_desc") or "") for k in ["用密码登录", "密码登录", "忘记密码", "切换"]) for el in elements)
-
-        if has_get_code_btn and not has_pwd_input:
+        # 阶段一判断：存在“获取验证码”按钮且无倒计时 -> 明确判定为尚未发码 (phone_wait_code)
+        if get_code_btn:
             return "phone_wait_code", {"has_get_code_btn": True}
 
-        # 4. 账号密码登录
+        # 若界面只有独立的验证码输入框，没有获取验证码按钮且没有密码框 -> 判定为纯验证码核验页
+        if sms_input_el and not has_pwd_input:
+            return "sms_code", {"sms_input_el": sms_input_el, "has_countdown": False}
+
+        # 账号密码登录
         if has_pwd_input or any(k in combined for k in ["密码登录", "用密码登录", "账号密码登录"]):
             return "credential", {"has_pwd_input": has_pwd_input}
 
@@ -582,6 +608,11 @@ class AITestAgent:
         2. 若未配置凭证，立即挂起任务流，向前端发出协同信号唤出【人机协同决策卡片】，AI 推理与步数时钟完全冻结；
         3. 若检测到同界面多次阻断，智能熔断防死循环，自动升级为【投屏手动接管引导】，支持一键放行！
         """
+        # 🛡️ 协同冷却防死循环门禁 (Anti-Loop HITL Guard)
+        import time
+        if getattr(self, "_hitl_cooldown_steps", 0) > 0 and (time.time() - getattr(self, "_last_hitl_resolved_time", 0) < 30.0):
+            logger.info(f"🛡️ [Anti-Loop HITL Guard] 当前处于人机协同冷却期 (cooldown_steps={self._hitl_cooldown_steps})，跳过登录门禁重复挂起，推进测试流")
+            return False
         # 🎯 目标豁免检测 (Goal Immunity Guard):
         # 若当前测试目标明确针对“验证码”、“短信”、“机器人检测”、“滑块验证”、“人机验证”、“图形验证”等，
         # 则当前登录或验证码界面是测试目标本身 (Target under Test)，绝非流程阻断门禁，直接放行给 AI 规划器自主测试！
@@ -704,7 +735,7 @@ class AITestAgent:
 
         # 🚀 对标 DeepSeek Harness: 深度安全挂起（支持长达 1800 秒人工响应，或直到外部终止）
         wait_start = time.time()
-        while time.time() - wait_start < 1800:
+        while time.time() - wait_start < max_wait_seconds:
             if getattr(self, "_stop_requested", False):
                 logger.info("🛑 挂起期间收到外部终止指令")
                 return False
@@ -763,6 +794,12 @@ class AITestAgent:
                             except Exception: pass
                             time.sleep(1.0)
 
+                        self._last_hitl_resolved_time = time.time()
+                        self._hitl_cooldown_steps = 3
+                        if not hasattr(self, "memory_context") or not isinstance(self.memory_context, list):
+                            self.memory_context = []
+                        self.memory_context.append("【人机协同已完成】：用户刚刚已协助提交凭证/短信验证码（或已在投屏手动完成），当前处于提交转场期。请重点观察界面跳转与业务主页，严禁立即重复发起协助请求！")
+
                         try: decision_file.unlink()
                         except Exception: pass
                         return True
@@ -773,10 +810,23 @@ class AITestAgent:
         logger.warning("⚠️ 等待人机协同超时 (1800s)，安全退出挂起")
         return False
 
-    def _handle_ai_requested_human_help(self, decision: Dict[str, Any], screen_info: Dict[str, Any], goal: str) -> bool:
+    def _handle_ai_requested_human_help(self, decision: Dict[str, Any], screen_info: Dict[str, Any], goal: str, max_wait_seconds: float = 1800.0) -> bool:
         """
         处理由 AI 模型根据真机视觉现场自主动态生成的协同请求 (AI-Generated Dynamic HITL Engine)
+        深度融合三级自适应合流流水线：
+        1. 冷却防重死循环门禁 (Anti-Loop HITL Guard)
+        2. 短信验证码两阶段时序智能流转 (Two-Phase Auth Flow: 手机发码 -> 倒计时等待短信)
+        3. 凭据注入与原生控件自愈映射 (Unified Credential & SMS Injection Pipeline)
         """
+        # 🛡️ 协同冷却防死循环门禁 (Anti-Loop HITL Guard)
+        import time
+        if getattr(self, "_hitl_cooldown_steps", 0) > 0 and (time.time() - getattr(self, "_last_hitl_resolved_time", 0) < 30.0):
+            logger.info(f"🛡️ [Anti-Loop HITL Guard] 当前处于人机协同冷却期 (cooldown_steps={self._hitl_cooldown_steps})，跳过 AI 重复协同请求，推进测试流")
+            if not hasattr(self, "memory_context") or not isinstance(self.memory_context, list):
+                self.memory_context = []
+            self.memory_context.append("【人机协同冷却拦截】：用户刚刚已协助提交凭证/操作，当前处于系统转场冷却期，严禁重复发起 request_human_help！请根据当前页面真实业务元素继续执行测试操作！")
+            return False
+
         title = decision.get("title") or "人机协同 · 需要人工协助"
         reason = decision.get("reason") or decision.get("thought") or "AI 在当前真机界面遇到现实屏障，需要人类协助"
         desc = decision.get("description") or reason
@@ -835,7 +885,7 @@ class AITestAgent:
 
         # 深度安全挂起等待人工决策
         wait_start = time.time()
-        while time.time() - wait_start < 1800:
+        while time.time() - wait_start < max_wait_seconds:
             if getattr(self, "_stop_requested", False):
                 logger.info("🛑 挂起期间收到外部终止指令")
                 return False
@@ -848,6 +898,7 @@ class AITestAgent:
                         try: decision_file.unlink()
                         except Exception: pass
                         return False
+
                     if data.get("status") == "RESOLVED":
                         logger.info(f"✅ [AI 协同响应] 收到人工提交响应数据: {data}")
                         decision_type = data.get("decision_type", "submit")
@@ -859,47 +910,115 @@ class AITestAgent:
                             logger.info("⏩ 用户选择跳过该步骤")
                             try: self.driver.back()
                             except Exception: pass
+                            time.sleep(1.0)
                         else:
-                            # 提取用户提交的动态字段数据并自动映射上屏
+                            # 提取提交数据的所有输入项
                             inputs = data.get("inputs") or {}
                             for k, v in data.items():
                                 if k not in ["status", "decision_type", "remember", "app_key"] and k not in inputs:
                                     inputs[k] = v
 
-                            for f in fields:
-                                f_key = f.get("key")
-                                val = str(inputs.get(f_key, "")).strip()
-                                if not val and f_key == "sms_code" and "sms_code" in inputs:
-                                    val = str(inputs["sms_code"]).strip()
-                                if not val:
+                            acc_val = str(inputs.get("account") or inputs.get("username") or inputs.get("phone") or "").strip()
+                            pwd_val = str(inputs.get("password") or "").strip()
+                            sms_val = str(inputs.get("sms_code") or inputs.get("code") or "").strip()
+
+                            # 判定当前界面的物理状态机
+                            login_state, _ = self._detect_login_screen_state(screen_info)
+                            logger.info(f"🔍 [AI 协同注入识别] 界面分型: [{login_state}], inputs={list(inputs.keys())}")
+
+                            # 分支 1: 短信验证码注入 (用户提交了 sms_code，或当前处于 sms_code 阶段)
+                            if decision_type == "inject_sms" or (sms_val and not pwd_val):
+                                logger.info(f"📨 [AI 协同合流] 命中短信验证码注入模式: code={sms_val}")
+                                self._execute_sms_code_injection(sms_val, screen_info)
+
+                            # 分支 2: 手机号发码阶段 (当前处于 phone_wait_code 阶段且用户提供了手机号，且无密码)
+                            elif decision_type == "inject_phone" or (login_state == "phone_wait_code" and acc_val and not pwd_val):
+                                logger.info(f"📱 [AI 协同合流] 命中手机发码阶段，自动填入手机号 [{acc_val}] 并点击获取验证码...")
+                                sent = self._execute_phone_send_sms(acc_val, screen_info)
+                                if sent:
+                                    time.sleep(1.5)
+                                    post_screen = ScreenParser.get_screen_summary(self.driver)
+                                    post_state, _ = self._detect_login_screen_state(post_screen)
+                                    screen_info = post_screen
+                                    
+                                    # 删除当前已解决的决策文件，平滑转入第二阶段
+                                    try: decision_file.unlink()
+                                    except Exception: pass
+
+                                    if post_state == "manual_takeover":
+                                        logger.info("🛡️ 发码后触发图形滑块验证，唤起投屏接管...")
+                                        print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}&mode=manual_takeover&attempt=1\n", flush=True)
+                                        self._notify_status({
+                                            "step": getattr(self, "step_count", 0),
+                                            "action": "等待滑块验证",
+                                            "log": "⏸️ 触发了图形滑块/拼图验证，请直接在右侧真机投屏滑动完成，完成后点击已完成！"
+                                        })
+                                    else:
+                                        logger.info("📨 发码成功，平滑唤起【短信验证码】输入卡片...")
+                                        print(f"\n⏸️ [WAIT_HITL_DECISION] session_id={session_id}&app={app_key}&mode=sms_code&attempt=1\n", flush=True)
+                                        self._notify_status({
+                                            "step": getattr(self, "step_count", 0),
+                                            "action": "等待短信验证码",
+                                            "log": f"⏸️ 已自动填入手机号 [{acc_val}] 并触发获取验证码，请查收真机短信并在下方填入验证码！"
+                                        })
+                                    # 继续在主挂起循环中等待第二阶段人工响应
+                                    wait_start = time.time()
                                     continue
-                                
-                                target_el = None
-                                t_idx = f.get("target_index")
-                                if t_idx is not None:
-                                    for el in screen_info.get("elements", []):
-                                        if el.get("index") == t_idx:
-                                            target_el = el
-                                            break
-                                if not target_el:
-                                    for el in screen_info.get("elements", []):
-                                        el_t = (el.get("text") or el.get("content_desc") or "").strip()
-                                        if any(k in el_t for k in [f.get("label", ""), f.get("placeholder", ""), "验证码"]):
-                                            target_el = el
-                                            break
 
-                                if target_el:
-                                    logger.info(f"AI 协同字段 [{f_key}] 自动填入组件: {target_el.get('bounds')}")
-                                    self.executor._locate_and_type(target_el, val)
-                                    time.sleep(0.4)
-                                else:
-                                    logger.info(f"未找到目标组件，使用原生 ADB 直接填入字段 [{f_key}]: {val}")
-                                    try:
-                                        self.driver.execute_adb(["shell", "input", "text", val])
+                            # 分支 3: 账号密码登录注入 (存在密码)
+                            elif pwd_val:
+                                logger.info(f"🔑 [AI 协同合流] 命中账号密码登录模式: acc={acc_val}")
+                                self._execute_credential_injection(acc_val, pwd_val, screen_info, goal=goal)
+
+                            # 分支 4: 结构化 fields 字段按需填入
+                            elif fields:
+                                for f in fields:
+                                    f_key = f.get("key")
+                                    val = str(inputs.get(f_key, "")).strip()
+                                    if not val and f_key == "sms_code" and sms_val:
+                                        val = sms_val
+                                    if not val:
+                                        continue
+                                    
+                                    target_el = None
+                                    t_idx = f.get("target_index")
+                                    if t_idx is not None:
+                                        for el in screen_info.get("elements", []):
+                                            if el.get("index") == t_idx:
+                                                target_el = el
+                                                break
+                                    if not target_el:
+                                        for el in screen_info.get("elements", []):
+                                            el_t = (el.get("text") or el.get("content_desc") or "").strip()
+                                            if any(k in el_t for k in [f.get("label", ""), f.get("placeholder", ""), "验证码"]):
+                                                target_el = el
+                                                break
+
+                                    if target_el:
+                                        logger.info(f"AI 协同字段 [{f_key}] 自动填入组件: {target_el.get('bounds')}")
+                                        self.executor._locate_and_type(target_el, val)
                                         time.sleep(0.4)
-                                    except Exception:
-                                        pass
+                                    else:
+                                        logger.info(f"未找到目标组件，使用原生 ADB 直接填入字段 [{f_key}]: {val}")
+                                        try:
+                                            self.driver.execute_adb(["shell", "input", "text", val])
+                                            time.sleep(0.4)
+                                        except Exception:
+                                            pass
 
+                            # 分支 5: 通用兜底映射（枚举屏幕上所有的输入控件，将已有值逐个填入）
+                            else:
+                                edit_texts = [e for e in screen_info.get("elements", []) if e.get("is_input") or "EditText" in e.get("class", "")]
+                                if edit_texts and acc_val:
+                                    logger.info(f"通用兜底：向第 1 个输入框填入账号/手机号: {acc_val}")
+                                    self.executor._locate_and_type(edit_texts[0], acc_val)
+                                    time.sleep(0.4)
+                                    if len(edit_texts) >= 2 and pwd_val:
+                                        logger.info(f"通用兜底：向第 2 个输入框填入密码: {pwd_val}")
+                                        self.executor._locate_and_type(edit_texts[1], pwd_val)
+                                        time.sleep(0.4)
+
+                            # 处理选项选择
                             selected_choice = data.get("choice")
                             if selected_choice:
                                 for el in screen_info.get("elements", []):
@@ -910,8 +1029,18 @@ class AITestAgent:
                                         time.sleep(0.6)
                                         break
 
-                            # 点击登录/提交按钮
+                            # 自动勾选协议并点击登录/提交按钮
                             time.sleep(0.4)
+                            for el in screen_info.get("elements", []):
+                                el_t = (el.get("text") or el.get("content_desc") or "").strip()
+                                if any(k in el_t for k in ["协议", "同意", "已阅读", "我已阅读"]):
+                                    try:
+                                        self.executor._locate_and_click(el, None)
+                                        time.sleep(0.3)
+                                        break
+                                    except Exception:
+                                        pass
+
                             for el in screen_info.get("elements", []):
                                 el_t = (el.get("text") or el.get("content_desc") or "").strip()
                                 if any(k in el_t for k in ["登录", "进入", "确定", "下一步", "完成", "提交"]):
@@ -921,6 +1050,13 @@ class AITestAgent:
                                         time.sleep(1.5)
                                         break
 
+                        # 🛡️ 协同成功解除：激活冷却与事实记忆注入，彻底杜绝连续弹窗轰炸
+                        self._last_hitl_resolved_time = time.time()
+                        self._hitl_cooldown_steps = 3
+                        if not hasattr(self, "memory_context") or not isinstance(self.memory_context, list):
+                            self.memory_context = []
+                        self.memory_context.append("【人机协同已完成】：用户刚刚已协助提交凭证/短信验证码（或已在投屏手动完成），当前处于提交转场期。请重点观察界面跳转与业务主页，严禁立即重复发起协助请求！")
+
                         try: decision_file.unlink()
                         except Exception: pass
                         return True
@@ -928,7 +1064,7 @@ class AITestAgent:
                     logger.warning(f"读取 AI 协同决策文件异常: {e}")
             time.sleep(1.0)
 
-        logger.warning("⚠️ 等待 AI 人机协同超时 (1800s)")
+        logger.warning(f"⚠️ 等待 AI 人机协同超时 ({max_wait_seconds}s)")
         return False
 
     def _ensure_home_context_if_needed(self, goal: str, screen_info: Dict[str, Any]):
@@ -1039,6 +1175,8 @@ class AITestAgent:
 
             # 只有离开阻断状态后，才正式递增有效探索步骤
             step_count += 1
+            if getattr(self, "_hitl_cooldown_steps", 0) > 0:
+                self._hitl_cooldown_steps -= 1
             # 实时沉淀当前真机屏幕实体与工作记忆 (Muse 范式)
             self._sync_working_memory(screen_info)
             logger.info(f"\n--- [Step {step_count}/{max_steps}] 感知界面与决策 ---")

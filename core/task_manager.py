@@ -2060,6 +2060,20 @@ class TaskManager:
             # 实时捕获人机协同决策事件
             if "⏸️ [WAIT_HITL_DECISION]" in line:
                 session["status"] = "WAITING_USER_INPUT"
+                session_id = session.get("session_id")
+
+                # 🛡️ 优先从磁盘重载子进程最新写入的完整会话状态，杜绝内存脏数据与覆盖
+                disk_sess_path = Path("data/sessions") / f"{session_id}.json"
+                if not disk_sess_path.exists():
+                    disk_sess_path = Path("outputs/sessions") / f"{session_id}.json"
+                if disk_sess_path.exists():
+                    try:
+                        disk_data = json.loads(disk_sess_path.read_text(encoding="utf-8"))
+                        if disk_data.get("hitl_decision"):
+                            session["hitl_decision"] = disk_data["hitl_decision"]
+                    except Exception as e:
+                        logger.warning(f"重载磁盘 hitl_decision 失败: {e}")
+
                 app_key = session.get("app_package") or session.get("app_label") or session.get("app_filename") or "demo_app"
                 m_app = re.search(r"app=([^&\s]+)", line)
                 if m_app:
@@ -2077,23 +2091,32 @@ class TaskManager:
                 # 🚀 优先保护 AI 自主生成的结构化协同契约 (AI-Generated Schema)
                 if mode == "ai_generated" and session.get("hitl_decision") and session["hitl_decision"].get("type") == "ai_generated":
                     action_tip = f"⏸️ 挂起中：等待完成协同 ({session['hitl_decision'].get('title', 'AI人机协助')})"
+                    # 若 AI 自主发起的协同涉及验证码，同步设置 mode 便于 Bridge 智能衔接
+                    fields = session["hitl_decision"].get("fields") or []
+                    title = session["hitl_decision"].get("title", "")
+                    if any("code" in f.get("key", "").lower() for f in fields) or "验证码" in title:
+                        session["hitl_decision"]["mode"] = "sms_code"
                 else:
                     if mode == "sms_code":
                         title = "人机协同 · 请输入短信验证码"
                         desc = "端侧已向手机发送验证码，请查收真机短信并在下方填入验证码，或直接在右侧真机投屏输入完成："
                         action_tip = "⏸️ 挂起中：等待输入短信验证码"
+                        decision_type = "sms_code"
                     elif mode == "phone_input":
                         title = "人机协同 · 请输入测试手机号"
                         desc = "检测到应用处于短信验证码登录页，请输入测试手机号，系统将自动代填并点击获取验证码："
                         action_tip = "⏸️ 挂起中：等待输入手机号"
+                        decision_type = "phone_input"
                     elif mode == "manual_takeover":
                         title = "人机协同 · 请在投屏手动完成"
                         desc = "端侧需要进一步操作（如滑块拼图/验证码/选择公司）。请直接在右侧真机投屏中轻触完成，完成后点击【我已在投屏中完成】！"
                         action_tip = "⏸️ 挂起中：请在投屏手动操作并点击已完成"
+                        decision_type = "manual_takeover"
                     else:
                         title = "人机协同 · 需要登录凭证"
                         desc = "检测到目标应用进入账号密码/登录鉴权页，请提供测试账号密码，或在右侧投屏手动完成登录："
                         action_tip = "⏸️ 挂起中：等待输入账号密码或投屏手动登录"
+                        decision_type = "credential"
 
                     prior_account = ""
                     if session.get("hitl_decision") and session["hitl_decision"].get("preset_account"):
@@ -2102,7 +2125,7 @@ class TaskManager:
                         prior_account = existing_cred["account"]
 
                     session["hitl_decision"] = {
-                        "type": "credential",
+                        "type": decision_type,
                         "mode": mode,
                         "app_key": app_key,
                         "title": title,
@@ -3195,4 +3218,4 @@ class TaskManager:
             self.register_deliverables(session_id)
 
         self._save_session(session_id)
-        logger.info(f"🏁 [Suite Runner] 系统测试套件 [{session_id}] 执行结束，整体通过: {overall_success} (失败: {failed_count}/{len(cases)})")
+        logger.info(f"🏁 [Suite Runner] 系统测试套件 [{session_id}] 执行结束，整体通过: {overall_success} (失败: {failed_count}/{len(cases)})")
