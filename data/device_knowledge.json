@@ -27,6 +27,20 @@
           "title": "AOSP 无障碍服务异常断开与 SELinux 权限拦截",
           "situation": "自动化依赖的无障碍服务刚启动便被系统关闭，且底层安全策略拦截导致自动化进程崩溃闪退。",
           "solution": "1. 进入「设置」->「无障碍」，找到当前自动化测试服务（如 UiAutomator/Appium 相关），先关闭再重新开启，并允许受限设置；\n2. 进入「设置」->「应用」-> 找到测试服务应用，进入「电池」设置为「无限制」；\n3. 备用解决：在电脑终端执行 `adb shell setenforce 0` 将 SELinux 临时设为宽容模式，并执行 `adb reboot` 重启设备后重试。"
+        },
+        {
+          "issue_key": "auto_1792550956_xiaomi",
+          "pattern": "permission denied|failed|error",
+          "title": "无障碍服务争用导致自动化注入进程退出",
+          "situation": "第三方按键拦截或辅助工具抢占了系统无障碍通道，导致自动化测试底层进程被挤退并停止响应。",
+          "solution": "1. 依次打开手机【设置】->【无障碍/辅助功能】->【已安装的应用/服务】，找到并关闭所有第三方辅助服务（如按键拦截、自动化助手、点击器等），仅保留必要的系统服务后重启手机；\n2. 若手机已 Root，可在终端执行命令 `adb shell settings put secure enabled_accessibility_services none` 快速重置所有无障碍争用，并重新连接测试脚本。"
+        },
+        {
+          "issue_key": "auto_1792550956_xiaomi",
+          "pattern": "permission denied|failed|error",
+          "title": "AOSP 无障碍服务冲突与 SELinux 权限拦截",
+          "situation": "无障碍通道被后台拦截服务抢占，叠加高版本系统安全策略限制，导致自动化框架刚启动便被系统强制断开。",
+          "solution": "1. 进入手机【设置】->【无障碍/辅助功能】，检查已安装的服务，关闭如‘KeyInterceptor’或其它正在运行的第三方无障碍按键拦截服务；\n2. 若手机已 Root，通过终端或电脑执行命令临时将 SELinux 设为宽容模式排查：`su -c setenforce 0`；\n3. 进入【设置】->【系统】->【开发者选项】，开启【指针位置】以验证底层触摸注入是否生效，如失效请重启手机后重新连接执行。"
         }
       ]
     },

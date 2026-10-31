@@ -35,7 +35,7 @@ class DriverFactory:
                 native_driver = NativeADBDriver(device_id=device_id)
                 if native_driver.device_id:
                     logger.info(f"✨ 成功激活原生 ADB 极速真机驱动 [设备: {native_driver.device_id}]，免驱动安装，彻底免疫弹窗！")
-                    if auto_launch and pkg and act and activity_name:
+                    if auto_launch and pkg:
                         native_driver.launch_app(pkg, act)
                     else:
                         logger.info(f"⚡ [就地接管] 保持目标应用 [{pkg}] 当前真机界面，跳过重复冷启动！")

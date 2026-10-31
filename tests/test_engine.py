@@ -59,7 +59,7 @@ def test_solidifier_script_generation(tmp_path):
 
     assert generated_file.exists()
     content = generated_file.read_text(encoding="utf-8")
-    assert "def test_test_login_and_business_verify" in content
+    assert "def test_login_and_business_verify" in content
     assert "com.example.app:id/username" in content
     assert "admin_user" in content
     assert "com.example.app:id/btn_login" in content

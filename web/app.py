@@ -16,7 +16,8 @@ logger = logging.getLogger("WebApp")
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks, Body
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+import uuid
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -34,6 +35,12 @@ from core.task_manager import TaskManager
 from core.auth_manager import AuthManager
 from core.screen_stream_hub import screen_stream_hub
 from core.document_parser import extract_document, MAX_FILE_SIZE
+from core.document_extractor import DocumentExtractor
+from core.test_spec_synthesizer import TestSpecSynthesizer
+
+# 多模态需求资产上传与缓存目录
+UPLOADS_DIR = BASE_DIR / "data" / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Autotest Web Console", description="移动端 AI 自动化测试操作平台")
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
@@ -150,7 +157,7 @@ def resolve_target_device_id(preferred_id: Optional[str] = None) -> Optional[str
         return None
 
     # 若指定了有效在线设备且在当前在线列表中，直接使用
-    if preferred_id and preferred_id not in ["mock-device", "local-simulator", "default", "auto", "2145189e"]:
+    if preferred_id and preferred_id not in ["mock-device", "local-simulator", "default", "auto"]:
         if preferred_id in conn_ids:
             return preferred_id
 
@@ -565,6 +572,41 @@ async def resolve_session_decision(session_id: str, payload: Dict[str, Any] = Bo
     success = task_mgr.resolve_decision(session_id, payload)
     return {"success": success}
 
+
+@app.get("/api/device/installed_apps")
+async def get_device_installed_apps(device_id: Optional[str] = None, include_system: bool = False):
+    """🚀 0.08s 极速读取已连接真机上已安装的桌面应用列表 (无需上传 APK)"""
+    dev = device_id
+    if not dev:
+        connected = app_mgr.get_connected_devices()
+        dev = connected[0] if connected else None
+    if not dev:
+        return {"success": False, "apps": [], "message": "未连接任何物理真机设备"}
+    apps = app_mgr.get_device_installed_apps(device_id=dev, include_system=include_system)
+    return {"success": True, "device_id": dev, "apps": apps, "total": len(apps)}
+
+@app.get("/api/device/foreground_app")
+async def get_device_foreground_app(device_id: Optional[str] = None):
+    """0.05s 极速捕获真机当前屏幕前台正在运行的应用包名、Activity 与识别名称"""
+    dev = device_id
+    if not dev:
+        connected = app_mgr.get_connected_devices()
+        dev = connected[0] if connected else None
+    if not dev:
+        return {"success": False, "app": None, "message": "未连接任何物理真机设备"}
+    fg = app_mgr.get_current_foreground_app(device_id=dev)
+    return {"success": True, "device_id": dev, "app": fg}
+
+@app.post("/api/device/app_label")
+async def save_device_app_label(payload: Dict[str, str] = Body(...)):
+    """保存用户自定义的应用中文名称 (持久化记忆)"""
+    pkg = payload.get("package", "").strip()
+    lbl = payload.get("label", "").strip()
+    if not pkg or not lbl:
+        return JSONResponse(status_code=400, content={"success": False, "message": "包名和名称不能为空"})
+    app_mgr.save_custom_app_label(pkg, lbl)
+    return {"success": True, "package": pkg, "label": lbl}
+
 @app.get("/api/apps/check_installed")
 async def check_app_installed(package: str, device_id: Optional[str] = None):
     """检测指定包名的应用是否已安装在目标真机设备上"""
@@ -666,6 +708,166 @@ async def upload_app_package(file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "message": f"上传失败: {str(e)}"})
 
+@app.post("/api/upload")
+async def upload_requirement_attachment(files: List[UploadFile] = File(...)):
+    """
+    多模态测试需求资产上传中心 (Antigravity 范式)
+    支持文档 (.docx, .pdf, .md, .txt, .json) 与视觉参考图 (.png, .jpg, .jpeg, .webp)
+    内置轻量零依赖文本提取与元数据构建
+    """
+    try:
+        uploaded_results = []
+        for f in files:
+            if not f.filename:
+                continue
+            orig_name = f.filename
+            safe_stem = re.sub(r"[^\w\.-]", "_", Path(orig_name).stem)[:40]
+            ext = Path(orig_name).suffix.lower()
+            unique_name = f"up_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}_{safe_stem}{ext}"
+            dest_file = UPLOADS_DIR / unique_name
+            content = await f.read()
+            dest_file.write_bytes(content)
+            
+            meta = DocumentExtractor.get_file_metadata(str(dest_file), original_filename=orig_name)
+            uploaded_results.append(meta)
+        return {"success": True, "files": uploaded_results}
+    except Exception as e:
+        logger.error(f"上传多模态需求资产失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"上传失败: {str(e)}"})
+
+@app.get("/api/uploads/{filename}")
+async def get_uploaded_attachment(filename: str):
+    """安全获取已上传的多模态需求文档或测试截图"""
+    if ".." in filename or "/" in filename or "\\" in filename:
+        return JSONResponse(status_code=400, content={"error": "非法文件名"})
+    file_path = UPLOADS_DIR / filename
+    if not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "附件未找到"})
+    
+    suffix = file_path.suffix.lower()
+    media_map = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".pdf": "application/pdf",
+        ".txt": "text/plain; charset=utf-8",
+        ".md": "text/markdown; charset=utf-8",
+        ".json": "application/json"
+    }
+    media_type = media_map.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
+
+# ================= 需求文档驱动用例智能生成与自由编排套件 (Suite Builder) API =================
+
+@app.post("/api/test_suite/synthesize")
+async def synthesize_test_suite(request: Request):
+    """
+    根据上传的需求文档提取文本并智能生成系统级测试用例套件 (Suite Builder)
+    支持 json payload 或 form 提交:
+    - filename: 已上传在 data/uploads/ 下的文件名
+    - doc_path: 服务器文件绝对路径或相对路径
+    - doc_text: 纯文本需求
+    - provider / model: 可选模型覆盖
+    """
+    try:
+        data = {}
+        if isinstance(request, dict):
+            data = request
+        else:
+            content_type = request.headers.get("content-type", "")
+            if "application/json" in content_type:
+                data = await request.json()
+            else:
+                form = await request.form()
+                data = dict(form)
+
+        filename = data.get("filename", "")
+        doc_path = data.get("doc_path", "")
+        doc_text = data.get("doc_text", "")
+        provider = data.get("provider")
+        model = data.get("model")
+
+        # 1. 尝试从 filename 或 doc_path 提取文本
+        orig_filename = data.get("doc_filename") or data.get("original_filename")
+        resolved_filename = orig_filename or filename or (Path(doc_path).name if doc_path else "需求文档")
+        if not doc_text:
+            target_p = None
+            if filename:
+                target_p = UPLOADS_DIR / filename
+                if not target_p.exists():
+                    target_p = BASE_DIR / "data" / "uploads" / filename
+            elif doc_path:
+                target_p = Path(doc_path)
+
+            if target_p and target_p.exists():
+                doc_text = DocumentExtractor.extract_text(str(target_p))
+                if not orig_filename:
+                    resolved_filename = target_p.name
+
+        suite = TestSpecSynthesizer.synthesize_from_doc(
+            doc_text=doc_text,
+            filename=resolved_filename,
+            provider=provider,
+            model=model
+        )
+        return {"success": True, "suite": suite}
+    except Exception as e:
+        logger.error(f"智能提炼测试套件失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"提炼测试套件失败: {str(e)}"})
+
+
+@app.post("/api/test_suite/run")
+async def run_systemic_test_suite(payload: Dict[str, Any] = Body(...)):
+    """
+    接收编排后的用例列表与配置，创建/接续系统级测试任务
+    """
+    try:
+        session_id = payload.get("session_id")
+        suite_data = payload.get("suite_data")
+        if not suite_data and "cases" in payload:
+            suite_data = payload
+
+        keep_state = payload.get("keep_state", True)
+        res = task_mgr.run_systemic_suite(
+            session_id=session_id,
+            suite_data=suite_data,
+            keep_state=keep_state
+        )
+        return res
+    except Exception as e:
+        logger.error(f"启动系统级用例套件失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"启动套件失败: {str(e)}"})
+
+
+@app.post("/api/test_suite/save")
+async def save_test_suite_endpoint(payload: Dict[str, Any] = Body(...)):
+    """
+    保存用例套件至持久化目录 (data/test_suites/)
+    """
+    try:
+        suite_data = payload.get("suite_data") if "suite_data" in payload else payload
+        res = task_mgr.save_test_suite(suite_data)
+        return {"success": True, "suite_id": res.get("suite_id"), "suite": res, "message": "套件已成功保存至项目用例库！"}
+    except Exception as e:
+        logger.error(f"保存测试套件失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"保存套件失败: {str(e)}"})
+
+
+@app.get("/api/test_suites")
+async def list_test_suites_endpoint():
+    """
+    获取所有已保存的系统测试套件列表
+    """
+    try:
+        suites = task_mgr.list_test_suites()
+        return {"success": True, "suites": suites, "total": len(suites)}
+    except Exception as e:
+        logger.error(f"获取测试套件列表失败: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": f"获取套件列表失败: {str(e)}"})
+
+
 ALL_SUGGESTED_CASES = [
     {
         "id": "CASE-01",
@@ -726,14 +928,25 @@ ALL_SUGGESTED_CASES = [
 ]
 
 @app.api_route("/api/ai/suggest_cases", methods=["GET", "POST"])
-async def suggest_cases(request: Request, app_name: Optional[str] = None):
-    """AI 测试用例助手：针对当前应用生成完善的多样化测试用例矩阵"""
-    import random
+async def suggest_cases(request: Request, app_name: Optional[str] = None, package_name: Optional[str] = None):
+    """AI 测试用例助手：针对当前应用生成端到端业务旅程套件与单点精选用例 (Journey Synthesizer)"""
     if not app_name:
         app_name = request.query_params.get("app_name") or "待测应用"
-    # 随机抽取 4 个不重复的业务用例
-    sampled = random.sample(ALL_SUGGESTED_CASES, min(4, len(ALL_SUGGESTED_CASES)))
-    return {"app_name": app_name, "cases": sampled}
+    if not package_name:
+        package_name = request.query_params.get("package_name") or ""
+
+    from core.journey_synthesizer import JourneySynthesizer
+    domain = JourneySynthesizer.infer_app_domain(f"{app_name} {package_name}")
+    suites = JourneySynthesizer.generate_journey_suites(app_name, package_name)
+    cases = JourneySynthesizer.generate_single_cases(app_name, package_name)
+
+    return {
+        "app_name": app_name,
+        "package_name": package_name,
+        "domain": domain,
+        "journey_suites": suites,
+        "cases": cases
+    }
 
 
 def _coerce_generated_cases(result: Any) -> List[Dict[str, Any]]:
@@ -1022,15 +1235,76 @@ def auto_categorize_case(goal: str, title: str = "", steps: list = None) -> tupl
         clean_title = clean_title[:28] + "..."
     return module, level, clean_title
 
+KNOWN_APP_META = {
+    "xianghe_zhaofang": {
+        "name": "象盒找房",
+        "package": "com.apicloud.A6995433058179",
+        "version": "真机已安装",
+    },
+    "xianghe_workbench": {
+        "name": "象盒工作台",
+        "package": "com.xhj.workbench",
+        "version": "真机已安装",
+    },
+    "demo_app": {
+        "name": "待测示例应用",
+        "package": "com.autotest.demo",
+        "version": "v1.0.0",
+    }
+}
+
+def resolve_session_app_id(session: dict) -> str:
+    """提取会话确切归属的 App 工程标识 (app_id)"""
+    aid = session.get("app_id")
+    if aid and aid != "demo_app":
+        return aid
+    fn = session.get("app_filename")
+    if fn:
+        from pathlib import Path
+        return Path(fn).stem
+    pkg = str(session.get("app_package") or "")
+    lbl = str(session.get("app_label") or "")
+    if "apicloud.A6995433058179" in pkg or "象盒找房" in lbl:
+        return "xianghe_zhaofang"
+    if "xhj.workbench" in pkg or "象盒工作台" in lbl:
+        return "xianghe_workbench"
+    if pkg:
+        return re.sub(r"[^\w]+", "_", pkg).strip("_").lower()
+    if lbl:
+        return re.sub(r"[^\w]+", "_", lbl).strip("_").lower()
+    return "demo_app"
+
 @app.get("/api/app_projects")
 async def get_app_projects():
     """获取所有跟随 App 建立的测试项目文件夹清单与用例统计"""
     projects = []
     seen_ids = set()
+
+    # 1. 优先扫描真机常见已知 App 项目工程
+    for app_id, meta in KNOWN_APP_META.items():
+        proj_dir = settings.SOLIDIFIED_DIR / app_id
+        if proj_dir.exists() or app_id in ["xianghe_zhaofang", "xianghe_workbench"]:
+            proj_dir.mkdir(parents=True, exist_ok=True)
+            seen_ids.add(app_id)
+            py_files = list(proj_dir.glob("*.py"))
+            projects.append({
+                "id": app_id,
+                "name": meta["name"],
+                "package": meta["package"],
+                "version": meta["version"],
+                "filename": f"{app_id}.apk",
+                "case_count": len(py_files),
+                "folder": f"tests/solidified/{app_id}",
+                "is_current": (app_id == "xianghe_zhaofang")
+            })
+
+    # 2. 扫描 apps/ 本地 APK 安装包
     apps_dir = settings.APPS_DIR
     if apps_dir.exists():
         for apk_file in sorted(apps_dir.glob("*.apk")):
             app_id = apk_file.stem
+            if app_id in seen_ids:
+                continue
             seen_ids.add(app_id)
             info = app_mgr.get_apk_info(apk_file)
             proj_dir = settings.SOLIDIFIED_DIR / app_id
@@ -1047,19 +1321,21 @@ async def get_app_projects():
                 "filename": apk_file.name,
                 "case_count": len(py_files),
                 "folder": f"tests/solidified/{app_id}",
-                "is_current": (app_id == "demo_app" or len(projects) == 0)
+                "is_current": (len(projects) == 0)
             })
 
+    # 3. 扫描 tests/solidified/ 下已有的其他独立工程目录
     if settings.SOLIDIFIED_DIR.exists():
         for sub in sorted(settings.SOLIDIFIED_DIR.iterdir()):
             if sub.is_dir() and not sub.name.startswith((".", "_")) and sub.name not in seen_ids and sub.name != "__pycache__":
                 seen_ids.add(sub.name)
                 py_files = list(sub.glob("*.py"))
+                known = KNOWN_APP_META.get(sub.name, {})
                 projects.append({
                     "id": sub.name,
-                    "name": sub.name.replace("_", " ").title(),
-                    "package": f"com.{sub.name}",
-                    "version": "v1.0.0",
+                    "name": known.get("name") or sub.name.replace("_", " ").title(),
+                    "package": known.get("package") or f"com.{sub.name}",
+                    "version": known.get("version") or "v1.0.0",
                     "filename": f"{sub.name}.apk",
                     "case_count": len(py_files),
                     "folder": f"tests/solidified/{sub.name}",
@@ -1268,13 +1544,8 @@ async def save_session_to_local_case(
             "expected": goal[:8] if goal else "首页"
         })
 
-    # 确定保存的目标 App 项目文件夹 (优先当前会话绑定的 App，默认 demo_app)
-    app_id = session.get("app_id")
-    if not app_id and session.get("target_app"):
-        app_id = Path(session["target_app"]).stem
-    if not app_id:
-        app_id = "demo_app"
-
+    # 🌟 确定保存的目标 App 项目文件夹 (精准对齐待测 App，彻底杜绝全部堆入 demo_app)
+    app_id = resolve_session_app_id(session)
     target_app_dir = settings.SOLIDIFIED_DIR / app_id
     target_app_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1322,17 +1593,19 @@ async def save_session_to_local_case(
     session["solidified_app_id"] = app_id
     task_mgr._save_session(session_id)
 
+    app_display_name = KNOWN_APP_META.get(app_id, {}).get("name") or session.get("app_label") or app_id
     logger.info(f"💾 用户主动将测试会话 [{session_id}] 固化保存为本地用例: {solid_file.name} (项目目录: {app_id}, 归类: {module})")
     return {
         "success": True,
         "filename": solid_file.name,
         "app_id": app_id,
+        "app_name": app_display_name,
         "module": module,
         "title": final_title,
         "level": auto_level,
         "case_id": case_id,
         "created_at": now_str,
-        "message": f"用例已成功保存至【{app_id}】项目库，自动归类至【{module}】"
+        "message": f"用例已成功保存至【{app_display_name}】专属用例工程库，自动归类至【{module}】"
     }
 
 @app.post("/api/solidified_cases/batch_run")
@@ -1459,6 +1732,7 @@ async def update_config(
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
     app_label: Optional[str] = Form(None),
+    app_activity: Optional[str] = Form(None),
     api_key: Optional[str] = Form(None),
     base_url: Optional[str] = Form(None)
 ):
@@ -1780,9 +2054,12 @@ async def create_task_session(
     model: Optional[str] = Form(None),
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
-    app_label: Optional[str] = Form(None)
+    app_label: Optional[str] = Form(None),
+    app_activity: Optional[str] = Form(None),
+    app_id: Optional[str] = Form(None),
+    attachments: Optional[str] = Form(None)
 ):
-    """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型"""
+    """创建新任务会话并向所选设备分发并发执行，支持自动放行与人工审批确认，支持动态指定模型与多模态需求附件"""
     device_ids = []
     if devices and devices != "auto":
         device_ids = [d.strip() for d in devices.split(",") if d.strip()]
@@ -1800,6 +2077,15 @@ async def create_task_session(
                 status_code=400,
                 content={"success": False, "message": f"所选待测应用不存在：{app_filename}，请重新上传或选择应用包。"}
             )
+
+    parsed_attachments = None
+    if attachments:
+        try:
+            parsed_attachments = json.loads(attachments)
+            if not isinstance(parsed_attachments, list):
+                parsed_attachments = None
+        except Exception:
+            parsed_attachments = None
     session_id = task_mgr.create_session(
         goal=goal,
         device_ids=device_ids,
@@ -1810,7 +2096,10 @@ async def create_task_session(
         model=model,
         app_filename=app_filename,
         app_package=app_package,
-        app_label=app_label
+        app_label=app_label,
+        app_activity=app_activity,
+        app_id=app_id,
+        attachments=parsed_attachments
     )
     return {"success": True, "session_id": session_id, "message": "测试会话已创建"}
 
@@ -1888,11 +2177,22 @@ async def append_session_message(
     model: Optional[str] = Form(None),
     app_filename: Optional[str] = Form(None),
     app_package: Optional[str] = Form(None),
-    app_label: Optional[str] = Form(None)
+    app_label: Optional[str] = Form(None),
+    app_activity: Optional[str] = Form(None),
+    attachments: Optional[str] = Form(None)
 ):
-    """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，支持动态切换模型"""
+    """在已有单条任务会话中进行多轮连续对话，支持打断纠偏与追加测试意图，支持动态切换模型与多模态附件"""
     try:
-        res = task_mgr.append_session_message(session_id, message, provider=provider, model=model)
+        parsed_attachments = None
+        if attachments:
+            try:
+                parsed_attachments = json.loads(attachments)
+                if not isinstance(parsed_attachments, list):
+                    parsed_attachments = None
+            except Exception:
+                parsed_attachments = None
+
+        res = task_mgr.append_session_message(session_id, message, provider=provider, model=model, attachments=parsed_attachments)
         return res
     except Exception as e:
         return JSONResponse(status_code=400, content={"success": False, "message": str(e)})
@@ -1949,6 +2249,19 @@ async def get_session_token_pressure(session_id: str):
         est_tokens = MemoryManager.estimate_tokens(ctx) + len(session.get("plan_steps", [])) * 120
         status = MemoryManager.get_token_pressure_status(est_tokens)
         return {"session_id": session_id, "token_pressure": status}
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+@app.get("/api/sessions/{session_id}/compatibility_matrix")
+async def get_session_compatibility_matrix(session_id: str):
+    """获取当前会话的多机型视觉差异与步骤对齐对比看板 (Multi-Device Visual Diff Matrix)"""
+    try:
+        session = task_mgr.get_session(session_id)
+        if not session:
+            return JSONResponse(status_code=404, content={"error": "会话不存在"})
+        from core.report_generator import ReportGenerator
+        matrix = ReportGenerator.generate_compatibility_matrix(session)
+        return matrix
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 

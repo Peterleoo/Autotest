@@ -28,7 +28,7 @@ from ai_engine.solidifier import Solidifier
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MainRunner")
 
-def run_test(goal: str, case_name: str, app_file: str = None, app_package: str = None, provider: str = None, auto_solidify: bool = True, device_id: str = None, session_id: str = None, turn_id: int = 1):
+def run_test(goal: str, case_name: str, app_file: str = None, provider: str = None, auto_solidify: bool = True, device_id: str = None, session_id: str = None, turn_id: int = 1, package: str = None, activity: str = None):
     print("=" * 60)
     print(f"🤖 AI 移动端全自动测试与固化引擎")
     print(f"🎯 测试目标: {goal}")
@@ -37,15 +37,15 @@ def run_test(goal: str, case_name: str, app_file: str = None, app_package: str =
     print(f"🧠 模型服务: {(provider or ai_config.PROVIDER).upper()}")
     print("=" * 60)
 
-    # 1. 检查并安装应用（避免重复安装）
+    # 1. 检查并调起应用 (支持真机已安装直调，免上传 APK)
     app_mgr = AppManager()
-    target_app = app_mgr.find_target_app(app_file)
+    target_app = app_mgr.find_target_app(app_file) if app_file else None
     if app_file and not target_app:
         logger.error(f"❌ 所选待测应用 [{app_file}] 不存在于 apps 目录，测试终止。请重新上传或选择应用包！")
         sys.exit(1)
     apk_info = app_mgr.get_apk_info(target_app) if target_app else {}
-    pkg = apk_info.get("package") or app_package or settings.ANDROID_APP_PACKAGE
-    act = apk_info.get("activity") or settings.ANDROID_APP_ACTIVITY
+    pkg = package or apk_info.get("package") or settings.ANDROID_APP_PACKAGE
+    act = activity or apk_info.get("activity") or settings.ANDROID_APP_ACTIVITY
     print(f"🎯 [待测应用锁定] 安装包: {target_app.name if target_app else '未指定'} · 包名: {pkg} · Activity: {act}")
 
     is_installed = app_mgr.is_app_installed(pkg, device_id=device_id)
@@ -59,8 +59,8 @@ def run_test(goal: str, case_name: str, app_file: str = None, app_package: str =
         if build_mismatch:
             print(f"\n⚠️ [安装包一致性] 真机现装包与所选 APK 不一致 (设备 {installed_apk_size} B / 本地 {local_apk_size} B)，自动覆盖安装所选版本...")
         if not target_app:
-            logger.error(f"❌ 真机未安装应用 [{pkg}]，且未在 apps 目录下找到可供安装的安装包！测试终止。")
-            print(f"\n💡 提示: 请将待测 APK 安装包放入 apps/ 目录，或提前在真机上手动安装该应用。")
+            logger.error(f"❌ 真机未安装应用 [{pkg}]，且未指定安装包文件！测试终止。")
+            print(f"\n💡 提示: 请在手机上手动安装该应用，或将 APK 放入 apps/ 目录后重试。")
             sys.exit(1)
 
         if settings.PLATFORM == "android":
@@ -133,7 +133,7 @@ def run_test(goal: str, case_name: str, app_file: str = None, app_package: str =
                     logger.warning(f"载入会话记忆异常: {e}")
 
         # 4. 运行 AI 智能体 (传入连续上下文)
-        agent = AITestAgent(driver=driver, llm_provider=provider, app_identifier=app_file, session_id=session_id)
+        agent = AITestAgent(driver=driver, llm_provider=provider, app_identifier=app_file or pkg or "demo_app", session_id=session_id)
         result = agent.run_goal(goal, memory_context=memory_context)
 
         # 4. 后期固化为标准测试脚本 (仅当测试真正成功且具备执行历史时才予以固化沉淀)
@@ -166,7 +166,8 @@ if __name__ == "__main__":
     parser.add_argument("--goal", "-g", type=str, default="打开应用，完成账号登录注册流程，并验证用户信息接口", help="测试目标描述")
     parser.add_argument("--name", "-n", type=str, default="login_register_flow", help="固化测试用例英文标识名")
     parser.add_argument("--app", "-a", type=str, default=None, help="apps 目录下的指定安装包文件名")
-    parser.add_argument("--package", "-k", type=str, default=None, help="显式指定待测应用包名")
+    parser.add_argument("--package", "-k", type=str, default=None, help="显式指定待测应用包名 (支持真机已安装应用免上传直测)")
+    parser.add_argument("--activity", type=str, default=None, help="目标应用启动入口 Activity")
     parser.add_argument("--device", "-d", type=str, default=None, help="指定运行的目标设备序列号")
     parser.add_argument("--provider", "-p", type=str, default=None, help="AI 模型提供商 (claude / deepseek / antigravity / openai)")
     parser.add_argument("--no-solidify", action="store_true", help="不自动生成固化脚本")
@@ -178,10 +179,11 @@ if __name__ == "__main__":
         goal=args.goal,
         case_name=args.name,
         app_file=args.app,
-        app_package=args.package,
         device_id=args.device,
         provider=args.provider,
         auto_solidify=not args.no_solidify,
         session_id=args.session_id,
-        turn_id=args.turn_id
+        turn_id=args.turn_id,
+        package=args.package,
+        activity=args.activity
     )

@@ -44,6 +44,13 @@ class ActionExecutor:
                 el_info = self._find_element_by_index(target_idx, elements_map)
                 locator = self._locate_and_click(el_info, action_dict.get("coordinates"))
                 trace_item["locator"] = locator
+                if el_info:
+                    trace_item["element_text"] = el_info.get("text", "")
+                    trace_item["element_desc"] = el_info.get("desc", "")
+                    trace_item["element_id"] = el_info.get("resource_id", "")
+                    trace_item["center"] = el_info.get("center")
+                win_size = getattr(self.driver, "get_window_size", lambda: {"width": 1080, "height": 2160})()
+                trace_item["screen_size"] = win_size
 
             elif action == "type":
                 target_idx = action_dict.get("target_index")
@@ -57,6 +64,13 @@ class ActionExecutor:
                 locator = self._locate_and_type(el_info, text)
                 trace_item["locator"] = locator
                 trace_item["text"] = text
+                if el_info:
+                    trace_item["element_text"] = el_info.get("text", "")
+                    trace_item["element_desc"] = el_info.get("desc", "")
+                    trace_item["element_id"] = el_info.get("resource_id", "")
+                    trace_item["center"] = el_info.get("center")
+                win_size = getattr(self.driver, "get_window_size", lambda: {"width": 1080, "height": 2160})()
+                trace_item["screen_size"] = win_size
 
             elif action == "swipe":
                 direction = action_dict.get("direction", "up").lower()
@@ -180,7 +194,14 @@ class ActionExecutor:
             self.driver.execute_adb(["shell", "input", "tap", str(x), str(y)])
             cost_ms = int((time.perf_counter() - t0) * 1000)
             logger.info(f"原生 ADB 物理手势精准点击完成: ({x}, {y}) [{name}] (用时 {cost_ms}ms)")
-            return {"by": "coordinates", "value": f"{x},{y}", "cost_ms": cost_ms}
+            return {
+                "by": "coordinates",
+                "value": f"{x},{y}",
+                "cost_ms": cost_ms,
+                "text": el_info.get("text", "") if el_info else "",
+                "res_id": el_info.get("resource_id", "") if el_info else "",
+                "desc": el_info.get("desc", "") if el_info else ""
+            }
 
         # 2. 如果是传统 Appium 驱动且元素有定位符
         if el_info:
@@ -221,7 +242,17 @@ class ActionExecutor:
         # 优先支持原生 ADB 坐标点击输入
         if el_info.get("center") and hasattr(self.driver, "execute_adb"):
             self._locate_and_click(el_info, None)
-            time.sleep(0.5)
+            time.sleep(0.3)
+
+            # 🛡️ 确定性清空输入框历史残留（防拼接/防账号密码串框）
+            # 移动光标至末尾并批量退格删除，确保输入框内容纯净
+            try:
+                self.driver.execute_adb(["shell", "input", "keyevent", "123"])  # KEYCODE_MOVE_END
+                self.driver.execute_adb(["shell", "input", "keyevent"] + ["67"] * 40)  # KEYCODE_DEL x 40
+            except Exception as e:
+                logger.debug(f"输入框退格清空跳过: {e}")
+
+            time.sleep(0.2)
 
             # 判断是否包含中文汉字
             if any(ord(c) > 127 for c in text):
@@ -246,6 +277,16 @@ class ActionExecutor:
                     # 激活免权限 UnicodeIME 输入法（真机已就绪）
                     self.driver.execute_adb(["shell", "ime", "enable", "io.appium.settings/.UnicodeIME"])
                     self.driver.execute_adb(["shell", "ime", "set", "io.appium.settings/.UnicodeIME"])
+                    # 等待 IME 切换完成，最多 3 秒
+                    timeout = time.time() + 3
+                    while time.time() < timeout:
+                        ime_res = self.driver.execute_adb(["shell", "ime", "list", "-s"])
+                        ime_status = ime_res.decode("utf-8") if isinstance(ime_res, bytes) else str(ime_res)
+                        if "io.appium.settings/.UnicodeIME" in ime_status:
+                            break
+                        time.sleep(0.2)
+                    else:
+                        raise RuntimeError("UnicodeIME 激活超时，输入中文失败")
                     utf7_encoded = _encode_imap_utf7(text)
                     logger.info(f"原生 ADB UnicodeIME 中文汉字极速上屏: '{text}' (RFC3501: {utf7_encoded})")
                     # 使用单引号包裹，防止 Android /system/bin/sh 将 & 误判为后台任务

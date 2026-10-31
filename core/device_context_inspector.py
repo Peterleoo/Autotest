@@ -91,6 +91,9 @@ class DeviceContextInspector:
                     elif any(k in all_text_str for k in ["参考首付", "带看记录", "经纪人", "户型分间", "房源核验码", "同小区二手房"]):
                         result["scene_type"] = "APP_DETAIL_PAGE"
                         result["planning_hint"] = "【房源详情页】：应用已在前台但停留在历史房源详情页，规划的第一步必须是【从当前详情页点击返回键退回列表/首页】，严禁重复冷启动打开App！"
+                    elif any(k in all_text_str for k in ["历史搜索", "热门搜索", "大家都在搜", "清空搜索", "搜索发现"]) or ("取消" in all_text_str and any(k in all_text_str for k in ["搜索", "找房", "请输入", "楼盘"])):
+                        result["scene_type"] = "APP_SEARCH_PAGE"
+                        result["planning_hint"] = "【搜索页面】：待测应用已在前台但停留在搜索子页面，未处于首页主界面。规划的第一步必须是【点击取消或返回键退回首页】，然后再从主界面导航至目标业务！"
                     elif any(k in all_text_str for k in ["区域", "总价", "户型", "排序", "筛选", "岳麓区", "雨花区"]) and "二手房" in all_text_str:
                         result["scene_type"] = "APP_LIST_PAGE"
                         result["planning_hint"] = "【房源列表页】：应用已在前台且已处于二手房列表页，无需重复进入二手房入口，可直接从当前列表执行筛选与排序！"
