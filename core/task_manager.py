@@ -821,6 +821,108 @@ class TaskManager:
                 from core.device_context_inspector import DeviceContextInspector
                 dev_ctx = DeviceContextInspector.inspect(app_mgr.adb_bin, primary_dev, app_package) if primary_dev else None
 
+                # ------------------------------------------------------------------
+                # 🚀 场景 A: 需求文档驱动系统测试套件提炼与串联执行 (Doc-Driven Suite Mode)
+                # ------------------------------------------------------------------
+                doc_att = [a for a in (attachments or []) if isinstance(a, dict) and a.get("is_doc")]
+                is_doc_driven = False
+                if doc_att:
+                    g_low = goal.lower()
+                    doc_kws = ["文档", "用例", "测试用例", "生成", "套件", "prd", "需求", "规约", "写用例", "按照", "系统测试", "业务规格", "测试", "自动测试"]
+                    if any(k in g_low for k in doc_kws) or len(goal.strip()) <= 30:
+                        is_doc_driven = True
+
+                if is_doc_driven and doc_att:
+                    try:
+                        doc_entry = doc_att[0]
+                        doc_text = doc_entry.get("extracted_text") or ""
+                        if not doc_text and doc_entry.get("path"):
+                            from pathlib import Path as FilePath
+                            fp = FilePath(doc_entry["path"])
+                            if fp.exists():
+                                doc_text = fp.read_text(encoding="utf-8", errors="ignore")
+                        doc_filename = doc_entry.get("name") or doc_entry.get("filename") or "需求规格说明书.md"
+
+                        from core.test_spec_synthesizer import TestSpecSynthesizer
+                        logger.info(f"📄 [Doc-Driven Engine] 正在从需求文档《{doc_filename}》智能提炼系统用例套件...")
+                        suite_res = TestSpecSynthesizer.synthesize_from_doc(doc_text, filename=doc_filename, provider=provider, model=model)
+                        cases = suite_res.get("cases", [])
+
+                        if cases:
+                            cur_sess = self.sessions.get(session_id)
+                            if not cur_sess or cur_sess.get("status") in ["STOPPED", "FAILED"]:
+                                return
+
+                            suite_title = suite_res.get("suite_title") or "需求驱动系统测试用例套件"
+                            decomp_dur = round(time.time() - t_decomp_start + 0.35, 2)
+                            duration_str = f"{decomp_dur}s"
+
+                            cur_sess["is_systemic_suite"] = True
+                            cur_sess["suite_data"] = suite_res
+                            cur_sess["title"] = suite_title[:24]
+
+                            suite_plan_steps = []
+                            for idx, c in enumerate(cases):
+                                prio = c.get("priority", "P1")
+                                mod = c.get("module", "业务流程")
+                                c_title = c.get("title", f"用例 {idx+1}")
+                                suite_plan_steps.append({
+                                    "step_id": idx + 1,
+                                    "step_number": idx + 1,
+                                    "title": f"[{prio}] {mod}: {c_title}",
+                                    "desc": f"目标: {c.get('goal', '')} | 断言: {c.get('assert_rule', '')}",
+                                    "status": "RUNNING" if idx == 0 else "READY",
+                                    "case_id": c.get("id", f"tc-{idx+1:02d}"),
+                                    "depends_on": c.get("depends_on", "")
+                                })
+
+                            final_thinking = {
+                                "duration": duration_str,
+                                "bullets": [
+                                    {"tag": "需求文档语义萃取", "content": f"深度解析《{doc_filename}》，提炼生成【{suite_title}】共 {len(cases)} 项业务用例。"},
+                                    {"tag": "系统测试套件编排", "content": f"装配完成：{' ➔ '.join([c.get('title','') for c in cases[:3]])}... 串联执行并继承现场状态。"},
+                                    {"tag": "端侧断言与执行预案", "content": "逐项驱动目标真机执行各模块核心动作并核验业务断言，遇异常提供全景诊断。"}
+                                ]
+                            }
+
+                            cur_sess["thinking"] = final_thinking
+                            cur_sess["plan_steps"] = suite_plan_steps
+                            cur_sess["status"] = "RUNNING" if is_auto else "AWAITING_APPROVAL"
+                            if cur_sess.get("turns"):
+                                cur_sess["turns"][0]["thinking"] = final_thinking
+                                cur_sess["turns"][0]["plan_steps"] = suite_plan_steps
+                                cur_sess["turns"][0]["status"] = cur_sess["status"]
+
+                            tb = cur_sess.setdefault("timeline_blocks", [])
+                            thought_block = next((b for b in tb if b.get("type") == "thought"), None)
+                            if thought_block:
+                                thought_block["duration"] = duration_str
+                                thought_block["bullets"] = final_thinking["bullets"]
+
+                            # 注入 Generative UI Suite Builder 编排卡片
+                            tb.append({
+                                "type": "suite_builder",
+                                "block_id": f"suite_block_{session_id}",
+                                "suite_data": suite_res,
+                                "timestamp": datetime.now().strftime("%H:%M:%S")
+                            })
+
+                            # 挂载或更新 todo 块
+                            tb.append(TimelineManager.create_todo_block(suite_plan_steps, turn_id=0))
+
+                            for dev_id in device_ids:
+                                if dev_id in cur_sess.get("devices", {}):
+                                    cur_sess["devices"][dev_id]["action"] = f"正在启动系统测试套件: {cases[0].get('title', '')}" if is_auto else "等待人工审批套件执行..."
+                                    cur_sess["devices"][dev_id]["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] 📋 需求文档提炼就绪，装配 {len(cases)} 项用例：{' ➔ '.join([c.get('title','') for c in cases[:3]])}")
+
+                            self._save_session(session_id)
+
+                            if is_auto:
+                                self.executor.submit(self._systemic_suite_runner, session_id, cases, keep_state=True)
+                            return
+                    except Exception as err:
+                        logger.error(f"需求文档驱动套件提炼异常，降级常规规划: {err}", exc_info=True)
+
                 plan_steps = self._decompose_plan_steps(goal, is_auto, device_context=dev_ctx)
                 decomp_dur = round(time.time() - t_decomp_start + 0.35, 2)
                 duration_str = f"{decomp_dur}s"
@@ -934,6 +1036,12 @@ class TaskManager:
         session["status"] = "RUNNING"
         for s in session["plan_steps"]:
             s["status"] = "APPROVED"
+
+        if session.get("is_systemic_suite"):
+            cases = session.get("suite_data", {}).get("cases", [])
+            if cases:
+                self.executor.submit(self._systemic_suite_runner, session_id, cases, session.get("keep_state", True))
+                return True
 
         for dev_id in session["target_devices"]:
             if dev_id in session["devices"]:
