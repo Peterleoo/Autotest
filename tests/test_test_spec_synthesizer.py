@@ -33,9 +33,10 @@ class TestTestSpecSynthesizer(unittest.TestCase):
     def setUp(self):
         self.mgr = TaskManager()
         self.test_suite_ids = []
+        self.test_session_ids = []
 
     def tearDown(self):
-        # 清理测试生成的套件文件
+        # 1. 清理测试生成的套件文件
         for sid in self.test_suite_ids:
             p = TEST_SUITES_STORE_DIR / f"{sid}.json"
             if p.exists():
@@ -43,6 +44,22 @@ class TestTestSpecSynthesizer(unittest.TestCase):
                     p.unlink()
                 except Exception:
                     pass
+        # 2. 彻底清理测试生成的会话持久化文件与内存对象，绝不污染界面列表
+        from core.task_manager import SESSIONS_STORE_DIR
+        for sid in self.test_session_ids:
+            p = SESSIONS_STORE_DIR / f"{sid}.json"
+            if p.exists():
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+            self.mgr.sessions.pop(sid, None)
+        # 兜底清理任何带 mock 或 test 的临时 suite 会话
+        for sf in SESSIONS_STORE_DIR.glob("sess_test_*.json"):
+            try:
+                sf.unlink()
+            except Exception:
+                pass
 
     def test_01_synthesize_from_doc_structure_and_types(self):
         """测试 1: 文档文本提取 -> 用例套件强类型结构化生成"""
@@ -204,6 +221,8 @@ class TestTestSpecSynthesizer(unittest.TestCase):
 
         self.assertTrue(res.get("success"))
         session_id = res.get("session_id")
+        if session_id:
+            self.test_session_ids.append(session_id)
         self.assertIsNotNone(session_id)
         self.assertEqual(res.get("cases_count"), 2)
 
@@ -255,6 +274,8 @@ class TestTestSpecSynthesizer(unittest.TestCase):
         }))
         self.assertTrue(run_data["success"])
         self.assertIn("session_id", run_data)
+        if run_data.get("session_id"):
+            self.test_session_ids.append(run_data["session_id"])
 
     def test_07_normalize_robustness_markdown_and_list(self):
         """测试 7: 校验多形态容错解析 (Markdown代码块包裹、纯数组输入与别名字段)"""
@@ -293,6 +314,7 @@ class TestTestSpecSynthesizer(unittest.TestCase):
         """测试 8: 在已有激活会话中继续执行系统级测试套件 (Session Reuse & State Reset)"""
         # 先创建一个普通会话
         session_id = "test_sess_reuse_001"
+        self.test_session_ids.append(session_id)
         self.mgr.sessions[session_id] = {
             "session_id": session_id,
             "title": "先前单次测试",
