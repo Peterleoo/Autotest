@@ -17,6 +17,7 @@ from config.settings import settings
 from config.ai_config import ai_config
 from core.report_generator import ReportGenerator
 from core.timeline_manager import TimelineManager
+from core.device_watchdog import DeviceWatchdog
 
 logger = logging.getLogger("TaskManager")
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -2158,6 +2159,27 @@ class TaskManager:
                 except RuntimeError:
                     pass
 
+    def _handle_watchdog_heal_event(self, session: dict, dev_state: dict, evt: dict):
+        """处理看门狗触发的自愈事件，注入时间线与设备日志"""
+        msg = evt.get("message", "执行异常自愈")
+        atype = evt.get("anomaly_type", "UNKNOWN")
+        action = evt.get("heal_action", "")
+        evidence = evt.get("evidence_screenshot")
+
+        log_line = f"[{datetime.now().strftime('%H:%M:%S')}] 🐕‍🦺 [看门狗自愈] {msg} (动作: {action})"
+        dev_state["logs"].append(log_line)
+
+        # 写入时间线系统通知块
+        tb = session.setdefault("timeline_blocks", [])
+        tb.append({
+            "type": "system_notice",
+            "block_id": f"wd_heal_{int(time.time()*1000)}",
+            "content": f"🐕‍🦺 [看门狗自愈] {msg}",
+            "evidence": evidence,
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        })
+        self._save_session(session.get("session_id", ""))
+
     def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float, turn_id: int = 1):
         doc_texts = [a.get("extracted_text", "") for a in session.get("attachments", []) if a.get("extracted_text")]
         if doc_texts:
@@ -2188,6 +2210,20 @@ class TaskManager:
         )
         self.session_procs[session["session_id"]] = proc
 
+        # 🐕‍🦺 挂载真机执行看门狗与自愈引擎 (Device Watchdog)
+        from core.app_manager import AppManager
+        _app_mgr = AppManager()
+        watchdog = DeviceWatchdog(
+            session_id=session.get("session_id", ""),
+            device_id=device_id,
+            target_package=session.get("app_package"),
+            timeout_seconds=float(session.get("watchdog_timeout", 60.0)),
+            adb_bin=_app_mgr.adb_bin,
+            on_heal_event=lambda evt: self._handle_watchdog_heal_event(session, dev_state, evt),
+            get_session_status=lambda: session.get("status", "")
+        )
+        watchdog.start(proc)
+
         all_output = []
         cur_idx = 0
         last_error_line = ""
@@ -2202,6 +2238,7 @@ class TaskManager:
             line = raw_line.rstrip("\r\n")
             if not line:
                 continue
+            watchdog.feed_heartbeat(line)
             all_output.append(line)
             dev_state["logs"].append(line)
 
@@ -2736,6 +2773,8 @@ class TaskManager:
                     error_type=session.get("error_type", "")
                 )
             )
+        if 'watchdog' in locals() and watchdog:
+            watchdog.stop()
 
     def _run_ios_pipeline(self, session: dict, dev_state: dict, goal: str, case_name: str, start_t: float):
         """iOS 真机/节点测试执行流程，按 plan_steps 逐节点推进与高亮"""

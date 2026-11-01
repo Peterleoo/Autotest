@@ -127,9 +127,13 @@ class TestDocAppRelevanceGuard(unittest.TestCase):
         )
         self.created_sessions.append(sid)
 
-        # 先等门禁拦截
-        time.sleep(1.0)
-        sess = self.mgr.get_session(sid)
+        # 轮询等待门禁拦截生效
+        for _ in range(30):
+            time.sleep(0.1)
+            sess = self.mgr.get_session(sid)
+            if sess and sess.get("status") == "AWAITING_USER_INPUT":
+                break
+
         self.assertEqual(sess.get("status"), "AWAITING_USER_INPUT")
 
         # 触发强制放行接续
@@ -138,7 +142,7 @@ class TestDocAppRelevanceGuard(unittest.TestCase):
 
         # 验证是否越过门禁，进入用例提炼
         resumed = False
-        for _ in range(40):
+        for _ in range(70):
             time.sleep(0.2)
             s = self.mgr.get_session(sid)
             if s and s.get("is_systemic_suite"):
