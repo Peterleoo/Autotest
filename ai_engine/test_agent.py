@@ -19,8 +19,8 @@ SYSTEM_PROMPT = """
 你是一个资深的移动应用自动化测试 AI 智能体。你的任务是根据用户的【测试目标】，分析当前移动设备屏幕截图与视觉识别出的文字元素，进行高智力、有条理的自动化测试决策。
 
 你支持以下操作类型（Action）：
-1. tap: 点击元素。需指定 target_index（元素编号）或 coordinates ([x, y])。优先使用 target_index。
-2. type: 在文本框中输入。需指定 target_index 和 text（输入的文本）。
+1. tap: 点击元素。需指定 ref (如 "@e1") 或 target_index（元素编号）或 coordinates ([x, y])。强烈推荐使用 ref，零定位偏差。
+2. type: 在文本框中输入。需指定 ref (如 "@e2") 或 target_index，以及 text（输入的文本）。
 3. swipe: 滑动手势。需指定 direction ("up" / "down" / "left" / "right")，可选 repeat（连续重复次数，例如 {"action": "swipe", "direction": "up", "repeat": 2}，用于长列表连滑浏览）。
 4. fast_forward_guide: 引导页极速穿透宏动作。当识别为新用户多页轮播引导页时优先使用，端侧自动连翻3页并轻触体验/跳过，一步直接穿透至主页！
 5. press_key: 按键模拟。例如 {"action": "press_key", "key": "back"}。
@@ -1325,21 +1325,26 @@ class AITestAgent:
                 except Exception:
                     pass
 
+            # 🚀 动态业务技能按需评估 (借鉴 Vercel Labs vercel-labs/skills 规范)
+            from core.skills.skill_registry import SkillRegistry
+            quick_skill_action, skill_prompt_patch = SkillRegistry.evaluate_and_activate(screen_info, goal)
+            skill_sec = f"\n【动态激活的业务专项技能指南】\n{skill_prompt_patch}\n" if skill_prompt_patch else ""
+
             plan_steps_summary = self._get_plan_steps_summary()
             user_prompt = f"""
 【待测目标应用】
 {app_context_str}
 
 【用户测试总目标】
-{goal}{coref_hint}
+{goal}{coref_hint}{skill_sec}
 
 {plan_steps_summary}
 
 【当前已执行的操作历史】
 {json.dumps([{'action': h.get('action'), 'reason': h.get('reason'), 'error': h.get('error')} for h in self.executor.action_history[-4:]], ensure_ascii=False)}
 {oscillation_warning}
-【当前屏幕可交互元素列表】
-{screen_info['element_summary_text']}{lessons_context}
+【当前屏幕精简符号化元素列表（借鉴 agent-browser / agent-desktop 规范，优先使用 ref 字段如 "@e1"）】
+{screen_info.get('compact_ref_text') or screen_info['element_summary_text']}{lessons_context}
 
 请分析当前界面，并给出你的下一步测试动作决策（纯 JSON）。
 """
@@ -1373,12 +1378,16 @@ class AITestAgent:
                     )
                     image_to_send = screen_info["image_b64"] if screen_info.get("perception_mode") == PerceptionMode.FULL_VISION else None
 
-                decision = self.llm.chat_decision(
-                    system_prompt=SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                    image_base64=image_to_send,
-                    memory_context=memory_context
-                )
+                if quick_skill_action:
+                    decision = quick_skill_action
+                    logger.info(f"⚡ [技能极速放行] 激活技能确定性动作: {decision.get('reason')}")
+                else:
+                    decision = self.llm.chat_decision(
+                        system_prompt=SYSTEM_PROMPT,
+                        user_prompt=user_prompt,
+                        image_base64=image_to_send,
+                        memory_context=memory_context
+                    )
                 thought = decision.get('thought', '')
                 logger.info(f"AI 决策: {thought}")
                 step_prog = decision.get('step_progress')

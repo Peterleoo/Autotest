@@ -40,7 +40,7 @@ class ActionExecutor:
 
         try:
             if action == "tap":
-                target_idx = action_dict.get("target_index")
+                target_idx = action_dict.get("ref") or action_dict.get("target_index")
                 el_info = self._find_element_by_index(target_idx, elements_map)
                 locator = self._locate_and_click(el_info, action_dict.get("coordinates"))
                 trace_item["locator"] = locator
@@ -53,7 +53,7 @@ class ActionExecutor:
                 trace_item["screen_size"] = win_size
 
             elif action == "type":
-                target_idx = action_dict.get("target_index")
+                target_idx = action_dict.get("ref") or action_dict.get("target_index")
                 raw_text = action_dict.get("text", "")
                 el_info = self._find_element_by_index(target_idx, elements_map)
                 
@@ -174,12 +174,22 @@ class ActionExecutor:
             self.action_history.append(trace_item)
             return result
 
-    def _find_element_by_index(self, index: Optional[int], elements_map: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _find_element_by_index(self, index: Any, elements_map: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if index is None:
             return None
-        for el in elements_map:
-            if el["index"] == index:
-                return el
+        # 1. 优先支持 @ref 符号定位（借鉴 agent-browser / agent-desktop）
+        if isinstance(index, str) and index.startswith("@e"):
+            for el in elements_map:
+                if el.get("ref") == index:
+                    return el
+        # 2. 数字索引定位
+        try:
+            idx_int = int(index)
+            for el in elements_map:
+                if el.get("index") == idx_int:
+                    return el
+        except (ValueError, TypeError):
+            pass
         return None
 
     def _locate_and_click(self, el_info: Optional[Dict[str, Any]], coordinates: Optional[List[int]]) -> Dict[str, str]:

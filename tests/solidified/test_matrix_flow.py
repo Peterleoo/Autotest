@@ -1,6 +1,6 @@
 """
 由 AI 自动化测试智能体自动录制固化的跨端测试用例 (Dual-Mode Resilient Test Suite)
-测试目标: 在【待测应用 (示例)】搜索框输入测试关键词触发搜索，验证结果列表正常展示，返回后核对搜索历史标签生成
+测试目标: 冷启动【象盒找房】，若弹出隐私服务协议勾选同意，快速穿透引导轮播图直达应用主页，断言主导航 Tab 与主框架正常就绪。
 执行命令: pytest test_matrix_flow.py -v -s
 特性优势:
   1. 语义优先 (Text / ID / Desc) 动态查找；
@@ -127,36 +127,26 @@ def api_client():
 
 
 @allure.feature("固化测试套件")
-@allure.story("在【待测应用 (示例)】搜索框输入测试关键词触发搜索，验证结果列表正常展示，返回后核对搜索历史标签生成")
+@allure.story("冷启动【象盒找房】，若弹出隐私服务协议勾选同意，快速穿透引导轮播图直达应用主页，断言主导航 Tab 与主框架正常就绪。")
 def test_matrix_flow(driver, api_client):
     """
     自动化用例: test_matrix_flow
-    测试目标: 在【待测应用 (示例)】搜索框输入测试关键词触发搜索，验证结果列表正常展示，返回后核对搜索历史标签生成
+    测试目标: 冷启动【象盒找房】，若弹出隐私服务协议勾选同意，快速穿透引导轮播图直达应用主页，断言主导航 Tab 与主框架正常就绪。
     """
-    # 步骤 1: 点击返回按钮退出房源详情页
-    robust_click(driver, text=None, res_id=None, desc=None, rel_x=0.075, rel_y=0.0736)
+    # 步骤 1: 点击同意隐私服务协议，进入下一步
+    robust_click(driver, text=None, res_id=None, desc='我同意', rel_x=0.6602, rel_y=0.9556)
     time.sleep(1)
 
-    # 步骤 2: 点击首页顶部搜索框进入搜索界面
-    robust_click(driver, text=None, res_id=None, desc='请输入小区名或地址搜索', rel_x=0.588, rel_y=0.0718)
+    # 步骤 2: 引导页极速穿透宏动作（快速翻页至末页直达主界面）
+    robust_swipe(driver, direction='left', repeat=3)
+    time.sleep(0.5)
+    # 点击标准底部体验按钮区域 (水平居中，垂直75%)
+    robust_click(driver, text='立即体验', rel_x=0.5, rel_y=0.75)
     time.sleep(1)
 
-    # 步骤 3: 在搜索框中输入测试关键词'星城国际'触发搜索 (输入: 星城国际)
-    robust_type(driver, text=None, res_id=None, desc=None, rel_x=0.4815, rel_y=0.1403, input_text='星城国际')
+    # 步骤 3: 点击随便看看或跳过需求定制，直达应用主页
+    robust_click(driver, text=None, res_id=None, desc='随便看看', rel_x=0.5, rel_y=0.7449)
     time.sleep(1)
 
-    # 步骤 4: 点击清除按钮清空输入框中的乱码
-    robust_click(driver, text=None, res_id=None, desc=None, rel_x=0.8231, rel_y=0.1403)
-    time.sleep(1)
-
-    # 步骤 5: 点击热门搜索中的'星城国际'触发搜索进入结果列表
-    robust_click(driver, text=None, res_id=None, desc='4\n星城国际', rel_x=0.2731, rel_y=0.4935)
-    time.sleep(1)
-
-    # 步骤 6: 点击左上角返回按钮回到搜索页以核对搜索历史标签生成
-    robust_click(driver, text=None, res_id=None, desc=None, rel_x=0.0787, rel_y=0.0648)
-    time.sleep(1)
-
-    # 步骤 7: 点击首页顶部搜索框进入搜索页
-    robust_click(driver, text=None, res_id=None, desc='请输入小区名或地址搜索', rel_x=0.588, rel_y=0.0718)
-    time.sleep(1)
+    # 步骤 4: 校验界面是否包含预期内容 [首页]
+    assert '首页' in driver.page_source, f'业务断言失败：界面未出现预期内容 [首页]'

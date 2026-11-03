@@ -66,6 +66,10 @@ class TaskManager:
         session = self.sessions.get(session_id)
         if not session:
             return
+
+        # 🛡️ 契约式 Generative UI 校验清洗 (借鉴 Vercel Labs json-render 规范)
+        if "timeline_blocks" in session and isinstance(session["timeline_blocks"], list):
+            session["timeline_blocks"] = [TimelineManager.validate_and_sanitize_block(b) for b in session["timeline_blocks"]]
         try:
             target_path = SESSIONS_STORE_DIR / f"{session_id}.json"
             # 序列化为安全 JSON
@@ -862,14 +866,12 @@ class TaskManager:
                         if not relevance_info.get("is_relevant") and not is_force:
                             logger.warning(f"🛑 [Doc-App Guard] 拦截到不匹配文档《{doc_filename}》与待测应用【{app_disp_name}】")
                             cur_sess["status"] = "AWAITING_USER_INPUT"
-                            guard_block = {
-                                "type": "doc_mismatch_guard",
-                                "block_id": f"guard_{session_id}",
-                                "doc_name": doc_filename,
-                                "app_name": app_disp_name,
-                                "relevance_info": relevance_info,
-                                "timestamp": datetime.now().strftime("%H:%M:%S")
-                            }
+                            guard_block = TimelineManager.create_doc_mismatch_guard_block(
+                                session_id=session_id,
+                                doc_name=doc_filename,
+                                app_name=app_disp_name,
+                                relevance_info=relevance_info
+                            )
                             tb = cur_sess.setdefault("timeline_blocks", [])
                             # 避免重复插入卡片
                             if not any(b.get("type") == "doc_mismatch_guard" for b in tb):
@@ -2171,13 +2173,10 @@ class TaskManager:
 
         # 写入时间线系统通知块
         tb = session.setdefault("timeline_blocks", [])
-        tb.append({
-            "type": "system_notice",
-            "block_id": f"wd_heal_{int(time.time()*1000)}",
-            "content": f"🐕‍🦺 [看门狗自愈] {msg}",
-            "evidence": evidence,
-            "timestamp": datetime.now().strftime("%H:%M:%S")
-        })
+        tb.append(TimelineManager.create_system_notice_block(
+            content=f"🐕‍🦺 [看门狗自愈] {msg}",
+            evidence=evidence
+        ))
         self._save_session(session.get("session_id", ""))
 
     def _run_real_android_pipeline(self, session: dict, dev_state: dict, device_id: str, goal: str, case_name: str, start_t: float, turn_id: int = 1):
@@ -3402,13 +3401,11 @@ class TaskManager:
             thought_block["duration"] = duration_str
             thought_block["bullets"] = final_thinking["bullets"]
 
-        # 注入 Generative UI Suite Builder 编排卡片
-        tb.append({
-            "type": "suite_builder",
-            "block_id": f"suite_block_{session_id}",
-            "suite_data": suite_res,
-            "timestamp": datetime.now().strftime("%H:%M:%S")
-        })
+        # 注入 Generative UI Suite Builder 编排卡片 (契约式组件)
+        tb.append(TimelineManager.create_suite_builder_block(
+            suite_data=suite_res,
+            session_id=session_id
+        ))
 
         # 挂载或更新 todo 块
         tb.append(TimelineManager.create_todo_block(suite_plan_steps, turn_id=0))

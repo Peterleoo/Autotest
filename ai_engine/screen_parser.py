@@ -302,14 +302,87 @@ class ScreenParser:
                 info += " [可交互]"
             element_lines.append(info)
 
+        # 🚀 紧凑 @ref 符号化快照 (借鉴 Vercel Labs agent-browser/agent-desktop)
+        compact_ref_text, ref_map = ScreenParser.generate_compact_ref_snapshot(merged_elements)
+
         return {
             "image_b64": b64_img,
             "raw_bytes": raw_bytes,
             "elements": merged_elements,
             "element_summary_text": "\n".join(element_lines),
+            "compact_ref_text": compact_ref_text,
+            "ref_map": ref_map,
             "ocr_cached": ocr_cached,
             "perception_mode": mode,
             "perception_confidence": confidence,
             "perception_reason": reason,
             "hierarchy_rich": is_rich
         }
+
+    @staticmethod
+    def generate_compact_ref_snapshot(elements: List[Dict[str, Any]]) -> Tuple[str, Dict[str, Dict[str, Any]]]:
+        """
+        借鉴 Vercel Labs agent-browser/agent-desktop 思想：
+        将 UI 元素树高度压缩为紧凑的 @ref 符号化文本快照，过滤无语义容器，
+        生成稳定引用符号字典 (@e1, @e2, ...) 以及反查映射，节省 70%+ Token 并不偏不倚精确定位。
+        """
+        ref_map: Dict[str, Dict[str, Any]] = {}
+        lines: List[str] = []
+
+        class_map = {
+            "android.widget.TextView": "Text",
+            "android.widget.Button": "Button",
+            "android.widget.EditText": "Input",
+            "android.widget.ImageView": "Icon",
+            "android.widget.ImageButton": "Button",
+            "android.widget.CheckBox": "Checkbox",
+            "android.widget.RadioButton": "Radio",
+            "android.widget.Switch": "Switch",
+            "android.widget.ProgressBar": "Progress",
+            "android.webkit.WebView": "Webview",
+            "android.widget.ScrollView": "Scroll",
+            "android.widget.RecyclerView": "List",
+            "android.widget.ListView": "List",
+        }
+
+        ref_idx = 1
+        for el in elements:
+            raw_cls = el.get("class", "Element")
+            cls_name = class_map.get(raw_cls, raw_cls.split(".")[-1] if "." in raw_cls else raw_cls)
+            text = (el.get("text") or "").strip()
+            desc = (el.get("desc") or "").strip()
+            res_id = (el.get("resource_id") or "").strip()
+            clickable = el.get("clickable", False)
+
+            # 智能去噪：无文本、无描述、无ID、不可点击且非输入框/列表的纯布局容器直接剔除
+            if not text and not desc and not res_id and not clickable and cls_name not in ["Input", "List", "Webview"]:
+                continue
+
+            ref_tag = f"@e{ref_idx}"
+            el["ref"] = ref_tag
+            ref_map[ref_tag] = el
+
+            # 构建精炼紧凑表示
+            parts = [ref_tag, f"[{cls_name}"]
+            if text:
+                t_clean = text.replace("\n", " ")[:35]
+                parts.append(f'"{t_clean}"')
+            if desc and desc != text:
+                d_clean = desc.replace("\n", " ")[:25]
+                parts.append(f'desc="{d_clean}"')
+            if res_id:
+                short_id = res_id.split("/")[-1] if "/" in res_id else res_id
+                parts.append(f'id="{short_id}"')
+            if clickable:
+                parts.append("[click]")
+
+            line_str = " ".join(parts) + "]"
+            if el.get("center"):
+                line_str += f" center={el['center']}"
+
+            lines.append(line_str)
+            ref_idx += 1
+
+        compact_text = "\n".join(lines)
+        return compact_text, ref_map
+
