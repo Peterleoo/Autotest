@@ -19,6 +19,7 @@ data/auth_license.json
 
 # 运行态会话历史 (包含用户真实 Prompt 与大模型交互记录)
 data/sessions/*
+data/sessions_test_backup/
 !data/sessions/.gitkeep
 data/test_suites/*
 !data/test_suites/.gitkeep

@@ -1,12 +1,23 @@
 # -*- coding: utf-8 -*-
+import json
+import shutil
 import unittest
 import asyncio
+from pathlib import Path
+
+from core.task_common import SESSIONS_STORE_DIR
 from web.app import task_mgr, get_session_raw_logs_endpoint, save_session_to_local_case
+
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "sessions"
 
 
 class TestRawLogsAndSaveCase(unittest.TestCase):
     def setUp(self):
+        # 使用仓库内夹具，复制到隔离会话目录，不依赖用户本地真实会话数据
         self.session_id = "sess_1031_100648_1f45"
+        fixture = FIXTURE_DIR / f"{self.session_id}.json"
+        shutil.copy(fixture, SESSIONS_STORE_DIR / fixture.name)
+        task_mgr.sessions[self.session_id] = json.loads(fixture.read_text(encoding="utf-8"))
 
     def test_raw_logs_endpoint(self):
         """测试全量真实运行日志流接口"""

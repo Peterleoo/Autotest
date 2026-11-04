@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any
 from fastapi import Request, Form, Body
 from fastapi.responses import JSONResponse
 from web.path_safety import safe_path
+from core.task_common import SESSIONS_STORE_DIR
 from config.settings import settings
 from ai_engine.solidifier import Solidifier
 from core.report_generator import REPORTS_DIR
@@ -532,7 +533,7 @@ async def save_session_to_local_case(
     """
     session = task_mgr.sessions.get(session_id)
     if not session:
-        sess_file = settings.SESSIONS_STORE_DIR / f"{session_id}.json"
+        sess_file = SESSIONS_STORE_DIR / f"{session_id}.json"
         if sess_file.exists():
             try:
                 with open(sess_file, "r", encoding="utf-8") as f:

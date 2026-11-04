@@ -8,6 +8,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
 
+from core.task_common import SESSIONS_STORE_DIR
 from config.settings import settings
 from config.ai_config import ai_config
 from core.app_manager import AppManager
@@ -80,7 +81,7 @@ def run_test(goal: str, case_name: str, app_file: str = None, provider: str = No
         if session_id:
             from pathlib import Path
             import json
-            sess_file = Path("data/sessions") / f"{session_id}.json"
+            sess_file = SESSIONS_STORE_DIR / f"{session_id}.json"
             if not sess_file.exists():
                 sess_file = Path("outputs/sessions") / f"{session_id}.json"
             if sess_file.exists():

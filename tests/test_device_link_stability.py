@@ -270,3 +270,26 @@ def test_truncated_gzip_does_not_permanently_disable_compression(monkeypatch, cl
 
     assert frame["mode"] == "raw_cv2"
     assert DEV not in hub_mod._GZIP_UNSUPPORTED
+
+
+# ---------------------------------------------------------------- 测试数据隔离
+
+def test_tests_never_write_to_real_session_store():
+    """测试产生的会话必须进临时目录，不能出现在用户侧边栏任务列表"""
+    from core.task_common import BASE_DIR, SESSIONS_STORE_DIR, TEST_SUITES_STORE_DIR
+
+    assert SESSIONS_STORE_DIR.resolve() != (BASE_DIR / "data" / "sessions").resolve()
+    assert TEST_SUITES_STORE_DIR.resolve() != (BASE_DIR / "data" / "test_suites").resolve()
+
+
+def test_no_hardcoded_session_paths_left():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    offenders = [
+        str(p.relative_to(root))
+        for d in ("core", "ai_engine", "web")
+        for p in (root / d).rglob("*.py")
+        if 'Path("data/sessions")' in p.read_text(encoding="utf-8", errors="ignore")
+    ] + (["run_ai_test.py"] if 'Path("data/sessions")' in (root / "run_ai_test.py").read_text(encoding="utf-8") else [])
+    assert offenders == []

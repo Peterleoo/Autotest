@@ -12,7 +12,7 @@ from config.settings import settings
 from core.report_generator import ReportGenerator
 from core.timeline_manager import TimelineManager
 from core.device_watchdog import DeviceWatchdog, DEFAULT_WATCHDOG_TIMEOUT
-from core.task_common import BASE_DIR
+from core.task_common import BASE_DIR, SESSIONS_STORE_DIR
 
 logger = logging.getLogger("TaskManager")
 
@@ -91,7 +91,7 @@ class DevicePipelineMixin:
                 session_id = session.get("session_id")
 
                 # 🛡️ 优先从磁盘重载子进程最新写入的完整会话状态，杜绝内存脏数据与覆盖
-                disk_sess_path = Path("data/sessions") / f"{session_id}.json"
+                disk_sess_path = SESSIONS_STORE_DIR / f"{session_id}.json"
                 if not disk_sess_path.exists():
                     disk_sess_path = Path("outputs/sessions") / f"{session_id}.json"
                 if disk_sess_path.exists():

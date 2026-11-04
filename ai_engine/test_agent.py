@@ -6,6 +6,7 @@ import subprocess
 from typing import Optional, List, Dict, Any
 from appium import webdriver
 
+from core.task_common import SESSIONS_STORE_DIR
 from core.llm_client import LLMClient
 from core.api_client import APIClient
 from ai_engine.screen_parser import ScreenParser, PerceptionMode
@@ -152,7 +153,7 @@ class AITestAgent:
             return ""
         try:
             from pathlib import Path
-            sess_file = Path("data/sessions") / f"{self.session_id}.json"
+            sess_file = SESSIONS_STORE_DIR / f"{self.session_id}.json"
             if not sess_file.exists():
                 sess_file = Path("outputs/sessions") / f"{self.session_id}.json"
             if sess_file.exists():
@@ -178,7 +179,7 @@ class AITestAgent:
         try:
             from core.memory_manager import MemoryManager
             from pathlib import Path
-            sess_file = Path("data/sessions") / f"{self.session_id}.json"
+            sess_file = SESSIONS_STORE_DIR / f"{self.session_id}.json"
             if not sess_file.exists():
                 sess_file = Path("outputs/sessions") / f"{self.session_id}.json"
             if sess_file.exists():
@@ -879,7 +880,7 @@ class AITestAgent:
         # 通过持久化会话同步到前端
         from pathlib import Path
         import json
-        sess_file = Path("data/sessions") / f"{session_id}.json"
+        sess_file = SESSIONS_STORE_DIR / f"{session_id}.json"
         if not sess_file.exists():
             sess_file = Path("outputs/sessions") / f"{session_id}.json"
         if sess_file.exists():
@@ -1340,7 +1341,7 @@ class AITestAgent:
                 try:
                     from core.memory_manager import MemoryManager
                     from pathlib import Path
-                    sess_file = Path("data/sessions") / f"{self.session_id}.json"
+                    sess_file = SESSIONS_STORE_DIR / f"{self.session_id}.json"
                     if not sess_file.exists():
                         sess_file = Path("outputs/sessions") / f"{self.session_id}.json"
                     if sess_file.exists():
