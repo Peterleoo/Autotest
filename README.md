@@ -82,6 +82,49 @@
 - **终态核心断言守卫（Assertion Guard）**：
   - 若原任务中带有“验证/断言/核验/成功弹出”等核心断言步骤被跳过（SKIPPED），系统坚决拒绝草率判定为通过，如实定性为 `BLOCKED`（业务受阻 / 待补前置），前端以高质感琥珀金胶囊条清晰展示。
 
+### 10. 📑 需求驱动用例智能生成与自由编排系统 (Suite Builder)
+- **文档一键智能提炼（Spec Synthesis）**：
+  - 支持直接上传产品需求文档（PRD/Word `.docx`、PDF、Markdown、纯文本 `.txt`）；
+  - 后端智能提取核心业务规则并交由 `TestSpecSynthesizer` 提炼为强类型用例套件（TestSuite，含模块划分、优先级 P0/P1/P2、核心目标与关键断言规则）；
+- **Generative UI 自由编排卡片**：
+  - 遵循现代工程级极简设计范式，在时间线中原地渲染可交互套件编排卡片；
+  - 支持原地双击即时编辑用例标题/测试目标、自由勾选组合、上下调换执行顺序、单项删除与一键增补自定义用例；
+- **系统级现场串联执行（Systemic Suite Execution with State Retention）**：
+  - 支持一键发起系统级测试，开启“保持应用现场连续探索（`keep_state: true`）”；
+  - 真机按编排时序无缝串联执行各用例，用例间不杀进程、继承登录态与界面上下文；
+  - 执行完成后自动聚合成系统级全景测试报告，并将调优后的用例套件持久化存盘至 `data/test_suites/` 供未来秒级直接复跑。
+
+### 11. 🛡️ 需求文档与待测应用相关性校验门禁 (Doc Mismatch Guard)
+- **业务领域语义比对**：
+  - 当用户上传文档并发起测试时，门禁自动提取文档核心关键词与当前待测 APK/应用元数据进行交叉比对；
+  - 若检测到文档与当前待测应用无关（例如在房产或外卖 App 上传了外语教学课件），系统进行**智能前置阻断**；
+- **自愈式 Generative UI 告警交互**：
+  - 在时间线呈现优雅警示卡片，清晰说明不匹配原因，并提供“重新确认/修改意图”与“仍要强制执行”双向选择，从源头杜绝盲目消耗 Token 与无效测试。
+
+### 12. ⚡ 分层感知三级火箭架构 (Layered Perception Architecture)
+- **Level 1 (UI 树极速短路)**：
+  - 若真机 UIAutomator 原生控件树信息充沛（富含文本、ID、清晰控件层级），感知层自动短路，跳过全量大图截屏与图片网络上传；
+  - 采用结构化纯文本毫秒级直接决策，单步决策耗时从 5~8 秒直降至 **400~800ms**，Token 消耗节省超 **80%**；
+- **Level 2 (端侧本地 OCR 补齐兜底)**：
+  - 当页面为自绘 Webview / Flutter / H5 等导致原生 UI 树节点稀疏时，自动激活端侧轻量 OCR 补齐文字位置并以轻量文本决策；
+- **Level 3 (视觉多模态大模型攻坚)**：
+  - 仅在纯图标按钮、复杂图形滑块验证码或遇到阻断重试时，无缝升格为全量截屏 + 多模态视觉模型（Vision）攻坚，确保 100% 视觉兜底与稳定性。
+
+### 13. 🤝 人机协同挂起与连续对话意图拦截中枢 (HITL & Intent Gate)
+- **人机协同挂起（Human-in-the-Loop, HITL）**：
+  - 遇到短信验证码、生物识别或人工强校验场景，测试智能体优雅挂起，在前端渲染倒计时人机协同卡片；
+  - 用户可在卡片中直接填入验证码放行，或一键点击取消终止；
+- **控制意图拦截中枢 (Intent Gate)**：
+  - 彻底重构多轮对话入口，建立控制指令正则与模式识别；
+  - 当任务处于等待或执行态时，用户在底部输入框输入“停止”、“终止”、“取消”、“退出”等词汇，系统第一时间拦截并优雅中止底层进程，坚决不将其误识别为追加测试业务步骤；
+- **无重复流式渲染与 DOM 脏检查**：
+  - 全面消除前端临时乐观节点与后端权威 Block 的冲突，通过 DOM 脏检查机制杜绝重复消息气泡与页面闪烁。
+
+### 14. 🧱 统一时间线标准事件流 (借鉴 Vercel Labs json-render 契约护栏)
+- **权威组件 Catalog 白名单**：
+  - 依托 `TimelineManager` 建立受控的强类型 Block 契约（`user_message`, `system_notice`, `thought`, `todo_list`, `step_execution`, `suite_builder`, `doc_mismatch_guard`, `test_summary`, `fault_diagnosis`, `report`）；
+  - 任何非规范数据结构自动安全降级，前端与后端数据契约严丝合缝，杜绝未知类型导致界面白屏。
+
 ---
 
 ## 📁 项目目录结构
@@ -97,18 +140,24 @@ f:\Autotest
 │   ├── device_knowledge_manager.py # 🌟 设备画像识别与故障自进化知识库管理器
 │   ├── native_adb_driver.py     # 原生 ADB 极速真机驱动引擎 (含手势探针)
 │   ├── task_manager.py          # 任务调度中心、DSH 计划突变与断言守卫
+│   ├── test_spec_synthesizer.py # 🌟 需求文档驱动用例套件智能提取与编排引擎 (Suite Builder)
+│   ├── timeline_manager.py      # 🌟 标准化时间线 Block 契约管理器 (json-render catalog)
 │   └── llm_client.py            # 大模型统一网关与结构化推理
 ├── ai_engine/
 │   ├── verifier.py              # 🌟 独立核验门禁与反幻觉审查 (TaskVerifier Gate)
-│   ├── screen_parser.py         # 视觉截屏与 OCR 感知
+│   ├── screen_parser.py         # 视觉截屏与 OCR 感知 (含分层感知评估)
 │   ├── action_executor.py       # 原子动作执行器 (点击/滑动/输入/断言)
-│   ├── test_agent.py            # AI 测试智能体核心循环 (含凭证注入与门禁审查)
+│   ├── test_agent.py            # AI 测试智能体核心循环 (含分层感知调度与门禁审查)
 │   └── solidifier.py            # 动作轨迹一键固化编译引擎
 ├── data/
 │   ├── device_knowledge.json    # 🌟 持久化设备特征与机型避坑规则知识库
+│   ├── test_suites/             # 🌟 持久化系统级测试用例套件存储库
 │   └── sessions/                # 历史测试会话与诊断日志 JSON 存储
 ├── tests/
 │   ├── test_dsh_verifier_and_injection.py # 🌟 DSH 独立门禁与凭证注入机制单元测试
+│   ├── test_test_spec_synthesizer.py      # 🌟 用例套件合成与系统级串联测试套件
+│   ├── test_timeline_schema_contract.py   # 🌟 时间线强类型契约校验测试
+│   ├── test_layered_perception.py         # 🌟 分层感知三级火箭分流单元测试
 │   ├── solidified/              # 固化生成的标准自动化测试脚本 (.py)
 │   └── test_engine.py           # 基础驱动自检单元测试
 ├── web/
