@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import glob
 import time
 import json
 import shutil
@@ -18,6 +19,7 @@ import uuid
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from web.path_safety import safe_path
 
 # 添加工程根目录到 sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -339,9 +341,9 @@ async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
     file_path = None
     ref_name = Path(safe_ref).name
     candidates = [
-        BASE_DIR / safe_ref,
-        BASE_DIR / "tests" / "solidified" / safe_ref,
-        BASE_DIR / "tests" / "solidified" / ref_name
+        safe_path(BASE_DIR, safe_ref),
+        safe_path(BASE_DIR / "tests" / "solidified", safe_ref),
+        safe_path(BASE_DIR / "tests" / "solidified", ref_name)
     ]
     for c in candidates:
         if c.exists() and c.is_file():
@@ -600,7 +602,7 @@ async def check_app_installed(package: str, device_id: Optional[str] = None):
 @app.delete("/api/apps/{filename}")
 async def delete_app_package(filename: str):
     """从应用库中移除指定 APK 安装包"""
-    apk_path = settings.APPS_DIR / filename
+    apk_path = safe_path(settings.APPS_DIR, filename)
     if apk_path.exists():
         try:
             apk_path.unlink()
@@ -612,7 +614,7 @@ async def delete_app_package(filename: str):
 @app.post("/api/install")
 async def install_app_to_device(device_id: Optional[str] = Form(None), filename: str = Form(...)):
     """安装指定 APK 到设备，支持针对小米 MIUI / 国内厂商安全限制的自适应降级与通道兜底"""
-    apk_path = settings.APPS_DIR / filename
+    apk_path = safe_path(settings.APPS_DIR, filename)
     if not apk_path.exists():
         return JSONResponse(status_code=404, content={"message": "安装包不存在"})
 
@@ -675,8 +677,8 @@ async def download_from_qr(url_or_code: str = Form(...)):
 @app.post("/api/upload_app")
 async def upload_app_package(file: UploadFile = File(...)):
     """接收用户上传的 APK / IPA 安装包文件并存入 apps 目录"""
+    dest_path = safe_path(settings.APPS_DIR, file.filename or "")
     try:
-        dest_path = settings.APPS_DIR / file.filename
         content = await file.read()
         dest_path.write_bytes(content)
         info = app_mgr.get_apk_info(dest_path)
@@ -720,9 +722,7 @@ async def upload_requirement_attachment(files: List[UploadFile] = File(...)):
 @app.get("/api/uploads/{filename}")
 async def get_uploaded_attachment(filename: str):
     """安全获取已上传的多模态需求文档或测试截图"""
-    if ".." in filename or "/" in filename or "\\" in filename:
-        return JSONResponse(status_code=400, content={"error": "非法文件名"})
-    file_path = UPLOADS_DIR / filename
+    file_path = safe_path(UPLOADS_DIR, filename)
     if not file_path.is_file():
         return JSONResponse(status_code=404, content={"error": "附件未找到"})
     
@@ -1762,7 +1762,7 @@ async def switch_antigravity_model(model: str = Form(...)):
 @app.get("/api/solidified_cases/{filename}/content")
 async def get_solidified_case_content(filename: str):
     """读取指定自动化测试脚本的源码内容，供右侧工作台内嵌直接阅览与审查"""
-    target = settings.SOLIDIFIED_DIR / filename
+    target = safe_path(settings.SOLIDIFIED_DIR, filename)
     if target.exists() and target.is_file():
         return {"success": True, "filename": filename, "content": target.read_text(encoding="utf-8")}
     return JSONResponse(status_code=404, content={"success": False, "message": "脚本不存在"})
@@ -1770,8 +1770,8 @@ async def get_solidified_case_content(filename: str):
 @app.post("/api/solidified_cases/delete")
 async def delete_solidified_case(filename: str = Form(...)):
     """删除指定的本地固化测试脚本"""
-    safe_name = Path(filename).name
-    target = settings.SOLIDIFIED_DIR / safe_name
+    target = safe_path(settings.SOLIDIFIED_DIR, filename)
+    safe_name = target.name
     if target.exists() and target.is_file() and target.suffix == ".py":
         try:
             target.unlink()
@@ -1786,7 +1786,7 @@ async def save_solidified_case(filename: str = Form(...), content: str = Form(..
     safe_name = Path(filename).name
     if not safe_name.endswith(".py"):
         safe_name += ".py"
-    target = settings.SOLIDIFIED_DIR / safe_name
+    target = safe_path(settings.SOLIDIFIED_DIR, safe_name)
     try:
         target.write_text(content, encoding="utf-8")
         return {"success": True, "filename": safe_name, "message": f"脚本 [{safe_name}] 已成功保存到本地脚本库"}
@@ -1801,9 +1801,11 @@ async def get_reports():
 @app.get("/api/reports/{session_id}/markdown")
 async def get_report_markdown(session_id: str, download: bool = False):
     """获取或下载指定会话的 6 大维度全景 Markdown 测试报告"""
-    target = ReportGenerator.MARKDOWN_DIR / f"test_report_{session_id}.md"
+    target = safe_path(ReportGenerator.MARKDOWN_DIR, f"test_report_{session_id}.md")
+    if target.parent != ReportGenerator.MARKDOWN_DIR.resolve():
+        return Response(status_code=400, content=b"Invalid session id", media_type="text/plain")
     if not target.exists():
-        candidates = list(ReportGenerator.MARKDOWN_DIR.glob(f"*{session_id}*.md"))
+        candidates = list(ReportGenerator.MARKDOWN_DIR.glob(f"*{glob.escape(session_id)}*.md"))
         if candidates:
             target = candidates[0]
         else:
@@ -1822,9 +1824,9 @@ async def get_report_markdown(session_id: str, download: bool = False):
 async def delete_report(report_id: str = Form(...)):
     """删除指定的 Markdown 交付物测试报告"""
     safe_name = Path(report_id).stem
-    md_file = ReportGenerator.MARKDOWN_DIR / f"{safe_name}.md"
+    md_file = safe_path(ReportGenerator.MARKDOWN_DIR, f"{safe_name}.md")
     if not md_file.exists():
-        md_file = ReportGenerator.MARKDOWN_DIR / f"test_report_{safe_name}.md"
+        md_file = safe_path(ReportGenerator.MARKDOWN_DIR, f"test_report_{safe_name}.md")
     deleted = False
     try:
         if md_file.exists():
@@ -2850,8 +2852,8 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
 async def run_pytest(filename: str = Form(...)):
     """以原生 Pytest 模式独立执行已固化的本地测试脚本"""
     start_t = time.time()
-    script_path = settings.SOLIDIFIED_DIR / filename
-    if not script_path.exists():
+    script_path = safe_path(settings.SOLIDIFIED_DIR, filename)
+    if script_path.suffix != ".py" or not script_path.is_file():
         return {"success": False, "message": "脚本不存在"}
 
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -196,6 +196,6 @@ pip install -r requirements.txt
 ### 3. 一键启动 Web 工作台
 双击根目录下的 `start_web.bat`，或在命令行运行：
 ```bash
-python -m uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 在浏览器中打开：`http://127.0.0.1:8000` 即可开始使用。
