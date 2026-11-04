@@ -13,6 +13,7 @@ from core.report_generator import ReportGenerator
 from core.timeline_manager import TimelineManager
 from core.device_watchdog import DeviceWatchdog, DEFAULT_WATCHDOG_TIMEOUT
 from core.task_common import BASE_DIR, SESSIONS_STORE_DIR
+from core.token_usage import accumulate, parse_usage_line
 
 logger = logging.getLogger("TaskManager")
 
@@ -84,6 +85,11 @@ class DevicePipelineMixin:
             watchdog.feed_heartbeat(line)
             all_output.append(line)
             dev_state["logs"].append(line)
+
+            # 累加子进程回报的真实 token 用量
+            usage = parse_usage_line(line)
+            if usage:
+                session["token_stats"] = accumulate(session.get("token_stats"), usage)
 
             # 实时捕获人机协同决策事件
             if "⏸️ [WAIT_HITL_DECISION]" in line:

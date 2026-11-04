@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 import requests
 
 from core.antigravity_credentials import get_client_credentials
+from core.token_usage import TokenUsage
 
 logger = logging.getLogger("AntigravityDirect")
 
@@ -30,6 +31,7 @@ class AntigravityDirectClient:
     """
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or os.getenv("ANTIGRAVITY_MODEL", "gemini-2.5-flash")
+        self.last_usage: TokenUsage = TokenUsage()
         self.proxy = self._detect_proxy()
         self.session = requests.Session()
         self.session.proxies.update(self.proxy)
@@ -192,12 +194,9 @@ class AntigravityDirectClient:
                 resp = session.post(url, headers=headers, json=body, timeout=40)
                 if resp.status_code == 200:
                     data = resp.json()
-                    cands = data.get("response", {}).get("candidates", [])
-                    if cands:
-                        parts = cands[0].get("content", {}).get("parts", [])
-                        raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
+                    if data.get("response", {}).get("candidates"):
                         logger.info("Google Antigravity 官方响应成功！")
-                        return self._parse_json(raw_text)
+                        return self._consume_response(data, body["model"])
                     raise RuntimeError(f"Google 响应未包含候选内容: {data}")
                 elif resp.status_code == 401:
                     # 强制重新刷新 token 并重试一次
@@ -206,10 +205,7 @@ class AntigravityDirectClient:
                     headers["Authorization"] = f"Bearer {token}"
                     resp2 = session.post(url, headers=headers, json=body, timeout=25)
                     if resp2.status_code == 200:
-                        cands = resp2.json().get("response", {}).get("candidates", [])
-                        parts = cands[0].get("content", {}).get("parts", [])
-                        raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
-                        return self._parse_json(raw_text)
+                        return self._consume_response(resp2.json(), body["model"])
                     raise RuntimeError(f"Google 鉴权失败 ({resp2.status_code}): {resp2.text[:200]}")
                 elif resp.status_code in [429, 503, 404] and body["model"] != "gemini-2.5-flash":
                     logger.warning(f"当前模型 [{body['model']}] 返回 {resp.status_code}，自动热切换至高可用模型 gemini-2.5-flash...")
@@ -232,6 +228,15 @@ class AntigravityDirectClient:
                     raise e
             finally:
                 session.close()
+
+    def _consume_response(self, data: Dict[str, Any], model: str) -> Dict[str, Any]:
+        """提取候选文本并记录 Google 回报的真实 token 用量 (usageMetadata)"""
+        response = data.get("response", {})
+        cands = response.get("candidates") or [{}]
+        parts = cands[0].get("content", {}).get("parts", [])
+        raw_text = "".join([p.get("text", "") for p in parts if "text" in p])
+        self.last_usage = TokenUsage.from_gemini(response.get("usageMetadata"), model)
+        return self._parse_json(raw_text)
 
     def _parse_json(self, raw_text: str) -> Dict[str, Any]:
         raw_text = raw_text.strip()

@@ -3928,6 +3928,24 @@
             }
         }
 
+        // 模型真实 token 用量（由服务商回报，后端累加到 session.token_stats）；无数据时不展示，杜绝伪造
+        function formatTokenCount(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(2) + "M";
+            if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+            return String(n);
+        }
+
+        function buildTokenUsagePill(sessionData) {
+            const stats = (sessionData && sessionData.token_stats) || {};
+            const total = Number(stats.total_tokens) || 0;
+            if (total <= 0) return "";
+            const prompt = Number(stats.prompt_tokens) || 0;
+            const completion = Number(stats.completion_tokens) || 0;
+            const calls = Number(stats.llm_calls) || 0;
+            const tip = `输入 ${prompt.toLocaleString()} · 输出 ${completion.toLocaleString()} · 共 ${total.toLocaleString()} tokens，模型调用 ${calls} 次`;
+            return `<span class="font-mono text-sub ms-2" style="font-size: 11.5px;" title="${escapeHtml(tip)}"><i class="bi bi-cpu me-1"></i>${formatTokenCount(total)} tokens</span>`;
+        }
+
         function buildBlockHtml(blk, sessionData) {
             if (blk.type === "doc_mismatch_guard") {
                 return renderDocMismatchGuardHtml(blk, sessionData);
@@ -4370,7 +4388,7 @@
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="mono-pill ${isBlocked ? 'blocked-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isBlocked ? 'BLOCKED' : 'FAIL'}</span>
-                                    <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>
+                                    <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>${buildTokenUsagePill(sessionData)}
                                 </div>
                                 <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
                                     <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="openLogViewer('${sid}')" style="font-size: 11px; color: var(--text-sub);" title="在右侧抽屉展开底层运行日志流">
@@ -4467,7 +4485,7 @@
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="mono-pill ${isPass ? 'pass-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isPass ? 'PASS' : 'FAIL'}</span>
-                                <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>
+                                <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>${buildTokenUsagePill(sessionData)}
                                 <span style="color: var(--status-green); font-size: 11px; font-family: var(--font-mono);"><i class="bi bi-shield-check"></i> 0 异常</span>
                                 ${isReviewState ? `
                                     <span class="badge" style="background: rgba(14, 165, 233, 0.12); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.25); font-size: 10px; font-weight: 500; border-radius: 4px; padding: 2px 7px;">待验收</span>
