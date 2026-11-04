@@ -1,19 +1,30 @@
 import pytest
+from types import SimpleNamespace
 from pathlib import Path
 from core.api_client import APIClient
 from ai_engine.solidifier import Solidifier
 
-def test_api_client_and_history():
-    """测试统一接口客户端的功能与历史追踪"""
-    client = APIClient(base_url="https://api.github.com")
-    try:
-        resp = client.get("/")
-        assert resp.status_code in [200, 403]
-        assert len(client.history) == 1
-    except Exception:
-        # 网络环境若无法直连公网，测试本地记录逻辑
-        client.history.append({"method": "GET", "url": "/mock", "status_code": 200, "response_text": "mock"})
-        assert len(client.history) == 1
+def test_api_client_and_history(monkeypatch):
+    """测试统一接口客户端的 URL 拼接与历史追踪（mock 网络，不依赖公网）"""
+    client = APIClient(base_url="https://api.example.com/")
+    sent = {}
+
+    def fake_request(method, url, timeout=None, **kwargs):
+        sent.update(method=method, url=url, timeout=timeout, **kwargs)
+        return SimpleNamespace(status_code=201, text="ok" * 600,
+                               request=SimpleNamespace(headers={"X-Test": "1"}))
+
+    monkeypatch.setattr(client.session, "request", fake_request)
+    resp = client.post("/v1/items", json={"name": "a"}, timeout=3)
+
+    assert resp.status_code == 201
+    assert sent["method"] == "POST" and sent["url"] == "https://api.example.com/v1/items"
+    assert sent["timeout"] == 3 and sent["json"] == {"name": "a"}
+    assert len(client.history) == 1
+    record = client.history[0]
+    assert record["status_code"] == 201 and record["endpoint"] == "/v1/items"
+    assert record["json"] == {"name": "a"} and record["headers"] == {"X-Test": "1"}
+    assert len(record["response_text"]) == 1000
 
 def test_solidifier_script_generation(tmp_path):
     """测试固化引擎：将模拟的登录与业务动作轨迹固化为 Pytest 脚本"""
