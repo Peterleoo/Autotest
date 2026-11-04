@@ -3,7 +3,8 @@
 import ast
 from pathlib import Path
 
-APP_FILE = Path(__file__).resolve().parent.parent / "web" / "app.py"
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+WEB_FILES = [WEB_DIR / "app.py", WEB_DIR / "shared.py", *sorted((WEB_DIR / "routers").glob("*.py"))]
 BLOCKING = {
     ("subprocess", "run"), ("subprocess", "check_output"), ("subprocess", "call"),
     ("subprocess", "check_call"), ("time", "sleep"), ("request", "urlopen"),
@@ -26,11 +27,11 @@ def _blocking_calls(node, inside_lambda=False):
 
 
 def test_async_endpoints_do_not_call_blocking_apis_directly():
-    tree = ast.parse(APP_FILE.read_text(encoding="utf-8"))
-    offenders = {
-        fn.name: list(_blocking_calls(fn))
-        for fn in ast.walk(tree)
-        if isinstance(fn, ast.AsyncFunctionDef)
-    }
+    offenders = {}
+    for path in WEB_FILES:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for fn in ast.walk(tree):
+            if isinstance(fn, ast.AsyncFunctionDef):
+                offenders[f"{path.name}:{fn.name}"] = list(_blocking_calls(fn))
     offenders = {k: v for k, v in offenders.items() if v}
     assert not offenders, f"async 函数中存在阻塞调用，请改为 def 或 asyncio.to_thread: {offenders}"

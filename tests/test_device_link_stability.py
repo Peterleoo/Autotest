@@ -149,7 +149,7 @@ def test_stream_interval_leaves_adb_idle_window():
 # ---------------------------------------------------------------- /api/devices
 
 def test_device_list_failure_is_not_cached(monkeypatch):
-    import web.app as app_mod
+    import web.routers.devices as app_mod
 
     cached = {"android_devices": [{"id": DEV}], "ios_node": {}}
     monkeypatch.setitem(app_mod._DEVICE_CACHE, "data", cached)
@@ -167,7 +167,7 @@ def test_device_list_failure_is_not_cached(monkeypatch):
 
 
 def test_device_list_failure_without_cache_returns_empty(monkeypatch):
-    import web.app as app_mod
+    import web.routers.devices as app_mod
 
     monkeypatch.setitem(app_mod._DEVICE_CACHE, "data", None)
     monkeypatch.setitem(app_mod._DEVICE_CACHE, "timestamp", 0.0)

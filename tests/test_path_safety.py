@@ -8,6 +8,8 @@ import pytest
 from fastapi import HTTPException, UploadFile
 
 import web.app as web_app
+import web.routers.cases as cases_router
+import web.routers.reports as reports_router
 from config.settings import settings
 from core.report_generator import ReportGenerator
 from web.path_safety import safe_path
@@ -24,8 +26,8 @@ def dirs(tmp_path, monkeypatch):
     (base / "solidified" / "secret.py").write_text("x = 1", encoding="utf-8")
     monkeypatch.setattr(settings, "SOLIDIFIED_DIR", base / "solidified")
     monkeypatch.setattr(settings, "APPS_DIR", base / "apps")
-    monkeypatch.setattr(web_app, "UPLOADS_DIR", base / "uploads")
-    monkeypatch.setattr(web_app, "BASE_DIR", base / "solidified")
+    monkeypatch.setattr(reports_router, "UPLOADS_DIR", base / "uploads")
+    monkeypatch.setattr(cases_router, "BASE_DIR", base / "solidified")
     monkeypatch.setattr(ReportGenerator, "MARKDOWN_DIR", base / "md")
     return base
 
