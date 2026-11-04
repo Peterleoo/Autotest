@@ -2004,11 +2004,11 @@ async def rename_session(session_id: str, payload: Dict[str, Any] = Body(...)):
     new_title = (payload.get("title") or "").strip()
     if not new_title:
         return JSONResponse({"success": False, "error": "标题不能为空"})
-    session = task_mgr.get_session(session_id)
+    session = task_mgr.sessions.get(session_id)
     if not session:
         return JSONResponse({"success": False, "error": "会话不存在"})
     session["title"] = new_title
-    task_mgr._save_session_to_disk(session)
+    task_mgr._save_session(session_id)
     return JSONResponse({"success": True, "title": new_title})
 
 @app.post("/api/sessions/{session_id}/force_run_doc_suite")

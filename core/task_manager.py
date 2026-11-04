@@ -2,6 +2,7 @@ from core.memory_manager import MemoryManager
 import os
 import re
 import sys
+import copy
 import time
 import json
 import uuid
@@ -59,6 +60,8 @@ class TaskManager:
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.active_session_id: Optional[str] = None
         self.session_procs: Dict[str, subprocess.Popen] = {}
+        self._session_save_locks: Dict[str, threading.Lock] = {}
+        self._session_save_locks_guard = threading.Lock()
         self._load_persisted_sessions()
 
     def _save_session(self, session_id: str):
@@ -67,16 +70,45 @@ class TaskManager:
         if not session:
             return
 
-        # 🛡️ 契约式 Generative UI 校验清洗 (借鉴 Vercel Labs json-render 规范)
-        if "timeline_blocks" in session and isinstance(session["timeline_blocks"], list):
-            session["timeline_blocks"] = [TimelineManager.validate_and_sanitize_block(b) for b in session["timeline_blocks"]]
-        try:
+        with self._session_save_locks_guard:
+            lock = self._session_save_locks.setdefault(session_id, threading.Lock())
+
+        with lock:
+            # 🛡️ 契约式 Generative UI 校验清洗 (借鉴 Vercel Labs json-render 规范)
+            if "timeline_blocks" in session and isinstance(session["timeline_blocks"], list):
+                session["timeline_blocks"] = [TimelineManager.validate_and_sanitize_block(b) for b in session["timeline_blocks"]]
             target_path = SESSIONS_STORE_DIR / f"{session_id}.json"
-            # 序列化为安全 JSON
-            with open(target_path, "w", encoding="utf-8") as f:
-                json.dump(session, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.warning(f"持久化会话 {session_id} 失败: {e}")
+            tmp_path = target_path.with_name(f"{target_path.name}.tmp")
+            try:
+                # 先快照再序列化：避免其他线程并发修改导致写出半截或不一致的 JSON
+                snapshot = None
+                for _ in range(3):
+                    try:
+                        snapshot = copy.deepcopy(session)
+                        break
+                    except RuntimeError:
+                        time.sleep(0.01)
+                if snapshot is None:
+                    raise RuntimeError("会话在快照期间持续被修改")
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                # Windows 下目标文件正被读取时 replace 会短暂 PermissionError，稍后重试
+                for attempt in range(5):
+                    try:
+                        os.replace(tmp_path, target_path)
+                        break
+                    except PermissionError:
+                        if attempt == 4:
+                            raise
+                        time.sleep(0.05)
+            except Exception as e:
+                logger.warning(f"持久化会话 {session_id} 失败: {e}")
+                try:
+                    tmp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def _load_persisted_sessions(self):
         """服务启动时自动从本地磁盘加载所有历史测试会话"""
