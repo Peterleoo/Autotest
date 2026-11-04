@@ -22,6 +22,7 @@ from core.device_watchdog import DeviceWatchdog, DEFAULT_WATCHDOG_TIMEOUT
 
 logger = logging.getLogger("TaskManager")
 from core.task_common import BASE_DIR, SESSIONS_STORE_DIR, TEST_SUITES_STORE_DIR  # noqa: F401
+from core.retention import prune_old_files
 from core.task_timeline import TimelineViewMixin
 from core.task_conversation import ConversationMixin
 from core.task_planning import PlanningMixin
@@ -65,7 +66,18 @@ class TaskManager(TimelineViewMixin, ConversationMixin, PlanningMixin, RuntimeMi
         self.session_procs: Dict[str, subprocess.Popen] = {}
         self._session_save_locks: Dict[str, threading.Lock] = {}
         self._session_save_locks_guard = threading.Lock()
+        self._apply_retention_policy()
         self._load_persisted_sessions()
+
+    @staticmethod
+    def _apply_retention_policy():
+        """启动时按保留策略清理过期的报告与会话文件（先于会话加载，过期会话不再进入内存）"""
+        try:
+            prune_old_files(BASE_DIR / "data" / "reports", settings.REPORTS_RETENTION_DAYS,
+                            settings.RETENTION_KEEP_LATEST, recursive=True)
+            prune_old_files(SESSIONS_STORE_DIR, settings.SESSIONS_RETENTION_DAYS, settings.RETENTION_KEEP_LATEST)
+        except Exception as e:
+            logger.warning(f"执行数据保留策略失败: {e}")
 
     def _save_session(self, session_id: str):
         """将单个会话原子化存盘持久化到本地磁盘，保证重启与刷新不丢失"""
