@@ -17,10 +17,12 @@ CHILD_SCRIPT = (
 )
 
 
-def _run(monkeypatch, exit_code):
+def _run(monkeypatch, exit_code, captured=None):
     real_popen = subprocess.Popen
 
     def fake_popen(cmd, **kwargs):
+        if captured is not None:
+            captured.update(kwargs)
         return real_popen([sys.executable, "-c", CHILD_SCRIPT.format(code=exit_code)], **kwargs)
 
     monkeypatch.setattr(pipeline_module.subprocess, "Popen", fake_popen)
@@ -54,3 +56,10 @@ def test_nonzero_exit_with_goal_achieved_reports_exit_code(monkeypatch):
     assert session["error_type"] == "CHILD_EXIT_NONZERO"
     assert "退出码 3" in session["error_message"]
     assert "ConnectionResetError" not in session["error_message"]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="仅 Windows 存在控制台 Ctrl+C 广播问题")
+def test_child_runs_in_new_process_group_to_ignore_console_ctrl_c(monkeypatch):
+    captured = {}
+    _run(monkeypatch, 0, captured)
+    assert captured["creationflags"] & subprocess.CREATE_NEW_PROCESS_GROUP

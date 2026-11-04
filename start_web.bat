@@ -13,6 +13,6 @@ echo 服务访问地址: http://127.0.0.1:8000
 echo 按 Ctrl + C 可终止服务。
 echo.
 
-python -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir core --reload-dir web --reload-dir ai_engine --reload-dir config
 
 pause

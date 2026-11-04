@@ -197,6 +197,6 @@ python -m playwright install chromium   # 仅运行前端 UI 测试时需要
 ### 3. 一键启动 Web 工作台
 双击根目录下的 `start_web.bat`，或在命令行运行：
 ```bash
-python -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir core --reload-dir web --reload-dir ai_engine --reload-dir config
 ```
 在浏览器中打开：`http://127.0.0.1:8000` 即可开始使用。

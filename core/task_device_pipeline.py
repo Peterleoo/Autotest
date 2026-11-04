@@ -46,7 +46,10 @@ class DevicePipelineMixin:
             encoding="utf-8",
             errors="replace",
             cwd=str(BASE_DIR),
-            bufsize=1
+            bufsize=1,
+            # Windows: 独立进程组使子进程不接收控制台 Ctrl+C（uvicorn --reload 重启会向整个控制台发送 CTRL_C_EVENT）；
+            # 停止任务走 proc.kill()，不受影响
+            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         )
         self.session_procs[session["session_id"]] = proc
 
