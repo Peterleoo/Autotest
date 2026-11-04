@@ -194,7 +194,19 @@ python -m playwright install chromium   # 仅运行前端 UI 测试时需要
    - **OPPO/一加（ColorOS）**：开启【禁止权限监控】；
    - **华为（HarmonyOS）**：退出【纯净模式】。
 
-### 3. 一键启动 Web 工作台
+### 3. 配置 AI 模型（以 Google Antigravity 为例）
+每位部署者都使用**自己的** Google 账号与额度，凭据只保存在本机，绝不提交到仓库：
+
+1. 复制配置模板：`cp .env.example .env`（`.env` 已被 git 忽略）；
+2. 在 `.env` 中填写 `ANTIGRAVITY_CLIENT_ID` 与 `ANTIGRAVITY_CLIENT_SECRET`（Antigravity OAuth 客户端凭据，请自行获取，仓库不提供）；
+3. 启动工作台后在界面中点击 **Antigravity 登录**，浏览器完成 Google 授权后，个人令牌会自动保存到本机 `config/antigravity_oauth.json`（已被 git 忽略，切勿分享）；
+4. （可选）如需 OpenAI 兼容的本地桥接服务：`python tools/antigravity_bridge.py`
+   - 默认只监听 `127.0.0.1:19387`，**不要改成 `0.0.0.0`**，否则局域网内任何人都能消耗你的模型额度；
+   - 如需额外防护，在 `.env` 中设置 `ANTIGRAVITY_BRIDGE_KEY`，并让 `ANTIGRAVITY_API_KEY` 与之保持一致。
+
+不使用 Antigravity 时，也可以在 `.env` 中改配 DeepSeek / Claude / OpenAI 等其他模型。
+
+### 4. 一键启动 Web 工作台
 双击根目录下的 `start_web.bat`，或在命令行运行：
 ```bash
 python -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir core --reload-dir web --reload-dir ai_engine --reload-dir config

@@ -94,3 +94,16 @@ def test_bridge_rejects_requests_without_key(monkeypatch, bridge):
 def test_bridge_open_locally_when_no_key(monkeypatch, bridge):
     monkeypatch.setattr(bridge, "BRIDGE_KEY", "")
     assert _get_status(bridge.app, "/health") == 200
+
+
+def test_oauth_state_works_without_client_credentials(monkeypatch):
+    """新部署的用户还没配置 .env 时，查询状态/配置接口不能报错，只有真正登录时才提示配置"""
+    from core import antigravity_credentials as cred
+    from core.antigravity_oauth import AntigravityOAuth
+    monkeypatch.delenv(cred.CLIENT_ID_ENV, raising=False)
+    monkeypatch.delenv(cred.CLIENT_SECRET_ENV, raising=False)
+
+    oauth = AntigravityOAuth()
+    assert isinstance(oauth.get_state(), dict)
+    with pytest.raises(cred.AntigravityCredentialsMissing):
+        _ = oauth.client_secret

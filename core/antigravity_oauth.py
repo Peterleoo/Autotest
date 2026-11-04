@@ -71,7 +71,6 @@ class _OAuthCallbackHandler(BaseHTTPRequestHandler):
 
 class AntigravityOAuth:
     def __init__(self):
-        self.client_id, self.client_secret = get_client_credentials()
         self.redirect_port = 51121
         self.redirect_uri = f"http://localhost:{self.redirect_port}/oauth-callback"
         self.proxies = {
@@ -79,6 +78,15 @@ class AntigravityOAuth:
             "https": "http://127.0.0.1:7897"
         }
         self.server_thread = None
+
+    # 客户端凭据只在登录 / 换取令牌时才需要；查询状态、列模型等不得因本地未配置而报错
+    @property
+    def client_id(self) -> str:
+        return get_client_credentials()[0]
+
+    @property
+    def client_secret(self) -> str:
+        return get_client_credentials()[1]
 
     def get_state(self) -> Dict[str, Any]:
         """读取当前的 OAuth 授权状态与可用模型"""
