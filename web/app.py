@@ -820,6 +820,8 @@ async def run_systemic_test_suite(payload: Dict[str, Any] = Body(...)):
             keep_state=keep_state
         )
         return res
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"success": False, "message": str(e)})
     except Exception as e:
         logger.error(f"启动系统级用例套件失败: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"success": False, "message": f"启动套件失败: {str(e)}"})

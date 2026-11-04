@@ -3195,10 +3195,9 @@ class TaskManager:
                 from core.app_manager import AppManager
                 app_mgr = AppManager()
                 conn_devs = app_mgr.get_connected_devices()
-                if conn_devs:
-                    device_ids = [conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id", "auto_device")]
-                else:
-                    device_ids = ["mock_device"]
+                if not conn_devs:
+                    raise ValueError("未检测到已连接的真机设备，请连接设备后重试")
+                device_ids = [conn_devs[0] if isinstance(conn_devs[0], str) else conn_devs[0].get("id", "auto_device")]
 
             session_id = f"sess_suite_{datetime.now().strftime('%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
 
@@ -3472,9 +3471,13 @@ class TaskManager:
         if not session:
             return
 
-        target_devs = session.get("target_devices", [])
+        target_devs = session.get("target_devices", []) or list(session.get("devices", {}).keys())
         if not target_devs:
-            target_devs = list(session.get("devices", {}).keys()) or ["mock_device"]
+            logger.error(f"🛑 [Suite Runner] 会话 [{session_id}] 无可用目标设备，终止套件执行")
+            session["status"] = "FAILED"
+            session["error_message"] = "未检测到可用的真机设备，系统测试套件无法执行"
+            self._save_session(session_id)
+            return
         primary_dev = target_devs[0]
         dev_state = session["devices"].get(primary_dev)
         if not dev_state:
