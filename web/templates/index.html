@@ -10811,7 +10811,7 @@
                     }
                 } else {
                     // 局部更新（支持 thought, todo_list, step_execution, step_result, test_summary 等节点动态流式刷新与折叠状态响应）
-                    if (blk.type === "thought" || blk.type === "todo_list" || blk.type === "step_execution" || blk.type === "step_result" || blk.type === "test_summary") {
+                    if (blk.type === "thought" || blk.type === "todo_list" || blk.type === "todo_plan" || blk.type === "step_execution" || blk.type === "step_result" || blk.type === "test_summary") {
                         if (blk.type === "thought") {
                             const curBody = existingEl.querySelector(".stream-thought-drawer, .stream-thought-body");
                             if (curBody && !curBody.classList.contains("d-none")) {
@@ -10820,7 +10820,7 @@
                             }
                         }
                         // 🛡️ 遵循生命周期自动流转：仅保持用户显式手动展开的动作，绝不把上轮运行态反向锁死为永久展开！
-                        if (blk.type === "todo_list") {
+                        if (blk.type === "todo_list" || blk.type === "todo_plan") {
                             const curTodoBody = existingEl.querySelector(".stream-todo-body");
                             if (curTodoBody && !curTodoBody.classList.contains("d-none")) {
                                 window._streamTodoState = window._streamTodoState || {};
@@ -13363,13 +13363,14 @@
                     </div>
                 `;
             }
-            if (blk.type === "todo_list") {
+            if (blk.type === "todo_list" || blk.type === "todo_plan") {
                 let itemsHtml = "";
                 let completedCount = 0;
-                let totalItems = Array.isArray(blk.items) ? blk.items.length : (blk.total_count || 0);
+                const rawItems = (Array.isArray(blk.items) && blk.items.length > 0) ? blk.items : (Array.isArray(blk.steps) ? blk.steps : []);
+                let totalItems = rawItems.length || blk.total_count || blk.total_steps || 0;
 
-                if (Array.isArray(blk.items)) {
-                    blk.items.forEach((it, idx) => {
+                if (rawItems.length > 0) {
+                    rawItems.forEach((it, idx) => {
                         const isRunning = (it.status === "RUNNING");
                         const isCompleted = (it.status === "COMPLETED" || it.status === "PASS");
                         const isFailed = (it.status === "FAILED" || it.status === "FAIL");
@@ -13393,7 +13394,7 @@
                                 <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 100%;">
                                     ${statusIcon}
                                     <span class="item-title text-truncate">
-                                        <span class="fw-medium text-main">${escapeHtml(it.title)}</span>
+                                        <span class="fw-medium text-main">${escapeHtml(it.title || '')}</span>
                                         ${(it.desc && it.desc !== it.title && !it.desc.startsWith(it.title)) ? `<span class="text-sub ms-1.5 opacity-75" style="font-size: 11px;">${escapeHtml(it.desc)}</span>` : ''}
                                     </span>
                                 </div>
@@ -13402,7 +13403,7 @@
                     });
                 }
 
-                const effCompleted = (completedCount > 0) ? completedCount : (blk.completed_count || 0);
+                const effCompleted = (completedCount > 0) ? completedCount : (blk.completed_count ?? blk.completed_steps ?? 0);
                 const isExpanded = (window._streamTodoState[blk.block_id] !== false);
                 const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
                 const bodyClass = isExpanded ? "" : "d-none";

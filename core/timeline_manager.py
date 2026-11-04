@@ -15,6 +15,7 @@ class TimelineManager:
         "user_message",
         "system_notice",
         "thought",
+        "todo_list",
         "todo_plan",
         "tool_call",
         "step_result",
@@ -102,9 +103,10 @@ class TimelineManager:
         turn_id: int = 0
     ) -> Dict[str, Any]:
         """
-        装配专业级 Todo 任务状态栏模型
+        装配专业级 Todo 任务状态栏模型（同时兼容 todo_list 与 todo_plan 契约规范）
         """
         formatted_steps = []
+        diff_items = []
         for idx, step in enumerate(steps):
             s_num = step.get("step_number", idx + 1)
             raw_title = step.get("title", f"步骤 {s_num}")
@@ -122,9 +124,15 @@ class TimelineManager:
                 "is_dynamic": step.get("is_dynamic", False),
                 "updated_at": step.get("updated_at", datetime.now().strftime("%H:%M:%S"))
             })
+            diff_items.append({
+                "title": raw_title,
+                "desc": raw_desc,
+                "status": status,
+                "diff_type": step.get("diff_type", "added")
+            })
 
         total = len(formatted_steps)
-        completed = sum(1 for s in formatted_steps if s["status"] in ["COMPLETED", "SKIPPED"])
+        completed = sum(1 for s in formatted_steps if s["status"] in ["COMPLETED", "SKIPPED", "PASS"])
         running_step = next((s for s in formatted_steps if s["status"] == "RUNNING"), None)
 
         if running_step:
@@ -139,12 +147,16 @@ class TimelineManager:
 
         return {
             "block_id": f"blk_todo_{turn_id}",
-            "type": "todo_plan",
+            "type": "todo_list",
             "turn_id": turn_id,
             "status": block_status,
+            "title": f"任务清单 · {completed}/{total} 已完成",
             "summary": summary,
+            "total_count": total,
             "total_steps": total,
+            "completed_count": completed,
             "completed_steps": completed,
+            "items": diff_items,
             "steps": formatted_steps,
             "timestamp": datetime.now().strftime("%H:%M:%S")
         }
