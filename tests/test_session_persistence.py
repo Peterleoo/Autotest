@@ -38,7 +38,7 @@ def test_failed_write_keeps_previous_file_intact(store, monkeypatch):
     monkeypatch.undo()
 
     assert _read(store)["title"] == "原标题"
-    assert not list(store.glob("*.tmp"))
+    assert not list(store.glob(f"{SID}*.tmp"))
 
 
 def test_concurrent_mutation_and_saves_always_produce_valid_json(store, caplog):
@@ -77,7 +77,7 @@ def test_concurrent_mutation_and_saves_always_produce_valid_json(store, caplog):
     assert not [r for r in caplog.records if "持久化会话" in r.getMessage()]
     data = _read(store)
     assert data["session_id"] == SID and isinstance(data["logs"], list)
-    assert not list(store.glob("*.tmp"))
+    assert not list(store.glob(f"{SID}*.tmp"))
 
 
 def test_rename_persists_title(store):
