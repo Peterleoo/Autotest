@@ -6067,12 +6067,21 @@ function renderChatStream(sessionData) {
             }
         }
 
+        // 投屏限流：与后端 STREAM_FRAME_INTERVAL(0.8s) 对齐，40ms 连拉会让旧真机 USB 链路频繁重新枚举掉线
+        const PIP_FRAME_INTERVAL_MS = 800;
+        const PIP_HIDDEN_POLL_MS = 1500;
+
         function runPipStreamLoop() {
             if (!isPipScreenOpen) {
                 isPipLoopActive = false;
                 return;
             }
             isPipLoopActive = true;
+            // 页面隐藏时暂停抓帧，避免后台标签页持续占用真机 USB/ADB 通道
+            if (document.hidden) {
+                setTimeout(runPipStreamLoop, PIP_HIDDEN_POLL_MS);
+                return;
+            }
             const targetDev = getPipTargetDeviceId();
             if (!targetDev) {
                 updateDeviceFloatingEmptyState(availableDevices || []);
@@ -6095,7 +6104,7 @@ function renderChatStream(sessionData) {
                     img.style.display = "block";
                 }
                 if (empty) empty.style.display = "none";
-                setTimeout(runPipStreamLoop, 40);
+                setTimeout(runPipStreamLoop, PIP_FRAME_INTERVAL_MS);
             };
             preloader.onerror = () => {
                 _pipErrorStreak++;

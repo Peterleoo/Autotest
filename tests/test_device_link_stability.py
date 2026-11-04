@@ -178,3 +178,95 @@ def test_device_list_failure_without_cache_returns_empty(monkeypatch):
 
     assert result["android_devices"] == []
     assert app_mod._DEVICE_CACHE["data"] is None
+
+
+@pytest.mark.parametrize("fmt,hub_method", [("jpeg", "get_jpeg_bytes"), ("png", "get_png_bytes")])
+def test_screenshot_endpoint_reuses_frames_within_stream_interval(monkeypatch, fmt, hub_method):
+    """前端画中画按 /screenshot 轮询：后端必须按 STREAM_FRAME_INTERVAL 复用帧，防止任何客户端把 ADB 通道打满"""
+    import web.routers.devices as dev_mod
+
+    seen = {}
+
+    async def fake_get(device_id, max_age):
+        seen["max_age"] = max_age
+        return b"img"
+
+    monkeypatch.setattr(dev_mod, "resolve_target_device_id", lambda _d: DEV)
+    monkeypatch.setattr(dev_mod.screen_stream_hub, hub_method, fake_get)
+
+    resp = asyncio.run(dev_mod.get_device_screenshot(device_id=DEV, format=fmt))
+
+    assert resp.status_code == 200
+    assert seen["max_age"] >= hub_mod.STREAM_FRAME_INTERVAL
+
+
+def test_pip_loop_is_throttled_and_pauses_when_hidden():
+    from tests.frontend_source import read_frontend_source
+
+    html = read_frontend_source()
+    loop = html[html.index("function runPipStreamLoop()"):html.index("function triggerPipImmediateRefresh()")]
+    assert "setTimeout(runPipStreamLoop, 40)" not in loop
+    assert "document.hidden" in loop
+    assert "const PIP_FRAME_INTERVAL_MS = 800;" in html
+
+
+# ---------------------------------------------------------------- 端侧 gzip 压缩采集
+
+def _fake_raw_frame(w=64, h=128):
+    import struct as _struct
+    return _struct.pack("<IIII", w, h, 1, 0) + bytes([120]) * (w * h * 4)
+
+
+class FakeCapture:
+    """按命令返回预设的 exec-out 输出，记录调用的抓屏命令"""
+
+    def __init__(self, outputs):
+        self.outputs = outputs
+        self.cmds = []
+
+    def __call__(self, cmd, *a, **k):
+        shell_cmd = cmd[-1] if cmd[-2] == "exec-out" else " ".join(cmd[cmd.index("exec-out") + 1:])
+        self.cmds.append(shell_cmd)
+        return SimpleNamespace(returncode=0, stdout=self.outputs.get(shell_cmd, b""))
+
+
+@pytest.fixture
+def clean_gzip_state(monkeypatch):
+    if not hub_mod.HAS_OPENCV:
+        pytest.skip("需要 OpenCV")
+    monkeypatch.setattr(hub_mod, "_GZIP_UNSUPPORTED", set())
+
+
+def test_capture_prefers_gzip_compressed_raw(monkeypatch, clean_gzip_state):
+    import gzip as _gzip
+    fake = FakeCapture({"screencap | gzip -1": _gzip.compress(_fake_raw_frame(), 1)})
+    monkeypatch.setattr(hub_mod.subprocess, "run", fake)
+
+    frame = hub_mod._capture_raw_and_encode_sync("adb", DEV)
+
+    assert frame["mode"] == "raw_gzip_cv2"
+    assert (frame["w"], frame["h"]) == (64, 128)
+    assert fake.cmds == ["screencap | gzip -1"]
+
+
+def test_capture_falls_back_and_remembers_when_gzip_missing(monkeypatch, clean_gzip_state):
+    fake = FakeCapture({"screencap | gzip -1": b"/system/bin/sh: gzip: not found\n", "screencap": _fake_raw_frame()})
+    monkeypatch.setattr(hub_mod.subprocess, "run", fake)
+
+    first = hub_mod._capture_raw_and_encode_sync("adb", DEV)
+    second = hub_mod._capture_raw_and_encode_sync("adb", DEV)
+
+    assert first["mode"] == second["mode"] == "raw_cv2"
+    assert fake.cmds == ["screencap | gzip -1", "screencap", "screencap"]  # 第二帧不再白跑 gzip
+
+
+def test_truncated_gzip_does_not_permanently_disable_compression(monkeypatch, clean_gzip_state):
+    import gzip as _gzip
+    truncated = _gzip.compress(_fake_raw_frame(), 1)[:50]  # 模拟 USB 中途断开导致的截断
+    fake = FakeCapture({"screencap | gzip -1": truncated, "screencap": _fake_raw_frame()})
+    monkeypatch.setattr(hub_mod.subprocess, "run", fake)
+
+    frame = hub_mod._capture_raw_and_encode_sync("adb", DEV)
+
+    assert frame["mode"] == "raw_cv2"
+    assert DEV not in hub_mod._GZIP_UNSUPPORTED

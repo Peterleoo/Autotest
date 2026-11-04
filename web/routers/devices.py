@@ -140,13 +140,13 @@ async def get_device_screenshot(device_id: Optional[str] = None, format: str = "
         return Response(status_code=404, content=b"No device connected", media_type="text/plain")
 
     try:
-        # 1. 优先通过极速屏幕采集分发中枢获取 (内存缓存命中仅 0.01ms，过期自动极速采集)
+        # 1. 优先通过极速屏幕采集分发中枢获取；帧在 STREAM_FRAME_INTERVAL 内复用，任何前端轮询都无法把 ADB 通道打满
         if format.lower() == "png":
-            png_bytes = await screen_stream_hub.get_png_bytes(target_dev, max_age=0.45)
+            png_bytes = await screen_stream_hub.get_png_bytes(target_dev, max_age=STREAM_FRAME_INTERVAL)
             if png_bytes:
                 return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
         else:
-            jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=0.45)
+            jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=STREAM_FRAME_INTERVAL)
             if jpeg_bytes:
                 return Response(content=jpeg_bytes, media_type="image/jpeg", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     except Exception as e:
