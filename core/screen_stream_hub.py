@@ -29,6 +29,13 @@ except ImportError:
 
 logger = logging.getLogger("ScreenStreamHub")
 
+RAW_CAPTURE_TIMEOUT = 6.0       # RAW 帧约 10MB，3s 在 USB 繁忙时极易超时并中途杀进程，诱发 offline 抖动
+PNG_CAPTURE_TIMEOUT = 8.0
+STREAM_FRAME_INTERVAL = 0.8     # MJPEG 帧流最小采集间隔：给测试指令留出 ADB 通道空闲窗口，杜绝通道被投屏占满
+STREAM_POLL_SLEEP = 0.1
+FAILURE_THRESHOLD = 3           # 连续失败 N 次才判定断连，单次抖动继续展示上一帧
+FAILURE_COOLDOWN = 2.0          # 判定断连后的熔断冷却时间
+
 
 def _capture_raw_and_encode_sync(adb_bin: str, device_id: str) -> Optional[Dict[str, Any]]:
     """
@@ -43,7 +50,7 @@ def _capture_raw_and_encode_sync(adb_bin: str, device_id: str) -> Optional[Dict[
     if HAS_OPENCV:
         try:
             t0 = time.time()
-            res = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap"], capture_output=True, timeout=3)
+            res = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap"], capture_output=True, timeout=RAW_CAPTURE_TIMEOUT)
             raw = res.stdout
             if res.returncode == 0 and raw and len(raw) > 16:
                 w, h, fmt, cs = struct.unpack('<IIII', raw[:16])
@@ -76,7 +83,7 @@ def _capture_raw_and_encode_sync(adb_bin: str, device_id: str) -> Optional[Dict[
     # 2. 兼容兜底方案: screencap -p
     try:
         t0 = time.time()
-        res = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap", "-p"], capture_output=True, timeout=5)
+        res = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap", "-p"], capture_output=True, timeout=PNG_CAPTURE_TIMEOUT)
         raw = res.stdout
         if res.returncode == 0 and raw and len(raw) > 200:
             if not raw.startswith(b"\x89PNG\r\n\x1a\n") and b"PNG" in raw[:16]:
@@ -132,6 +139,7 @@ class ScreenStreamHub:
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
         self._failure_timestamps: Dict[str, float] = {}
+        self._failure_counts: Dict[str, int] = {}
 
     def set_adb_bin(self, adb_bin: str):
         self._adb_bin = adb_bin
@@ -155,6 +163,7 @@ class ScreenStreamHub:
         if device_id in self._cache:
             self._cache[device_id]["time"] = 0
         self._failure_timestamps.pop(device_id, None)
+        self._failure_counts.pop(device_id, None)
 
     async def get_frame(self, device_id: str, max_age: float = 0.45) -> Optional[Dict[str, Any]]:
         """
@@ -163,7 +172,7 @@ class ScreenStreamHub:
         否则加锁由当前协程在线程池发起抓取，排队协程共享该次抓取产物。
         """
         now = time.time()
-        if (now - self._failure_timestamps.get(device_id, 0.0)) < 2.0:
+        if (now - self._failure_timestamps.get(device_id, 0.0)) < FAILURE_COOLDOWN:
             return None
 
         cached = self._cache.get(device_id)
@@ -182,13 +191,23 @@ class ScreenStreamHub:
             frame_data = await asyncio.to_thread(_capture_raw_and_encode_sync, adb_bin, device_id)
             if frame_data:
                 self._failure_timestamps.pop(device_id, None)
+                self._failure_counts.pop(device_id, None)
                 self._cache[device_id] = frame_data
                 return frame_data
-            else:
-                # 🌟 真机采集失败（已离线或断开），记入失败时间戳启动 2s 熔断，清除旧缓存帧
-                self._failure_timestamps[device_id] = time.time()
-                self._cache.pop(device_id, None)
-                return None
+            return self._handle_capture_failure(device_id)
+
+    def _handle_capture_failure(self, device_id: str) -> Optional[Dict[str, Any]]:
+        """单次采集抖动沿用上一帧；连续失败达到阈值才判定断连、熔断并清除缓存帧"""
+        count = self._failure_counts.get(device_id, 0) + 1
+        self._failure_counts[device_id] = count
+        if count < FAILURE_THRESHOLD:
+            logger.debug(f"设备 [{device_id}] 屏幕采集失败 {count}/{FAILURE_THRESHOLD}，沿用上一帧")
+            return self._cache.get(device_id)
+        logger.warning(f"设备 [{device_id}] 屏幕连续采集失败 {count} 次，判定断连并熔断 {FAILURE_COOLDOWN}s")
+        self._failure_counts.pop(device_id, None)
+        self._failure_timestamps[device_id] = time.time()
+        self._cache.pop(device_id, None)
+        return None
 
     async def get_jpeg_bytes(self, device_id: str, max_age: float = 0.45) -> Optional[bytes]:
         """获取压缩后的极速 JPEG 字节流 (约 35KB，加载延迟极低)"""

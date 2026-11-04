@@ -34,7 +34,7 @@ from ai_engine.solidifier import Solidifier
 from core.report_generator import ReportGenerator, REPORTS_DIR
 from core.task_manager import TaskManager
 from core.auth_manager import AuthManager
-from core.screen_stream_hub import screen_stream_hub
+from core.screen_stream_hub import screen_stream_hub, STREAM_FRAME_INTERVAL, STREAM_POLL_SLEEP
 from core.document_extractor import DocumentExtractor
 from core.test_spec_synthesizer import TestSpecSynthesizer
 
@@ -68,6 +68,7 @@ async def index(request: Request):
 
 # ================= 优化：设备列表内存级低开销缓存 (5秒 TTL，杜绝高频 ADB 子进程与物理点击探针) =================
 _DEVICE_CACHE = {"timestamp": 0.0, "data": None}
+DEVICE_LIST_TIMEOUT = 8.0  # 投屏/测试占用 ADB 时 3s 易超时，导致界面误报无设备
 
 @app.get("/api/devices")
 async def get_devices(probe: bool = False, force: bool = False):
@@ -80,7 +81,13 @@ async def get_devices(probe: bool = False, force: bool = False):
     devices = []
     adb_bin = app_mgr.adb_bin
     try:
-        res = await asyncio.to_thread(lambda: subprocess.run([adb_bin, "devices", "-l"], capture_output=True, text=True, timeout=3))
+        res = await asyncio.to_thread(lambda: subprocess.run([adb_bin, "devices", "-l"], capture_output=True, text=True, timeout=DEVICE_LIST_TIMEOUT))
+    except Exception as e:
+        return _device_list_fallback(f"adb devices 执行失败: {e}")
+    if res.returncode != 0:
+        return _device_list_fallback(f"adb devices 返回码 {res.returncode}: {(res.stderr or '').strip()[:200]}")
+
+    try:
         for line in res.stdout.strip().split("\n")[1:]:
             parts = line.split()
             if len(parts) >= 2 and parts[1] == "device":
@@ -114,9 +121,16 @@ async def get_devices(probe: bool = False, force: bool = False):
                     "status": "在线 (Online)"
                 })
     except Exception as e:
-        pass
+        return _device_list_fallback(f"解析设备列表失败: {e}")
 
-    ios_node = {
+    result = {"android_devices": devices, "ios_node": _build_ios_node()}
+    _DEVICE_CACHE["timestamp"] = now
+    _DEVICE_CACHE["data"] = result
+    return result
+
+
+def _build_ios_node() -> Dict[str, Any]:
+    return {
         "id": "remote-ios",
         "model": settings.IOS_DEVICE_NAME,
         "platform": "iOS",
@@ -124,10 +138,13 @@ async def get_devices(probe: bool = False, force: bool = False):
         "status": f"局域网 Mac: {settings.APPIUM_SERVER_URL}"
     }
 
-    result = {"android_devices": devices, "ios_node": ios_node}
-    _DEVICE_CACHE["timestamp"] = now
-    _DEVICE_CACHE["data"] = result
-    return result
+
+def _device_list_fallback(reason: str) -> Dict[str, Any]:
+    """adb 查询瞬时失败时不写缓存：优先沿用上次成功结果，避免界面误显示"设备掉线\""""
+    logger.warning(f"获取设备列表失败，沿用上次结果: {reason}")
+    if _DEVICE_CACHE["data"] is not None:
+        return _DEVICE_CACHE["data"]
+    return {"android_devices": [], "ios_node": _build_ios_node()}
 
 _DEVICE_DIMENSIONS_CACHE: Dict[str, Tuple[int, int]] = {}
 
@@ -216,16 +233,18 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
         return Response(status_code=404, content=b"No online device connected", media_type="text/plain")
 
     async def frame_generator():
+        last_sent = None
         while True:
             if await request.is_disconnected():
                 break
             try:
-                # 持续从分发中枢获取新鲜帧 (双重检查锁保护，零 ADB 通道争抢)
-                jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=0.1)
-                if jpeg_bytes:
+                # 限流：同一帧在 STREAM_FRAME_INTERVAL 内复用，给测试 ADB 指令留出通道空闲窗口
+                jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=STREAM_FRAME_INTERVAL)
+                if jpeg_bytes and jpeg_bytes is not last_sent:
+                    last_sent = jpeg_bytes
                     yield (b"--frame\r\n"
                            b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n")
-                await asyncio.sleep(0.04)
+                await asyncio.sleep(STREAM_POLL_SLEEP)
             except asyncio.CancelledError:
                 break
             except Exception:

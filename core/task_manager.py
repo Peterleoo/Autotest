@@ -18,7 +18,7 @@ from config.settings import settings
 from config.ai_config import ai_config
 from core.report_generator import ReportGenerator
 from core.timeline_manager import TimelineManager
-from core.device_watchdog import DeviceWatchdog
+from core.device_watchdog import DeviceWatchdog, DEFAULT_WATCHDOG_TIMEOUT
 
 logger = logging.getLogger("TaskManager")
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -2248,7 +2248,7 @@ class TaskManager:
             session_id=session.get("session_id", ""),
             device_id=device_id,
             target_package=session.get("app_package"),
-            timeout_seconds=float(session.get("watchdog_timeout", 60.0)),
+            timeout_seconds=float(session.get("watchdog_timeout", DEFAULT_WATCHDOG_TIMEOUT)),
             adb_bin=_app_mgr.adb_bin,
             on_heal_event=lambda evt: self._handle_watchdog_heal_event(session, dev_state, evt),
             get_session_status=lambda: session.get("status", "")

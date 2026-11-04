@@ -21,6 +21,25 @@ from typing import Dict, Any, Optional, Callable, List
 
 logger = logging.getLogger("DeviceWatchdog")
 
+DEVICE_STATE_ONLINE = "device"
+DEVICE_STATE_ABSENT = "absent"
+DEVICE_STATE_UNKNOWN = "unknown"
+
+ADB_CMD_TIMEOUT = 5.0          # 单条 adb shell 诊断指令超时（投屏占用通道时 2s 过短易误判）
+ADB_DEVICES_TIMEOUT = 8.0      # adb devices / reconnect 超时
+RECONNECT_WAIT_TIMEOUT = 15.0  # 单设备重连后等待恢复上限
+OFFLINE_CONFIRM_DELAY = 1.5    # 判定离线前的复核间隔
+DEFAULT_WATCHDOG_TIMEOUT = 180.0  # 无日志输出判定假死阈值（大模型推理/页面加载常超 60s，过短会误杀测试）
+
+
+def parse_device_state(devices_output: str, device_id: str) -> str:
+    """从 `adb devices` 输出中精确解析指定设备状态（逐行精确匹配序列号，杜绝子串误判）"""
+    for line in devices_output.splitlines()[1:]:
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == device_id:
+            return parts[1]
+    return DEVICE_STATE_ABSENT
+
 
 class DeviceWatchdog:
     def __init__(
@@ -131,12 +150,18 @@ class DeviceWatchdog:
         anomaly_type = diag.get("anomaly_type", "UNKNOWN_HANG")
 
         if anomaly_type == "DEVICE_OFFLINE":
-            heal_action = "reset_adb"
-            message = "检测到真机设备掉线，正在尝试自动重启 ADB 守护进程并重连"
-            self._run_adb_cmd(["kill-server"])
-            time.sleep(0.5)
-            self._run_adb_cmd(["start-server"])
-            heal_success = True
+            # ⚠️ 绝不 kill-server：那会断开本机所有设备、投屏与正在执行的 ADB 指令，反而制造掉线
+            heal_action = "reconnect_device"
+            heal_success = self._reconnect_device()
+            message = (
+                f"检测到真机 [{self.device_id}] 掉线 ({diag.get('device_state')})，已对该设备单独重连"
+                + ("成功" if heal_success else "失败，请检查 USB 连接与调试授权")
+            )
+
+        elif anomaly_type == "ADB_UNRESPONSIVE":
+            # ADB 通道繁忙/超时无法判定设备状态：不做任何破坏性动作，等待下一轮心跳复核
+            heal_action = "observe_only"
+            message = "ADB 通道响应超时，暂无法判定真机状态，本轮不做干预以免误伤连接"
 
         elif anomaly_type == "SCREEN_OFF":
             heal_action = "wake_and_unlock"
@@ -198,10 +223,12 @@ class DeviceWatchdog:
         if "mock" in self.device_id.lower():
             return {"anomaly_type": "EXECUTION_HANG", "detail": "模拟环境假死测试"}
 
-        # 1. 检查物理设备是否在列表中
-        dev_out = self._run_adb_cmd(["devices"])
-        if self.device_id and self.device_id not in dev_out:
-            return {"anomaly_type": "DEVICE_OFFLINE", "raw": dev_out}
+        # 1. 检查物理设备连接状态（区分"确实离线"与"ADB 繁忙超时"，并二次复核防误判）
+        state = self._confirmed_device_state()
+        if state == DEVICE_STATE_UNKNOWN:
+            return {"anomaly_type": "ADB_UNRESPONSIVE", "device_state": state}
+        if state != DEVICE_STATE_ONLINE:
+            return {"anomaly_type": "DEVICE_OFFLINE", "device_state": state}
 
         # 2. 检查屏幕状态
         power_out = self._run_adb_shell(["dumpsys", "power"])
@@ -242,7 +269,35 @@ class DeviceWatchdog:
             logger.debug(f"快照固化略过: {e}")
         return None
 
-    def _run_adb_cmd(self, args: List[str]) -> str:
+    def _query_device_state(self) -> str:
+        """查询目标设备在 `adb devices` 中的精确状态；命令超时/出错时返回 unknown 而非误判离线"""
+        try:
+            res = subprocess.run(
+                [self.adb_bin, "devices"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, timeout=ADB_DEVICES_TIMEOUT, encoding="utf-8", errors="ignore"
+            )
+        except Exception as e:
+            logger.warning(f"🐕‍🦺 [Watchdog] adb devices 查询失败，视为状态未知: {e}")
+            return DEVICE_STATE_UNKNOWN
+        if res.returncode != 0:
+            return DEVICE_STATE_UNKNOWN
+        return parse_device_state(res.stdout or "", self.device_id)
+
+    def _confirmed_device_state(self) -> str:
+        """非在线状态需间隔复核一次，避免 USB 瞬时抖动被当成掉线"""
+        state = self._query_device_state()
+        if state == DEVICE_STATE_ONLINE:
+            return state
+        time.sleep(OFFLINE_CONFIRM_DELAY)
+        return self._query_device_state()
+
+    def _reconnect_device(self) -> bool:
+        """仅针对目标设备重连并等待恢复，不影响同机其他设备与 ADB 服务"""
+        self._run_adb_cmd(["reconnect"], timeout=ADB_DEVICES_TIMEOUT)
+        self._run_adb_cmd(["wait-for-device"], timeout=RECONNECT_WAIT_TIMEOUT)
+        return self._query_device_state() == DEVICE_STATE_ONLINE
+
+    def _run_adb_cmd(self, args: List[str], timeout: float = ADB_CMD_TIMEOUT) -> str:
         if "mock" in self.device_id.lower():
             return ""
         cmd = [self.adb_bin]
@@ -250,7 +305,7 @@ class DeviceWatchdog:
             cmd.extend(["-s", self.device_id])
         cmd.extend(args)
         try:
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=2.0, encoding="utf-8", errors="ignore")
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=timeout, encoding="utf-8", errors="ignore")
             return res.stdout or ""
         except Exception as e:
             return f"ERROR: {e}"
