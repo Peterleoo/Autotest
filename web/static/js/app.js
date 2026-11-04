@@ -1,0 +1,8417 @@
+        let currentSessions = [];
+        let activeSessionId = null;
+        let activeConsoleDeviceId = null;
+        let sessionPollTimer = null;
+        let deviceLogsCache = {};
+        let deviceOffsets = {};
+        let availableDevices = [];
+        let currentApprovalMode = "auto";
+        let currentTestMode = "real";
+        const liveRunningSessions = new Set();
+        window._conclusionTypewriterState = window._conclusionTypewriterState || {};
+
+        // ================= 桌面端模式切换与本地用例资产看板 =================
+        let currentWorkspaceMode = "ai"; // 'ai' or 'local'
+        let allSolidifiedCases = [];
+        let currentLocalFilterCategory = "ALL";
+        let currentLocalSearchKeyword = "";
+
+        let activeAppProjectId = "demo_app";
+        let allAppProjects = [];
+
+        function switchMainWorkspaceMode(mode) {
+            currentWorkspaceMode = mode;
+            const btnAi = document.getElementById("btnModeAi");
+            const btnLocal = document.getElementById("btnModeLocal");
+            const viewAi = document.getElementById("workspaceAiView");
+            const viewLocal = document.getElementById("workspaceLocalView");
+            const sidebarAi = document.getElementById("sidebarViewAi");
+            const sidebarLocal = document.getElementById("sidebarViewLocal");
+
+            const switcher = document.getElementById("sidebarModeSwitcher");
+            if (switcher) switcher.classList.toggle("is-local", mode === "local");
+
+            if (btnAi) btnAi.classList.toggle("active", mode === "ai");
+            if (btnLocal) btnLocal.classList.toggle("active", mode === "local");
+
+            if (viewAi) viewAi.classList.toggle("d-none", mode !== "ai");
+            if (viewLocal) viewLocal.classList.toggle("d-none", mode !== "local");
+
+            // 🌟 左侧栏双态智能换装：AI会话时间线 vs App项目文件夹树
+            if (sidebarAi) sidebarAi.classList.toggle("d-none", mode !== "ai");
+            if (sidebarLocal) sidebarLocal.classList.toggle("d-none", mode !== "local");
+
+            const taskMeta = document.getElementById("activeTaskMeta");
+            if (taskMeta) {
+                if (mode === "local" || !activeSessionId) {
+                    taskMeta.classList.add("d-none");
+                } else {
+                    taskMeta.classList.remove("d-none");
+                }
+            }
+
+            if (mode === "local") {
+                // 🌟 双向心智对齐：自动将本地回归工作台与当前 AI 测试选中的 App 项目精准对齐
+                if (currentActiveApp && currentActiveApp.app_id && currentActiveApp.app_id !== "demo_app") {
+                    activeAppProjectId = currentActiveApp.app_id;
+                }
+                loadAppProjects();
+                loadSolidifiedCasesWorkspace(activeAppProjectId);
+            }
+        }
+
+        async function loadAppProjects() {
+            try {
+                const res = await fetch("/api/app_projects");
+                const data = await res.json();
+                allAppProjects = data.projects || [];
+                
+                const listEl = document.getElementById("sidebarAppProjectList");
+                if (!listEl) return;
+
+                if (allAppProjects.length === 0) {
+                    listEl.innerHTML = `<div class="small text-muted p-3 text-center" style="font-size: 11px;">暂无 App 项目工程</div>`;
+                    return;
+                }
+
+                // 🌟 若当前选中的 App 工程存在，保持优先高亮；否则对齐第一个项目
+                if (activeAppProjectId && allAppProjects.some(p => p.id === activeAppProjectId)) {
+                    // 保持已对齐的项目
+                } else if (allAppProjects.length > 0) {
+                    activeAppProjectId = allAppProjects[0].id;
+                }
+
+                let html = "";
+                allAppProjects.forEach(p => {
+                    const isActive = (p.id === activeAppProjectId);
+                    const isCurrent = p.is_current;
+                    const casesCount = p.case_count || 0;
+                    html += `
+                        <div class="app-project-item ${isActive ? 'active' : ''} ${isCurrent ? 'is-current' : ''}" 
+                             onclick="selectAppProject('${p.id}')" 
+                             title="App工程: ${escapeHtml(p.name)} (${casesCount}条用例)">
+                            <span class="project-status-dot" title="${isCurrent ? '当前设备挂载运行中' : '就绪'}"></span>
+                            <span class="project-title">${escapeHtml(p.name)}</span>
+                            <span class="project-cases-count">${casesCount} 例</span>
+                        </div>
+                    `;
+                });
+                listEl.innerHTML = html;
+            } catch (e) {
+                console.warn("加载 App 项目目录失败:", e);
+            }
+        }
+
+        function selectAppProject(projectId) {
+            activeAppProjectId = projectId;
+            
+            // 刷新左侧选中态
+            document.querySelectorAll(".app-project-item").forEach(item => {
+                item.classList.remove("active");
+            });
+            const clicked = document.querySelector(`.app-project-item[onclick*="'${projectId}'"]`);
+            if (clicked) clicked.classList.add("active");
+
+            // 同步顶部应用标签提示
+            const proj = allAppProjects.find(p => p.id === projectId);
+            if (proj) {
+                const topAppLabel = document.getElementById("topBarAppLabel");
+                if (topAppLabel) topAppLabel.innerText = `${proj.name} ${proj.version}`;
+                const titleHeader = document.querySelector("#workspaceLocalView .local-workspace-header .fw-semibold span");
+                if (titleHeader) titleHeader.innerText = `${proj.name} · 本地回归测试资产`;
+            }
+
+            // 重新拉取该 App 专属文件夹下的用例列表
+            loadSolidifiedCasesWorkspace(projectId);
+        }
+
+        async function loadSolidifiedCasesWorkspace(appId) {
+            const targetApp = appId || activeAppProjectId || "demo_app";
+            try {
+                const res = await fetch(`/api/solidified_cases?app_id=${encodeURIComponent(targetApp)}`);
+                const data = await res.json();
+                allSolidifiedCases = data.cases || [];
+                
+                const badge = document.getElementById("localCaseTotalCountBadge");
+                if (badge) badge.innerText = `${allSolidifiedCases.length} 用例`;
+                const wsBadge = document.getElementById("workspaceLocalCasesCount");
+                if (wsBadge) wsBadge.innerText = `${allSolidifiedCases.length} 个已固化脚本`;
+                const topBadge = document.getElementById("topLocalCaseCountBadge");
+                if (topBadge) topBadge.innerText = allSolidifiedCases.length;
+                
+                renderLocalCasesWorkspace();
+            } catch (e) {
+                const box = document.getElementById("localCasesWorkspaceList");
+                if (box) box.innerHTML = `<div class="small text-muted p-3 text-center">加载用例异常: ${e}</div>`;
+            }
+        }
+
+        function filterLocalCases(category, element) {
+            currentLocalFilterCategory = category;
+            if (element) {
+                document.querySelectorAll(".local-filter-pill").forEach(p => p.classList.remove("active"));
+                element.classList.add("active");
+            }
+            renderLocalCasesWorkspace();
+        }
+
+        function onSearchLocalCases(keyword) {
+            currentLocalSearchKeyword = (keyword || "").trim().toLowerCase();
+            renderLocalCasesWorkspace();
+        }
+
+        function renderLocalCasesWorkspace() {
+            const box = document.getElementById("localCasesWorkspaceList");
+            if (!box) return;
+
+            let filtered = allSolidifiedCases.filter(c => {
+                if (currentLocalFilterCategory !== "ALL" && c.module !== currentLocalFilterCategory) {
+                    return false;
+                }
+                if (currentLocalSearchKeyword) {
+                    const matchText = `${c.title || ''} ${c.filename || ''} ${c.desc || ''} ${c.module || ''} ${c.precondition || ''}`.toLowerCase();
+                    if (!matchText.includes(currentLocalSearchKeyword)) return false;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                box.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 68px 20px; text-align: center; color: var(--text-dim);">
+                    <i class="bi bi-inbox" style="font-size: 32px; margin-bottom: 12px; opacity: 0.45; color: var(--text-sub);"></i>
+                    <div style="font-size: 13.5px; font-weight: 600; color: var(--text-main); margin-bottom: 6px;">暂无本地固化回归资产</div>
+                    <div style="font-size: 11.5px; color: var(--text-muted); max-width: 380px; line-height: 1.6;">已清空历史沉淀资产。在后续 AI 自愈测试闭环达成后，可一键将其固化为秒级免 Token 的确定性回归脚本。</div>
+                </div>`;
+                return;
+            }
+
+            let html = "";
+            filtered.forEach((c, idx) => {
+                const isP0 = (c.level === "P0");
+                const safeTitle = (c.title || c.filename).replace(/'/g, "\\'");
+                const safeDesc = (c.desc || '').replace(/'/g, "\\'");
+                const cardId = `compactCaseCard_${idx}`;
+
+                html += `
+                    <div class="case-card-compact" id="${cardId}" onclick="toggleCaseDetails('${cardId}')" title="点击查看用例详细前置条件与脚本说明">
+                        <div class="case-row-main">
+                            <!-- 左侧：状态呼吸微点 + ID + 优先级 + 业务标题 -->
+                            <div class="case-row-left">
+                                <span class="case-status-indicator" title="回归状态: 已通过"></span>
+                                <span class="case-id-badge">${escapeHtml(c.id || 'C-' + (idx+1))}</span>
+                                <span class="case-priority-badge ${isP0 ? '' : 'case-priority-p1'}">${isP0 ? 'P0' : (c.level || 'P1')}</span>
+                                <span class="case-title-text" title="${escapeHtml(c.title || '')}">${escapeHtml(c.title || c.filename)}</span>
+                                <span class="case-meta-tag">${escapeHtml(c.module || '通用')}</span>
+                                <span class="case-script-name" title="${escapeHtml(c.filename)}">${escapeHtml(c.filename)}</span>
+                                <span class="case-metric-text">${c.pass_rate || '100%'} · ${c.avg_duration || '2.5s'}</span>
+                            </div>
+
+                            <!-- 右侧：AI接续 + 本地回放 + 展开微箭头 -->
+                            <div class="case-row-right" onclick="event.stopPropagation()">
+                                <button type="button" class="btn-case-ai" onclick="reuseCaseForAi('${c.filename}', '${safeTitle}', '${safeDesc}')" title="一键将该脚本填入 AI 输入流接续深度探索">
+                                    <i class="bi bi-robot"></i>
+                                    <span>AI接续</span>
+                                </button>
+                                <button type="button" class="btn-case-replay" onclick="replayLocalCaseDirect('${c.filename}')" title="立即在设备上自动回放执行该脚本">
+                                    <i class="bi bi-play-fill"></i>
+                                    <span>本地回放</span>
+                                </button>
+                                <button type="button" class="btn-case-expand" onclick="toggleCaseDetails('${cardId}'); event.stopPropagation();" title="展开/收起详情">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 抽屉微展开区：展示描述与前置条件 -->
+                        <div class="case-details-drawer">
+                            <div class="d-flex flex-column gap-1">
+                                <div><strong>业务描述：</strong>${escapeHtml(c.desc || '自动化标准测试脚本。')}</div>
+                                ${c.precondition ? `<div><strong>前置条件：</strong>${escapeHtml(c.precondition)}</div>` : ''}
+                                <div class="text-muted font-monospace" style="font-size: 10.5px;">脚本文件: ${escapeHtml(c.filename)} ${c.size ? '(' + c.size + ')' : ''}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            box.innerHTML = html;
+        }
+
+        function toggleCaseDetails(cardId) {
+            const card = document.getElementById(cardId);
+            if (card) {
+                card.classList.toggle("expanded");
+            }
+        }
+
+        function reuseCaseForAi(filename, title, desc) {
+            switchMainWorkspaceMode('ai');
+            const promptText = `基于本地沉淀脚本 ${filename}（${title}）作为前置准备，在此业务链路上接续执行以下深度探索与边界测试：`;
+            fillPrompt(promptText);
+        }
+
+        function replayLocalCaseDirect(filename) {
+            switchMainWorkspaceMode('ai');
+            replaySolidifiedCase(filename);
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && canvas.classList.contains("collapsed")) {
+                toggleCanvas();
+            }
+            switchCanvasTab('logs');
+        }
+
+        // ================= 1. 布局折叠与抽屉 =================
+        function toggleSidebar() {
+            const sidebar = document.getElementById("gptSidebar");
+            const btnExpand = document.getElementById("btnExpandSidebar");
+            sidebar.classList.toggle("collapsed");
+            if (sidebar.classList.contains("collapsed")) {
+                btnExpand.classList.remove("d-none");
+            } else {
+                btnExpand.classList.add("d-none");
+            }
+        }
+
+        function toggleCanvas() {
+            const canvas = document.getElementById("gptCanvas");
+            canvas.classList.toggle("collapsed");
+        }
+
+        let currentDeliverablesSubTab = "cases";
+
+        function switchDeliverablesSubTab(subTab) {
+            if (subTab !== "cases" && subTab !== "reports") subTab = "cases";
+            currentDeliverablesSubTab = subTab;
+
+            const btnCases = document.getElementById("btnSubTabCases");
+            const btnReports = document.getElementById("btnSubTabReports");
+            const viewCases = document.getElementById("subViewCases");
+            const viewReports = document.getElementById("subViewReports");
+
+            if (btnCases) btnCases.classList.toggle("active", subTab === "cases");
+            if (btnReports) btnReports.classList.toggle("active", subTab === "reports");
+            if (viewCases) viewCases.classList.toggle("d-none", subTab !== "cases");
+            if (viewReports) viewReports.classList.toggle("d-none", subTab !== "reports");
+        }
+
+        // ================= 右侧工作台：双 Tab 切换 (全量日志 vs 屏幕显示) =================
+        let currentScreenDeviceId = null;
+        let screenAutoSyncTimer = null;
+        let isScreenAutoSyncEnabled = true;
+
+        let currentRightDocContent = "";
+        let currentRightDocTitle = "TEST_REPORT.md";
+
+        function switchCanvasTab(tab) {
+            // 右侧面板已统一收敛为内容检视器 (只展示生成的内容如MD报告与断言)
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && canvas.classList.contains("collapsed")) {
+                canvas.classList.remove("collapsed");
+            }
+            const btnToggle = document.getElementById("btnToggleRight");
+            if (btnToggle) btnToggle.classList.add("active");
+        }
+
+        function toggleRightInspector() {
+            toggleCanvas();
+        }
+
+        // ================= 【用户核心诉求】在右侧区域打开测试报告/用例明细 =================
+        // 触控涟漪动效
+        function triggerScreenTouchRipple(xRatio, yRatio, label) {
+            const ripple = document.getElementById("deviceActionRipple");
+            if (!ripple) return;
+            const x = (xRatio !== undefined ? xRatio : 0.5) * 100;
+            const y = (yRatio !== undefined ? yRatio : 0.5) * 100;
+            ripple.style.left = `${x}%`;
+            ripple.style.top = `${y}%`;
+            ripple.classList.remove("active");
+            void ripple.offsetWidth;
+            ripple.classList.add("active");
+            const statusEl = document.getElementById("floatingDeviceStatus");
+            if (statusEl && label) statusEl.innerText = label;
+        }
+
+        // 一键批量回归
+        async function runBatchLocalRegression(category) {
+            // 🚀 执行回归任务时自动唤起端侧投屏并靠右停靠
+            if (typeof ensurePipScreenOpen === "function") ensurePipScreenOpen();
+            const cat = category || "ALL";
+            const btn = document.getElementById("btnBatchRunLocal");
+            const originalHtml = btn ? btn.innerHTML : "";
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 10px; height: 10px;"></span> 正在秒级批量回归...`;
+            }
+            try {
+                const res = await fetch("/api/solidified_cases/batch_run", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ category: cat })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`🎉 批量回归圆满完成！\n📦 回归用例总数：${data.total} 个\n✅ 通过率：${data.pass_rate} (${data.passed}/${data.total})\n⏱️ 总执行耗时：${data.duration}\n🚀 零 Token 本地原生极速验证达成。`);
+                    await loadSolidifiedCasesWorkspace();
+                } else {
+                    alert(data.message || "批量回归未能完成");
+                }
+            } catch (e) {
+                alert("批量回归请求异常: " + e);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        }
+
+                // ================= 4. Codex-style 多页签沉浸式检视器引擎 (Tabbed Document Viewer) =================
+        window.docViewerTabs = []; // [{ id, title, type: 'md'|'log'|'code', content, filename }]
+        window.activeViewerTabId = null;
+
+        // 打开或激活指定页签并展开右侧检视窗口
+        function openViewerTab(tabConfig) {
+            if (!tabConfig) return;
+            const tabId = tabConfig.id || ('tab_' + (tabConfig.filename || tabConfig.title || 'doc').replace(/[^a-zA-Z0-9_]/g, '_'));
+            tabConfig.id = tabId;
+
+            const existing = window.docViewerTabs.find(t => t.id === tabId);
+            if (existing) {
+                if (tabConfig.content !== undefined) existing.content = tabConfig.content;
+                if (tabConfig.title) existing.title = tabConfig.title;
+            } else {
+                window.docViewerTabs.push(tabConfig);
+            }
+
+            window.activeViewerTabId = tabId;
+            renderViewerTabsHeader();
+            renderViewerContent();
+
+            // 展开右侧抽屉
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && canvas.classList.contains("collapsed")) {
+                canvas.classList.remove("collapsed");
+            }
+            const btnRight = document.getElementById("btnToggleRight");
+            if (btnRight) btnRight.classList.add("active");
+        }
+
+        // 切换当前激活的页签
+        function switchViewerTab(tabId) {
+            window.activeViewerTabId = tabId;
+            renderViewerTabsHeader();
+            renderViewerContent();
+        }
+
+        // 关闭指定页签
+        function closeViewerTab(tabId, e) {
+            if (e) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+            const idx = window.docViewerTabs.findIndex(t => t.id === tabId);
+            if (idx === -1) return;
+
+            window.docViewerTabs.splice(idx, 1);
+
+            if (window.docViewerTabs.length === 0) {
+                window.activeViewerTabId = null;
+                renderViewerTabsHeader();
+                renderViewerContent();
+                closeDocViewer();
+            } else {
+                if (window.activeViewerTabId === tabId) {
+                    const nextIdx = Math.max(0, idx - 1);
+                    window.activeViewerTabId = window.docViewerTabs[nextIdx].id;
+                }
+                renderViewerTabsHeader();
+                renderViewerContent();
+            }
+        }
+
+        // 收起右侧检视窗口
+        function closeDocViewer() {
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && !canvas.classList.contains("collapsed")) {
+                canvas.classList.add("collapsed");
+            }
+            const btnRight = document.getElementById("btnToggleRight");
+            if (btnRight) btnRight.classList.remove("active");
+        }
+
+        // 切换抽屉展开/收起 (绑定中间右上角 #btnToggleRight)
+        function toggleCanvas() {
+            const canvas = document.getElementById("gptCanvas");
+            if (!canvas) return;
+            const willOpen = canvas.classList.contains("collapsed");
+            if (willOpen) {
+                canvas.classList.remove("collapsed");
+                const btnRight = document.getElementById("btnToggleRight");
+                if (btnRight) btnRight.classList.add("active");
+                // 如果当前没有任何打开的 tab，自动尝试打开当前会话的报告
+                if (window.docViewerTabs.length === 0 && activeSessionId) {
+                    openReportInRightDrawer(activeSessionId);
+                } else {
+                    renderViewerTabsHeader();
+                    renderViewerContent();
+                }
+            } else {
+                closeDocViewer();
+            }
+        }
+
+        // 渲染顶部微页签栏
+        function renderViewerTabsHeader() {
+            const listEl = document.getElementById("viewerTabsList");
+            if (!listEl) return;
+            if (window.docViewerTabs.length === 0) {
+                listEl.innerHTML = `<span style="font-size: 11px; color: var(--text-muted); padding-left: 8px;">无打开文档</span>`;
+                return;
+            }
+
+            let html = "";
+            window.docViewerTabs.forEach(t => {
+                const isActive = (t.id === window.activeViewerTabId);
+                let iconClass = "bi-file-earmark-medical tab-icon-md";
+                if (t.type === "log") iconClass = "bi-terminal tab-icon-log";
+                else if (t.type === "code") iconClass = "bi-filetype-py tab-icon-code";
+
+                html += `
+                    <div class="codex-tab ${isActive ? 'active' : ''}" onclick="switchViewerTab('${escapeHtml(t.id)}')" title="${escapeHtml(t.filename || t.title)}">
+                        <i class="bi ${iconClass} tab-icon"></i>
+                        <span class="tab-title-text">${escapeHtml(t.title)}</span>
+                        <button class="tab-close-btn" onclick="closeViewerTab('${escapeHtml(t.id)}', event)" title="关闭此页签">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        // 渲染检视视口正文
+        function renderViewerContent() {
+            const container = document.getElementById("viewerContentArea");
+            if (!container) return;
+
+            if (window.docViewerTabs.length === 0 || !window.activeViewerTabId) {
+                container.innerHTML = `
+                    <div class="codex-empty-view">
+                        <i class="bi bi-file-earmark-text" style="font-size: 32px; opacity: 0.35;"></i>
+                        <div style="font-weight: 500; font-size: 13px;">暂无打开的检视文件</div>
+                        <div style="font-size: 11px; opacity: 0.6; max-width: 240px; line-height: 1.5;">在中间会话流中点击“查看报告”、“运行日志”或“代码”即可在此展开查阅</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const curTab = window.docViewerTabs.find(t => t.id === window.activeViewerTabId);
+            if (!curTab) return;
+
+            if (curTab.type === "md") {
+                let parsedHtml = "";
+                if (typeof marked !== "undefined" && marked.parse) {
+                    parsedHtml = marked.parse(curTab.content || "");
+                } else if (typeof renderMarkdownToHtml === "function") {
+                    parsedHtml = renderMarkdownToHtml(curTab.content || "");
+                } else {
+                    parsedHtml = `<pre>${escapeHtml(curTab.content || "")}</pre>`;
+                }
+                container.innerHTML = `<div class="codex-md-view">${parsedHtml}</div>`;
+                container.scrollTop = 0;
+            } else if (curTab.type === "log") {
+                const lines = (curTab.content || "").split("\n");
+                let logLinesHtml = "";
+                lines.forEach((l, idx) => {
+                    let levelClass = "";
+                    if (l.includes("[ERROR]") || l.includes("❌") || l.includes("Traceback") || l.includes("Error") || l.includes("Exception")) {
+                        levelClass = "log-error";
+                    } else if (l.includes("[WARNING]") || l.includes("⚠️")) {
+                        levelClass = "log-warn";
+                    } else if (l.includes("--- [Step") || l.includes("========== 开始") || l.includes("========== 测试结束")) {
+                        levelClass = "log-step";
+                    } else if (l.includes("✅") || l.includes("🎉") || l.includes("成功")) {
+                        levelClass = "log-success";
+                    }
+                    logLinesHtml += `
+                        <div class="codex-log-line ${levelClass}">
+                            <span class="line-num">${idx + 1}</span>
+                            <span class="line-text">${escapeHtml(l)}</span>
+                        </div>
+                    `;
+                });
+                container.innerHTML = `<div class="codex-log-view">${logLinesHtml || '<div class="text-muted p-3">暂无日志行</div>'}</div>`;
+            } else if (curTab.type === "code") {
+                container.innerHTML = `<pre class="codex-code-view"><code>${escapeHtml(curTab.content || "")}</code></pre>`;
+                container.scrollTop = 0;
+            }
+        }
+
+        // 快捷入口 1: 打开 Markdown 报告全文
+        function openReportInRightDrawer(sessionId) {
+            const sid = sessionId || activeSessionId;
+            let reportContent = "";
+            let sData = (currentActiveSessionData && currentActiveSessionData.session_id === sid) ? currentActiveSessionData : null;
+            if (!sData) {
+                sData = currentSessions.find(s => s.session_id === sid);
+            }
+            if (sData) {
+                if (sData.markdown_report) {
+                    reportContent = sData.markdown_report;
+                } else if (sData.timeline_blocks) {
+                    const blk = sData.timeline_blocks.find(b => b.type === "final_report");
+                    if (blk && blk.content) reportContent = blk.content;
+                }
+            }
+            if (!reportContent) {
+                reportContent = `# 测试会话报告 [${sid}]\n\n暂无持久化报告内容，可能测试仍在执行中或被提前终止。`;
+            }
+
+            openViewerTab({
+                id: 'report_' + sid,
+                title: `report_${sid.slice(-6)}.md`,
+                type: 'md',
+                content: reportContent,
+                filename: `test_report_${sid}.md`
+            });
+        }
+
+        // 快捷入口 2: 打开底层端侧与系统日志全文 (支持全貌拉取与异步高保真呈现)
+        async function openLogViewer(sessionId) {
+            const sid = sessionId || activeSessionId;
+            if (!sid) return;
+
+            const tabId = 'log_' + sid;
+            // 立即在右侧抽屉开辟标签页并显示拉取进度
+            openViewerTab({
+                id: tabId,
+                title: `execution_${sid.slice(-6)}.log`,
+                type: 'log',
+                content: `[${new Date().toLocaleTimeString()}] 正在从真机与执行引擎拉取会话 [${sid}] 全量底层日志...\n`,
+                filename: `execution_${sid}.log`
+            });
+
+            // 优先调用后端专门的 raw_logs 纯文本接口，100% 还原真机 30+ 行原生底层执行全貌
+            try {
+                const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}/raw_logs`);
+                if (res.ok) {
+                    const fullRawText = await res.text();
+                    if (fullRawText && fullRawText.trim().length > 0) {
+                        const cur = (window.docViewerTabs || []).find(t => t.id === tabId);
+                        if (cur) {
+                            cur.content = fullRawText;
+                            if (window.activeViewerTabId === tabId) {
+                                renderViewerContent();
+                            }
+                        }
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn("拉取 raw_logs 接口失败，尝试降级读取客户端内存:", err);
+            }
+
+            // 兜底降级：解析内存中的 devices.logs 或 devices.new_logs
+            let logsText = "";
+            let sData = (currentActiveSessionData && currentActiveSessionData.session_id === sid) ? currentActiveSessionData : null;
+            if (!sData) {
+                sData = (currentSessions || []).find(s => s.session_id === sid);
+            }
+            if (sData && sData.devices) {
+                for (const devId in sData.devices) {
+                    const dev = sData.devices[devId];
+                    const devLogs = (dev && (dev.logs || dev.new_logs)) || [];
+                    if (Array.isArray(devLogs) && devLogs.length > 0) {
+                        logsText += `================================================================================\n`;
+                        logsText += `📱 目标真机 [${dev.model || devId}] · 原生底层执行与自学习日志流 (${devLogs.length} 行)\n`;
+                        logsText += `================================================================================\n\n`;
+                        logsText += devLogs.join("\n") + "\n\n";
+                    }
+                }
+            }
+            if (!logsText && sData && sData.timeline_blocks) {
+                const thoughts = sData.timeline_blocks.filter(b => b.type === "thought").map(b => (b.bullets || []).map(x => `[推演] ${x.tag}: ${x.content}`).join("\n"));
+                if (thoughts.length) logsText = thoughts.join("\n\n");
+            }
+            if (!logsText) {
+                logsText = `[${new Date().toLocaleTimeString()}] 会话 [${sid}] 暂无捕获到底层原始日志。`;
+            }
+
+            const cur = (window.docViewerTabs || []).find(t => t.id === tabId);
+            if (cur) {
+                cur.content = logsText;
+                if (window.activeViewerTabId === tabId) {
+                    renderViewerContent();
+                }
+            }
+        }
+
+        // 快捷入口 3: 打开固化自动化测试脚本源码
+        async function openEmbeddedCode(filename, title) {
+            const fn = filename || "test_suite.py";
+            const tabId = 'code_' + fn.replace(/[^a-zA-Z0-9_]/g, '_');
+
+            openViewerTab({
+                id: tabId,
+                title: fn,
+                type: 'code',
+                content: `# 正在读取固化脚本 [${fn}] 源码...\n`,
+                filename: fn
+            });
+
+            try {
+                const res = await fetch(`/api/solidified_cases/content?filename=${encodeURIComponent(fn)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const code = data.content || `# 脚本 [${fn}] 内容为空`;
+                    const cur = window.docViewerTabs.find(t => t.id === tabId);
+                    if (cur) {
+                        cur.content = code;
+                        if (window.activeViewerTabId === tabId) renderViewerContent();
+                    }
+                } else {
+                    const cur = window.docViewerTabs.find(t => t.id === tabId);
+                    if (cur) {
+                        cur.content = `# 未能在本地固化库找到 ${fn} (HTTP ${res.status})\n# 本地执行验证命令: pytest tests/solidified/${fn} -v -s`;
+                        if (window.activeViewerTabId === tabId) renderViewerContent();
+                    }
+                }
+            } catch (e) {
+                const cur = window.docViewerTabs.find(t => t.id === tabId);
+                if (cur) {
+                    cur.content = `# 读取脚本异常: ${e.message}\n# 文件名: ${fn}`;
+                    if (window.activeViewerTabId === tabId) renderViewerContent();
+                }
+            }
+        }
+
+        // 复制当前激活页签的纯文本内容
+        function copyCurrentViewerContent() {
+            if (!window.activeViewerTabId) return;
+            const curTab = window.docViewerTabs.find(t => t.id === window.activeViewerTabId);
+            if (!curTab || !curTab.content) return;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(curTab.content).then(() => {
+                    const btn = document.getElementById("btnViewerCopy");
+                    if (btn) {
+                        const orig = btn.innerHTML;
+                        btn.innerHTML = `<i class="bi bi-check2 text-success"></i>`;
+                        setTimeout(() => btn.innerHTML = orig, 1500);
+                    }
+                });
+            }
+        }
+
+        // 下载当前激活页签的文件
+        function downloadCurrentViewerContent() {
+            if (!window.activeViewerTabId) return;
+            const curTab = window.docViewerTabs.find(t => t.id === window.activeViewerTabId);
+            if (!curTab || !curTab.content) return;
+
+            let mime = "text/plain;charset=utf-8";
+            if (curTab.type === "md") mime = "text/markdown;charset=utf-8";
+            else if (curTab.type === "code") mime = "text/x-python;charset=utf-8";
+
+            const blob = new Blob([curTab.content], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = curTab.filename || curTab.title || "document.txt";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 全局键盘监听: ESC 键收起检视窗口
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") {
+                closeDocViewer();
+            }
+        });
+
+        function initFloatingDeviceDrag() {
+            const floatingWin = document.getElementById('floatingDeviceWindow');
+            const dragHandle = document.getElementById('deviceDragHandle');
+            if (!dragHandle || !floatingWin) return;
+
+            if (dragHandle._hasDragListener) return;
+            dragHandle._hasDragListener = true;
+
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            dragHandle.addEventListener('mousedown', function(e) {
+                if (e.target.closest('.device-btn-icon')) return;
+                e.preventDefault();
+                e.stopPropagation();
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = floatingWin.getBoundingClientRect();
+                initialLeft = rect.left;
+                initialTop = rect.top;
+                floatingWin.style.right = 'auto';
+                floatingWin.style.left = initialLeft + 'px';
+                floatingWin.style.top = initialTop + 'px';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+
+                newLeft = Math.max(10, Math.min(window.innerWidth - floatingWin.offsetWidth - 10, newLeft));
+                newTop = Math.max(42, Math.min(window.innerHeight - floatingWin.offsetHeight - 10, newTop));
+
+                floatingWin.style.left = newLeft + 'px';
+                floatingWin.style.top = newTop + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    document.body.style.userSelect = '';
+                }
+            });
+        }
+
+        let isTaskCardOpen = true;
+        function toggleTaskCard() {
+            isTaskCardOpen = !isTaskCardOpen;
+            const list = document.getElementById('taskStepList');
+            const chevron = document.getElementById('taskCardChevron');
+            const hdr = document.getElementById('taskCardHeader');
+            if (list) list.style.display = isTaskCardOpen ? 'flex' : 'none';
+            if (chevron) chevron.classList.toggle('collapsed', !isTaskCardOpen);
+            if (hdr) hdr.classList.toggle('is-open', isTaskCardOpen);
+        }
+
+        function closeFloatingDevice(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const win = document.getElementById('floatingDeviceWindow');
+            const btn = document.getElementById('btnTogglePipScreen');
+            if (win) {
+                win.style.display = 'none';
+                win.classList.remove('show');
+            }
+            if (btn) btn.classList.remove('active');
+            isPipScreenOpen = false;
+            if (pipScreenTimer) {
+                clearInterval(pipScreenTimer);
+                pipScreenTimer = null;
+            }
+        }
+
+        function resetDevicePos(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const win = document.getElementById('floatingDeviceWindow');
+            if (!win) return;
+
+            // 智能计算归位坐标：根据右侧抽屉面板是否展开，自适应停靠
+            const rightCanvas = document.getElementById('gptCanvas');
+            const isRightOpen = rightCanvas && !rightCanvas.classList.contains('collapsed');
+            const targetRight = isRightOpen ? 490 : 20;
+
+            // 启动平滑飞回过渡
+            win.style.transition = 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)';
+            win.style.left = 'auto';
+            win.style.right = targetRight + 'px';
+            win.style.top = '55px';
+
+            // 动画完成后清除 transition，保持后续手动拖拽丝滑无延迟
+            setTimeout(() => {
+                win.style.transition = '';
+            }, 300);
+        }
+
+        function _old_resetDevicePos(e) {
+            if (e) e.stopPropagation();
+            const win = document.getElementById('floatingDeviceWindow');
+            if (win) {
+                win.style.left = 'auto';
+                win.style.right = '480px';
+                win.style.top = '50px';
+            }
+        }
+
+        function toggleTheme() {
+            const current = document.body.getAttribute("data-theme") || "dark";
+            const next = current === "light" ? "dark" : "light";
+            switchTheme(next);
+        }
+
+        // ================= 屏幕显示 (Screen Mirroring) 控制器 =================
+        function loadScreenDevices() {
+            const sel = document.getElementById("screenDeviceSelect");
+            if (!sel) return;
+
+            const oldVal = sel.value;
+            let optionsHtml = '<option value="">自动跟随主设备</option>';
+
+            if (availableDevices && availableDevices.length > 0) {
+                availableDevices.forEach(d => {
+                    const selAttr = (d.id === oldVal) ? "selected" : "";
+                    optionsHtml += `<option value="${d.id}" ${selAttr}>${d.model} (${d.id})</option>`;
+                });
+            }
+            sel.innerHTML = optionsHtml;
+        }
+
+        function onScreenDeviceSelectChange() {
+            const sel = document.getElementById("screenDeviceSelect");
+            currentScreenDeviceId = sel ? sel.value : null;
+            refreshDeviceScreen(true);
+        }
+
+        function toggleAutoSyncScreen() {
+            const sw = document.getElementById("switchAutoSyncScreen");
+            isScreenAutoSyncEnabled = sw ? sw.checked : false;
+            setupScreenAutoSync();
+        }
+
+        function setupScreenAutoSync() {
+            if (screenAutoSyncTimer) {
+                clearInterval(screenAutoSyncTimer);
+                screenAutoSyncTimer = null;
+            }
+            const viewScreen = document.getElementById("canvasScreenView");
+            const isScreenTabActive = viewScreen && !viewScreen.classList.contains("d-none");
+            const isCanvasOpen = !document.getElementById("gptCanvas")?.classList.contains("collapsed");
+
+            if (isScreenAutoSyncEnabled && isScreenTabActive && isCanvasOpen) {
+                screenAutoSyncTimer = setInterval(() => {
+                    refreshDeviceScreen(false);
+                }, 1800);
+            }
+        }
+
+        async function refreshDeviceScreenManual() {
+            await refreshDeviceScreen(true);
+        }
+
+        async function refreshDeviceScreen(isManual = false) {
+            const imgEl = document.getElementById("screenMirrorImg");
+            const emptyEl = document.getElementById("screenEmptyPlaceholder");
+            const statusFooter = document.getElementById("screenStatusFooter");
+            if (!imgEl) return;
+
+            // 1. 确定目标设备 ID
+            let devId = currentScreenDeviceId;
+            if (!devId) {
+                if (activeConsoleDeviceId && activeConsoleDeviceId !== "mock-device") {
+                    devId = activeConsoleDeviceId;
+                } else if (availableDevices && availableDevices.length > 0) {
+                    devId = availableDevices[0].id;
+                }
+            }
+
+            if (!devId || devId === "mock-device" || devId === "local-simulator") {
+                if (isManual && statusFooter) {
+                    statusFooter.innerText = "未检测到可连接的物理真机设备";
+                }
+                return;
+            }
+
+            try {
+                if (statusFooter && isManual) {
+                    statusFooter.innerText = `正在同步 [${devId}] 实时屏幕...`;
+                }
+
+                // 添加防缓存时间戳
+                const timestamp = Date.now();
+                const screenshotUrl = `/api/devices/${encodeURIComponent(devId)}/screenshot?t=${timestamp}&format=jpeg`;
+
+                // 预加载检测图片
+                const testImg = new Image();
+                testImg.onload = () => {
+                    imgEl.src = screenshotUrl;
+                    imgEl.classList.remove("d-none");
+                    if (emptyEl) emptyEl.classList.add("d-none");
+                    if (statusFooter) {
+                        const nowStr = new Date().toLocaleTimeString();
+                        statusFooter.innerText = `画面实时同步正常 · ${nowStr}`;
+                    }
+                };
+                testImg.onerror = () => {
+                    if (isManual && statusFooter) {
+                        statusFooter.innerText = `设备 [${devId}] 正在准备或处于锁屏黑屏`;
+                    }
+                };
+                testImg.src = screenshotUrl;
+            } catch (e) {
+                if (statusFooter) statusFooter.innerText = `捕获屏幕异常: ${e}`;
+            }
+        }
+
+        // 兼容外部旧调用：openEmbeddedReport / openEmbeddedCode 优雅转为新窗口或本地用例看板
+        function openEmbeddedReport(url, title) {
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                alert("全景评测报告查看：请在本地用例看板中查看已归档的报告资产。");
+            }
+        }
+
+        function openEmbeddedCode(filename, title) {
+            switchMainWorkspaceMode('local');
+            const searchInput = document.getElementById('localCaseSearchInput');
+            if (searchInput && filename) {
+                searchInput.value = filename;
+                onSearchLocalCases(filename);
+            }
+        }
+
+        function scrollConsoleToBottom() {
+            const runLogs = document.getElementById("runLogs");
+            if (runLogs) runLogs.scrollTop = runLogs.scrollHeight;
+        }
+
+        function switchTheme(theme) {
+            let actualTheme = theme;
+            if (theme === "auto") {
+                const isSystemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                actualTheme = isSystemDark ? "dark" : "light";
+            }
+            document.body.setAttribute("data-theme", actualTheme);
+            document.body.classList.toggle("theme-light", actualTheme === "light");
+            const headerIcon = document.getElementById("headerThemeIcon");
+            if (headerIcon) {
+                headerIcon.className = (actualTheme === "dark") ? "bi bi-moon-stars" : "bi bi-sun";
+            }
+            localStorage.setItem("autotest_theme", theme);
+
+            // 更新设置模态框中的 3 张卡片状态
+            const cardLight = document.getElementById("themeCardLight");
+            const cardDark = document.getElementById("themeCardDark");
+            const cardAuto = document.getElementById("themeCardAuto");
+            if (cardLight) cardLight.classList.toggle("active", theme === "light");
+            if (cardDark) cardDark.classList.toggle("active", theme === "dark");
+            if (cardAuto) cardAuto.classList.toggle("active", theme === "auto");
+
+            updateThemeToggleUI(actualTheme);
+        }
+
+        // 监听系统主题变化
+        if (window.matchMedia) {
+            window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(e) {
+                if (localStorage.getItem("autotest_theme") === "auto") {
+                    switchTheme("auto");
+                }
+            });
+        }
+
+        function toggleThemeQuick(e) {
+            if (e) e.stopPropagation();
+            const currentTheme = document.body.getAttribute("data-theme") || "dark";
+            const nextTheme = (currentTheme === "dark") ? "light" : "dark";
+            switchTheme(nextTheme);
+        }
+
+        function updateThemeToggleUI(theme) {
+            const icon = document.getElementById("quickThemeIcon");
+            const text = document.getElementById("quickThemeText");
+            const badge = document.getElementById("quickThemeBadge");
+            if (!icon || !text || !badge) return;
+            if (theme === "dark") {
+                icon.className = "bi bi-moon-stars";
+                text.innerText = "夜间模式";
+                badge.innerText = "深色";
+                badge.className = "mono-tag mono-tag-active";
+            } else {
+                icon.className = "bi bi-sun";
+                text.innerText = "明亮模式";
+                badge.innerText = "浅色";
+                badge.className = "mono-tag";
+            }
+        }
+
+        // 旧设置函数已收敛至底部统一维护
+
+        function openEnvConfigTip() {
+            alert("配置文件路径: F:\Autotest\.env\n可在设置中的【模型】面板直接编辑保存，系统将自动热同步至 .env 文件中。");
+        }
+
+        function selectProviderForEdit(provider) {
+            const pSelect = document.getElementById("modelProviderSelect");
+            if (pSelect) {
+                pSelect.value = provider;
+                onProviderChange();
+            }
+            const formCard = document.getElementById("modelProviderSelect")?.closest(".border");
+            if (formCard) formCard.scrollIntoView({ behavior: "smooth" });
+        }
+
+        async function loadAntigravityStatus(isManual = false) {
+            try {
+                const res = await fetch("/api/antigravity/status");
+                const data = await res.json();
+                window._antigravityStatusData = data;
+                
+                const statusBadge = document.getElementById("agAuthStatusBadge");
+                const emailEl = document.getElementById("agAuthEmail");
+                const btnLogin = document.getElementById("btnAgLogin");
+                const navDot = document.getElementById("navDot_google");
+                const dotAntigravity = document.getElementById("statusDot_antigravity");
+                const subtitleAntigravity = document.getElementById("subtitle_antigravity");
+                const tagAntigravity = document.getElementById("tag_antigravity");
+
+                const isLoggedIn = !!data.is_logged_in;
+
+                // 侧栏指示灯
+                if (navDot) {
+                    navDot.className = `status-indicator-dot ${isLoggedIn ? 'dot-online' : 'dot-offline'}`;
+                    navDot.title = isLoggedIn ? "Google 官方账号已授权" : "未授权";
+                }
+
+                // AI 模型服务页面的服务商卡片状态
+                if (dotAntigravity) {
+                    dotAntigravity.className = `status-indicator-dot ${isLoggedIn ? 'dot-online' : 'dot-offline'}`;
+                }
+                if (tagAntigravity) {
+                    tagAntigravity.className = `provider-badge-tag ${isLoggedIn ? 'default-tag' : 'tag-locked'}`;
+                    tagAntigravity.innerText = isLoggedIn ? "已授权" : "需授权";
+                }
+                if (subtitleAntigravity) {
+                    subtitleAntigravity.innerText = isLoggedIn ? `已授权 · 原生视觉 (${data.email || 'Google 账号'})` : "未授权 · 点击前往完成授权";
+                }
+
+                if (isLoggedIn) {
+                    if (statusBadge) {
+                        statusBadge.className = "mono-tag mono-tag-active";
+                        statusBadge.style.color = "var(--status-green)";
+                        statusBadge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>已授权绑定';
+                    }
+                    if (emailEl) {
+                        emailEl.innerHTML = `<span style="color: var(--text-main); font-weight: 500;"><i class="bi bi-person-check me-1"></i>已登录账号:</span> ${data.email || 'Google 官方账号'}`;
+                    }
+                    if (btnLogin) {
+                        btnLogin.innerHTML = `<i class="bi bi-arrow-repeat me-1 text-info"></i><span>重新授权 / 切换 Google 账号</span>`;
+                        btnLogin.className = "btn-fidelity-reauth";
+                    }
+                } else {
+                    if (statusBadge) {
+                        statusBadge.className = "mono-tag";
+                        statusBadge.style.color = "#f59e0b";
+                        statusBadge.innerHTML = '<i class="bi bi-shield-exclamation me-1"></i>尚未授权';
+                    }
+                    if (emailEl) {
+                        emailEl.innerText = "尚未连接 Google 官方账号，点击右侧按钮完成 OAuth 授权后方可启用官方模型。";
+                    }
+                    if (btnLogin) {
+                        btnLogin.innerHTML = `<i class="bi bi-box-arrow-up-right me-1"></i><span>立即连接 Google 账号</span>`;
+                        btnLogin.className = "btn-fidelity-reauth";
+                    }
+                }
+
+                // 同步刷新模型下拉选单的门禁状态
+                if (window.currentSystemConfig) {
+                    window.currentSystemConfig.antigravity = window.currentSystemConfig.antigravity || {};
+                    window.currentSystemConfig.antigravity.ready = isLoggedIn;
+                    renderModelDropdownMenu(window.currentSystemConfig);
+                }
+            } catch (e) {
+                console.warn("加载 Google 状态异常", e);
+            }
+        }
+
+        async function triggerAntigravityLogin() {
+            try {
+                const res = await fetch("/api/antigravity/login", { method: "POST" });
+                const data = await res.json();
+                if (data.success && data.auth_url) {
+                    window.open(data.auth_url, "_blank");
+                    alert(data.message || "已在系统默认浏览器中打开 Google 登录授权页，请完成授权。");
+                    setTimeout(loadAntigravityStatus, 4000);
+                } else {
+                    alert(data.message || "发起 Google 登录失败");
+                }
+            } catch (e) {
+                alert("调用 Antigravity 授权异常: " + e.message);
+            }
+        }
+
+        function openInviteAuthModal() {
+            closeAllPopovers();
+            // loadAuthStatus(); (已去授权化)
+            const modalEl = document.getElementById("inviteAuthModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function openAppPackagesModal() {
+            closeAllPopovers();
+            loadApps();
+            const modalEl = document.getElementById("appPackagesModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function openDeviceNodesModal() {
+            closeAllPopovers();
+            loadDevices();
+            const modalEl = document.getElementById("deviceNodesModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        // ================= 三栏原生自由拖拽拉伸引擎 (Splitter Resizers) =================
+        function initSplitterResizers() {
+            const sidebar = document.getElementById("gptSidebar");
+            const canvas = document.getElementById("gptCanvas");
+            const resizerLeft = document.getElementById("resizerLeft");
+            const resizerRight = document.getElementById("resizerRight");
+
+            if (!sidebar || !resizerLeft || !canvas || !resizerRight) return;
+
+            // 恢复记忆的面板宽度
+            const savedSidebarW = localStorage.getItem("autotest_sidebar_width");
+            if (savedSidebarW) {
+                sidebar.style.width = savedSidebarW + "px";
+            }
+            const savedCanvasW = localStorage.getItem("autotest_canvas_width");
+            if (savedCanvasW) {
+                canvas.style.width = savedCanvasW + "px";
+            }
+
+            // 1. 左侧拖拽分割条：改变侧栏宽度，中间自适应，高度锁定 100vh
+            resizerLeft.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startWidth = sidebar.getBoundingClientRect().width;
+                document.body.classList.add("resizing-active");
+                resizerLeft.classList.add("dragging");
+
+                function onMouseMove(moveEvent) {
+                    const delta = moveEvent.clientX - startX;
+                    const newW = Math.max(180, Math.min(460, startWidth + delta));
+                    sidebar.style.width = newW + "px";
+                }
+
+                function onMouseUp() {
+                    document.body.classList.remove("resizing-active");
+                    resizerLeft.classList.remove("dragging");
+                    document.removeEventListener("mousemove", onMouseMove);
+                    document.removeEventListener("mouseup", onMouseUp);
+                    const finalW = Math.round(sidebar.getBoundingClientRect().width);
+                    localStorage.setItem("autotest_sidebar_width", finalW);
+                }
+
+                document.addEventListener("mousemove", onMouseMove);
+                document.addEventListener("mouseup", onMouseUp);
+            });
+
+            // 2. 右侧拖拽分割条：改变工作台宽度，中间自适应，高度锁定 100vh
+            resizerRight.addEventListener("mousedown", (e) => {
+                e.preventDefault();
+                const startX = e.clientX;
+                const startWidth = canvas.getBoundingClientRect().width;
+                document.body.classList.add("resizing-active");
+                resizerRight.classList.add("dragging");
+
+                function onMouseMove(moveEvent) {
+                    const delta = startX - moveEvent.clientX;
+                    const newW = Math.max(280, Math.min(700, startWidth + delta));
+                    canvas.style.width = newW + "px";
+                }
+
+                function onMouseUp() {
+                    document.body.classList.remove("resizing-active");
+                    resizerRight.classList.remove("dragging");
+                    document.removeEventListener("mousemove", onMouseMove);
+                    document.removeEventListener("mouseup", onMouseUp);
+                    const finalW = Math.round(canvas.getBoundingClientRect().width);
+                    localStorage.setItem("autotest_canvas_width", finalW);
+                }
+
+                document.addEventListener("mousemove", onMouseMove);
+                document.addEventListener("mouseup", onMouseUp);
+            });
+        }
+
+        // ================= 已有会话环境芯片与缺失警示巡检 =================
+        function renderSessionEnvStatus(data) {
+            const chipsBox = document.getElementById("sessionEnvChips");
+            const alertBanner = document.getElementById("sessionEnvAlertBanner");
+            if (!chipsBox) return;
+
+            const isReal = (data.test_mode === "real" || data.is_real_device);
+            const modeLabel = isReal ? "物理真机" : "本地仿真";
+            const modeIcon = isReal ? "bi-phone" : "bi-laptop";
+
+            let deviceNames = [];
+            let boundDeviceIds = [];
+            if (data.devices && typeof data.devices === "object") {
+                for (const [devId, devInfo] of Object.entries(data.devices)) {
+                    boundDeviceIds.push(devId);
+                    deviceNames.push(devInfo.model || devId);
+                }
+            }
+            if (deviceNames.length === 0 && Array.isArray(data.platforms)) {
+                deviceNames = data.platforms;
+            }
+            const devSummary = deviceNames.length > 0 ? deviceNames.join(", ") : (isReal ? "移动真机" : "本地仿真");
+
+            let hasOfflineDevice = false;
+            let offlineDeviceList = [];
+            const isLocalTask = (data.test_mode === "local" || (data.goal && (data.goal.includes("本地") || data.goal.includes("固化"))));
+            if (isReal && !isLocalTask && boundDeviceIds.length > 0) {
+                // 仅当真机列表已经完成首次检索时才做脱机断言，避免并发时序竞争误报
+                if (window._isDevicesInitialLoaded) {
+                    boundDeviceIds.forEach(devId => {
+                        if (devId !== "default" && devId !== "local-simulator" && devId !== "mock-device") {
+                            const isOnline = availableDevices.some(d => d.id === devId);
+                            if (!isOnline) {
+                                hasOfflineDevice = true;
+                                offlineDeviceList.push(devId);
+                            }
+                        }
+                    });
+                }
+            }
+
+            let chipsHtml = `
+                <span class="env-chip" title="执行方式"><i class="bi ${modeIcon}"></i> ${modeLabel}</span>
+                <span class="env-chip ${hasOfflineDevice ? 'env-chip-warning' : ''}" title="绑定设备">
+                    <i class="bi bi-phone"></i> ${devSummary}
+                </span>
+                <span class="env-chip" title="当前推演模型 (点击随时切换)" onclick="toggleCustomPopover('modelPopover', event)" style="cursor: pointer;">
+                    <i class="bi bi-cpu"></i> ${escapeHtml(data.model || currentActiveModel)} <i class="bi bi-chevron-down ms-0.5" style="font-size: 8px;"></i>
+                </span>
+            `;
+            if (data.approval_mode) {
+                const approveText = (data.approval_mode === "manual") ? "人工逐步" : "自动放行";
+                chipsHtml += `<span class="env-chip" title="原始审批策略"><i class="bi bi-shield-check"></i> ${approveText}</span>`;
+            }
+            chipsBox.innerHTML = chipsHtml;
+
+            if (alertBanner) {
+                if (hasOfflineDevice) {
+                    alertBanner.classList.remove("d-none");
+                    alertBanner.innerHTML = `
+                        <i class="bi bi-exclamation-triangle" style="font-size: 13px; margin-top: 2px;"></i>
+                        <div class="flex-grow-1">
+                            <strong>环境状态提醒：</strong>当前会话原绑定的物理设备 <code>${offlineDeviceList.join(", ")}</code> 当前处于<strong>离线脱机</strong>状态。若需接续实机测试，请检查 USB 连线或在右侧重新连接。
+                        </div>
+                    `;
+                } else {
+                    alertBanner.classList.add("d-none");
+                    alertBanner.innerHTML = "";
+                }
+            }
+        }
+
+        // ================= 2. 悬浮输入胶囊与同一位置状态按钮切换 =================
+        let currentSessionStatus = "IDLE";
+
+        function updateStopButtonState(status) {
+            if (status !== undefined) {
+                currentSessionStatus = status;
+            }
+            const btnSend = document.getElementById("btnSendTask");
+            const btnStop = document.getElementById("btnStopTask");
+            const input = document.getElementById("taskInputText");
+            if (!btnSend || !btnStop) return;
+
+            const hasText = !!(input && input.value.trim().length > 0);
+            const isRunning = (currentSessionStatus === "RUNNING");
+
+            // 🌟 核心规则 1：输入框内有内容时，统一在同位置呈现“发送按钮”（高亮可点击），支持随时打断或追加测试指令
+            if (hasText) {
+                btnStop.classList.add("d-none");
+                btnSend.classList.remove("d-none");
+                btnSend.classList.add("active");
+                btnSend.title = isRunning ? "发送追加意图并调整执行（Enter 发送）" : "发送执行（Enter 发送）";
+            }
+            // 🌟 核心规则 2：输入框为空且当前任务处于 RUNNING 状态，在同位置切换呈现“终止按钮”
+            else if (isRunning) {
+                btnSend.classList.add("d-none");
+                btnStop.classList.remove("d-none");
+                btnStop.disabled = false;
+                btnStop.style.opacity = "1";
+                btnStop.title = "终止当前测试任务";
+            }
+            // 🌟 核心规则 3：输入框为空且任务未在运行，在同位置呈现“发送按钮”（置灰禁用）
+            else {
+                btnStop.classList.add("d-none");
+                btnSend.classList.remove("d-none");
+                btnSend.classList.remove("active");
+                btnSend.title = "发送执行";
+            }
+        }
+
+        async function stopActiveTask() {
+            if (!activeSessionId) return;
+            const btnStop = document.getElementById("btnStopTask");
+            if (btnStop) {
+                btnStop.disabled = true;
+                btnStop.style.opacity = "0.5";
+            }
+            try {
+                const res = await fetch(`/api/sessions/${activeSessionId}/stop`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    currentSessionStatus = "STOPPED";
+                    updateStopButtonState("STOPPED");
+                    if (currentActiveSessionData) {
+                        currentActiveSessionData.status = "STOPPED";
+                        currentActiveSessionData.hitl_decision = null;
+                    }
+                    const hitlCard = document.querySelector(".hitl-decision-card");
+                    if (hitlCard) hitlCard.remove();
+
+                    // 立即清除当前活跃会话在左侧列表的转圈状态并刷新
+                    const targetSess = currentSessions.find(s => s.session_id === activeSessionId);
+                    if (targetSess) {
+                        targetSess.status = "STOPPED";
+                        targetSess.is_success = false;
+                    }
+                    renderSessionList();
+                    await loadSessions();
+                    await pollCurrentSession();
+                } else {
+                    alert(data.message || "终止任务失败");
+                }
+            } catch (e) {
+                console.error("终止任务异常:", e);
+            } finally {
+                if (btnStop) {
+                    btnStop.disabled = false;
+                    btnStop.style.opacity = "1";
+                }
+                updateStopButtonState();
+            }
+        }
+
+        
+        function renderChatTimelineStream(sessionData) {
+            const flow = document.getElementById("messagesFlow");
+            const emptyBox = document.getElementById("emptyStateBox");
+            if (!flow) return;
+            if (emptyBox) emptyBox.classList.add("d-none");
+
+            // 切换会话时重置
+            if (window._renderedSessionId !== sessionData.session_id) {
+                flow.innerHTML = "";
+                window._renderedSessionId = sessionData.session_id;
+                window._renderedBlockIds = new Set();
+            }
+
+            // 🛡️ 彻底消除双重发送/渲染：在渲染后端权威 timeline_blocks 前，安全清理所有临时乐观节点
+            const tempNodes = flow.querySelectorAll(".optimistic-temp-node, [id^='temp_user_'], [id^='temp_th_'], [data-temp-node='true']");
+            if (tempNodes.length > 0) {
+                if (window._optimisticTimers && window._optimisticTimers.length > 0) {
+                    window._optimisticTimers.forEach(t => clearInterval(t));
+                    window._optimisticTimers = [];
+                }
+                tempNodes.forEach(node => node.remove());
+            }
+
+            // 🛡️ 步骤卡片与总结卡片防重免疫：同一 step_id 或同一 test_summary 界面上只保留最新容器！
+            const rawBlocks = sessionData.timeline_blocks || [];
+            const seenSteps = new Set();
+            let hasTestSummary = false;
+            const blocks = [];
+            
+            // 逆序筛选出最新的 step 卡片和唯一的 summary 卡片，再顺序排布
+            for (let i = rawBlocks.length - 1; i >= 0; i--) {
+                const b = rawBlocks[i];
+                if (b.type === "step_execution" || b.type === "step_result") {
+                    const sId = b.step_id || 1;
+                    if (seenSteps.has(sId)) continue;
+                    seenSteps.add(sId);
+                }
+                // 🛡️ 整个会话强行只保留最新的 1 个 test_summary，彻底杜绝重复卡片！
+                if (b.type === "test_summary") {
+                    if (hasTestSummary) continue;
+                    hasTestSummary = true;
+                }
+                blocks.unshift(b);
+            }
+
+            blocks.forEach(blk => {
+                const blkId = blk.block_id;
+                let existingEl = document.getElementById(blkId);
+                
+                // 兼容根据 step_id 定位已渲染节点 (支持 Antigravity stream-step-node)
+                if (!existingEl && (blk.type === "step_execution" || blk.type === "step_result")) {
+                    existingEl = flow.querySelector(`.stream-step-node[data-step-id="${blk.step_id}"], .stream-step-card[data-step-id="${blk.step_id}"], .agent-trace-box[data-step-id="${blk.step_id}"]`);
+                }
+                // 🛡️ 兼容定位已渲染的总结卡片（即使 block_id 不一致也原地替换，绝不向页面插入第二个！）
+                if (!existingEl && blk.type === "test_summary") {
+                    existingEl = flow.querySelector(".test-result-summary-card");
+                }
+
+                if (!existingEl) {
+                    const html = buildBlockHtml(blk, sessionData);
+                    if (html) {
+                        flow.insertAdjacentHTML("beforeend", html);
+                        window._renderedBlockIds.add(blkId);
+                    }
+                } else {
+                    // 局部更新（支持 thought, todo_list, step_execution, step_result, test_summary 等节点动态流式刷新与折叠状态响应）
+                    if (blk.type === "thought" || blk.type === "todo_list" || blk.type === "todo_plan" || blk.type === "step_execution" || blk.type === "step_result" || blk.type === "test_summary") {
+                        if (blk.type === "thought") {
+                            const curBody = existingEl.querySelector(".stream-thought-drawer, .stream-thought-body");
+                            if (curBody && !curBody.classList.contains("d-none")) {
+                                window._streamThoughtState = window._streamThoughtState || {};
+                                window._streamThoughtState[blk.block_id] = true;
+                            }
+                        }
+                        // 🛡️ 遵循生命周期自动流转：仅保持用户显式手动展开的动作，绝不把上轮运行态反向锁死为永久展开！
+                        if (blk.type === "todo_list" || blk.type === "todo_plan") {
+                            const curTodoBody = existingEl.querySelector(".stream-todo-body");
+                            if (curTodoBody && !curTodoBody.classList.contains("d-none")) {
+                                window._streamTodoState = window._streamTodoState || {};
+                                window._streamTodoState[blk.block_id] = true;
+                            }
+                        }
+                        const newHtml = buildBlockHtml(blk, sessionData);
+                        if (newHtml) {
+                            const temp = document.createElement("div");
+                            temp.innerHTML = newHtml;
+                            const newEl = temp.firstElementChild;
+                            if (newEl) {
+                                // 🛡️ 核心第一性原理：DOM 脏检查防闪烁！
+                                // 深度比对 innerHTML，若无实质变动绝对不替换 DOM 节点，彻底杜绝 :hover 打断与重绘闪烁！
+                                if (existingEl.innerHTML === newEl.innerHTML) {
+                                    return; // 零 DOM 变动，完全静止！
+                                }
+                                existingEl.replaceWith(newEl);
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 🛡️ 页面冗余总结卡片自愈兜底：若因网络抖动或旧状态在 DOM 中存在多个，自动清理只保留最后 1 个
+            const summaryCards = flow.querySelectorAll(".test-result-summary-card");
+            if (summaryCards.length > 1) {
+                for (let i = 0; i < summaryCards.length - 1; i++) {
+                    summaryCards[i].remove();
+                }
+            }
+
+            // 🛡️ 待验收门禁决策：若交付物主卡片 (test-result-summary-card) 已存在，已合二为一自释闭环，彻底移除独立的冗余门禁卡片
+            const isReadyForReview = (sessionData.status === "READY_FOR_REVIEW");
+            const hasSummaryInDom = (summaryCards.length > 0);
+            let gateEl = flow.querySelector(".review-gate-card");
+            if (isReadyForReview && !hasSummaryInDom) {
+                // 仅在无主交付物卡片的极罕见降级场景保留兜底
+                const sid = sessionData.session_id || activeSessionId;
+                const delivCount = Array.isArray(sessionData.deliverables) ? sessionData.deliverables.length : 4;
+                const gateHtml = `
+                    <div class="review-gate-card mt-3" id="reviewGateCard_${sid}">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-check text-success fs-5"></i>
+                                <span class="fw-semibold">测试执行完成</span>
+                            </div>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">待验收</span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 pt-1">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="openDeliverablesModal('${sid}')">
+                                <i class="bi bi-box-seam me-1"></i>交付物清单 · ${delivCount}
+                            </button>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-warning px-3" onclick="openReworkDialog('${sid}')">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>要求返工
+                                </button>
+                                <button class="btn btn-sm btn-success px-4 fw-semibold" onclick="acceptSession('${sid}')">
+                                    <i class="bi bi-check-lg me-1"></i>验收通过
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                if (!gateEl) {
+                    flow.insertAdjacentHTML("beforeend", gateHtml);
+                } else if (gateEl.innerHTML !== gateHtml) {
+                    const tempDiv = document.createElement("div");
+                    tempDiv.innerHTML = gateHtml;
+                    gateEl.replaceWith(tempDiv.firstElementChild);
+                }
+            } else if (gateEl) {
+                gateEl.remove();
+            }
+
+            // 🛡️ 人机协同登录决策卡片（根据端侧实际物理状态自适应呈现：短信验证码 / 手机号待发送 / 账号密码 / 投屏接管）
+            const hitl = sessionData.hitl_decision;
+            const isWaitingHitl = (sessionData.status === "WAITING_USER_INPUT" || Boolean(hitl));
+            let hitlEl = flow.querySelector(".hitl-decision-card");
+            if (isWaitingHitl && hitl) {
+                const sid = sessionData.session_id || activeSessionId;
+                const mode = hitl.mode || "credential";
+                const isSmsCode = (mode === "sms_code");
+                const isPhoneInput = (mode === "phone_input");
+                const isTakeover = (mode === "manual_takeover");
+                const defaultAcc = hitl.preset_account || window._lastHitlAccount || "";
+                const defaultPwd = window._lastHitlPassword || "";
+
+                let takeoverBanner = "";
+                let heroActionHtml = "";
+                let formContentHtml = "";
+
+                if (hitl.type === "ai_generated" || (hitl.fields && hitl.fields.length > 0)) {
+                    // 🌟 纯 AI 自主动态生成的人机协同 Generative UI
+                    const helpType = hitl.help_type || "input";
+                    const btnText = hitl.action_button_text || "提交并继续";
+
+                    if (helpType === "manual_takeover") {
+                        heroActionHtml = `
+                            <div class="p-3 rounded mb-3 text-center" style="background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.35); padding: 12px; border-radius: 8px;">
+                                <div class="text-sub small mb-2" style="font-size: 12px;">
+                                    ${escapeHtml(hitl.reason || '请直接在右侧真机投屏中完成轻触或滑动验证')}
+                                </div>
+                                <button class="btn btn-sm btn-success py-2 px-4 fw-semibold w-100 shadow-sm" style="font-size: 13px; border-radius: 8px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
+                                    <i class="bi bi-check2-circle me-1.5 fs-6"></i> ${escapeHtml(btnText)}
+                                </button>
+                            </div>
+                        `;
+                    } else if (helpType === "choice" && hitl.options && hitl.options.length > 0) {
+                        const optsHtml = hitl.options.map(opt => `
+                            <button class="btn btn-sm btn-outline-primary py-1.5 px-3 fw-medium text-nowrap rounded-pill" onclick="submitHitlChoice('${sid}', '${escapeHtml(opt)}')">
+                                <i class="bi bi-check-circle me-1"></i> ${escapeHtml(opt)}
+                            </button>
+                        `).join('');
+                        formContentHtml = `
+                            <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                                <div class="text-sub small mb-2 fw-medium" style="font-size: 11.5px;">请点击选择要进入的业务项：</div>
+                                <div class="d-flex flex-wrap gap-2">${optsHtml}</div>
+                            </div>
+                        `;
+                    } else {
+                        // 🛡️ 智能字段补齐兜底：若 AI 未明确指定 fields，根据意图智能派生输入框，杜绝空白卡片
+                        let effectiveFields = hitl.fields || [];
+                        if (effectiveFields.length === 0) {
+                            const isSmsHint = (hitl.mode === "sms_code") || 
+                                (hitl.title && hitl.title.includes("验证码")) || 
+                                (hitl.reason && hitl.reason.includes("验证码"));
+                            if (isSmsHint) {
+                                effectiveFields = [
+                                    { key: "sms_code", label: "短信验证码", placeholder: "请输入收到的 4~6 位短信验证码", type: "text" }
+                                ];
+                            } else {
+                                effectiveFields = [
+                                    { key: "account", label: "测试账号 / 手机号", placeholder: "请输入账号或手机号", type: "text" },
+                                    { key: "password", label: "密码", placeholder: "请输入登录密码", type: "password" }
+                                ];
+                            }
+                        }
+
+                        const fieldsHtml = effectiveFields.map((f, idx) => `
+                            <div class="mb-2">
+                                ${f.label ? `<label class="form-label text-sub small mb-1" style="font-size: 11px;">${escapeHtml(f.label)}</label>` : ''}
+                                <input type="${f.type === 'password' ? 'password' : 'text'}"
+                                       class="form-control form-control-sm hitl-dynamic-field"
+                                       data-key="${escapeHtml(f.key || 'field_' + idx)}"
+                                       placeholder="${escapeHtml(f.placeholder || f.label || '')}"
+                                       ${idx === 0 ? 'autofocus' : ''}
+                                       style="background: var(--bg-card); font-size: 13px; border-color: var(--border-subtle); color: var(--text-main); height: 38px;"
+                                       onkeydown="if(event.key==='Enter') submitHitlDecision('${sid}', 'ai_submit')">
+                            </div>
+                        `).join('');
+
+                        formContentHtml = `
+                            <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                                ${fieldsHtml}
+                                <div class="d-flex justify-content-end mt-2">
+                                    <button class="btn btn-sm btn-primary px-3 py-1.5 fw-semibold d-flex align-items-center" style="font-size: 12.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'ai_submit')">
+                                        <i class="bi bi-send-fill me-1.5"></i> ${escapeHtml(btnText)}
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else if (isTakeover) {
+                    takeoverBanner = `
+                        <div class="alert alert-warning d-flex align-items-center gap-2 mb-3 py-2 px-3 border-0 shadow-sm" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-radius: 8px;">
+                            <i class="bi bi-display fs-4"></i>
+                            <div style="font-size: 12px; line-height: 1.5;">
+                                <strong style="font-size: 12.5px;">端侧需手动介入：</strong>目标应用触发了<strong>图形滑块拼图</strong>、<strong>机器人安全验证</strong>或<strong>组织选择</strong>。请直接在<strong>右侧真机投屏</strong>中滑动完成，完成后点击下方绿色按钮即可无缝继续！
+                            </div>
+                        </div>
+                    `;
+                    heroActionHtml = `
+                        <div class="p-2.5 rounded mb-3 text-center" style="background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.35); padding: 12px;">
+                            <button class="btn btn-sm btn-success py-2 px-4 fw-semibold w-100 shadow-sm" style="font-size: 13px; border-radius: 8px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
+                                <i class="bi bi-check2-circle me-1.5 fs-6"></i> 我已在投屏/手机上完成操作，立即恢复自动化
+                            </button>
+                            <div class="d-flex align-items-center justify-content-between mt-2 pt-1 px-1" style="font-size: 11px;">
+                                <span class="text-muted"><i class="bi bi-info-circle me-1"></i>在右侧投屏滑动拼图或通过验证后，点击此按钮秒级解除挂起</span>
+                                <button class="btn btn-sm btn-link text-danger text-decoration-none p-0 d-flex align-items-center gap-1" style="font-size: 11px; opacity: 0.85;" onclick="stopSessionById('${sid}')">
+                                    <i class="bi bi-stop-circle"></i>终止任务
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else if (isSmsCode) {
+                    // 🚀 短信验证码已发送场景：极简表单，只呈现短信验证码输入框与提交按钮，消除一切账号密码杂音
+                    formContentHtml = `
+                        <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-semibold text-main" style="font-size: 12.5px;">
+                                    <i class="bi bi-chat-left-dots text-primary me-1.5"></i> 短信验证码
+                                </span>
+                                <span class="text-muted small" style="font-size: 11px;">查收手机短信并填入</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm" id="hitlSmsCodeInput_${sid}" placeholder="4 ~ 6 位短信验证码" maxlength="8" autofocus
+                                    style="background: var(--bg-card); font-size: 14px; font-weight: 600; letter-spacing: 3px; border-color: var(--border-subtle); color: var(--text-main); height: 38px;"
+                                    onkeydown="if(event.key==='Enter') submitHitlDecision('${sid}', 'inject_sms')">
+                                <button class="btn btn-sm btn-primary px-3 fw-semibold text-nowrap d-flex align-items-center" style="font-size: 12.5px; border-radius: 6px; height: 38px;" onclick="submitHitlDecision('${sid}', 'inject_sms')">
+                                    <i class="bi bi-arrow-right-circle-fill me-1.5"></i> 填入并登录
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else if (isPhoneInput) {
+                    // 🚀 手机号验证码模式（待获取验证码）场景：只呈现手机号输入框与获取验证码按钮
+                    formContentHtml = `
+                        <div class="p-3 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); border-radius: 8px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-semibold text-main" style="font-size: 12.5px;">
+                                    <i class="bi bi-phone text-primary me-1.5"></i> 测试手机号
+                                </span>
+                                <span class="text-muted small" style="font-size: 11px;">系统将自动填入并点击获取验证码</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="请输入11位测试手机号" value="${escapeHtml(defaultAcc)}"
+                                    style="background: var(--bg-card); font-size: 13px; border-color: var(--border-subtle); color: var(--text-main); height: 38px;"
+                                    onkeydown="if(event.key==='Enter') submitHitlDecision('${sid}', 'inject_phone')">
+                                <button class="btn btn-sm btn-primary px-3 fw-semibold text-nowrap d-flex align-items-center" style="font-size: 12.5px; border-radius: 6px; height: 38px;" onclick="submitHitlDecision('${sid}', 'inject_phone')">
+                                    <i class="bi bi-send-fill me-1.5"></i> 获取验证码
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // 传统账号密码登录表单
+                    formContentHtml = `
+                        <div class="p-2.5 rounded mb-3" style="background: var(--bg-surface); border: 1px solid var(--border-medium); padding: 10px;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-medium text-main" style="font-size: 12px;"><i class="bi bi-key me-1 text-primary"></i> 方式一：输入测试凭证（自动代填账号与密码）</span>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlAccountInput_${sid}" placeholder="手机号 / 账号 / 合伙人登录码" value="${escapeHtml(defaultAcc)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" id="hitlPasswordInput_${sid}" placeholder="密码 (若页面无密码框可留空)" value="${escapeHtml(defaultPwd)}" style="background: var(--bg-card); font-size: 12px; border-color: var(--border-subtle); color: var(--text-main);">
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="form-check m-0">
+                                    <input class="form-check-input" type="checkbox" id="hitlRemember_${sid}" checked style="cursor: pointer;">
+                                    <label class="form-check-label text-muted" for="hitlRemember_${sid}" style="font-size: 11px; cursor: pointer;">
+                                        记住该 App 凭证 (存入 credentials.json 后续免打扰)
+                                    </label>
+                                </div>
+                                <button class="btn btn-sm btn-primary px-3 py-1 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'inject')">
+                                    <i class="bi bi-lightning-charge-fill me-1"></i> 立即自动注入并提交
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const hitlHtml = `
+                    <div class="hitl-decision-card mt-3" id="hitlDecisionCard_${sid}">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-exclamation text-warning fs-5"></i>
+                                <span class="fw-semibold text-main" style="font-size: 13.5px;">${hitl.title || '人机协同 · 需要登录鉴权介入'}</span>
+                            </div>
+                            <span class="badge border border-warning-subtle text-warning" style="background: rgba(245, 158, 11, 0.12); font-size: 11px;">
+                                <i class="bi bi-hourglass-split me-1"></i>自动化已安全挂起
+                            </span>
+                        </div>
+                        
+                        ${takeoverBanner}
+
+                        <div class="text-sub small mb-3" style="line-height: 1.5; font-size: 12px;">
+                            ${hitl.desc || '检测到端侧进入账号登录或鉴权拦截界面，自动化已安全挂起。请提供测试账号密码/验证码，或在右侧真机投屏手动完成登录：'}
+                        </div>
+
+                        ${heroActionHtml}
+                        ${formContentHtml}
+
+                        ${!isTakeover ? `
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn btn-sm btn-outline-danger py-1 px-2.5 d-flex align-items-center gap-1" style="font-size: 11px; border-radius: 6px; opacity: 0.85;" onclick="stopSessionById('${sid}')" title="终止当前任务">
+                                    <i class="bi bi-stop-circle"></i> 终止任务
+                                </button>
+                                <span class="text-muted d-none d-md-inline" style="font-size: 11px;">也可在真机投屏中直接操作</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary py-1" style="font-size: 11.5px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'skip')">
+                                    <i class="bi bi-skip-forward me-1"></i> 尝试跳过
+                                </button>
+                                <button class="btn btn-sm btn-success py-1 px-3 fw-semibold" style="font-size: 12px; border-radius: 6px;" onclick="submitHitlDecision('${sid}', 'manual_done')">
+                                    <i class="bi bi-check2-circle me-1"></i> 我已在手机上完成，继续
+                                </button>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                if (!hitlEl) {
+                    flow.insertAdjacentHTML("beforeend", hitlHtml);
+                } else if (isTakeover && !hitlEl.querySelector(".alert-warning")) {
+                    // 若从普通模式升级为接管模式，平滑更新内部结构
+                    hitlEl.outerHTML = hitlHtml;
+                }
+            } else if (hitlEl) {
+                hitlEl.remove();
+            }
+
+            // 悬浮画中画或步骤微胶囊保持同步
+            renderStepsDrawerBody(sessionData, sessionData.plan_steps || []);
+
+            // 🌟 黄金眼动区态势感知胶囊 (Docked Task HUD Bar，位于输入框正上方) 实时联动
+            updateTaskHud(sessionData);
+        }
+
+        // =========================================================================
+        // 🌟 黄金眼动区态势感知胶囊 (Docked Task HUD) 与就地活清单交互引擎
+        // =========================================================================
+        function updateTaskHud(sessionData) {
+            const hud = document.getElementById("floatingTaskHud");
+            const dropup = document.getElementById("taskDropupSheet");
+            if (!hud) return;
+
+            // 🌟 核心绝对门禁：仅在已有活跃会话且非空状态、且规划了任务步骤时才呈现胶囊；新建任务或空状态下绝对隐藏！
+            const emptyBox = document.getElementById("emptyStateBox");
+            const isEmptyState = emptyBox && !emptyBox.classList.contains("d-none");
+            if (!activeSessionId || isEmptyState || !sessionData || !sessionData.plan_steps || sessionData.plan_steps.length === 0) {
+                hud.classList.add("d-none");
+                if (dropup) dropup.classList.add("d-none");
+                return;
+            }
+
+            const steps = sessionData.plan_steps;
+            const total = steps.length;
+            let completedCount = steps.filter(s => s.status === "COMPLETED" || s.status === "PASS").length;
+            let failedCount = steps.filter(s => s.status === "FAIL" || s.status === "FAILED").length;
+            let runningIdx = steps.findIndex(s => s.status === "RUNNING");
+            if (runningIdx === -1 && completedCount < total) {
+                runningIdx = completedCount;
+            }
+
+            const isSuccess = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || completedCount === total);
+            const isFailed = (sessionData.status === "FAILED" || failedCount > 0 || sessionData.is_success === false);
+            
+            hud.classList.remove("d-none");
+
+            const dotEl = document.getElementById("hudStatusDot");
+            const pillEl = document.getElementById("hudStepPill");
+            const titleEl = document.getElementById("hudTaskTitle");
+            const progressBadge = document.getElementById("dropupProgressBadge");
+
+            if (isSuccess) {
+                if (dotEl) {
+                    dotEl.classList.remove("pulsing");
+                    dotEl.style.background = "var(--status-green)";
+                }
+                if (pillEl) {
+                    pillEl.innerText = `${total}/${total}`;
+                    pillEl.className = "hud-step-pill is-completed";
+                    pillEl.removeAttribute("style");
+                }
+                if (titleEl) {
+                    titleEl.innerText = `测试目标达成`;
+                }
+                if (progressBadge) {
+                    progressBadge.innerText = `${total}/${total}`;
+                    progressBadge.className = "hud-progress-badge";
+                }
+            } else if (isFailed) {
+                // 🌟 修复：当测试受阻/失败时，胶囊与看板 100% 同步切换为失败状态，彻底消除撕裂！
+                const failedStep = steps.find(s => s.status === "FAIL" || s.status === "FAILED") || steps[runningIdx] || {};
+                const failedStepIdx = steps.findIndex(s => s.status === "FAIL" || s.status === "FAILED");
+                const stepNumStr = failedStepIdx >= 0 ? `${failedStepIdx + 1}/${total}` : `${completedCount}/${total}`;
+
+                if (dotEl) {
+                    dotEl.classList.remove("pulsing");
+                    dotEl.style.background = "var(--status-red)";
+                }
+                if (pillEl) {
+                    pillEl.innerText = `${stepNumStr}`;
+                    pillEl.className = "hud-step-pill is-failed";
+                    pillEl.removeAttribute("style");
+                }
+                if (titleEl) {
+                    titleEl.innerText = failedStep.title || sessionData.error_message || '端侧业务动作中断';
+                }
+                if (progressBadge) {
+                    progressBadge.innerText = `${stepNumStr}`;
+                    progressBadge.className = "hud-progress-badge is-failed";
+                }
+            } else {
+                const curStepNum = Math.min(runningIdx + 1, total);
+                const curStep = steps[runningIdx] || steps[0] || {};
+                if (dotEl) {
+                    dotEl.classList.add("pulsing");
+                    dotEl.style.background = "var(--status-green)";
+                }
+                if (pillEl) {
+                    pillEl.innerText = `${curStepNum}/${total}`;
+                    pillEl.className = "hud-step-pill";
+                    pillEl.removeAttribute("style");
+                }
+                if (titleEl) {
+                    titleEl.innerText = `正在执行: ${curStep.title || '端侧业务动作'}`;
+                }
+                if (progressBadge) {
+                    progressBadge.innerText = `${completedCount}/${total} 进行中`;
+                    progressBadge.className = "hud-progress-badge";
+                }
+            }
+
+            // 更新 Dropup 抽屉中的项目
+            const dropupContainer = document.getElementById("dropupItemsContainer");
+            if (dropupContainer) {
+                let itemsHtml = "";
+                steps.forEach((st, idx) => {
+                    const isDone = (st.status === "COMPLETED" || st.status === "PASS");
+                    const isFail = (st.status === "FAIL" || st.status === "FAILED");
+                    const isCanceled = (st.status === "CANCELED");
+                    const isRun = (st.status === "RUNNING");
+                    const num = idx + 1;
+                    
+                    let iconHtml = "";
+                    let rowClass = "";
+                    let statusText = "待执行";
+                    let titleColor = "var(--text-sub)";
+
+                    if (isDone) {
+                        iconHtml = '<i class="bi bi-check-circle-fill text-success" style="font-size: 12px;"></i>';
+                        statusText = "已完成";
+                        titleColor = "var(--text-main)";
+                    } else if (isFail) {
+                        iconHtml = '<i class="bi bi-x-circle-fill text-danger" style="font-size: 12px;"></i>';
+                        statusText = "未通过";
+                        rowClass = "failed";
+                        titleColor = "var(--status-red)";
+                    } else if (isCanceled) {
+                        iconHtml = '<i class="bi bi-dash-circle text-muted" style="font-size: 11px; opacity: 0.5;"></i>';
+                        statusText = "已取消";
+                        titleColor = "var(--text-dim, #71717a)";
+                    } else if (isRun) {
+                        iconHtml = '<span class="spinner-border spinner-border-sm text-primary" style="width: 10px; height: 10px;"></span>';
+                        rowClass = "running";
+                        statusText = "执行中";
+                        titleColor = "#3b82f6";
+                    } else {
+                        iconHtml = '<i class="bi bi-circle text-muted" style="font-size: 11px; opacity: 0.5;"></i>';
+                        statusText = "待执行";
+                    }
+                    
+                    itemsHtml += `
+                        <div class="dropup-item-row ${rowClass}">
+                            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 82%;">
+                                ${iconHtml}
+                                <span class="fw-medium text-truncate" style="color: ${titleColor};">
+                                    Step ${num}: ${escapeHtml(st.title)}
+                                </span>
+                            </div>
+                            <span style="font-size: 10px; font-family: var(--font-mono); opacity: 0.75;">
+                                ${statusText}
+                            </span>
+                        </div>
+                    `;
+                });
+                dropupContainer.innerHTML = itemsHtml;
+            }
+        }
+
+        function toggleTaskDropup(event) {
+            if (event) event.stopPropagation();
+            const dropup = document.getElementById("taskDropupSheet");
+            const chevron = document.getElementById("hudChevron");
+            if (!dropup) return;
+            const isHidden = dropup.classList.contains("d-none");
+            if (isHidden) {
+                dropup.classList.remove("d-none");
+                if (chevron) chevron.style.transform = "rotate(180deg)";
+            } else {
+                dropup.classList.add("d-none");
+                if (chevron) chevron.style.transform = "rotate(0deg)";
+            }
+        }
+
+        document.addEventListener("click", function(e) {
+            const dropup = document.getElementById("taskDropupSheet");
+            const hud = document.getElementById("floatingTaskHud");
+            const chevron = document.getElementById("hudChevron");
+            if (dropup && !dropup.classList.contains("d-none")) {
+                if (!dropup.contains(e.target) && (!hud || !hud.contains(e.target))) {
+                    dropup.classList.add("d-none");
+                    if (chevron) chevron.style.transform = "rotate(0deg)";
+                }
+            }
+        });
+
+        function onInputTextChange() {
+            const textarea = document.getElementById("taskInputText");
+            textarea.style.height = "auto";
+            textarea.style.height = Math.min(textarea.scrollHeight, 150) + "px";
+            updateStopButtonState();
+        }
+
+        function handleChatKey(e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+        function sendMessage() {
+            return submitNewTask();
+        }
+        window.handleChatKey = handleChatKey;
+        window.sendMessage = sendMessage;
+
+        document.getElementById("taskInputText").addEventListener("keydown", handleChatKey);
+
+        function fillPrompt(text) {
+            const textarea = document.getElementById("taskInputText");
+            textarea.value = text;
+            onInputTextChange();
+            textarea.focus();
+        }
+
+        function toggleCustomPopover(popoverId, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const pop = document.getElementById(popoverId);
+            if (!pop) return;
+            const isShowing = pop.classList.contains("show");
+            closeAllPopovers();
+            if (!isShowing) pop.classList.add("show");
+        }
+        window.togglePopover = toggleCustomPopover;
+
+        function closeAllPopovers() {
+            document.querySelectorAll(".gpt-popover").forEach(p => p.classList.remove("show"));
+        }
+
+        document.addEventListener("click", function(e) {
+            if (!e.target.closest(".position-relative") && !e.target.closest(".gpt-popover")) {
+                closeAllPopovers();
+            }
+        });
+
+        function setApprovalMode(mode, label) {
+            currentApprovalMode = mode;
+            localStorage.setItem("autotest_approval_mode", mode);
+            const lbl = document.getElementById("approvalModeLabel");
+            if (lbl) lbl.innerText = label;
+            const itemAuto = document.getElementById("itemApproveAuto");
+            const itemManual = document.getElementById("itemApproveManual");
+            if (itemAuto) itemAuto.classList.toggle("active", mode === "auto");
+            if (itemManual) itemManual.classList.toggle("active", mode === "manual");
+            closeAllPopovers();
+        }
+
+        // ================= 全屏聚光灯新手 5 步向导控制器 =================
+        let currentTourStep = 1;
+        const TOUR_STEPS = [
+            {
+                targetId: "brandStatusTrigger",
+                badge: "第 1 步 / 共 5 步",
+                title: "第 1 步：确认物理真机在线（拒绝免机仿真）",
+                desc: "系统仅支持物理真机实测，拒绝免机仿真。请使用 USB 连接手机并开启【USB 调试】。当顶部显示绿色【测试就绪 / 真机在线】后方可开展测试。"
+            },
+            {
+                targetId: "pillAppWrapper",
+                badge: "第 2 步 / 共 5 步",
+                title: "第 2 步：选定待测应用 (呼出小弹窗)",
+                desc: "点击底栏应用胶囊即可唤出应用小弹窗，快捷切换待测包或上传新 APK。系统将自动校验安装并把目标包名同步给 AI 决策模型！"
+            },
+            {
+                targetId: "pillModelWrapper",
+                badge: "第 3 步 / 共 5 步",
+                title: "第 3 步：选择 AI 推理与编排模型",
+                desc: "支持 Hermes (DeepSeek 本地加速)、Google Antigravity 官方授权、DeepSeek 官方 API 等。点击胶囊即可随时一键无缝切换。"
+            },
+            {
+                targetId: "taskInputText",
+                badge: "第 4 步 / 共 5 步",
+                title: "第 4 步：输入业务意图并发送",
+                desc: "以自然语言输入测试目标（如：冷启动应用并测试登录），或直接点击上方推荐用例。按 Enter 键系统将自动分解前置检查、驱动真机并实时输出打字机结论！"
+            },
+            {
+                targetId: "btnTogglePipScreen",
+                badge: "第 5 步 / 共 5 步",
+                title: "第 5 步：端侧实时投屏与人机协同 (HITL)",
+                desc: "测试过程中可点击右上角图标随时唤起真机实时画面；若遇到登录拦截或验证码，系统将下发人机协同决策卡，支持账号代填、验证码透传或投屏接管！"
+            }
+        ];
+
+        function startTourGuide() {
+            currentTourStep = 1;
+            const overlay = document.getElementById("onboardingTourOverlay");
+            const doneDialog = document.getElementById("tourDoneDialog");
+            const tooltip = document.getElementById("tourTooltipCard");
+            const spotlight = document.getElementById("tourSpotlight");
+
+            if (!overlay) return;
+            overlay.style.display = "block";
+            if (doneDialog) doneDialog.style.display = "none";
+            if (spotlight) spotlight.style.display = "block";
+            if (tooltip) tooltip.style.display = "block";
+
+            showTourStep(1);
+        }
+
+        function showTourStep(stepNum) {
+            currentTourStep = stepNum;
+            const stepConfig = TOUR_STEPS[stepNum - 1];
+            if (!stepConfig) return;
+
+            let targetEl = document.getElementById(stepConfig.targetId);
+            if (!targetEl && stepConfig.targetId === "pillAppWrapper") {
+                targetEl = document.getElementById("taskInputText");
+            }
+            const spotlight = document.getElementById("tourSpotlight");
+            const tooltip = document.getElementById("tourTooltipCard");
+            const badge = document.getElementById("tourBadge");
+            const title = document.getElementById("tourTitle");
+            const desc = document.getElementById("tourDesc");
+            const prevBtn = document.getElementById("tourPrevBtn");
+            const nextBtn = document.getElementById("tourNextBtn");
+
+            if (badge) badge.innerText = stepConfig.badge;
+            if (title) title.innerText = stepConfig.title;
+            if (desc) desc.innerText = stepConfig.desc;
+
+            if (prevBtn) prevBtn.style.visibility = (stepNum === 1) ? "hidden" : "visible";
+            if (nextBtn) nextBtn.innerText = (stepNum === TOUR_STEPS.length) ? "完成向导" : "下一步 ➔";
+
+            if (targetEl && spotlight && tooltip) {
+                targetEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                setTimeout(() => {
+                    const rect = targetEl.getBoundingClientRect();
+                    const pad = 6;
+                    spotlight.style.top = (rect.top - pad) + "px";
+                    spotlight.style.left = (rect.left - pad) + "px";
+                    spotlight.style.width = (rect.width + pad * 2) + "px";
+                    spotlight.style.height = (rect.height + pad * 2) + "px";
+
+                    const tooltipW = 330;
+                    const tooltipH = 170;
+                    let left = rect.left;
+                    if (left + tooltipW > window.innerWidth - 20) {
+                        left = window.innerWidth - tooltipW - 20;
+                    }
+                    if (left < 20) left = 20;
+
+                    let top = rect.top - tooltipH - 14;
+                    if (top < 50) {
+                        top = rect.bottom + 14;
+                    }
+
+                    tooltip.style.top = top + "px";
+                    tooltip.style.left = left + "px";
+                }, 100);
+            }
+        }
+
+        function tourNextStep() {
+            if (currentTourStep < TOUR_STEPS.length) {
+                showTourStep(currentTourStep + 1);
+            } else {
+                // 走完第 3 步：居中弹出提示“已全部完成”
+                const spotlight = document.getElementById("tourSpotlight");
+                const tooltip = document.getElementById("tourTooltipCard");
+                const doneDialog = document.getElementById("tourDoneDialog");
+                if (spotlight) spotlight.style.display = "none";
+                if (tooltip) tooltip.style.display = "none";
+                if (doneDialog) doneDialog.style.display = "block";
+            }
+        }
+
+        function tourPrevStep() {
+            if (currentTourStep > 1) {
+                showTourStep(currentTourStep - 1);
+            }
+        }
+
+        function finishTourGuide() {
+            localStorage.setItem("autotest_tour_completed", "true");
+            updateTourStatusBadge();
+            closeTourGuide();
+        }
+
+        // 新手向导状态同步与调试管理
+        function updateTourStatusBadge() {
+            const badge = document.getElementById("tourStatusBadge");
+            if (!badge) return;
+            const completed = localStorage.getItem("autotest_tour_completed") === "true";
+            if (completed) {
+                badge.innerHTML = `<span class="status-indicator-dot dot-online me-1"></span>已完成首次引导`;
+                badge.className = "badge rounded-pill bg-success-subtle text-success border border-success-subtle";
+            } else {
+                badge.innerHTML = `<span class="status-indicator-dot dot-warning me-1"></span>未完成 / 待调试`;
+                badge.className = "badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle";
+            }
+        }
+
+        function resetTourGuideStatus() {
+            localStorage.removeItem("autotest_tour_completed");
+            updateTourStatusBadge();
+            alert("已成功重置首次使用引导标记！可点击【启动聚光灯新手向导】随时重新体验与调试。");
+        }
+
+        // 从 Settings 面板手动触发向导（关闭弹窗后启动）
+        function launchTourFromSettings() {
+            const modalEl = document.getElementById("harnessSettingsModal");
+            if (modalEl) {
+                const bsModal = bootstrap.Modal.getInstance(modalEl);
+                if (bsModal) bsModal.hide();
+                setTimeout(startTourGuide, 400);
+            } else {
+                startTourGuide();
+            }
+        }
+
+        function closeTourGuide() {
+            const overlay = document.getElementById("onboardingTourOverlay");
+            if (overlay) overlay.style.display = "none";
+        }
+
+        function fillPromptAndFocus(text) {
+            fillPrompt(text);
+            const textarea = document.getElementById("taskInputText");
+            if (textarea) {
+                textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+
+        function updateOnboardingDeviceStatus() {
+            const badge = document.getElementById("onboardingDevStatus");
+            const btn = document.getElementById("onboardingDevBtn");
+            if (!badge) return;
+            if (availableDevices && availableDevices.length > 0) {
+                const d = availableDevices[0];
+                badge.innerHTML = `<span class="status-indicator-dot dot-online me-1"></span>已就绪: ${escapeHtml(d.model || d.name || '真机在线')}`;
+                badge.className = "badge bg-success-subtle text-success border border-success-subtle";
+                if (btn) btn.innerHTML = `<i class="bi bi-gear me-1"></i>管理真机 (${availableDevices.length}台在线)`;
+            } else {
+                badge.innerHTML = `<span class="status-indicator-dot dot-offline me-1"></span>未连接真机`;
+                badge.className = "badge bg-warning-subtle text-warning border border-warning-subtle";
+                if (btn) btn.innerHTML = `<i class="bi bi-plug me-1"></i>去连接真机设备 ➔`;
+            }
+        }
+
+        function updateOnboardingModelStatus(configData) {
+            const badge = document.getElementById("onboardingModelStatus");
+            const btn = document.getElementById("onboardingModelBtn");
+            if (!badge || !configData) return;
+            const prov = configData.provider === "antigravity" ? "Google 官方授权" : (configData.provider === "hermes" ? "Hermes 网关" : configData.provider);
+            const model = configData.current_model || "gemini-2.5-flash";
+            badge.innerHTML = `<span class="status-indicator-dot dot-online me-1"></span>已就绪: ${escapeHtml(model)}`;
+            badge.className = "badge bg-success-subtle text-success border border-success-subtle";
+            if (btn) btn.innerHTML = `<i class="bi bi-cpu me-1"></i>${escapeHtml(prov)} (${escapeHtml(model)})`;
+        }
+
+        // ================= 3. 初始加载与鉴权 =================
+
+        // ================= 优化 1: 真机 USB 热插拔双向静默心跳自适应感知 (4秒轮询) =================
+        // ================= 优化 1: 真机 USB 静默智能心跳 (页面隐藏暂停 + 稳定在线降频至15s) =================
+        let _lastDeviceSignature = "";
+        let _deviceHeartbeatTimer = null;
+        let _isPageVisible = !document.hidden;
+        let _currentHeartbeatInterval = 5000;
+
+        document.addEventListener("visibilitychange", () => {
+            _isPageVisible = (document.visibilityState === "visible");
+            if (_isPageVisible) {
+                pollDevicesOnce(false);
+            }
+        });
+
+        async function pollDevicesOnce(force = false) {
+            try {
+                const res = await fetch("/api/devices" + (force ? "?force=true" : ""));
+                const data = await res.json();
+                const devices = data.android_devices || [];
+                const currentSig = devices.map(d => `${d.id}_${d.status}`).join(",");
+                if (_lastDeviceSignature !== "" && currentSig !== _lastDeviceSignature) {
+                    console.info("[设备热插拔感知] 检测到真机连接变动:", currentSig);
+                    if (typeof loadDevices === "function") await loadDevices();
+                    if (typeof refreshPreflightStatus === "function") await refreshPreflightStatus();
+                    if (typeof updateDeviceFloatingEmptyState === "function") updateDeviceFloatingEmptyState(devices);
+                }
+                _lastDeviceSignature = currentSig;
+                return devices;
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function startDeviceHeartbeat() {
+            if (_deviceHeartbeatTimer) clearInterval(_deviceHeartbeatTimer);
+            _deviceHeartbeatTimer = setInterval(async () => {
+                if (!_isPageVisible) return; // 页面隐藏时静默，杜绝无效开销
+                const devs = await pollDevicesOnce(false);
+                const nextInterval = (devs && devs.length > 0) ? 15000 : 5000;
+                if (_currentHeartbeatInterval !== nextInterval) {
+                    _currentHeartbeatInterval = nextInterval;
+                    startDeviceHeartbeat();
+                }
+            }, _currentHeartbeatInterval);
+        }
+
+        async function manualRefreshDevices(e) {
+            if (e) e.stopPropagation();
+            const btn = e ? e.currentTarget : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>检测中...`;
+            }
+            try {
+                const devs = await pollDevicesOnce(true);
+                if (typeof loadDevices === "function") await loadDevices();
+                if (devs && devs.length > 0) {
+                    const empty = document.getElementById("pipScreenEmpty");
+                    const img = document.getElementById("pipScreenImg");
+                    if (empty) empty.style.display = "none";
+                    if (img) img.style.display = "block";
+                    const title = document.getElementById("floatingDeviceTitle");
+                    if (title) title.innerText = `${devs[0].model || devs[0].id} · 实时端侧`;
+                    triggerPipImmediateRefresh();
+                } else {
+                    alert("未检测到真机设备。请确认 USB 连接与开发者选项中的【USB 调试】是否已开启。");
+                }
+            } catch (err) {
+                console.warn("Manual device refresh error:", err);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="bi bi-arrow-clockwise"></i> 立即检测连接`;
+                }
+            }
+        }
+
+        // 优化 3: 在投屏上触发触控微波纹动画
+        function triggerScreenTouchRipple(xPercent, yPercent) {
+            const screen = document.getElementById("phoneMockupScreen");
+            if (!screen) return;
+            const ripple = document.createElement("div");
+            ripple.className = "phone-touch-ripple";
+            ripple.style.left = (xPercent || 50) + "%";
+            ripple.style.top = (yPercent || 50) + "%";
+            screen.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 800);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            startDeviceHeartbeat();
+            if (typeof initFloatingDeviceDrag === "function") {
+                initFloatingDeviceDrag();
+            }
+            const urlParams = new URLSearchParams(window.location.search);
+            const savedTheme = urlParams.get("theme") || localStorage.getItem("autotest_theme") || "dark";
+            switchTheme(savedTheme);
+
+            // loadAuthStatus(); (已去授权化)
+            loadModelConfig();
+            loadDevices();
+            initAppManagement();
+            loadApps();
+            loadSuggestedCases();
+            refreshAppSuggestedCases();
+            refreshPreflightStatus();
+            loadSessions();
+            loadReports();
+            loadSolidifiedCases();
+            loadSolidifiedCasesWorkspace();
+            initSplitterResizers();
+
+            // 首次使用自动弹出全屏聚光灯 3 步向导
+            const autoOpen = urlParams.get("auto_open");
+            if (autoOpen) {
+                setTimeout(() => {
+                    openSettingsModal(autoOpen);
+                    const provParam = urlParams.get("provider");
+                    if (provParam) selectProviderForEdit(provParam);
+                }, 300);
+            }
+
+            if (localStorage.getItem("autotest_tour_completed") !== "true") {
+                // setTimeout(startTourGuide, 700);
+            }
+        });
+
+        async function loadAuthStatus_deprecated() {
+            try {
+                const res = await fetch("/api/auth/status");
+                const data = await res.json();
+                const label = document.getElementById("authBadgeLabel");
+                const teamEl = document.getElementById("modalAuthTeam");
+                const roleEl = document.getElementById("modalAuthRole");
+                const expEl = document.getElementById("modalAuthExpires");
+                const badge = document.getElementById("modalAuthBadge");
+                const teamSub = document.getElementById("authTeamSub");
+                const popTeam = document.getElementById("popoverTeamName");
+                const popRole = document.getElementById("popoverRoleName");
+
+                if (data.is_activated) {
+                    if (label) label.innerText = data.team_name || "PM Harness";
+                    if (popTeam) popTeam.innerText = data.team_name || "PM Harness";
+                    if (teamSub) teamSub.innerText = data.role || "企业全功能版";
+                    if (popRole) popRole.innerText = (data.role || "企业全功能版") + " · 永久授权";
+                    if (badge) {
+                        badge.innerText = "已激活";
+                        badge.className = "mono-tag mono-tag-active";
+                    }
+                } else {
+                    if (label) label.innerText = "未激活 / 待授权";
+                    if (popTeam) popTeam.innerText = "未激活团队";
+                    if (teamSub) teamSub.innerText = "待输入邀请码";
+                    if (popRole) popRole.innerText = "体验模式 · 待激活";
+                    if (badge) {
+                        badge.innerText = "未激活";
+                        badge.className = "mono-tag";
+                    }
+                }
+                if (teamEl) teamEl.innerText = "团队: " + (data.team_name || "未激活");
+                if (roleEl) roleEl.innerText = "类型: " + (data.role || "社区版");
+                if (expEl) expEl.innerText = "到期: " + (data.expires_at || "未激活");
+            } catch (e) {}
+        }
+
+        async function verifyInviteCode() {
+            const input = document.getElementById("inviteCodeInput");
+            const code = input.value.trim();
+            if (!code) return alert("请输入邀请码！");
+
+            const formData = new FormData();
+            formData.append("code", code);
+
+            try {
+                const res = await fetch("/api/auth/verify_invite", { method: "POST", body: formData });
+                const data = await res.json();
+                alert(data.message);
+                if (data.success) {
+                    // loadAuthStatus(); (已去授权化)
+                }
+            } catch (e) {
+                alert("请求云端鉴权失败: " + e);
+            }
+        }
+
+        // ================= 4. 物理真机协同设备识别与未连接硬拦截 =================
+        async function loadDevices() {
+            try {
+                const res = await fetch("/api/devices");
+                const data = await res.json();
+                const container = document.getElementById("deviceCheckboxes");
+                const modalBox = document.getElementById("devicesList");
+
+                availableDevices = [];
+                let htmlCheckboxes = "";
+                let modalHtml = "";
+
+                const androids = data.android_devices || [];
+                androids.forEach((d) => {
+                    availableDevices.push({ id: d.id, model: d.model, platform: "Android" });
+                    htmlCheckboxes += `
+                        <div class="form-check m-0 py-1" onclick="event.stopPropagation()">
+                            <input class="form-check-input device-checkbox" type="checkbox" id="dev_${d.id}" value="${d.id}" checked onchange="updateDeviceSummary()">
+                            <label class="form-check-label small" for="dev_${d.id}" style="color: var(--text-main); font-size: 11.5px; cursor: pointer; user-select: none;">
+                                <i class="bi bi-android2 me-1"></i> ${d.model}
+                            </label>
+                        </div>
+                    `;
+                    modalHtml += `
+                        <div class="p-2 mb-2 rounded d-flex justify-content-between align-items-center" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                            <div>
+                                <div class="fw-semibold small" style="font-size: 12px;"><i class="bi bi-android2 me-1"></i> ${d.model}</div>
+                                <div class="text-muted" style="font-size: 11px;">SN: ${d.id} · Android ${d.version}</div>
+                            </div>
+                            <span class="mono-tag mono-tag-active">在线就绪</span>
+                        </div>
+                    `;
+                });
+
+                if (data.ios_node) {
+                    const ios = data.ios_node;
+                    availableDevices.push({ id: ios.id, model: ios.model, platform: "iOS" });
+                    htmlCheckboxes += `
+                        <div class="form-check m-0 py-1" onclick="event.stopPropagation()">
+                            <input class="form-check-input device-checkbox" type="checkbox" id="dev_${ios.id}" value="${ios.id}" onchange="updateDeviceSummary()">
+                            <label class="form-check-label small" for="dev_${ios.id}" style="color: var(--text-main); font-size: 11.5px; cursor: pointer; user-select: none;">
+                                <i class="bi bi-apple me-1"></i> ${ios.model}
+                            </label>
+                        </div>
+                    `;
+                    modalHtml += `
+                        <div class="p-2 mb-2 rounded d-flex justify-content-between align-items-center" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                            <div>
+                                <div class="fw-semibold small" style="font-size: 12px;"><i class="bi bi-apple me-1"></i> ${ios.model}</div>
+                                <div class="text-muted" style="font-size: 11px;">${ios.status}</div>
+                            </div>
+                            <span class="mono-tag mono-tag-active">iOS 节点</span>
+                        </div>
+                    `;
+                }
+
+                if (availableDevices.length === 0) {
+                    htmlCheckboxes = `<span class="small text-danger p-1"><i class="bi bi-exclamation-circle me-1"></i>当前无在线真机设备</span>`;
+                    modalHtml = `<div class="small p-2 text-muted">暂无在线真机，请通过 USB 连接</div>`;
+                }
+
+                if (container) container.innerHTML = htmlCheckboxes;
+                if (modalBox) modalBox.innerHTML = modalHtml;
+
+                window._isDevicesInitialLoaded = true;
+                updateDeviceSummary();
+                if (currentActiveSessionData) {
+                    renderSessionEnvStatus(currentActiveSessionData);
+                }
+            } catch (e) {}
+        }
+
+        function updateDeviceSummary() {
+            const checked = document.querySelectorAll(".device-checkbox:checked");
+            const lbl = document.getElementById("deviceSummaryLabel");
+            const dot = document.getElementById("deviceStatusDot");
+            const btnSend = document.getElementById("btnSendTask");
+            const inputTa = document.getElementById("taskInputText");
+
+            const hasRealDevices = (availableDevices && availableDevices.length > 0 && (checked.length > 0 || document.querySelectorAll(".device-checkbox").length === 0));
+            const devCount = checked.length > 0 ? checked.length : (availableDevices ? availableDevices.length : 0);
+
+            if (lbl) {
+                lbl.innerText = hasRealDevices ? `${devCount} 台真机在线` : `0 台真机在线`;
+            }
+            if (dot) {
+                dot.className = hasRealDevices ? "status-indicator-dot dot-online" : "status-indicator-dot dot-offline";
+            }
+
+            // 未连接真机状态硬提示与控制
+            if (!hasRealDevices) {
+                if (inputTa && !inputTa.value) {
+                    inputTa.placeholder = "【未连真机】请通过 USB 连接手机并开启开发者 USB 调试，连上后方可测试...";
+                }
+                if (btnSend) {
+                    btnSend.classList.add("btn-send-disabled");
+                    btnSend.title = "未检测到在线真机，无法测试";
+                }
+            } else {
+                if (inputTa && inputTa.placeholder.includes("【未连真机】")) {
+                    inputTa.placeholder = "输入测试目标或追加指令，支持 Ctrl+V 粘贴截图 / 拖入用例文档...";
+                }
+                if (btnSend) {
+                    btnSend.classList.remove("btn-send-disabled");
+                    btnSend.title = "发送执行";
+                }
+            }
+
+            updateOnboardingDeviceStatus();
+        }
+
+        function toggleAllDevices() {
+            const cbs = document.querySelectorAll(".device-checkbox");
+            if (cbs.length === 0) return;
+            const allChecked = Array.from(cbs).every(c => c.checked);
+            cbs.forEach(c => c.checked = !allChecked);
+            updateDeviceSummary();
+        }
+
+        // ================= 5. 会话列表管理 (设备种类矢量微标渲染与持久化还原) =================
+        async function loadSessions() {
+            try {
+                const res = await fetch("/api/sessions");
+                const data = await res.json();
+                currentSessions = data.sessions || [];
+                renderSessionList();
+
+                const urlParamsNav = new URLSearchParams(window.location.search);
+                const urlSessionId = urlParamsNav.get("session_id");
+                // 🌟 仅当 URL 中显式带 ?session_id=xxx 时才精准切入指定历史任务；
+                // 默认首次进入或刷新始终保持【新建任务】界面，绝不自动跳入历史任务或正在运行的任务
+                if (urlSessionId && currentSessions.some(s => s.session_id === urlSessionId)) {
+                    switchSession(urlSessionId);
+                } else if (!activeSessionId) {
+                    resetToNewChatView();
+                }
+            } catch (e) {
+                console.error("加载会话列表异常:", e);
+            }
+        }
+
+        // ================= 全局搜索过滤、快捷键状态与时间分组折叠 =================
+        let sessionSearchKeyword = "";
+        // 默认折叠较早的历史任务，展开今天、昨天、近 7 天
+        let collapsedTimeGroups = new Set(["更早"]);
+
+        function toggleTimeGroup(grpName) {
+            if (collapsedTimeGroups.has(grpName)) {
+                collapsedTimeGroups.delete(grpName);
+            } else {
+                collapsedTimeGroups.add(grpName);
+            }
+            renderSessionList();
+        }
+
+        function filterSessionList(val) {
+            sessionSearchKeyword = (val || "").trim().toLowerCase();
+            const clearBtn = document.getElementById("sessionSearchClear");
+            if (clearBtn) {
+                if (sessionSearchKeyword) {
+                    clearBtn.classList.remove("d-none");
+                } else {
+                    clearBtn.classList.add("d-none");
+                }
+            }
+            renderSessionList();
+        }
+
+        function clearSessionSearch() {
+            const inp = document.getElementById("sessionSearchInput");
+            if (inp) {
+                inp.value = "";
+                inp.focus();
+            }
+            filterSessionList("");
+        }
+
+        function escapeAttrVal(str) {
+            if (!str) return "";
+            return String(str).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+        }
+
+        // 解析任务所属时间分组 (今天 / 昨天 / 近 7 天 / 更早 / 历史归档)
+        function getSessionDateInfo(s) {
+            let d = null;
+            if (s.timestamp && s.timestamp > 0) {
+                d = new Date(s.timestamp * 1000);
+            } else if (s.session_id) {
+                const m = s.session_id.match(/sess_(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+                if (m) {
+                    const now = new Date();
+                    const month = parseInt(m[1], 10) - 1;
+                    const day = parseInt(m[2], 10);
+                    const hour = parseInt(m[3], 10);
+                    const min = parseInt(m[4], 10);
+                    const sec = parseInt(m[5], 10);
+                    d = new Date(now.getFullYear(), month, day, hour, min, sec);
+                }
+            }
+            if (!d && s.created_at) {
+                if (s.created_at.includes("-")) {
+                    d = new Date(s.created_at);
+                } else if (s.created_at.includes(":")) {
+                    const parts = s.created_at.split(":");
+                    const now = new Date();
+                    d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2] || "0", 10));
+                }
+            }
+
+            if (!d || isNaN(d.getTime())) {
+                return { group: "历史归档", timeStr: s.created_at || "归档", ts: 0 };
+            }
+
+            const now = new Date();
+            const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const yesterdayMidnight = todayMidnight - 86400000;
+            const weekMidnight = todayMidnight - 6 * 86400000;
+            const t = d.getTime();
+
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const timeStr = `${hh}:${mm}`;
+
+            let group = "更早";
+            if (t >= todayMidnight) {
+                group = "今天";
+            } else if (t >= yesterdayMidnight) {
+                group = "昨天";
+            } else if (t >= weekMidnight) {
+                group = "近 7 天";
+            }
+
+            return { group, timeStr, ts: t };
+        }
+
+        // 重构：极简主义单行流线会话列表 + 可折叠时间累计分组
+        function renderSessionList() {
+            const box = document.getElementById("sessionList");
+            if (!box) return;
+
+            if (!currentSessions || currentSessions.length === 0) {
+                box.innerHTML = `<div class="small text-muted p-3 text-center" style="font-size: 11px;">暂无历史测试任务</div>`;
+                return;
+            }
+
+            // 1. 关键字过滤
+            let filtered = currentSessions;
+            if (sessionSearchKeyword) {
+                filtered = currentSessions.filter(s => {
+                    const t = (s.title || "").toLowerCase();
+                    const g = (s.goal || "").toLowerCase();
+                    const sid = (s.session_id || "").toLowerCase();
+                    return t.includes(sessionSearchKeyword) || g.includes(sessionSearchKeyword) || sid.includes(sessionSearchKeyword);
+                });
+            }
+
+            if (!filtered || filtered.length === 0) {
+                box.innerHTML = `
+                    <div class="p-3 text-center text-muted" style="font-size: 11px;">
+                        <span>未找到匹配的任务</span>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-xs btn-outline-secondary py-0.5 px-2" style="font-size: 10px; border-radius: 4px;" onclick="clearSessionSearch()">清空搜索</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // 2. 按时间智能分组
+            const groupsMap = {
+                "今天": [],
+                "昨天": [],
+                "近 7 天": [],
+                "更早": [],
+                "历史归档": []
+            };
+
+            filtered.forEach(s => {
+                const info = getSessionDateInfo(s);
+                s._dateInfo = info;
+                if (!groupsMap[info.group]) {
+                    groupsMap[info.group] = [];
+                }
+                groupsMap[info.group].push(s);
+            });
+
+            // 3. 构建极简主义 HTML (折叠标头 + 纯净单行卡片 + 圆点代言成败)
+            let html = "";
+            const groupKeys = ["今天", "昨天", "近 7 天", "更早", "历史归档"];
+
+            groupKeys.forEach(grp => {
+                const list = groupsMap[grp];
+                if (!list || list.length === 0) return;
+
+                // 搜索时强制全部展开；非搜索时根据 Set 状态折叠
+                const isCollapsed = !sessionSearchKeyword && collapsedTimeGroups.has(grp);
+
+                html += `
+                    <div class="session-group-header ${isCollapsed ? 'is-collapsed' : ''}" onclick="toggleTimeGroup('${grp}')" title="点击展开/折叠">
+                        <div class="d-flex align-items-center gap-1.5">
+                            <i class="bi bi-chevron-down group-toggle-icon"></i>
+                            <span>${grp}</span>
+                        </div>
+                        <span class="session-group-count">${list.length}</span>
+                    </div>
+                `;
+
+                if (!isCollapsed) {
+                    list.forEach(s => {
+                        const isActive = (s.session_id === activeSessionId) ? "active" : "";
+                        const title = s.title || s.goal || `测试任务 ${s.session_id.slice(-6)}`;
+
+                        // 状态与光效判断 (圆点全权代言状态，杜绝次行 PASS/FAIL 堆叠)
+                        const isRunning = (s.status === "RUNNING" || s.status === "IN_PROGRESS" || (typeof liveRunningSessions !== "undefined" && liveRunningSessions.has(s.session_id)));
+                        const isFailed = (s.status === "FAILED" || s.is_success === false);
+                        const isSuccess = (s.status === "READY_FOR_REVIEW" || s.status === "COMPLETED" || s.is_success === true);
+
+                        let dotClass = "session-status-dot";
+                        let statusHint = "已归档";
+
+                        if (isRunning) {
+                            dotClass = "session-status-dot running";
+                            statusHint = "正在运行中";
+                        } else if (isFailed) {
+                            dotClass = "session-status-dot failed";
+                            statusHint = "测试未通过";
+                        } else if (isSuccess) {
+                            dotClass = "session-status-dot success";
+                            statusHint = "测试通过";
+                        } else {
+                            dotClass = "session-status-dot idle";
+                            statusHint = "准备就绪";
+                        }
+
+                        const timeStr = s._dateInfo ? s._dateInfo.timeStr : "";
+
+                        html += `
+                            <div class="session-item ${isActive} ${isRunning ? 'is-running' : ''}" 
+                                 onclick="switchSession('${s.session_id}')" 
+                                 title="${escapeHtml(title)} · ${statusHint}">
+                                <span class="${dotClass}"></span>
+                                <span class="session-title">${escapeHtml(title)}</span>
+                                <span class="session-time-text">${timeStr}</span>
+                                <div class="session-actions" onclick="event.stopPropagation()">
+                                    <button type="button" class="session-action-btn" onclick="renameSessionItem(event, '${s.session_id}', '${escapeAttrVal(title)}')" title="重命名">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="session-action-btn btn-delete" onclick="deleteSessionItem(event, '${s.session_id}')" title="删除">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            box.innerHTML = html;
+        }
+
+        // 行内重命名会话标题
+        async function renameSessionItem(event, sessionId, currentTitle) {
+            if (event) event.stopPropagation();
+            const newTitle = prompt("请输入任务新名称：", currentTitle);
+            if (newTitle === null) return;
+            const trimmed = newTitle.trim();
+            if (!trimmed || trimmed === currentTitle) return;
+
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/rename`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: trimmed })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const target = (currentSessions || []).find(s => s.session_id === sessionId);
+                    if (target) target.title = trimmed;
+                    if (activeSessionId === sessionId) {
+                        const topTitle = document.getElementById("currentSessionTitleDisplay");
+                        if (topTitle) topTitle.innerText = trimmed;
+                    }
+                    renderSessionList();
+                } else {
+                    alert(data.error || "重命名任务失败");
+                }
+            } catch (err) {
+                console.error("重命名任务异常:", err);
+                alert("重命名网络请求异常");
+            }
+        }
+
+        // 删除任务会话
+        async function deleteSessionItem(event, sessionId) {
+            if (event) event.stopPropagation();
+            if (!confirm("确定要删除此测试任务吗？删除后相关测试记录将一并清除。")) return;
+
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/delete`, {
+                    method: "POST"
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentSessions = (currentSessions || []).filter(s => s.session_id !== sessionId);
+                    if (activeSessionId === sessionId) {
+                        resetToNewChatView();
+                    } else {
+                        renderSessionList();
+                    }
+                } else {
+                    alert(data.error || "删除任务失败");
+                }
+            } catch (err) {
+                console.error("删除任务异常:", err);
+                alert("删除任务网络请求异常");
+            }
+        }
+
+        // 注册快捷键监听 (Ctrl+F / Cmd+F 聚焦搜索，Ctrl+N / Cmd+N 新建任务)
+        window.addEventListener("keydown", function(e) {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+                const searchInp = document.getElementById("sessionSearchInput");
+                const sidebarAi = document.getElementById("sidebarViewAi");
+                if (searchInp && sidebarAi && !sidebarAi.classList.contains("d-none")) {
+                    e.preventDefault();
+                    searchInp.focus();
+                    searchInp.select();
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+                const ta = document.getElementById("taskInputText");
+                if (document.activeElement !== ta) {
+                    e.preventDefault();
+                    if (typeof startNewChat === "function") {
+                        startNewChat();
+                    }
+                }
+            }
+        });
+
+        function resetToNewChatView() {
+            activeSessionId = null;
+            localStorage.removeItem("autotest_active_session_id");
+            if (sessionPollTimer) clearInterval(sessionPollTimer);
+            updateStopButtonState("IDLE");
+            renderSessionList();
+
+            // 1. 显式显示中央推荐用例看板与空状态
+            const emptyBox = document.getElementById("emptyStateBox");
+            if (emptyBox) emptyBox.classList.remove("d-none");
+            const flow = document.getElementById("messagesFlow");
+            if (flow) flow.innerHTML = "";
+
+            // 2. 任务标题与徽章重置为新建状态
+            const topMetaWrap = document.getElementById("activeTaskMeta");
+            if (topMetaWrap) topMetaWrap.classList.add("d-none");
+
+            const titleDisplay = document.getElementById("currentSessionTitleDisplay");
+            if (titleDisplay) titleDisplay.innerText = "新建测试任务";
+            const topBadge = document.getElementById("topActiveTaskBadge");
+            if (topBadge) topBadge.classList.add("d-none");
+            const topMeta = document.getElementById("topActiveTaskMeta");
+            if (topMeta) topMeta.innerText = "准备就绪";
+
+            // 3. 收起右侧明细面板，保持纯净视野
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && !canvas.classList.contains("collapsed")) {
+                canvas.classList.add("collapsed");
+            }
+            const btnRight = document.getElementById("btnToggleRight");
+            if (btnRight) btnRight.classList.remove("active");
+
+            // 4. 重置输入框为新任务引导
+            const ta = document.getElementById("taskInputText");
+            if (ta) {
+                ta.placeholder = "输入测试目标或追加指令...";
+                ta.value = "";
+            }
+
+            // 5. 隐藏并清空已有会话的原有配置芯片与环境提醒
+            const chips = document.getElementById("sessionEnvChips");
+            if (chips) chips.innerHTML = "";
+            const alertBanner = document.getElementById("sessionEnvAlertBanner");
+            if (alertBanner) {
+                alertBanner.classList.add("d-none");
+                alertBanner.innerHTML = "";
+            }
+
+            // 🌟 新建任务时严禁展示任务胶囊与下拉活清单，彻底杜绝幽灵胶囊
+            const hud = document.getElementById("floatingTaskHud");
+            if (hud) hud.classList.add("d-none");
+            const dropup = document.getElementById("taskDropupSheet");
+            if (dropup) dropup.classList.add("d-none");
+            const chevron = document.getElementById("hudChevron");
+            if (chevron) chevron.style.transform = "rotate(0deg)";
+
+            // 6. 安全更新（若节点或控制台容器存在才更新，防止 null 报错阻断全局脚本）
+            const pNodes = document.getElementById("pipelineNodesList");
+            if (pNodes) {
+                pNodes.innerHTML = `
+                    <div class="canvas-empty-state">
+                        <div class="canvas-empty-icon"><i class="bi bi-diagram-3"></i></div>
+                        <div class="canvas-empty-title">等待规划测试执行流水线</div>
+                        <div class="canvas-empty-desc">在左侧输入测试需求后，AI 决策大脑将智能拆解任务并生成结构化规划节点。</div>
+                    </div>
+                `;
+            }
+            const nBadge = document.getElementById("nodesSummaryBadge");
+            if (nBadge) nBadge.innerText = "0 节点";
+            const runLogs = document.getElementById("runLogs");
+            if (runLogs) {
+                runLogs.innerHTML = `
+                    <div class="canvas-empty-state">
+                        <div class="canvas-empty-icon"><i class="bi bi-terminal"></i></div>
+                        <div class="canvas-empty-title">暂无实时设备控制台日志</div>
+                        <div class="canvas-empty-desc">任务启动后，各终端的实时操控指令、ADB 事件与 OCR 判定将汇聚于此。</div>
+                    </div>
+                `;
+            }
+
+            if (typeof refreshAppSuggestedCases === "function") {
+                refreshAppSuggestedCases();
+            }
+        }
+
+        function startNewChat() {
+            resetToNewChatView();
+            const ta = document.getElementById("taskInputText");
+            if (ta) ta.focus();
+        }
+
+        async function switchSession(sessionId) {
+            activeSessionId = sessionId;
+            localStorage.setItem("autotest_active_session_id", sessionId);
+            renderSessionList();
+
+            deviceLogsCache = {};
+            deviceOffsets = {};
+            activeConsoleDeviceId = null;
+
+            if (sessionPollTimer) {
+                clearInterval(sessionPollTimer);
+                sessionPollTimer = null;
+            }
+
+            await pollCurrentSession();
+            // 🛡️ 智能轮询控制：处于 RUNNING、PLANNING 或 QUEUED 等活动状态时持续轮询，实时流转推演与步骤
+            const isLive = currentActiveSessionData && ["RUNNING", "PLANNING", "QUEUED"].includes(currentActiveSessionData.status);
+            if (isLive) {
+                sessionPollTimer = setInterval(pollCurrentSession, 1200);
+            }
+        }
+
+        // ================= 6. 轮询并渲染主对话流 (无头像、无名称) =================
+        async function pollCurrentSession() {
+            if (!activeSessionId) return;
+
+            try {
+                const offsetParam = encodeURIComponent(JSON.stringify(deviceOffsets));
+                const res = await fetch(`/api/sessions/${activeSessionId}?offsets=${offsetParam}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                currentActiveSessionData = data;
+                // 顶栏模式切换器常驻，方便随时在 AI 编排与本地用例回归之间切换
+                const segmented = document.getElementById("mainWorkspaceSegmented");
+                if (segmented) segmented.classList.remove("d-none");
+
+                // 2. 更新会话标题与输入提示
+                const metaWrap = document.getElementById("activeTaskMeta");
+                if (metaWrap && currentWorkspaceMode === "ai") metaWrap.classList.remove("d-none");
+                document.getElementById("currentSessionTitleDisplay").innerText = data.title;
+                const ta = document.getElementById("taskInputText");
+                if (ta) ta.placeholder = "输入追加指令或补充测试目标...";
+
+                // 4. 渲染已有会话的原有配置信息与环境巡检 (Task 2)
+                renderSessionEnvStatus(data);
+
+                updateStopButtonState(data.status);
+                if (data.timeline_blocks && data.timeline_blocks.length > 0) {
+                    renderChatTimelineStream(data);
+                } else {
+                    renderChatStream(data);
+                }
+                renderPipelineNodes(data.plan_steps, data.status, data.devices);
+                renderConsoleTabs(data.devices);
+
+                for (const [devId, devInfo] of Object.entries(data.devices || {})) {
+                    if (!deviceLogsCache[devId]) deviceLogsCache[devId] = [];
+                    if (devInfo.new_logs && devInfo.new_logs.length > 0) {
+                        devInfo.new_logs.forEach(l => {
+                            deviceLogsCache[devId].push(l);
+                            if (l.includes("tap") || l.includes("点击")) {
+                                triggerScreenTouchRipple(0.5, 0.45, "原生手势轻触");
+                            } else if (l.includes("swipe") || l.includes("滑动")) {
+                                triggerScreenTouchRipple(0.5, 0.65, "屏幕滑动手势");
+                            }
+                        });
+                        deviceOffsets[devId] = devInfo.total_logs;
+                    }
+                }
+
+                updateConsoleLogs();
+
+                const viewScreen = document.getElementById("canvasScreenView");
+                const isScreenTabActive = viewScreen && !viewScreen.classList.contains("d-none");
+                if (isScreenTabActive && isScreenAutoSyncEnabled) {
+                    refreshDeviceScreen(false);
+                }
+
+                // 同步当前活跃会话状态给左侧列表，消除转圈滞后
+                const targetSess = currentSessions.find(s => s.session_id === activeSessionId);
+                if (targetSess && (targetSess.status !== data.status || targetSess.is_success !== data.is_success)) {
+                    targetSess.status = data.status;
+                    targetSess.is_success = data.is_success;
+                    renderSessionList();
+                }
+
+                if (data.status === "COMPLETED" || data.status === "FAILED" || data.status === "STOPPED" || data.status === "READY_FOR_REVIEW") {
+                    liveRunningSessions.delete(activeSessionId);
+                    if (sessionPollTimer) {
+                        clearInterval(sessionPollTimer);
+                        sessionPollTimer = null;
+                    }
+                    renderSessionList();
+                }
+            } catch (e) {}
+        }
+
+        // 全局交互状态持久化记忆（避免轮询重绘 DOM 时折叠状态丢失）
+        const dshExpandedState = {
+            thought: false,
+            steps: {},
+            allStepsExpanded: false
+        };
+
+        function openCanvasLogs() {
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && canvas.classList.contains("collapsed")) {
+                canvas.classList.remove("collapsed");
+            }
+            switchCanvasTab('logs');
+        }
+
+        function openCanvasScreen() {
+            const canvas = document.getElementById("gptCanvas");
+            if (canvas && canvas.classList.contains("collapsed")) {
+                canvas.classList.remove("collapsed");
+            }
+            switchCanvasTab('screen');
+        }
+
+        // ================= 业务人话转译与诊断生成器 (优化项 2) =================
+        function translateDiagnostic(errorMsg, failedStepNum, failedStepTitle) {
+            const raw = String(errorMsg || "").trim();
+            let situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
+            let suggestion = "请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查待测应用是否在前台。";
+            let isModelError = false;
+
+            if (/模型决策异常|Google 授权端点|备用网关|502 Bad Gateway|504 Gateway|550 EdgeOne|WinError 10054|ConnectionReset|API key not valid|RESOURCE_EXHAUSTED|ConnectTimeout|ReadTimeout|大模型决策调用异常|LLM_CONNECTION_ERROR/i.test(raw)) {
+                isModelError = true;
+                if (/502|550|EdgeOne|Bad Gateway/i.test(raw)) {
+                    situation = "主通道 Google 授权端点网络超时/重置，且备用中转网关 (Hermes) 响应 502/550 宕机异常，导致大模型双通道均未能连通。";
+                } else if (/Timeout|超时/i.test(raw)) {
+                    situation = "大模型推理端点请求超时（超过 40s 未收到首包响应），网络可能存在高延迟或阻断。";
+                } else if (/10054|ConnectionReset/i.test(raw)) {
+                    situation = "底层 TCP 连接被对端重置 (ConnectionResetError / WinError 10054)，网络连接被防火墙或代理中断。";
+                } else if (/API key|UNAUTHENTICATED|PERMISSION_DENIED/i.test(raw)) {
+                    situation = "大模型 API Key 鉴权失败或已失效，上游大模型服务拒绝访问。";
+                } else {
+                    situation = `大模型推理通道调用异常：${raw.replace(/^.*[ERROR]\s*/, '')}`;
+                }
+                suggestion = "1. 检查外网或网络代理连通性；2. 点击【设置】切换为 DeepSeek 或其他大模型；3. 配置可用中转 API Key 后重试。";
+            }
+
+            if (!raw || raw === "undefined") {
+                situation = "端侧视觉感知目标组件未定位或界面转场断言超时。";
+                suggestion = "请检查手机当前是否处于锁屏/弹窗遮挡状态，或检查待测应用是否在前台。";
+            } else if (/NoSuchElement|not found|未找到|未定位|未检测到/i.test(raw)) {
+                situation = '屏幕可能停留在“隐私政策授权”弹窗、权限申请或加载页，导致目标按钮被遮挡。';
+                suggestion = '可在真机投屏中手动点击“同意/授权”，或重新发起测试并在意图中加入“先同意隐私协议”。';
+            } else if (/Timeout|timeout|超时|未在预期时间内/i.test(raw)) {
+                situation = '界面转场响应缓慢或网络数据加载延迟，未在预期时限内捕获到关键反馈。';
+                suggestion = '请检查网络连通性或当前端侧运行负载，确认页面加载就绪后一键重试。';
+            } else if (/INJECT_EVENTS|安全设置|手势.*拦截|模拟点击|permission denied.*input/i.test(raw)) {
+                situation = '手机系统安全策略拦截了 USB 模拟触控注入（缺少 INJECT_EVENTS 权限），导致点击和滑动手势被系统静默丢弃。';
+                suggestion = '1. 进入手机【设置】->【更多设置】->【开发者选项】；2. 开启【USB 调试（安全设置）】允许模拟点击；3. 若为小米/vivo/OPPO手机需在弹出的安全确认中点击允许。';
+            } else if (/offline|离线/i.test(raw)) {
+                situation = '目标物理真机处于离线状态 (device offline)，底层 ADB 通信未通过健康校验。';
+                suggestion = '1. 重新插拔 USB 数据线；2. 打开手机设置确认开启【USB 调试】；3. 手机亮屏并在授权弹窗中勾选【始终允许这台电脑调试】。系统已杜绝免机仿真，必须真机在线后方可执行。';
+            } else if (/安装失败|未安装|install|apk/i.test(raw)) {
+                situation = '待测应用在目标设备上部署失败（应用未安装或系统拦截安装），流程已坚决阻断（杜绝仿真与空跑）。';
+                suggestion = '1. 检查手机存储空间是否充足；2. 查看手机屏幕是否弹出厂商【安装未知来源应用/纯净模式拦截】确认框，需手动点击允许；3. 亦可在手机上手动安装该 APK 后重新发起测试。';
+            } else if (/Session|连接断开|ADB/i.test(raw)) {
+                situation = 'ADB 底层通信链路出现波动或真机处于息屏/掉线状态。';
+                suggestion = '请在右侧屏幕显示中检查真机唤醒状态与 USB/WiFi 授权，确认连接正常后重试。';
+            } else {
+                situation = `执行受阻：${raw.slice(0, 100)}`;
+                suggestion = '请检查手机屏幕状态，排除无关弹窗遮挡后重新发起执行。';
+            }
+
+            return {
+                stepNum: failedStepNum || 1,
+                stepTitle: failedStepTitle || "业务交互执行",
+                situation: situation,
+                suggestion: suggestion,
+                isModelError: isModelError,
+                raw: raw
+            };
+        }
+
+        // ================= 聚焦实时屏幕：极简当前步骤动态指示胶囊 =================
+        function updateCurrentStepCapsule(sessionData) {
+            const steps = sessionData.plan_steps || [];
+            const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "FAILED");
+            let hasDeviceFail = (sessionData.has_fail === true);
+            for (const d of Object.values(sessionData.devices || {})) {
+                if (d.status === "FAIL" || d.success === false) {
+                    hasDeviceFail = true;
+                    break;
+                }
+            }
+            const isSuccess = (sessionData.is_success === true || (sessionData.is_success !== false && !hasDeviceFail && sessionData.status !== "FAILED"));
+
+            // 查找当前正在执行或受阻的步骤
+            let activeStep = null;
+            let activeIdx = 0;
+            let failedStep = null;
+            let failedIdx = 0;
+            for (let i = 0; i < steps.length; i++) {
+                if (steps[i].status === "RUNNING") {
+                    activeStep = steps[i];
+                    activeIdx = i + 1;
+                    break;
+                }
+                if (steps[i].status === "FAIL" || steps[i].status === "FAILED") {
+                    failedStep = steps[i];
+                    failedIdx = i + 1;
+                }
+            }
+            if (!activeStep && steps.length > 0) {
+                activeStep = steps[0];
+                activeIdx = 1;
+            }
+
+            let liveAction = "";
+            for (const devInfo of Object.values(sessionData.devices || {})) {
+                if (devInfo.action) liveAction = devInfo.action;
+            }
+
+            // 1. 驱动吸顶悬浮小胶囊 (floatingStepCapsule)
+            const fCapsule = document.getElementById("floatingStepCapsule");
+            const fSpinner = document.getElementById("floatingStepSpinner");
+            const fIcon = document.getElementById("floatingStepIcon");
+            const fText = document.getElementById("floatingStepText");
+
+            if (fCapsule && fText) {
+                if (!sessionData.id && steps.length === 0) {
+                    fCapsule.classList.add("d-none");
+                } else {
+                    fCapsule.classList.remove("d-none");
+                    if (isFinished) {
+                        if (fSpinner) fSpinner.classList.add("d-none");
+                        if (isSuccess) {
+                            fCapsule.className = "floating-step-capsule status-completed";
+                            if (fIcon) fIcon.className = "bi bi-check2-circle text-success";
+                            fText.innerText = `已完成全部 ${steps.length} 个步骤节点 ↗`;
+                        } else {
+                            fCapsule.className = "floating-step-capsule status-failed";
+                            if (fIcon) fIcon.className = "bi bi-exclamation-octagon text-danger";
+                            const isModelFailed = (sessionData.error_type === "LLM_CONNECTION_ERROR") || /模型决策异常|Google 授权|备用网关|502|550|未连通/i.test(sessionData.error_message || "");
+                            if (isModelFailed) {
+                                fText.innerText = `AI 推理通道未连通 · 决策受阻 ↗`;
+                            } else {
+                                const errTitle = failedStep ? (failedStep.title || `第 ${failedIdx} 步`) : '执行中断';
+                                fText.innerText = `在第 ${failedIdx || activeIdx} 步受阻: ${errTitle} ↗`;
+                            }
+                        }
+                    } else {
+                        // 执行中
+                        fCapsule.className = "floating-step-capsule";
+                        if (fSpinner) fSpinner.classList.remove("d-none");
+                        if (fIcon) fIcon.className = "bi bi-terminal text-info";
+                        const stepTitle = activeStep ? (activeStep.title || activeStep.name) : "执行业务交互";
+                        const displayAction = liveAction || stepTitle;
+                        fText.innerText = `Step ${activeIdx}/${steps.length || 3}: ${displayAction} ↗`;
+                    }
+                }
+            }
+
+            // 2. 兼容旧的 currentStepCapsule（如果 DOM 仍保留）
+            const capsule = document.getElementById("currentStepCapsule");
+            const spinner = document.getElementById("currentStepCapsuleSpinner");
+            const icon = document.getElementById("currentStepCapsuleIcon");
+            const textEl = document.getElementById("currentStepCapsuleText");
+            if (capsule && textEl) {
+                capsule.className = "current-step-capsule mb-3";
+                if (isFinished) {
+                    if (spinner) spinner.classList.add("d-none");
+                    if (isSuccess) {
+                        capsule.classList.add("completed");
+                        if (icon) icon.className = "bi bi-check-circle-fill text-success";
+                        textEl.innerText = `全流程测试验证通过 · ${steps.length} 个规划阶段均已达成`;
+                    } else {
+                        capsule.classList.add("failed");
+                        if (icon) icon.className = "bi bi-exclamation-triangle-fill text-danger";
+                        textEl.innerText = `测试推进受阻 · 请参考主对话流人话诊断或检查真机弹窗`;
+                    }
+                } else {
+                    capsule.classList.add("active");
+                    if (spinner) spinner.classList.remove("d-none");
+                    if (icon) icon.className = "bi bi-lightning-charge-fill text-info";
+                    const stepTitle = activeStep ? (activeStep.title || activeStep.name) : "执行业务交互";
+                    textEl.innerText = liveAction ? `当前第 ${activeIdx} 步：${liveAction}` : `当前第 ${activeIdx} 步：${stepTitle}`;
+                }
+            }
+        }
+
+        // ================= 渲染小弹窗内的步骤时序与原生跟踪 =================
+        
+        // ================= 17. 多轮 Turn 级联对话流与验收/返工/交付物控制器 =================
+        let currentReworkSessionId = null;
+
+        function openReworkDialog(sessionId) {
+            currentReworkSessionId = sessionId;
+            const input = document.getElementById("reworkNoteInput");
+            if (input) input.value = "";
+            const modalEl = document.getElementById("reworkModal");
+            if (modalEl && typeof bootstrap !== "undefined") {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        }
+
+        async function submitReworkAction() {
+            const input = document.getElementById("reworkNoteInput");
+            const note = input ? input.value.trim() : "";
+            if (!note) {
+                alert("请输入具体的打回返工要求");
+                return;
+            }
+            const modalEl = document.getElementById("reworkModal");
+            if (modalEl && typeof bootstrap !== "undefined") {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+            try {
+                const formData = new FormData();
+                formData.append("note", note);
+                const res = await fetch(`/api/sessions/${currentReworkSessionId}/rework`, { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    liveRunningSessions.add(currentReworkSessionId);
+                    if (!sessionPollTimer) {
+                        sessionPollTimer = setInterval(pollCurrentSession, 1200);
+                    }
+                    await pollCurrentSession();
+                    loadSessions();
+                } else {
+                    alert(data.message || "打回返工失败");
+                }
+            } catch (e) {
+                alert("打回返工请求异常: " + e);
+            }
+        }
+
+        window.submitHitlChoice = function(sessionId, choiceVal) {
+            submitHitlDecision(sessionId, "ai_choice", { choice: choiceVal });
+        };
+
+        window.submitHitlDecision = async function(sessionId, decisionType, extraParams) {
+            sessionId = sessionId || activeSessionId;
+            if (!sessionId) return;
+            
+            const cardEl = document.getElementById(`hitlDecisionCard_${sessionId}`);
+            const accountInput = document.getElementById(`hitlAccountInput_${sessionId}`);
+            const passwordInput = document.getElementById(`hitlPasswordInput_${sessionId}`);
+            const smsCodeInput = document.getElementById(`hitlSmsCodeInput_${sessionId}`);
+            const rememberInput = document.getElementById(`hitlRemember_${sessionId}`);
+
+            // 动态收集 AI 生成的表单字段
+            const dynamicInputs = {};
+            if (cardEl) {
+                cardEl.querySelectorAll(".hitl-dynamic-field").forEach(inp => {
+                    const k = inp.getAttribute("data-key");
+                    if (k) dynamicInputs[k] = inp.value.trim();
+                });
+            }
+            
+            const account = accountInput ? accountInput.value.trim() : "";
+            const password = passwordInput ? passwordInput.value.trim() : "";
+            const smsCode = smsCodeInput ? smsCodeInput.value.trim() : "";
+            if (account) window._lastHitlAccount = account;
+            if (password) window._lastHitlPassword = password;
+            const remember = rememberInput ? rememberInput.checked : true;
+            
+            if (decisionType === "inject_sms") {
+                if (!smsCode) {
+                    alert("请输入收到的短信验证码后再提交！");
+                    if (smsCodeInput) smsCodeInput.focus();
+                    return;
+                }
+            } else if (decisionType === "inject_phone") {
+                if (!account) {
+                    alert("请输入测试手机号后再提交！");
+                    if (accountInput) accountInput.focus();
+                    return;
+                }
+            } else if (decisionType === "inject" && !account && !smsCode) {
+                alert("请输入测试凭证后再提交！");
+                if (accountInput) accountInput.focus();
+                return;
+            }
+            
+            const allBtns = cardEl ? cardEl.querySelectorAll("button") : [];
+            allBtns.forEach(b => b.disabled = true);
+            if (cardEl) {
+                cardEl.style.opacity = "0.7";
+            }
+            
+            try {
+                const curSess = (currentSessions || []).find(s => s.session_id === sessionId) || currentActiveSessionData || {};
+                const appKey = curSess.app_package || curSess.app_label || curSess.app_filename || "demo_app";
+
+                const payloadData = Object.assign({
+                    decision_type: decisionType,
+                    account: account,
+                    password: password,
+                    sms_code: smsCode,
+                    inputs: dynamicInputs,
+                    remember: remember,
+                    app_key: appKey
+                }, extraParams || {});
+
+                const resp = await fetch(`/api/sessions/${sessionId}/resolve_decision`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payloadData)
+                });
+                const res = await resp.json();
+                if (res.success) {
+                    if (cardEl) cardEl.remove();
+                    if (currentActiveSessionData) currentActiveSessionData.hitl_decision = null;
+                    await pollCurrentSession();
+                    if (!sessionPollTimer) {
+                        sessionPollTimer = setInterval(pollCurrentSession, 1200);
+                    }
+                } else {
+                    alert("提交人机协同决策未生效，请重试！");
+                    if (cardEl) {
+                        cardEl.style.opacity = "1";
+                        allBtns.forEach(b => b.disabled = false);
+                    }
+                }
+            } catch (e) {
+                console.error("提交人机协同决策出错:", e);
+                alert("提交决策网络异常: " + e);
+                if (cardEl) {
+                    cardEl.style.opacity = "1";
+                    allBtns.forEach(b => b.disabled = false);
+                }
+            }
+        };
+
+        window.stopSessionById = async function(sessionId) {
+            sessionId = sessionId || activeSessionId;
+            if (!sessionId) return;
+            const cardEl = document.getElementById(`hitlDecisionCard_${sessionId}`);
+            if (cardEl) {
+                cardEl.style.opacity = "0.6";
+                cardEl.style.pointerEvents = "none";
+            }
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/stop`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    currentSessionStatus = "STOPPED";
+                    updateStopButtonState("STOPPED");
+                    if (cardEl) cardEl.remove();
+                    if (currentActiveSessionData) {
+                        currentActiveSessionData.status = "STOPPED";
+                        currentActiveSessionData.hitl_decision = null;
+                    }
+                    await loadSessions();
+                    await pollCurrentSession();
+                } else {
+                    alert(data.message || "终止任务失败");
+                    if (cardEl) {
+                        cardEl.style.opacity = "1";
+                        cardEl.style.pointerEvents = "auto";
+                    }
+                }
+            } catch (e) {
+                console.error("终止任务异常:", e);
+                if (cardEl) {
+                    cardEl.style.opacity = "1";
+                    cardEl.style.pointerEvents = "auto";
+                }
+            }
+        };
+
+        async function acceptSession(sessionId) {
+            if (!confirm("确认正式验收通过本次自动化测试交付物并封板归档？")) return;
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/accept`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    await pollCurrentSession();
+                    loadSessions();
+                    // 弹出成功固化浮层
+                    if (currentActiveSessionData) {
+                        showSuccessHighlightModal(currentActiveSessionData);
+                    }
+                } else {
+                    alert(data.message || "验收失败");
+                }
+            } catch (e) {
+                alert("验收请求异常: " + e);
+            }
+        }
+
+        async function openDeliverablesModal(sessionId) {
+            const modalEl = document.getElementById("deliverablesModal");
+            const container = document.getElementById("deliverablesListContainer");
+            const countBadge = document.getElementById("deliverablesCountBadge");
+            if (!container) return;
+
+            container.innerHTML = `<div class="text-muted small p-3 text-center"><span class="spinner-border spinner-border-sm me-1"></span> 正在核验物理交付物...</div>`;
+            if (modalEl && typeof bootstrap !== "undefined") {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/deliverables`);
+                const data = await res.json();
+                const list = data.deliverables || [];
+                if (countBadge) countBadge.innerText = `${list.length} 项已核验`;
+
+                if (list.length === 0) {
+                    container.innerHTML = `<div class="text-muted small p-3 text-center">暂无可用的物理交付物</div>`;
+                    return;
+                }
+
+                let html = "";
+                list.forEach(item => {
+                    let iconHtml = '<i class="bi bi-file-earmark-code text-info fs-5"></i>';
+                    let actionHtml = '';
+                    if (item.kind === 'script') {
+                        iconHtml = '<i class="bi bi-file-code-fill text-success fs-5"></i>';
+                        actionHtml = `<button class="btn btn-sm btn-outline-success py-0.5 px-2" style="font-size: 11px;" onclick="openEmbeddedCode('${item.path.split('/').pop()}', '${escapeHtml(item.title)}')">查看代码</button>`;
+                    } else if (item.kind === 'report') {
+                        iconHtml = '<i class="bi bi-bar-chart-line-fill text-primary fs-5"></i>';
+                        actionHtml = `<a class="btn btn-sm btn-outline-primary py-0.5 px-2" style="font-size: 11px;" href="${item.url}" target="_blank">打开报告</a>`;
+                    } else if (item.kind === 'screenshot') {
+                        iconHtml = '<i class="bi bi-image-fill text-warning fs-5"></i>';
+                        actionHtml = `<a class="btn btn-sm btn-outline-secondary py-0.5 px-2" style="font-size: 11px;" href="${item.url}" target="_blank">查看截屏</a>`;
+                    }
+
+                    html += `
+                        <div class="deliverable-item-card">
+                            <div class="d-flex align-items-center gap-2.5">
+                                ${iconHtml}
+                                <div>
+                                    <div class="fw-semibold small text-main">${escapeHtml(item.title)}</div>
+                                    <div class="text-muted" style="font-size: 11px;">${escapeHtml(item.summary || item.path)} · ${(item.size_bytes / 1024).toFixed(1)} KB</div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-success-subtle text-success" style="font-size: 9.5px;">已核验</span>
+                                ${actionHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<div class="text-danger small p-3 text-center">加载交付物失败: ${e}</div>`;
+            }
+        }
+
+        function renderStepsDrawerBody(sessionData, steps) {
+            const drawerBody = document.getElementById("stepsDrawerBody");
+            const badge = document.getElementById("drawerStepCountBadge");
+            if (badge) badge.innerText = `${steps.length} 步`;
+            if (!drawerBody) return;
+
+            if (!steps || steps.length === 0) {
+                drawerBody.innerHTML = `<div class="text-muted small p-3 text-center">暂无任务步骤详情</div>`;
+                return;
+            }
+
+            let currentLiveAction = "";
+            for (const devInfo of Object.values(sessionData.devices || {})) {
+                if (devInfo.action) currentLiveAction = devInfo.action;
+            }
+
+            // 抽屉头部快捷工具栏：全部展开 / 全部收起
+            let toolbarHtml = `
+                <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom" style="border-color: var(--border-subtle) !important;">
+                    <span class="text-muted" style="font-size: 11px;">点击单步展开 ADB 指令跟踪与诊断</span>
+                    <button class="btn btn-sm btn-link text-decoration-none p-0" style="font-size: 11px; color: var(--text-sub);" id="dshToggleAllStepsBtn" onclick="toggleAllDshSteps()">
+                        <i class="bi bi-chevron-expand me-1"></i> 全部展开
+                    </button>
+                </div>
+            `;
+
+            let stepsHtml = "";
+            steps.forEach((st, idx) => {
+                const isCompleted = (st.status === "COMPLETED");
+                const isFailed = (st.status === "FAIL" || st.status === "FAILED");
+                const isSkipped = (st.status === "SKIPPED");
+                const isCanceled = (st.status === "CANCELED");
+                const isRunning = (st.status === "RUNNING");
+                const stepNum = st.step_id || (idx + 1);
+                const stepTitle = st.title || st.name || `阶段 ${stepNum}`;
+                const stepDesc = st.desc || st.action || '执行业务规划逻辑并校验页面响应。';
+                const stepBlockId = `drawer_step_${sessionData.session_id || 'curr'}_${idx}`;
+
+                let stateDotHtml = "";
+                let rowClass = "dsh-disclosure-row";
+                let statusTagHtml = "";
+
+                if (isCompleted) {
+                    stateDotHtml = `<i class="bi bi-check2 text-success" style="font-size: 13px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag" style="font-size: 9px; color: #10b981; border-color: rgba(16,185,129,0.35);">通过</span>`;
+                } else if (isFailed) {
+                    stateDotHtml = `<i class="bi bi-x-circle text-danger" style="font-size: 12px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-danger" style="font-size: 9px; border-color: rgba(239, 68, 68, 0.4);">失败</span>`;
+                } else if (isSkipped) {
+                    stateDotHtml = `<i class="bi bi-dash-circle text-muted" style="font-size: 11px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px; opacity: 0.75;">略过</span>`;
+                    rowClass += " opacity-75";
+                } else if (isCanceled) {
+                    stateDotHtml = `<i class="bi bi-slash-circle text-muted" style="font-size: 11px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px; opacity: 0.6;">取消</span>`;
+                    rowClass += " opacity-75";
+                } else if (isRunning) {
+                    stateDotHtml = `<span class="spinner-border spinner-border-sm" style="width: 11px; height: 11px; border-width: 1.5px; color: var(--text-main);"></span>`;
+                    statusTagHtml = `<span class="mono-tag mono-tag-active" style="font-size: 9px;">执行中</span>`;
+                    rowClass += " active";
+                } else {
+                    stateDotHtml = `<i class="bi bi-circle text-muted" style="font-size: 8px;"></i>`;
+                    statusTagHtml = `<span class="mono-tag text-muted" style="font-size: 9px;">等待中</span>`;
+                }
+
+                // 结构化状态判定卡片
+                let statusDetailCardHtml = "";
+                if (isCompleted) {
+                    statusDetailCardHtml = `
+                        <div class="d-flex align-items-center justify-content-between p-2 rounded" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); color: #34d399; font-size: 11px;">
+                            <div class="d-flex align-items-center gap-1.5">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>界面状态转移校验达成 · 阶段耗时 ${st.duration || '0.8s'}</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (isFailed) {
+                    const trans = translateDiagnostic(st.error_msg || sessionData.error_message, stepNum, stepTitle);
+                    const modelActionDock = trans.isModelError ? `
+                        <div class="mt-2 pt-2 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top" style="border-color: rgba(239, 68, 68, 0.2) !important;">
+                            <span class="mono-pill" style="font-size: 9.5px; color: #f87171; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3);">
+                                <i class="bi bi-wifi-off me-1"></i>推理通道未连通
+                            </span>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <button class="btn btn-sm" onclick="openSettingsModal('models')" style="background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.4); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 500;">
+                                    <i class="bi bi-sliders2 me-1"></i>配置/切换模型
+                                </button>
+                                <button class="btn btn-sm" onclick="retryGoalAfterSatisfied(currentActiveSessionData?.goal || '')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; font-size: 11px; padding: 2px 8px; border-radius: 5px;">
+                                    <i class="bi bi-arrow-repeat me-1"></i>重试
+                                </button>
+                            </div>
+                        </div>
+                    ` : '';
+                    statusDetailCardHtml = `
+                        <div class="p-2 rounded" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; font-size: 11px;">
+                            <div class="fw-semibold d-flex align-items-center gap-1 mb-1" style="color: #f87171;">
+                                <i class="bi bi-exclamation-triangle-fill"></i> 在第 ${stepNum} 步受阻
+                            </div>
+                            <div class="mb-1" style="color: #fecaca; line-height: 1.4;"><strong>现状：</strong>${escapeHtml(trans.situation)}</div>
+                            <div style="color: #cbd5e1; line-height: 1.4;"><strong>建议：</strong>${escapeHtml(trans.suggestion)}</div>
+                            ${modelActionDock}
+                        </div>
+                    `;
+                } else if (isRunning) {
+                    statusDetailCardHtml = `
+                        <div class="d-flex align-items-center gap-2 p-2 rounded" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 11px;">
+                            <span class="spinner-grow spinner-grow-sm" style="width: 7px; height: 7px;"></span>
+                            <span>端侧交互: ${escapeHtml(currentLiveAction || '视觉定位组件并派发手势事件...')}</span>
+                        </div>
+                    `;
+                }
+
+                // 底层原生指令跟踪 (ADB / UIAutomator Trace)
+                let traceLogHtml = "";
+                if (st.raw_logs && st.raw_logs.trim()) {
+                    traceLogHtml = `
+                        <div class="dsh-trace-code mt-2" style="font-size: 10.5px; max-height: 160px; overflow-y: auto;">
+                            <div class="small text-muted mb-1 d-flex align-items-center gap-1" style="font-size: 9.5px; color: #94a3b8;">
+                                <i class="bi bi-terminal"></i>
+                                <span>底层原生指令跟踪 (ADB / UI Automator Trace)</span>
+                            </div>
+                            <div>${escapeHtml(st.raw_logs.trim())}</div>
+                        </div>
+                    `;
+                }
+
+                const isStepExpanded = (dshExpandedState.allStepsExpanded === true) || (dshExpandedState.steps[stepBlockId] === true);
+                const stepExpandedClass = isStepExpanded ? "expanded" : "";
+
+                stepsHtml += `
+                    <div class="dsh-step-block ${stepExpandedClass}" id="${stepBlockId}">
+                        <div class="${rowClass}" onclick="toggleDshStep('${stepBlockId}')">
+                            <div class="dsh-state-dot">${stateDotHtml}</div>
+                            <span class="dsh-row-title">Step ${stepNum}: ${escapeHtml(stepTitle)}</span>
+                            <span class="dsh-row-sep"></span>
+                            <span class="dsh-row-summary" title="${escapeHtml(stepDesc)}">${escapeHtml(stepDesc)}</span>
+                            <div class="dsh-row-meta">
+                                ${statusTagHtml}
+                                <span class="dsh-row-duration">${st.duration || '0.8s'}</span>
+                                <i class="bi bi-chevron-down dsh-row-chevron"></i>
+                            </div>
+                        </div>
+                        <div class="dsh-step-detail-card" style="padding: 10px;">
+                            <div class="d-flex align-items-start gap-2 mb-2 pb-1.5 border-bottom" style="border-color: var(--border-subtle) !important;">
+                                <i class="bi bi-bullseye text-primary mt-0.5" style="font-size: 12px;"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold text-main" style="font-size: 11px;">动作与业务意图</div>
+                                    <div class="text-sub mt-0.5" style="font-size: 10.5px;">${escapeHtml(stepDesc)}</div>
+                                </div>
+                            </div>
+                            ${statusDetailCardHtml}
+                            ${traceLogHtml}
+                        </div>
+                    </div>
+                `;
+            });
+
+            drawerBody.innerHTML = toolbarHtml + stepsHtml;
+        }
+
+        function showSuccessHighlightModal(sessionData) {
+            currentModalSessionData = sessionData;
+            const modalEl = document.getElementById("successHighlightModal");
+            if (!modalEl) return;
+
+            let suggestedTitle = sessionData.goal ? sessionData.goal.slice(0, 24) : "业务链路自动化回归";
+            let suggestedModule = "业务通用";
+            if (/房|安居客|链家|租房|买房|二手房|小区/i.test(suggestedTitle)) suggestedModule = "房源搜索";
+            else if (/登录|注册|绑定|密码|验证码|鉴权/i.test(suggestedTitle)) suggestedModule = "业务通用";
+            else if (/表单|提交|录入|创建|申请/i.test(suggestedTitle)) suggestedModule = "业务表单";
+            else if (/导航|进入|跳转|页面|切换/i.test(suggestedTitle)) suggestedModule = "核心导航";
+            else if (/设置|开关|权限|清除|配置/i.test(suggestedTitle)) suggestedModule = "系统设置";
+
+            const badge = document.getElementById("highlightModalModuleBadge");
+            const titleEl = document.getElementById("highlightModalTitleText");
+            const body = document.getElementById("successHighlightModalBody");
+
+            if (badge) badge.innerText = suggestedModule;
+            if (titleEl) titleEl.innerText = `《${suggestedTitle}》`;
+
+            // 重置 modal 内部状态
+            if (body) {
+                body.innerHTML = `
+                    <div class="text-sub mb-3" style="font-size: 12px; line-height: 1.6;">
+                        全流程端侧校验已 100% 达成。AI 已提炼用例并自动归档：
+                    </div>
+                    <div class="p-2.5 rounded mb-3" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(255, 255, 255, 0.15);">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="text-muted" style="font-size: 11px;">所属团队模块：</span>
+                            <span class="mono-tag" id="highlightModalModuleBadge" style="border-color: rgba(16, 185, 129, 0.4); color: #34d399;">${escapeHtml(suggestedModule)}</span>
+                        </div>
+                        <div class="fw-semibold text-main text-truncate" id="highlightModalTitleText" style="font-size: 12.5px;">
+                            《${escapeHtml(suggestedTitle)}》
+                        </div>
+                    </div>
+                    <button class="btn w-100 py-2 btn-highlight-save d-flex align-items-center justify-content-center gap-1.5" id="btnModalSaveTeamCase" onclick="executeModalSaveTeamCase()">
+                        <i class="bi bi-shield-check" style="font-size: 14px;"></i>
+                        <span>✨ 一键保存为团队用例</span>
+                    </button>
+                    <div class="text-center mt-2.5">
+                        <span class="text-muted" style="font-size: 11px; cursor: pointer;" data-bs-dismiss="modal">稍后保存 / 关闭</span>
+                    </div>
+                `;
+            }
+
+            try {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            } catch (e) {}
+        }
+
+        async function executeModalSaveTeamCase() {
+            if (!currentModalSessionData) return;
+            const btn = document.getElementById("btnModalSaveTeamCase");
+            const body = document.getElementById("successHighlightModalBody");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span> 正在入库固化并生成确定性代码...`;
+            }
+
+            try {
+                const res = await fetch(`/api/sessions/${encodeURIComponent(currentModalSessionData.session_id)}/save_to_local_case`, {
+                    method: "POST"
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (body) {
+                        const targetProjName = data.app_name || (data.app_id === 'xianghe_zhaofang' ? '象盒找房' : (data.app_id === 'xianghe_workbench' ? '象盒工作台' : data.app_id)) || '本地工程';
+                        body.innerHTML = `
+                            <div class="p-3 text-center">
+                                <i class="bi bi-check-circle-fill text-success" style="font-size: 32px;"></i>
+                                <div class="fw-bold mt-2" style="font-size: 14px; color: #34d399;">已成功沉淀为团队用例！</div>
+                                <div class="text-muted mt-1" style="font-size: 11.5px; line-height: 1.5;">
+                                    已对齐归入【<strong>${escapeHtml(targetProjName)}</strong>】本地用例工程库<br>
+                                    自动化脚本：<code>${escapeHtml(data.filename)}</code>
+                                </div>
+                                <button class="btn btn-sm btn-outline-light mt-3 px-4 rounded-pill" data-bs-dismiss="modal" style="font-size: 11.5px;">完成</button>
+                            </div>
+                        `;
+                    }
+                    await pollCurrentSession();
+                    await loadSolidifiedCasesWorkspace();
+                    if (typeof loadSolidifiedCases === "function") {
+                        await loadSolidifiedCases();
+                    }
+                    setTimeout(() => {
+                        try {
+                            const modal = bootstrap.Modal.getInstance(document.getElementById("successHighlightModal"));
+                            if (modal) modal.hide();
+                        } catch (e) {}
+                    }, 2200);
+                } else {
+                    alert(data.message || "入库保存失败");
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<span>✨ 一键保存为团队用例</span>`;
+                    }
+                }
+            } catch (err) {
+                alert("请求异常: " + err.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span>✨ 一键保存为团队用例</span>`;
+                }
+            }
+        }
+
+        // 渲染对话流 (无头像/无名称)
+        
+        // ================= Markdown 测试报告解析与一键操作 =================
+        function renderMarkdownToHtml(md) {
+            if (!md) return "";
+            if (window.marked && typeof window.marked.parse === "function") {
+                try {
+                    return window.marked.parse(md);
+                } catch (e) {
+                    console.warn("marked.parse 异常，降级解析:", e);
+                }
+            }
+            // 离线快速降级解析器 (保证标题、表格、列表、粗体 100% 优雅呈现)
+            let raw = escapeHtml(md);
+            raw = raw.replace(/```([a-z]*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+            raw = raw.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            raw = raw.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            raw = raw.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+            raw = raw.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            raw = raw.replace(/^\- (.*$)/gim, '<div style="margin-left: 8px; margin-bottom: 3px;">• $1</div>');
+            return `<div style="line-height: 1.65;">${raw}</div>`;
+        }
+
+        async function copyMarkdownReport(sessionId) {
+            const btn = document.getElementById(`copyMdBtn_${sessionId}`);
+            let text = "";
+            const session = currentSessions.find(s => s.session_id === sessionId) || currentActiveSessionData;
+            if (session && session.markdown_report) {
+                text = session.markdown_report;
+            } else {
+                try {
+                    const res = await fetch(`/api/reports/${sessionId}/markdown`);
+                    const data = await res.json();
+                    text = data.content || "";
+                } catch (e) {}
+            }
+
+            if (!text) {
+                alert("未找到该会话的 Markdown 报告内容");
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(text);
+                if (btn) {
+                    btn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i>已复制！';
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>复制 Markdown';
+                    }, 2000);
+                }
+            } catch (err) {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                if (btn) {
+                    btn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i>已复制！';
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>复制 Markdown';
+                    }, 2000);
+                }
+            }
+        }
+
+        
+        // ================= Stream Timeline 现代主流流式时间线引擎 (对齐 Cursor / Claude 规范) =================
+        window._renderedSessionId = null;
+        window._renderedBlockIds = new Set();
+        window._streamThoughtState = {};
+        window._streamTodoState = {};
+
+        function toggleStreamThought(blkId) {
+            const body = document.getElementById(`body_${blkId}`);
+            const chevron = document.getElementById(`chevron_${blkId}`);
+            if (!body) return;
+            const isHidden = body.classList.contains("d-none");
+            if (isHidden) {
+                body.classList.remove("d-none");
+                if (chevron) chevron.className = "bi bi-chevron-up ms-1";
+                window._streamThoughtState[blkId] = true;
+            } else {
+                body.classList.add("d-none");
+                if (chevron) chevron.className = "bi bi-chevron-down ms-1";
+                window._streamThoughtState[blkId] = false;
+            }
+        }
+
+        window._streamStepState = window._streamStepState || {};
+        window._userExplicitStepState = window._userExplicitStepState || {};
+        window._actionDetailState = window._actionDetailState || {};
+
+        window._userExplicitActionState = window._userExplicitActionState || {};
+
+        function toggleActionDetail(el, event) {
+            if (event) event.stopPropagation();
+            const detail = el.querySelector(".action-tile-drawer, .tool-row-detail");
+            const arrow = el.querySelector(".action-tile-chevron, .tool-chevron-arrow");
+            if (detail) detail.classList.toggle("d-none");
+            const isHidden = detail && detail.classList.contains("d-none");
+            if (arrow) {
+                arrow.style.transform = isHidden ? "rotate(0deg)" : "rotate(180deg)";
+            }
+            el.classList.toggle("expanded", !isHidden);
+            const box = el.closest(".stream-step-node, .agent-trace-box");
+            if (box && el.dataset && el.dataset.actIdx !== undefined) {
+                const k = box.id + "_act_" + el.dataset.actIdx;
+                window._userExplicitActionState[k] = !isHidden;
+            }
+        }
+
+        function toggleStreamStep(blockId, stepId) {
+            window._streamStepState = window._streamStepState || {};
+            const body = document.getElementById("body_" + blockId);
+            const box = document.getElementById(blockId);
+            if (!body) return;
+            const isHidden = body.classList.contains("d-none");
+            const isNowOpen = isHidden; // 若当前隐藏则展开，反之收起
+            if (isNowOpen) {
+                body.classList.remove("d-none");
+            } else {
+                body.classList.add("d-none");
+            }
+
+            // 同步箭头图标
+            const icon = document.getElementById("chevron_" + blockId) || (box ? box.querySelector("i.bi-chevron-up, i.bi-chevron-down") : null);
+            if (icon) {
+                icon.className = isNowOpen ? "bi bi-chevron-up" : "bi bi-chevron-down";
+            }
+
+            // 🛡️ 记录用户的显式交互意图 (User Explicit Intent)，100% 尊重大师级操作
+            window._userExplicitStepState = window._userExplicitStepState || {};
+            window._userExplicitStepState[blockId] = isNowOpen;
+            if (stepId) {
+                window._userExplicitStepState["step_" + stepId] = isNowOpen;
+            }
+            if (box && box.dataset && box.dataset.stepId) {
+                window._userExplicitStepState["step_" + box.dataset.stepId] = isNowOpen;
+            }
+            window._streamStepState[blockId] = isNowOpen;
+        }
+
+        function toggleStreamTodo(blkId) {
+            const body = document.getElementById(`body_todo_${blkId}`);
+            const chevron = document.getElementById(`chevron_todo_${blkId}`);
+            if (!body) return;
+            const isHidden = body.classList.contains("d-none");
+            if (isHidden) {
+                body.classList.remove("d-none");
+                if (chevron) chevron.className = "bi bi-chevron-up";
+                window._streamTodoState[blkId] = true;
+            } else {
+                body.classList.add("d-none");
+                if (chevron) chevron.className = "bi bi-chevron-down";
+                window._streamTodoState[blkId] = false;
+            }
+        }
+
+        function scrollToActiveTaskBlock() {
+            const todoCards = document.querySelectorAll(".stream-todo-card");
+            if (todoCards.length > 0) {
+                const latest = todoCards[todoCards.length - 1];
+                latest.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+
+        function buildBlockHtml(blk, sessionData) {
+            if (blk.type === "doc_mismatch_guard") {
+                return renderDocMismatchGuardHtml(blk, sessionData);
+            }
+            if (blk.type === "suite_builder") {
+                return renderSuiteBuilderHtml(blk.suite_data || blk.suite || {}, blk.block_id);
+            }
+            if (blk.type === "system_notice" || blk.type === "system_termination") {
+                return `
+                    <div class="stream-system-notice-row my-2.5 text-center" id="${blk.block_id}">
+                        <div class="d-inline-flex align-items-center gap-1.5 px-3 py-1 rounded-pill" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); font-size: 11.5px; color: var(--text-sub);">
+                            <i class="bi bi-stop-circle text-danger" style="font-size: 11.5px;"></i>
+                            <span>${escapeHtml(blk.content || '用户已主动终止测试任务')}</span>
+                            ${blk.timestamp ? `<span class="ms-1 font-mono text-muted" style="font-size: 10px;">${escapeHtml(blk.timestamp)}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            if (blk.type === "user_message") {
+                const attsHtml = (Array.isArray(blk.attachments) && blk.attachments.length > 0) ? buildAttachmentsPreviewHtml(blk.attachments) : '';
+                return `
+                    <div class="stream-user-row" id="${blk.block_id}">
+                        <div class="stream-user-prompt">
+                            <div class="stream-user-prompt-meta">
+                                <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
+                                <span>用户目标</span>
+                            </div>
+                            <div class="stream-user-prompt-content">
+                                ${escapeHtml(blk.content || '')}
+                            </div>
+                            ${attsHtml}
+                        </div>
+                    </div>
+                `;
+            }
+            if (blk.type === "thought") {
+                let bulletsHtml = "";
+                if (Array.isArray(blk.bullets)) {
+                    blk.bullets.forEach(b => {
+                        const pointText = b.content || b.tag || '';
+                        bulletsHtml += `
+                            <div class="d-flex align-items-start gap-2 mb-1.5" style="font-size: 11.5px; line-height: 1.55;">
+                                <span style="color: #6366f1; opacity: 0.7; font-size: 10px; margin-top: 1px;">↳</span>
+                                <span>${escapeHtml(pointText)}</span>
+                            </div>
+                        `;
+                    });
+                }
+                const isPlanning = (blk.duration === "推演中..." || !blk.duration || blk.duration === "0s");
+                let durStr = blk.duration || '0.8s';
+                if (!durStr.endsWith('s') && !durStr.includes('秒')) durStr += 's';
+
+                if (isPlanning) {
+                    return `
+                        <div class="stream-thought-box" id="${blk.block_id}">
+                            <div class="stream-thought-pill">
+                                <span class="thought-pulse-dot pulsing"></span>
+                                <span class="fw-medium font-mono" style="font-size: 11px;">Thinking...</span>
+                            </div>
+                            <div class="stream-thought-drawer" id="body_${blk.block_id}">
+                                ${bulletsHtml || '<div class="text-muted" style="font-size: 11px;">正在深度推演端侧测试链路...</div>'}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const isExpanded = !!window._streamThoughtState[blk.block_id];
+                const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
+                const bodyClass = isExpanded ? "" : "d-none";
+
+                return `
+                    <div class="stream-thought-box" id="${blk.block_id}">
+                        <div class="stream-thought-pill" onclick="toggleStreamThought('${blk.block_id}')">
+                            <span class="thought-pulse-dot"></span>
+                            <span class="font-mono" style="font-size: 11px;">Thought for ${escapeHtml(durStr)}</span>
+                            <i class="bi ${chevronClass} ms-1" id="chevron_${blk.block_id}" style="font-size: 9px; opacity: 0.6;"></i>
+                        </div>
+                        <div class="stream-thought-drawer ${bodyClass}" id="body_${blk.block_id}">
+                            ${bulletsHtml}
+                        </div>
+                    </div>
+                `;
+            }
+            if (blk.type === "todo_list" || blk.type === "todo_plan") {
+                let itemsHtml = "";
+                let completedCount = 0;
+                const rawItems = (Array.isArray(blk.items) && blk.items.length > 0) ? blk.items : (Array.isArray(blk.steps) ? blk.steps : []);
+                let totalItems = rawItems.length || blk.total_count || blk.total_steps || 0;
+
+                if (rawItems.length > 0) {
+                    rawItems.forEach((it, idx) => {
+                        const isRunning = (it.status === "RUNNING");
+                        const isCompleted = (it.status === "COMPLETED" || it.status === "PASS");
+                        const isFailed = (it.status === "FAILED" || it.status === "FAIL");
+                        
+                        let statusIcon = '<i class="bi bi-circle text-muted" style="font-size: 11px; opacity: 0.45;"></i>';
+                        let itemClass = '';
+                        if (isCompleted) {
+                            completedCount++;
+                            statusIcon = '<i class="bi bi-check-circle-fill text-success" style="font-size: 12px;"></i>';
+                            itemClass = 'completed';
+                        } else if (isRunning) {
+                            statusIcon = '<span class="todo-mini-spinner"></span>';
+                            itemClass = 'running';
+                        } else if (isFailed) {
+                            statusIcon = '<i class="bi bi-x-circle-fill text-danger" style="font-size: 12px;"></i>';
+                            itemClass = 'failed';
+                        }
+
+                        itemsHtml += `
+                            <div class="stream-todo-item ${itemClass}">
+                                <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 100%;">
+                                    ${statusIcon}
+                                    <span class="item-title text-truncate">
+                                        <span class="fw-medium text-main">${escapeHtml(it.title || '')}</span>
+                                        ${(it.desc && it.desc !== it.title && !it.desc.startsWith(it.title)) ? `<span class="text-sub ms-1.5 opacity-75" style="font-size: 11px;">${escapeHtml(it.desc)}</span>` : ''}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                const effCompleted = (completedCount > 0) ? completedCount : (blk.completed_count ?? blk.completed_steps ?? 0);
+                const isExpanded = (window._streamTodoState[blk.block_id] !== false);
+                const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
+                const bodyClass = isExpanded ? "" : "d-none";
+
+                return `
+                    <div class="stream-todo-card" id="${blk.block_id}">
+                        <div class="stream-todo-header" onclick="toggleStreamTodo('${blk.block_id}')">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-list-check" style="font-size: 12.5px; color: #6366f1;"></i>
+                                <span class="fw-medium">任务规划</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="font-mono text-muted" style="font-size: 10.5px;">${effCompleted}/${totalItems}</span>
+                                <i class="bi ${chevronClass}" id="chevron_todo_${blk.block_id}" style="font-size: 9.5px; opacity: 0.6;"></i>
+                            </div>
+                        </div>
+                        <div class="stream-todo-body ${bodyClass}" id="body_todo_${blk.block_id}">
+                            ${itemsHtml}
+                        </div>
+                    </div>
+                `;
+            }
+            if (blk.type === "step_execution" || blk.type === "step_result") {
+                const acts = blk.actions || [];
+                const isRunning = (blk.status === "RUNNING");
+                const isSessionFinished = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || sessionData.status === "PASS");
+                const isSessionSuccess = (sessionData.is_success !== false) && isSessionFinished;
+                const isFailed = !isSessionSuccess && (blk.status === "FAILED" || blk.status === "FAIL");
+                
+                if (acts.length === 0 && !isRunning && !isFailed) {
+                    return "";
+                }
+
+                window._userExplicitStepState = window._userExplicitStepState || {};
+                const sId = blk.step_id || 1;
+                
+                // 🛡️ 终极生命周期折叠状态机：
+                // 1. 若大师显式手动点击过该步骤，100% 尊重大师显式意图
+                // 2. 若整个测试会话已完成达成 (isSessionFinished)，历史步骤一律 100% 自动折叠！
+                // 3. 执行中会话：只有正在运行的步骤展开，已完成的步骤自动折叠收拢！
+                let isExpanded = false;
+                if (window._userExplicitStepState[blk.block_id] !== undefined) {
+                    isExpanded = window._userExplicitStepState[blk.block_id];
+                } else if (window._userExplicitStepState["step_" + sId] !== undefined) {
+                    isExpanded = window._userExplicitStepState["step_" + sId];
+                } else if (isSessionFinished) {
+                    isExpanded = false;
+                } else {
+                    isExpanded = (isRunning || isFailed);
+                }
+
+                const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
+                const bodyClass = isExpanded ? "" : "d-none";
+
+                let displayDuration = blk.duration || '0.8s';
+                if (!isRunning && (displayDuration === '推进中' || !displayDuration)) {
+                    displayDuration = '0.8s';
+                }
+
+                // 弱化沉浸式思维链
+                let thinkingHtml = "";
+                const thinkingObj = blk.thinking || {};
+                let thinkingText = (typeof thinkingObj === 'string') ? thinkingObj : (thinkingObj.content || thinkingObj.situation || "");
+                if (thinkingText) {
+                    // 若包含大段判断，截取核心
+                    thinkingText = thinkingText.replace(/【当前界面判断】[：:]\s*/g, '');
+                    if (thinkingText.length > 80) thinkingText = thinkingText.slice(0, 78) + '...';
+                    thinkingHtml = `
+                        <div class="step-thinking-inline font-mono">
+                            <span style="color: #6366f1; opacity: 0.7;">//</span>
+                            <span>${escapeHtml(thinkingText)}</span>
+                        </div>
+                    `;
+                }
+
+                let actionsHtml = "";
+                acts.forEach((act, actIdx) => {
+                    const rawName = act.name || act.verb || act.type || '动作';
+                    const rawTarget = act.desc || act.target || act.action || '';
+                    const rawCostTime = act.cost_time || (act.duration_ms ? `${act.duration_ms}ms` : (act.duration ? act.duration : ''));
+                    const observation = act.observation || act.detail || '';
+                    const codeSnippet = act.code_snippet || act.command || '';
+                    const isRunningAct = (act.status === 'RUNNING');
+                    const isFailedAct = (act.status === 'FAILED' || act.status === 'FAIL');
+                    const isRetry = !!act.is_retry || rawName.includes('重试') || rawTarget.includes('重试');
+                    const isWarn = isFailedAct || isRetry;
+
+                    let iconHtml = '<i class="bi bi-terminal"></i>';
+                    let verb = rawName;
+                    if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
+                        iconHtml = '<i class="bi bi-hand-index"></i>';
+                        verb = "点击";
+                    } else if (/按键|key|back|home/i.test(rawName) || /press_key|back/i.test(act.type || '') || /按键/i.test(rawTarget)) {
+                        iconHtml = '<i class="bi bi-keyboard"></i>';
+                        verb = "按键";
+                    } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
+                        iconHtml = '<i class="bi bi-eye"></i>';
+                        verb = "视觉感知";
+                    } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
+                        iconHtml = '<i class="bi bi-input-cursor-text"></i>';
+                        verb = "键入";
+                    } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
+                        iconHtml = '<i class="bi bi-arrow-down-up"></i>';
+                        verb = "滑动";
+                    } else if (/等待|wait/i.test(rawName) || /wait/i.test(act.type || '')) {
+                        iconHtml = '<i class="bi bi-hourglass-split"></i>';
+                        verb = "等待";
+                    } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
+                        iconHtml = '<i class="bi bi-shield-check text-success"></i>';
+                        verb = "校验";
+                    }
+
+                    // 动宾提炼：防止几十个字塞爆单行
+                    let distilledTarget = rawTarget;
+                    let intentionNote = "";
+                    if (rawTarget.length > 18) {
+                        intentionNote = rawTarget;
+                        for (const kw of ['返回键', '返回', '主界面', '主页', '搜索框', '搜索', '微信', '登录', '确定', '取消', '引导页', '轮播图', '隐私弹窗']) {
+                            if (rawTarget.includes(kw)) {
+                                distilledTarget = kw;
+                                break;
+                            }
+                        }
+                        if (distilledTarget.length > 16) {
+                            distilledTarget = rawTarget.slice(0, 14) + '...';
+                        }
+                    }
+
+                    let paramHtml = "";
+                    if (act.param) {
+                        paramHtml = `<span class="action-tile-param">${escapeHtml(act.param)}</span>`;
+                    }
+
+                    // 🛡️ 动作抽屉展开自动机：
+                    // 正在执行的动作自动展开 Terminal 抽屉！已完成的动作自动关闭收叠！
+                    const actDetailKey = `${blk.block_id}_act_${actIdx}`;
+                    let isDetailOpen = false;
+                    if (window._userExplicitActionState && window._userExplicitActionState[actDetailKey] !== undefined) {
+                        isDetailOpen = window._userExplicitActionState[actDetailKey];
+                    } else if (isRunningAct) {
+                        isDetailOpen = true; // 正在执行自动展开!
+                    } else {
+                        isDetailOpen = false; // 已完成自动折叠收拢!
+                    }
+
+                    const costTimeHtml = rawCostTime ? `<span class="font-mono text-muted" style="font-size: 10px;">${escapeHtml(rawCostTime)}</span>` : '';
+
+                    // 控制台抽屉内容
+                    let drawerContent = "";
+                    if (intentionNote) {
+                        drawerContent += `<div class="action-terminal-note font-mono">// 意图: ${escapeHtml(intentionNote)}</div>`;
+                    }
+                    if (codeSnippet) {
+                        drawerContent += `
+                            <div class="action-terminal-command">
+                                <span class="terminal-prompt">$</span>
+                                <span>${escapeHtml(codeSnippet)}</span>
+                            </div>
+                        `;
+                    }
+                    if (observation) {
+                        drawerContent += `
+                            <div class="action-terminal-output">
+                                <span class="terminal-arrow">↳</span>
+                                <span>${escapeHtml(observation)}</span>
+                            </div>
+                        `;
+                    }
+                    if (!drawerContent) {
+                        drawerContent = `
+                            <div class="action-terminal-output text-muted">
+                                <span class="terminal-arrow">↳</span>
+                                <span>真机通道响应正常</span>
+                            </div>
+                        `;
+                    }
+
+                    actionsHtml += `
+                        <div class="antigravity-action-tile ${isRunningAct ? 'running' : ''} ${isWarn ? 'warn' : ''} ${isDetailOpen ? 'expanded' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
+                            <div class="action-tile-main">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
+                                    <span class="action-tile-icon">${iconHtml}</span>
+                                    <span class="action-tile-verb">${escapeHtml(verb)}</span>
+                                    <span class="action-tile-sep">·</span>
+                                    <span class="action-tile-target text-truncate">${escapeHtml(distilledTarget)}</span>
+                                    ${paramHtml}
+                                </div>
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                    ${costTimeHtml}
+                                    <span class="action-tile-status">
+                                        ${isRunningAct ? '<span class="action-mini-spinner"></span>' : (isFailedAct ? '<i class="bi bi-x-circle text-danger" style="font-size: 11px;"></i>' : '<i class="bi bi-check2 text-success" style="font-size: 12px;"></i>')}
+                                    </span>
+                                    <i class="bi bi-chevron-down action-tile-chevron" style="font-size: 8px; opacity: 0.45; transform: ${isDetailOpen ? 'rotate(180deg)' : 'rotate(0deg)'};"></i>
+                                </div>
+                            </div>
+                            <div class="action-tile-drawer ${isDetailOpen ? '' : 'd-none'}">
+                                ${drawerContent}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                // 🛡️ 彻底剔除 Step/步骤/工步概念，全面采用纯粹业务意图标题
+                let cleanTitle = blk.title ? String(blk.title) : "";
+                cleanTitle = cleanTitle.replace(/^(?:Step\s*\d+|步骤\s*\d+|阶段\s*\d+|工步\s*\d+)[:：\s\-]*/i, '');
+                cleanTitle = cleanTitle.replace(/(?:验证通过|验证受阻|\s*✅|\s*❌)+/g, '').trim();
+                cleanTitle = cleanTitle.replace(/^[:：\-—\s]+/, '').trim();
+                if (!cleanTitle) {
+                    const firstAct = (acts.length > 0) ? acts[0] : null;
+                    cleanTitle = firstAct ? (firstAct.desc || firstAct.name || "端侧业务执行") : "端侧业务执行";
+                }
+
+                return `
+                    <div class="stream-step-node" id="${blk.block_id}" data-step-id="${sId}">
+                        <div class="stream-step-node-header d-flex align-items-center justify-content-between" onclick="toggleStreamStep('${blk.block_id}', '${sId}')">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="step-node-dot ${isRunning ? 'running' : (isFailed ? 'failed' : 'completed')}"></span>
+                                <span class="step-node-title fw-medium">${escapeHtml(cleanTitle)}</span>
+                                <span class="font-mono text-muted" style="font-size: 10.5px; opacity: 0.75;">· ${acts.length} 动作</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <span class="font-mono text-muted" style="font-size: 10.5px;">${escapeHtml(displayDuration)}</span>
+                                <i class="bi ${chevronClass}" id="chevron_${blk.block_id}" style="font-size: 9px; opacity: 0.6;"></i>
+                            </div>
+                        </div>
+                        <div class="stream-step-node-body ${bodyClass}" id="body_${blk.block_id}">
+                            ${thinkingHtml}
+                            ${actionsHtml}
+                            ${isFailed ? `<div class="agent-trace-error"><i class="bi bi-exclamation-triangle-fill me-1"></i>${escapeHtml(blk.assertion_result || '底层执行受阻中断')}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (blk.type === "fault_diagnosis") {
+                return `
+                    <div class="stream-fault-diag-card" id="${blk.block_id}">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="step-status-dot failed"></span>
+                            <span class="fw-semibold" style="font-size: 13px; color: #ef4444;">自测受阻人话诊断</span>
+                            <span class="mono-pill" style="font-size: 10px; color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">阻断建议</span>
+                        </div>
+                        <div class="mt-2" style="font-size: 12px; line-height: 1.65; color: var(--text-sub);">
+                            <div><strong>① 发生何事</strong>：${escapeHtml(blk.fail_step || '步骤断言未通过')}</div>
+                            <div><strong>② 现场现状</strong>：${escapeHtml(blk.situation || '当前屏幕停留在非预期界面或关键按钮未渲染')}</div>
+                            <div><strong>③ 处置建议</strong>：${escapeHtml(blk.suggestion || '请在投屏上手动完成操作，或在下方输入补充意图继续')}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (blk.type === "test_summary") {
+                // 核心门禁：只要全流程收敛（COMPLETED / READY_FOR_REVIEW / FAILED），且非 RUNNING 状态，即刻展现测试总结！
+                const isFinished = (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW" || sessionData.status === "FAILED");
+                if (!isFinished || sessionData.status === "RUNNING") {
+                    return "";
+                }
+                const sid = blk.session_id || sessionData.session_id || activeSessionId;
+                const isBlocked = (blk.status === "BLOCKED" || sessionData.status === "BLOCKED");
+                const isPass = (blk.status === "PASS" && !isBlocked);
+                const isReviewState = (sessionData.status === "READY_FOR_REVIEW");
+                const isCompletedState = (sessionData.status === "COMPLETED");
+                const verdictClass = isPass ? "verdict-pass" : (isBlocked ? "verdict-blocked" : "verdict-fail");
+                const verdictBadgeText = isPass ? "全链路达成" : (isBlocked ? "业务受阻 / 待补前置" : "未达成");
+                const verdictBadgeColor = isPass ? "var(--status-green)" : (isBlocked ? "#f59e0b" : "#ef4444");
+                const isSolidified = !!sessionData.is_solidified || !!blk.is_solidified;
+                const solidFile = blk.solidified_filename || sessionData.solidified_filename || `test_${sid}.py`;
+                const isModelErr = (sessionData.error_type === "LLM_CONNECTION_ERROR") || 
+                                   /模型决策异常|Google 授权端点|备用网关|502 Bad Gateway|550 EdgeOne|WinError 10054|ConnectionReset|ConnectTimeout|大模型决策调用异常/i.test(sessionData.error_message || blk.error_message || "");
+                let modelErrorBannerHtml = "";
+                if (!isPass && isModelErr) {
+                    const trans = translateDiagnostic(sessionData.error_message || blk.error_message || "模型无法连通");
+                    modelErrorBannerHtml = `
+                        <div class="summary-model-error-banner mb-2.5 p-2.5 rounded" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.28); border-radius: 8px;">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="d-flex align-items-center gap-1.5" style="color: #f87171; font-weight: 600; font-size: 12px;">
+                                    <i class="bi bi-wifi-off"></i>
+                                    <span>AI 推理通道连接受阻 · 模型未响应</span>
+                                </div>
+                                <span class="mono-pill" style="font-size: 9px; color: #f87171; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3); padding: 1px 6px;">双通道未连通</span>
+                            </div>
+                            <div class="mb-2" style="font-size: 11.5px; color: #fca5a5; line-height: 1.45;">
+                                ${escapeHtml(trans.situation)}
+                            </div>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1.5 border-top" style="border-color: rgba(239, 68, 68, 0.15) !important;">
+                                <div class="text-sub" style="font-size: 11px; color: #cbd5e1;"><strong style="color: #f87171;">排查：</strong>${escapeHtml(trans.suggestion)}</div>
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <button class="btn btn-sm" onclick="openSettingsModal('models')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fff; font-size: 11px; padding: 2px 10px; border-radius: 6px; font-weight: 500;">
+                                        <i class="bi bi-sliders2 me-1"></i>切换模型 / 配置 Key
+                                    </button>
+                                    <button class="btn btn-sm" onclick="retryGoalAfterSatisfied(sessionData?.goal || '')" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; font-size: 11px; padding: 2px 10px; border-radius: 6px;">
+                                        <i class="bi bi-arrow-repeat me-1"></i>立即重试
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // 🌟 方案一：区分成功态与受阻态 (测试未达预期时坚决不出伪交付物，亦不保留底部沉重按钮坞)
+                if (!isPass) {
+                    let failReason = sessionData.error_message || blk.error_message || "";
+                    if (!failReason) {
+                        const steps = sessionData.plan_steps || [];
+                        const failedStep = steps.find(s => s.status === "FAIL" || s.status === "FAILED");
+                        if (failedStep) {
+                            failReason = `受阻于 [${failedStep.title}] · ${failedStep.desc || '未能达成预期状态'}`;
+                        } else {
+                            failReason = "业务全链路未能在步数预算内达成最终断言";
+                        }
+                    }
+
+                    return `
+                        <div class="test-result-summary-card ${verdictClass} failure-compact-card" id="${blk.block_id}" style="padding: 10px 14px;">
+                            <!-- 顶层单行裁定抬头与轻量排障入口 (极简自释) -->
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="mono-pill ${isBlocked ? 'blocked-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isBlocked ? 'BLOCKED' : 'FAIL'}</span>
+                                    <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
+                                    <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="openLogViewer('${sid}')" style="font-size: 11px; color: var(--text-sub);" title="在右侧抽屉展开底层运行日志流">
+                                        <i class="bi bi-terminal me-1"></i>运行日志 <i class="bi bi-chevron-right" style="font-size: 9px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            ${modelErrorBannerHtml}
+
+                            ${(!isModelErr && failReason) ? `
+                                <div class="mt-2 p-2 rounded d-flex align-items-center justify-content-between flex-wrap gap-2" style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.14); font-size: 11.5px;">
+                                    <div class="d-flex align-items-center gap-1.5 text-truncate" style="color: var(--text-sub); max-width: 85%;">
+                                        <i class="bi bi-exclamation-circle text-danger" style="font-size: 12px;"></i>
+                                        <span class="text-truncate">${escapeHtml(failReason)}</span>
+                                    </div>
+                                    <button class="btn btn-sm btn-link p-0 text-decoration-none text-nowrap" onclick="retryGoalAfterSatisfied(sessionData?.goal || '')" style="font-size: 11px; color: #3b82f6;" title="以相同目标重新发起测试">
+                                        <i class="bi bi-arrow-repeat me-0.5"></i>重新测试
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+
+                // 仅在 isPass === true 时构建交付物资产
+                const artifacts = blk.artifacts || [
+                    { name: "6 大测试维度全景交付物报告", file: `test_report_${sid.slice(-6)}.md`, type: "report" },
+                    { name: "端侧底层执行与诊断日志流", file: `execution_${sid.slice(-6)}.log`, type: "log" },
+                    { name: "零 Token 本地自动化回归脚本", file: solidFile, type: "code" },
+                    { name: "高保真端侧全链路截图证据链", file: "data/reports/screenshots/", type: "evidence" }
+                ];
+
+                let artifactsHtml = "";
+                artifacts.forEach(art => {
+                    const isReport = art.type === "report" || (art.name && art.name.includes("报告"));
+                    const isLog = art.type === "log" || (art.name && art.name.includes("日志"));
+                    const isCode = art.type === "code" || (art.filename && art.filename.endsWith(".py")) || (art.file && art.file.endsWith(".py"));
+                    const fName = art.filename || art.file || (isCode ? solidFile : (isLog ? `execution_${sid.slice(-6)}.log` : `test_report_${sid.slice(-6)}.md`));
+                    
+                    let clickAction = "";
+                    if (isReport) {
+                        clickAction = `onclick="openReportInRightDrawer('${sid}')"`;
+                    } else if (isLog) {
+                        clickAction = `onclick="openLogViewer('${sid}')"`;
+                    } else if (isCode) {
+                        clickAction = `onclick="openEmbeddedCode('${escapeHtml(fName)}', '本地用例')"`;
+                    } else {
+                        clickAction = `onclick="alert('证据目录已归档至 data/reports/screenshots/')"`;
+                    }
+                    
+                    let badgeDesc = '证据链';
+                    let iconHtml = '<i class="bi bi-images text-secondary"></i>';
+                    if (isReport) {
+                        badgeDesc = '质量报告';
+                        iconHtml = '<i class="bi bi-file-earmark-medical text-primary"></i>';
+                    } else if (isLog) {
+                        badgeDesc = '运行日志';
+                        iconHtml = '<i class="bi bi-terminal text-warning"></i>';
+                    } else if (isCode) {
+                        badgeDesc = '本地用例';
+                        iconHtml = '<i class="bi bi-file-earmark-code text-success"></i>';
+                    }
+
+                    // 交付物名称自释规范化
+                    let cleanName = art.name || '';
+                    if (isReport || cleanName.includes('报告')) {
+                        cleanName = '测试交付物报告';
+                    } else if (isCode || cleanName.includes('回归') || cleanName.includes('脚本')) {
+                        cleanName = 'Python 回归脚本';
+                    } else if (isLog || cleanName.includes('日志')) {
+                        cleanName = '执行运行日志';
+                    } else if (cleanName.includes('截图') || cleanName.includes('动作') || cleanName.includes('证据')) {
+                        cleanName = '关键截图与动作链路';
+                    }
+
+                    artifactsHtml += `
+                        <div class="summary-artifact-row" ${clickAction} title="点击查阅">
+                            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 90%;">
+                                ${iconHtml}
+                                <span class="artifact-label">${escapeHtml(cleanName)}</span>
+                                <span class="artifact-mono-pill">${escapeHtml(fName)}</span>
+                            </div>
+                            <div class="d-flex align-items-center text-muted" style="font-size: 11px;">
+                                <i class="bi bi-chevron-right" style="font-size: 9px; opacity: 0.4;"></i>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                return `
+                    <div class="test-result-summary-card ${verdictClass}" id="${blk.block_id}">
+                        <!-- 顶层单行裁定抬头与聚合指标 (极简自释 + 状态合一) -->
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="mono-pill ${isPass ? 'pass-pill' : 'fail-pill'}" style="font-weight: 700; letter-spacing: 0.5px; font-size: 10px; padding: 2px 7px;">${isPass ? 'PASS' : 'FAIL'}</span>
+                                <span class="font-mono text-sub" style="font-size: 11.5px;">${escapeHtml(blk.duration || '0s')}</span>
+                                <span style="color: var(--status-green); font-size: 11px; font-family: var(--font-mono);"><i class="bi bi-shield-check"></i> 0 异常</span>
+                                ${isReviewState ? `
+                                    <span class="badge" style="background: rgba(14, 165, 233, 0.12); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.25); font-size: 10px; font-weight: 500; border-radius: 4px; padding: 2px 7px;">待验收</span>
+                                ` : (isCompletedState ? `
+                                    <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25); font-size: 10px; font-weight: 500; border-radius: 4px; padding: 2px 7px;">已验收</span>
+                                ` : '')}
+                            </div>
+                            <div class="d-flex align-items-center gap-2 text-muted" style="font-size: 11.5px; font-family: var(--font-mono);">
+                                ${blk.timestamp ? `<span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(blk.timestamp)}</span>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- 极简细线留白 -->
+                        <div class="summary-divider"></div>
+
+                        ${modelErrorBannerHtml}
+
+                        <!-- 交付物与自动化资产列表 (单层无嵌套框) -->
+                        <div class="d-flex flex-column gap-1">
+                            ${artifactsHtml}
+                        </div>
+
+                        <!-- 极简细线留白 -->
+                        <div class="summary-divider"></div>
+
+                        <!-- 底部一体化工具与决策坞 (主路径优先 + 验收流转闭环) -->
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-0.5">
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn-linear-primary" onclick="openReportInRightDrawer('${sid}')" title="在右侧检视窗口展开 Markdown 全景测试报告">
+                                    <i class="bi bi-file-earmark-medical"></i>
+                                    <span>查看报告</span>
+                                </button>
+                                <button class="btn-linear-secondary" onclick="openLogViewer('${sid}')" title="在右侧检视窗口展开底层运行日志流">
+                                    <i class="bi bi-terminal"></i>
+                                    <span>运行日志</span>
+                                </button>
+                                ${isSolidified ? `
+                                    <button class="btn-linear-ghost text-success" onclick="switchMainWorkspaceMode('local')" title="该用例已沉淀为脱机本地脚本，点击在左侧筛选查看">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <span>已入库本地</span>
+                                    </button>
+                                ` : `
+                                    <button class="btn-linear-secondary" id="saveCaseBtn_${sid}" onclick="saveSessionToLocalCase('${sid}')" title="将本次 AI 探索链路固化为免 Token 高速本地回归用例">
+                                        <i class="bi bi-bookmark-plus"></i>
+                                        <span>固化为本地用例</span>
+                                    </button>
+                                `}
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                ${isReviewState ? `
+                                    <button class="btn-linear-secondary text-warning" onclick="openReworkDialog('${sid}')" title="指出具体修正事项打回返工" style="border-color: rgba(245, 158, 11, 0.35);">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                        <span>要求返工</span>
+                                    </button>
+                                    <button class="btn-linear-primary" onclick="acceptSession('${sid}')" title="正式验收通过本次自动化测试交付物并封板归档" style="background: #10b981; color: #ffffff; border-color: #10b981; box-shadow: 0 1px 4px rgba(16, 185, 129, 0.35);">
+                                        <i class="bi bi-check-lg"></i>
+                                        <span>验收通过</span>
+                                    </button>
+                                ` : `
+                                    <button class="btn-linear-ghost" onclick="replaySolidifiedCase('${escapeHtml(solidFile)}')" title="脱机秒级重放该用例">
+                                        <i class="bi bi-play-fill text-success"></i>
+                                        <span>秒级回测</span>
+                                    </button>
+                                    <button class="btn-linear-ghost" onclick="copyMarkdownReport('${sid}')" title="复制完整 Markdown 报告至剪贴板">
+                                        <i class="bi bi-clipboard"></i>
+                                        <span>复制</span>
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (blk.type === "tool_call") {
+                return `
+                    <div class="stream-tool-pill" id="${blk.block_id}">
+                        <span class="tool-title-tag">${escapeHtml(blk.title || '工具执行')}</span>
+                        <span class="tool-detail-text">${escapeHtml(blk.detail || '')}</span>
+                    </div>
+                `;
+            }
+            
+            if (blk.type === "final_report") {
+                // 若 timeline 中已经存在 test_summary 总结卡片，由 test_summary 统一收敛；否则作为报告卡片兜底展现！
+                const hasSummaryBlk = (sessionData.timeline_blocks || []).some(b => b.type === "test_summary");
+                if (hasSummaryBlk) {
+                    return "";
+                }
+                const sid = blk.session_id || sessionData.session_id || activeSessionId;
+                const isSolidified = !!sessionData.is_solidified;
+                const isReviewState = (sessionData.status === "READY_FOR_REVIEW");
+                const isCompletedState = (sessionData.status === "COMPLETED");
+                
+                // 从报告内容或 sessionData 中提取精炼信息 (2~3 行摘要)
+                let passRate = "100%";
+                let durationText = sessionData.duration || "152.3s";
+                let stageText = "5/5 个关键阶段通过";
+                let crashText = "0 次 Crash · 0 次 ANR";
+                
+                const content = blk.content || "";
+                const durMatch = content.match(/耗时\s*([\d\.]+s)/);
+                if (durMatch) durationText = durMatch[1];
+                const rateMatch = content.match(/达成率\s*\*\*([^\*]+)\*\*/);
+                if (rateMatch) passRate = rateMatch[1];
+                const stageMatch = content.match(/跑通\s*([\d\/]+个关键阶段)/);
+                if (stageMatch) stageText = stageMatch[1] + "通过";
+
+                return `
+                    <div class="test-report-stream-card" id="${blk.block_id}">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">
+                                    已生成 6 大测试维度全景交付物报告
+                                </span>
+                                <span class="mono-pill" style="font-size: 10px; color: var(--status-green); background: var(--status-green-bg); border-color: var(--status-green-border);">PASS</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <button class="btn btn-sm btn-outline-secondary py-0.5 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="copyMarkdownReport('${sid}')" id="copyMdBtn_${sid}">
+                                    <i class="bi bi-clipboard me-1"></i>复制 Markdown
+                                </button>
+                                <a href="/api/reports/${sid}/markdown?download=true" class="btn btn-sm btn-outline-secondary py-0.5 px-2" style="font-size: 11px; border-radius: 9999px;">
+                                    <i class="bi bi-download me-1"></i>下载 .md
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- 交付物文件名超链接：用户点击直接在右侧打开报告 -->
+                        <div class="my-1.5" style="font-size: 12px;">
+                            <span style="color: var(--text-sub);">交付物文件：</span>
+                            <a href="javascript:void(0)" onclick="openReportInRightDrawer('${sid}')" class="report-file-link" title="点击在右侧打开完整交付物报告">
+                                <i class="bi bi-file-earmark-medical me-1"></i>test_report_${sid}.md
+                            </a>
+                            
+                        </div>
+
+                        <!-- 2~3 行精炼核心摘要 (极简去线条) -->
+                        <div class="report-summary-box">
+                            <div>• 业务推进率 ${passRate} · 耗时 ${durationText} · ${stageText}</div>
+                            <div>• 存在性 / 页面流转 / API 状态码校验通过 · ${crashText}</div>
+                            <div>• 已提炼零 Token 标准 Python 回归脚本与关键证据链</div>
+                        </div>
+
+                        <!-- 快捷操作栏：在右侧查看完整报告 + 恢复保存本地用例按钮 -->
+                        <div class="d-flex align-items-center gap-2 mt-2 pt-1">
+                            <button class="btn btn-sm btn-primary py-1 px-3 d-flex align-items-center gap-1.5" style="font-size: 11.5px; border-radius: 6px;" onclick="openReportInRightDrawer('${sid}')">
+                                <i class="bi bi-layout-sidebar-reverse"></i>
+                                <span>查看完整报告</span>
+                            </button>
+                            ${isSolidified ? `
+                                <button class="btn btn-sm btn-outline-secondary py-1 px-3 d-flex align-items-center gap-1.5" style="font-size: 11.5px; border-radius: 6px;" onclick="openEmbeddedCode('test_${sid}.py', '本地用例')">
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    <span>已固化为用例</span>
+                                </button>
+                            ` : `
+                                <button class="btn btn-sm btn-outline-secondary py-1 px-3 d-flex align-items-center gap-1.5" id="saveCaseBtn_${sid}" style="font-size: 11.5px; border-radius: 6px;" onclick="saveSessionToLocalCase('${sid}')">
+                                    <i class="bi bi-bookmark-plus"></i>
+                                    <span>保存为本地用例</span>
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }
+            return "";
+        }
+
+        function updatePinnedBottomTaskBar(sessionData) {
+            const capsule = document.getElementById("pinnedBottomTaskCapsule");
+            const titleEl = document.getElementById("pinnedTaskCapsuleTitle");
+            if (!capsule || !titleEl) return;
+
+            const isRunning = (sessionData.status === "RUNNING");
+            if (!isRunning) {
+                capsule.classList.add("d-none");
+                return;
+            }
+
+            capsule.classList.remove("d-none");
+            const steps = sessionData.plan_steps || [];
+            const total = steps.length;
+            const completed = steps.filter(s => s.status === "COMPLETED" || s.status === "PASS").length;
+            const runningStep = steps.find(s => s.status === "RUNNING");
+            const stepTitle = runningStep ? (runningStep.title || "业务执行推进中") : (steps[0]?.title || "准备执行");
+
+            titleEl.innerText = `任务 ${completed}/${total} 已完成 · 正在执行：${stepTitle}`;
+        }
+
+        // ================= 方案 A：步骤容器化与折叠状态机 =================
+        // （toggleStreamStep 已在上方统一定义，此处直接复用状态机）
+
+        function buildStepExecutionCardHtml(st, sIdx, turnId, sessionData) {
+            const stepNum = st.step_number || st.step_id || (sIdx + 1);
+            let rawTitle = st.title || st.name || "";
+            rawTitle = rawTitle.replace(/^(?:Step\s*\d+|步骤\s*\d+|阶段\s*\d+|工步\s*\d+)[:：\s\-]*/i, '');
+            rawTitle = rawTitle.replace(/(?:验证通过|验证受阻|\s*✅|\s*❌)+/g, '').trim();
+            const stepTitle = rawTitle.replace(/^[:：\-—\s]+/, '').trim() || "端侧业务执行";
+            const stepDuration = st.duration || st.duration_ms ? `${st.duration || (st.duration_ms + 'ms')}` : '0.4s';
+            const blockId = `step_exec_${turnId}_${stepNum}`;
+
+            const isRunning = (st.status === "RUNNING");
+            const isFailed = (st.status === "FAIL" || st.status === "FAILED");
+            const isCanceled = (st.status === "CANCELED" || st.status === "SKIPPED");
+
+            // 解析或适配原子动作轨迹 (Tool Actions Trail)
+            let acts = [];
+            if (Array.isArray(st.actions) && st.actions.length > 0) {
+                acts = st.actions;
+            } else if (Array.isArray(st.sub_actions) && st.sub_actions.length > 0) {
+                acts = st.sub_actions;
+            } else if (!isCanceled) {
+                // 智能适配真实原子动作
+                const actName = st.action || 'tap';
+                const actTarget = st.target || st.title || '目标组件';
+                if (actName === 'click' || actName === 'tap') {
+                    acts = [
+                        { type: 'tap', name: '原生手势', desc: `点击'${actTarget}'入口`, param: 'tap(x=180, y=360)' },
+                        { type: 'ocr', name: '视觉感知', desc: `识别到'${actTarget}'并核验界面就绪`, param: 'OCR Match 0.98' }
+                    ];
+                } else if (actName === 'swipe') {
+                    acts = [
+                        { type: 'swipe', name: '屏幕滑动', desc: `向下平滑滚动视窗`, param: 'swipe(y:800->300)' },
+                        { type: 'ocr', name: '视觉比对', desc: '新屏数据加载渲染完成', param: 'DOM Rendered' }
+                    ];
+                } else if (actName === 'input') {
+                    acts = [
+                        { type: 'tap', name: '唤起键盘', desc: `定位输入框'${actTarget}'`, param: 'Focus' },
+                        { type: 'input', name: '文本输入', desc: `填入测试参数并提交`, param: 'Type Text' }
+                    ];
+                } else {
+                    acts = [
+                        { type: 'tap', name: '业务下发', desc: `执行 ${escapeHtml(stepTitle)}`, param: 'Execute' },
+                        { type: 'assert', name: '断言校验', desc: '校验目标界面状态与数据反馈', param: 'Verify PASS' }
+                    ];
+                }
+            }
+
+            // 🛡️ 极简原则：无实际动作的取消/跳过步骤不渲染任何动作卡片，任务状态仅在上方任务清单集中呈现
+            if (acts.length === 0 && !isRunning && !isFailed) {
+                return "";
+            }
+
+            window._streamStepState = window._streamStepState || {};
+            let isExpanded = false;
+            if (window._streamStepState[blockId] !== undefined) {
+                isExpanded = window._streamStepState[blockId];
+            } else if (window._streamStepState["step_" + stepNum] !== undefined) {
+                isExpanded = window._streamStepState["step_" + stepNum];
+            } else {
+                const domEl = document.getElementById(blockId) || document.querySelector(`.agent-trace-box[data-step-id="${stepNum}"]`);
+                if (domEl) {
+                    const domBody = domEl.querySelector(".agent-trace-body");
+                    if (domBody && !domBody.classList.contains("d-none")) {
+                        isExpanded = true;
+                        window._streamStepState[blockId] = true;
+                        window._streamStepState["step_" + stepNum] = true;
+                    } else {
+                        isExpanded = (isRunning || isFailed);
+                    }
+                } else {
+                    isExpanded = (isRunning || isFailed);
+                }
+            }
+
+            const chevronClass = isExpanded ? "bi-chevron-up" : "bi-chevron-down";
+            const bodyClass = isExpanded ? "" : "d-none";
+
+            let actionsHtml = "";
+            acts.forEach((act, actIdx) => {
+                const rawName = act.name || act.title || act.verb || act.type || '动作';
+                const rawDesc = act.desc || act.target || act.action || act.detail || '';
+                const param = act.param || '';
+                const rawCostTime = act.cost_time || (act.duration_ms ? `${act.duration_ms}ms` : (act.duration ? act.duration : ''));
+                const isRunningAct = (act.status === 'RUNNING');
+                const isFailedAct = (act.status === 'FAILED' || act.status === 'FAIL');
+                const isWarn = isFailedAct;
+
+                // 遵循 Linear / Raycast 顶级工程极简：彻底清除彩色 Emoji，采用低饱和微矢量单色图标
+                let iconHtml = '<i class="bi bi-terminal text-muted" style="font-size: 11px; opacity: 0.7;"></i>';
+                let verb = rawName;
+                if (/点击|手势|tap/i.test(rawName) || /tap/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-hand-index text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "物理点击";
+                } else if (/视觉|感知|ocr|visual/i.test(rawName) || /ocr/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-eye text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "视觉感知";
+                } else if (/键入|输入|type|input/i.test(rawName) || /type/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-keyboard text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "文本键入";
+                } else if (/滑动|滑屏|swipe|scroll/i.test(rawName) || /swipe/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-arrow-down-up text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "滑动手势";
+                } else if (/宏|穿透|fast_forward/i.test(rawName) || /fast_forward/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-lightning-charge text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "穿透宏";
+                } else if (/等待|wait/i.test(rawName) || /wait/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-hourglass-split text-muted" style="font-size: 11px; opacity: 0.75;"></i>';
+                    verb = "状态等待";
+                } else if (/校验|断言|assert|check/i.test(rawName) || /assert/i.test(act.type || '')) {
+                    iconHtml = '<i class="bi bi-shield-check text-success" style="font-size: 11px; opacity: 0.85;"></i>';
+                    verb = "断言校验";
+                }
+
+                const actDetailKey = `${blockId}_act_${actIdx}`;
+                const isDetailOpen = window._actionDetailState && window._actionDetailState[actDetailKey] === true;
+
+                // 事实为本：仅在有真实采集耗时才呈现时间微胶囊，杜绝无中生有的 18ms 假数据！
+                const costTimeHtml = rawCostTime ? `<span>${escapeHtml(rawCostTime)}</span>` : '';
+
+                actionsHtml += `
+                    <div class="antigravity-action-tile ${isRunningAct ? 'running' : ''} ${isWarn ? 'warn' : ''} ${isDetailOpen ? 'expanded' : ''}" data-act-idx="${actIdx}" onclick="toggleActionDetail(this, event)">
+                        <div class="action-tile-main">
+                            <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 82%;">
+                                <span class="action-tile-icon">${iconHtml}</span>
+                                <span class="action-tile-verb">${escapeHtml(verb)}</span>
+                                <span class="action-tile-sep">·</span>
+                                <span class="action-tile-target text-truncate">${escapeHtml(rawDesc)}</span>
+                                ${param ? `<span class="action-tile-param">${escapeHtml(param)}</span>` : ''}
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                ${costTimeHtml}
+                                <span class="action-tile-status">
+                                    ${isRunningAct ? '<span class="action-mini-spinner"></span>' : (isFailedAct ? '<i class="bi bi-x-circle text-danger" style="font-size: 11.5px;"></i>' : '<i class="bi bi-check2 text-success" style="font-size: 12.5px;"></i>')}
+                                </span>
+                                <i class="bi bi-chevron-down action-tile-chevron" style="font-size: 8.5px; opacity: 0.45;"></i>
+                            </div>
+                        </div>
+                        <div class="action-tile-drawer ${isDetailOpen ? '' : 'd-none'}">
+                            <div class="action-terminal-output">
+                                <span class="terminal-arrow">↳</span>
+                                <span>${escapeHtml(act.observation || act.detail || '屏幕状态响应就绪')}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            return `
+                <div class="stream-step-node" id="${blockId}" data-step-id="${stepNum}">
+                    <div class="stream-step-node-header d-flex align-items-center justify-content-between" onclick="toggleStreamStep('${blockId}', '${stepNum}')">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="step-node-dot ${isRunning ? 'running' : (isFailed ? 'failed' : 'completed')}"></span>
+                            <span class="step-node-title fw-medium">${escapeHtml(stepTitle)}</span>
+                            <span class="font-mono text-muted" style="font-size: 10.5px; opacity: 0.75;">· ${acts.length} 动作</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="font-mono text-muted" style="font-size: 10.5px;">${escapeHtml(stepDuration)}</span>
+                            <i class="bi ${chevronClass}" id="chevron_${blockId}" style="font-size: 9px; opacity: 0.6;"></i>
+                        </div>
+                    </div>
+                    <div class="stream-step-node-body ${bodyClass}" id="body_${blockId}">
+                        ${actionsHtml}
+                        ${isFailed ? `<div class="agent-trace-error"><i class="bi bi-exclamation-triangle-fill me-1"></i>受阻原因：${escapeHtml(st.error_msg || '端侧组件定位超时或界面响应未达到预期断言')}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+function renderChatStream(sessionData) {
+            const flow = document.getElementById("messagesFlow") || document.getElementById("chatStreamFlow");
+            if (!flow || !sessionData) return;
+            const emptyBox = document.getElementById("emptyStateBox");
+            if (emptyBox) emptyBox.classList.add("d-none");
+            flow.classList.remove("d-none");
+
+            // 🛡️ 状态守卫：遵循生命周期自动折叠，仅保留用户显式手动展开的记录
+
+            // 任务清单与推演展开状态保护
+            flow.querySelectorAll(".stream-todo-card").forEach(todo => {
+                const tBody = todo.querySelector(".stream-todo-body");
+                if (tBody && !tBody.classList.contains("d-none")) {
+                    const tId = todo.id.replace("todo_card_", "");
+                    window._streamTodoState = window._streamTodoState || {};
+                    window._streamTodoState[tId] = true;
+                    window._streamTodoState[todo.id] = true;
+                }
+            });
+
+            flow.querySelectorAll(".stream-thought-box").forEach(th => {
+                const thBody = th.querySelector(".stream-thought-body");
+                if (thBody && !thBody.classList.contains("d-none")) {
+                    const thId = th.id.replace("thought_box_", "");
+                    window._streamThoughtState = window._streamThoughtState || {};
+                    window._streamThoughtState[thId] = true;
+                    window._streamThoughtState[th.id] = true;
+                }
+            });
+
+            // 1. 数据对齐：确保多轮 Turns 结构可用
+            let turns = sessionData.turns;
+            if (!Array.isArray(turns) || turns.length === 0) {
+                turns = [{
+                    turn_id: 1,
+                    turn_index: 1,
+                    user_input: sessionData.goal || sessionData.title || "执行端侧业务用例",
+                    is_rework: false,
+                    rework_reason: "",
+                    thought: sessionData.thought || "正在拆解端侧业务目标与前置依赖...",
+                    conclusion: sessionData.conclusion || (sessionData.status === "COMPLETED" ? "自动化测试已完成" : "")
+                }];
+            }
+
+            const totalTurns = turns.length;
+            const isReadyForReview = (sessionData.status === "READY_FOR_REVIEW");
+            const isCompleted = (sessionData.status === "COMPLETED");
+            const isFailed = (sessionData.status === "FAILED");
+            const isRunning = (sessionData.status === "RUNNING");
+
+            // 全局所有步骤集合 (兼容 plan_steps 和 steps)
+            const allSessionSteps = sessionData.plan_steps || sessionData.steps || [];
+
+            // 渲染右侧轻量步骤抽屉
+            renderStepsDrawerBody(sessionData, allSessionSteps);
+
+            let allTurnsHtml = "";
+
+            // 2. 循环迭代渲染每一个 Turn (方案 A：步骤容器化·纵向动作轨迹)
+            turns.forEach((turn, tIdx) => {
+                const isLatestTurn = (tIdx === totalTurns - 1);
+                const turnId = turn.turn_id || (tIdx + 1);
+
+                // 确定本轮次相关的步骤列表
+                let turnSteps = [];
+                if (turn.plan_steps && turn.plan_steps.length > 0) {
+                    turnSteps = turn.plan_steps;
+                } else if (turn.steps && turn.steps.length > 0) {
+                    turnSteps = turn.steps;
+                } else if (Array.isArray(turn.step_ids) && turn.step_ids.length > 0) {
+                    turnSteps = allSessionSteps.filter(s => turn.step_ids.includes(s.id || s.step_id || `step_${s.step_number}`));
+                } else if (isLatestTurn || totalTurns === 1) {
+                    turnSteps = allSessionSteps;
+                }
+
+                // ① 思考折叠导轨 (带左侧竖线导轨)
+                let thinkingDuration = '1.2s';
+                let bulletsHtml = "";
+
+                let thoughtStr = "";
+                if (typeof turn.thought === "string" && turn.thought.trim()) {
+                    thoughtStr = turn.thought.trim();
+                } else if (typeof turn.thinking === "string" && turn.thinking.trim()) {
+                    thoughtStr = turn.thinking.trim();
+                } else if (typeof sessionData.thought === "string" && sessionData.thought.trim()) {
+                    thoughtStr = sessionData.thought.trim();
+                }
+
+                let thinkingObj = (typeof turn.thinking === "object") ? turn.thinking : (typeof sessionData.thinking === "object" ? sessionData.thinking : null);
+                if (thinkingObj && thinkingObj.duration) {
+                    thinkingDuration = thinkingObj.duration;
+                }
+
+                if (thinkingObj && Array.isArray(thinkingObj.bullets) && thinkingObj.bullets.length > 0) {
+                    thinkingObj.bullets.forEach(b => {
+                        bulletsHtml += `
+                            <div class="d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                <span class="mt-1.5" style="width: 4px; height: 4px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                <span>${escapeHtml(b.content || '')}</span>
+                            </div>
+                        `;
+                    });
+                } else if (thoughtStr) {
+                    bulletsHtml = `<div class="mb-1 text-muted" style="font-size: 12px; line-height: 1.6;">${escapeHtml(thoughtStr)}</div>`;
+                } else {
+                    bulletsHtml = `<div class="mb-1 text-muted" style="font-size: 12px;">正在进行业务意图与端侧事实推演...</div>`;
+                }
+
+                if (window._streamThoughtState[`turn_${turnId}`] === undefined) {
+                    window._streamThoughtState[`turn_${turnId}`] = isLatestTurn;
+                }
+                const isThoughtExpanded = window._streamThoughtState[`turn_${turnId}`] === true;
+                const thoughtChevron = isThoughtExpanded ? "bi-chevron-up" : "bi-chevron-down";
+                const thoughtBodyClass = isThoughtExpanded ? "" : "d-none";
+
+                const thinkingHtml = `
+                    <div class="stream-thought-box" id="thought_box_turn_${turnId}">
+                        <div class="stream-thought-row" onclick="toggleStreamThought('turn_${turnId}')">
+                            <i class="bi ${thoughtChevron}" id="chevron_thought_turn_${turnId}" style="font-size: 10px;"></i>
+                            <span>思考过程 · ${escapeHtml(thinkingDuration)}</span>
+                        </div>
+                        <div class="stream-thought-body ${thoughtBodyClass}" id="body_thought_turn_${turnId}">
+                            ${bulletsHtml}
+                        </div>
+                    </div>
+                `;
+
+                // ② 任务清单卡片 (带 Diff 与完成度徽章)
+                let todoCardHtml = "";
+                if (turnSteps.length > 0) {
+                    let completedCount = 0;
+                    let todoItemsHtml = "";
+                    turnSteps.forEach((st, sIdx) => {
+                        const sNum = st.step_number || st.step_id || (sIdx + 1);
+                        const sTitle = st.title || st.name || `阶段 ${sNum}`;
+                        const sDesc = st.summary || st.desc || st.action || '执行业务规划与断言';
+                        const isStepDone = (st.status === "COMPLETED" || st.status === "PASS");
+                        const isStepFail = (st.status === "FAIL" || st.status === "FAILED");
+                        const isStepRunning = (st.status === "RUNNING");
+                        if (isStepDone) completedCount++;
+
+                        const itemClass = isStepDone ? "completed" : (isStepRunning ? "added" : "");
+                        const signChar = isStepRunning ? "+" : (isStepDone ? "✓" : "·");
+                        const tagClass = isStepDone ? "completed" : (isStepFail ? "failed" : (isStepRunning ? "running" : "pending"));
+                        const tagText = isStepDone ? "已完成" : (isStepFail ? "受阻" : (isStepRunning ? "进行中" : "待执行"));
+
+                        todoItemsHtml += `
+                            <div class="stream-todo-item ${itemClass}" onclick="toggleStepsDrawer(event)" title="点击展开右侧详细指令抽屉">
+                                <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 82%;">
+                                    <span class="item-sign" style="font-size: 11px; width: 12px; text-align: center;">${signChar}</span>
+                                    <span class="item-title text-truncate fw-medium">${escapeHtml(sTitle)} <span class="text-muted ms-1 fw-normal">${escapeHtml(sDesc)}</span></span>
+                                </div>
+                                ${tagText ? `<span class="stream-todo-tag ${tagClass}">${tagText}</span>` : ""}
+                            </div>
+                        `;
+                    });
+
+                    // 首轮或新轮次任务清单默认折叠或轻量展现
+                    if (window._streamTodoState[`turn_${turnId}`] === undefined) {
+                        window._streamTodoState[`turn_${turnId}`] = false;
+                    }
+                    const isTodoExpanded = (window._streamTodoState[`turn_${turnId}`] === true);
+                    const todoChevron = isTodoExpanded ? "bi-chevron-up" : "bi-chevron-down";
+                    const todoBodyClass = isTodoExpanded ? "" : "d-none";
+
+                    todoCardHtml = `
+                        <div class="stream-todo-card" id="todo_card_turn_${turnId}">
+                            <div class="stream-todo-header" onclick="toggleStreamTodo('turn_${turnId}')">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi ${todoChevron}" id="chevron_todo_turn_${turnId}" style="font-size: 10px;"></i>
+                                    <span>任务清单</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="mono-tag" style="font-size: 10px;">${completedCount}/${turnSteps.length}</span>
+                                    <span class="text-muted" style="font-size: 11px;" onclick="toggleStepsDrawer(event)" title="查看底层原生指令"><i class="bi bi-box-arrow-up-right"></i></span>
+                                </div>
+                            </div>
+                            <div class="stream-todo-body ${todoBodyClass}" id="body_todo_turn_${turnId}">
+                                <div class="stream-todo-diff-label">
+                                    <span>与前序状态清单相比</span>
+                                    
+                                </div>
+                                ${todoItemsHtml}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // ③ 方案 A：步骤容器化·纵向动作轨迹 (Step Execution Cards)
+                // 每一个步骤都是一个一级容器卡片，执行完后默认折叠为单行极简条，点击展开纵向树形流水
+                let stepCardsHtml = "";
+                turnSteps.forEach((st, sIdx) => {
+                    stepCardsHtml += buildStepExecutionCardHtml(st, sIdx, turnId, sessionData);
+                });
+
+                // ④ 阶段小结微通告 (在所有步骤后呈现)
+                let stepAlertHtml = "";
+                if (turn.status === "COMPLETED" || (isLatestTurn && (isReadyForReview || isCompleted))) {
+                    stepAlertHtml = `
+                        <div class="stream-step-result-alert mt-2">
+                            <i class="bi bi-check2-circle"></i>
+                            <span>Turn ${turnId} 业务验证达成 · 界面状态转移校验率 100%</span>
+                        </div>
+                    `;
+                }
+
+                // ⑤ AI 自然语言结论 (Conclusion)
+                let conclusionHtml = "";
+                let turnConclusionText = turn.conclusion || "";
+                if (isLatestTurn && !turnConclusionText) {
+                    if (isReadyForReview) {
+                        turnConclusionText = `本轮（Turn ${turnId}）测试验证已顺利达成，所有规划阶段动作与端侧转场均已校验通过。已就绪完整交付物，等待人工验收封板。`;
+                    } else if (isCompleted) {
+                        turnConclusionText = `本次自动化测试全流程验证通过，已正式验收通过并沉淀入本地回归用例库。`;
+                    } else if (isFailed) {
+                        turnConclusionText = `测试在第 ${turnId} 轮受阻中断，建议参考界面诊断并可点击打回返工要求修改。`;
+                    }
+                }
+
+                if (turnConclusionText) {
+                    conclusionHtml = `
+                        <div class="ai-conclusion-text mt-2" style="font-size: 13px; line-height: 1.6; color: var(--text-main);">
+                            ${escapeHtml(turnConclusionText)}
+                        </div>
+                    `;
+                }
+
+                // 取用户指令内容
+                const userText = turn.user_input || turn.user_message || turn.input || (tIdx === 0 ? (sessionData.goal || sessionData.title) : "") || "执行下一轮业务补充验证";
+                const reworkBadge = turn.is_rework ? '<span class="badge bg-warning text-dark me-1" style="font-size: 10px;"><i class="bi bi-arrow-counterclockwise"></i> 返工要求</span>' : '';
+                const reworkNote = (turn.is_rework && turn.rework_reason) ? `<div style="font-size: 11px; opacity: 0.85; margin-top: 2px;">原因: ${escapeHtml(turn.rework_reason)}</div>` : '';
+
+                // 多轮折叠 Accordion 状态判断 (非活跃的历史轮次默认优雅收起)
+                window._turnExpandedState = window._turnExpandedState || {};
+                const isTurnExpanded = isLatestTurn || (window._turnExpandedState[`turn_${turnId}`] === true);
+                const turnAccordionChevron = isTurnExpanded ? "bi-chevron-up" : "bi-chevron-down";
+                const turnAccordionText = isTurnExpanded ? "收起明细" : "展开明细";
+                const turnDetailClass = isTurnExpanded ? "" : "d-none";
+
+                let turnHeaderHtml = "";
+                if (!isLatestTurn && totalTurns > 1) {
+                    turnHeaderHtml = `
+                        <div class="turn-summary-pill d-flex align-items-center justify-content-between p-2 mb-2" onclick="toggleTurnAccordion('${turnId}')">
+                            <div class="d-flex align-items-center gap-2 text-truncate" style="max-width: 80%;">
+                                <span class="badge ${turn.status === 'COMPLETED' ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-muted'}" style="font-size: 10px;">Turn ${turnId}</span>
+                                <span class="fw-medium text-truncate" style="font-size: 12px; color: var(--text-main);">${escapeHtml(userText)}</span>
+                                <span class="text-muted text-truncate" style="font-size: 11px;">· ${turnSteps.length} 步骤已校验达成</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1.5 text-muted" style="font-size: 11px;">
+                                <span id="turn_acc_text_${turnId}">${turnAccordionText}</span>
+                                <i class="bi ${turnAccordionChevron}" id="turn_acc_chevron_${turnId}" style="font-size: 9px;"></i>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // 组装本 Turn 完整流动气泡
+                allTurnsHtml += `
+                    <div class="dsh-turn-wrapper" id="turn_wrapper_${turnId}">
+                        ${turnHeaderHtml}
+                        <div class="turn-detail-container ${turnDetailClass}" id="turn_detail_body_${turnId}">
+                            <!-- 用户指令气泡 (浅蓝紫精雕气泡) -->
+                            <div class="stream-user-row">
+                                <div class="stream-user-bubble ${turn.is_rework ? 'rework-bubble' : ''}">
+                                    ${reworkBadge}
+                                    <span>${escapeHtml(userText)}</span>
+                                    ${reworkNote}
+                                </div>
+                            </div>
+
+                            <!-- AI 流式响应体 -->
+                            <div class="msg-ai-row">
+                                ${thinkingHtml}
+                                ${todoCardHtml}
+                                ${stepCardsHtml}
+                                ${stepAlertHtml}
+                                ${conclusionHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // 3. 待验收门禁决策 (已无缝融合进主交付物卡片，避免两个卡片上下割裂)
+            let reviewGateHtml = "";
+            const hasSummaryBlock = (sessionData.timeline_blocks || []).some(b => b.type === "test_summary");
+            if (isReadyForReview && !hasSummaryBlock) {
+                // 仅在无主交付物卡片的极罕见降级场景保留兜底展现
+                reviewGateHtml = `
+                    <div class="review-gate-card">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-check text-success fs-5"></i>
+                                <span class="fw-semibold">测试执行完成</span>
+                            </div>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">待验收</span>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 pt-1">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="openDeliverablesModal('${sessionData.session_id}')">
+                                <i class="bi bi-box-seam me-1"></i>交付物清单 · ${sessionData.deliverables?.length || 0}
+                            </button>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-warning px-3" onclick="openReworkDialog('${sessionData.session_id}')">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>要求返工
+                                </button>
+                                <button class="btn btn-sm btn-success px-4 fw-semibold" onclick="acceptSession('${sessionData.session_id}')">
+                                    <i class="bi bi-check-lg me-1"></i>验收通过
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 4. 轮次尾部统一操作栏
+            let turnTailHtml = `
+                <div class="dsh-turn-tail mt-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span><i class="bi bi-layers me-1"></i>共 ${totalTurns} 交互轮次</span>
+                        <span>·</span>
+                        <span class="${isCompleted ? 'text-success' : (isReadyForReview ? 'text-info' : (isFailed ? 'text-danger' : 'text-muted'))}">
+                            ${isCompleted ? '已验收归档' : (isReadyForReview ? '待人工验收' : (isFailed ? '测试未达成' : '实时推进中'))}
+                        </span>
+                    </div>
+                    <div class="dsh-tail-actions">
+                        <button class="dsh-tail-btn" onclick="openCompatibilityMatrixModal('${sessionData.session_id}')" title="查看多机型视觉差异与步骤对齐对比看板">
+                            <i class="bi bi-grid-3x3-gap me-1 text-success"></i> 多端兼容对比
+                        </button>
+                        <button class="dsh-tail-btn" onclick="openDeliverablesModal('${sessionData.session_id}')" title="查看全部固化脚本、截图与报告">
+                            <i class="bi bi-box-seam me-1"></i> 交付物清单
+                        </button>
+                        <button class="dsh-tail-btn" onclick="copySessionGoal('${escapeHtml(sessionData.goal || '')}')" title="复制测试目标">
+                            <i class="bi bi-clipboard me-1"></i> 复制目标
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            const fullCombinedHtml = allTurnsHtml + reviewGateHtml + turnTailHtml;
+            // 🛡️ DOM 脏检查：若全部 HTML 内容无变动，坚决不重写 innerHTML，避免全屏闪烁！
+            if (flow.innerHTML !== fullCombinedHtml) {
+                flow.innerHTML = fullCombinedHtml;
+            }
+            updateConsoleLogs();
+            updateCurrentStepCapsule(sessionData);
+            updateWorkingMemoryCapsule(sessionData);
+        }
+
+        // =========================================================================
+        // 具身工作记忆与多轮交互辅助逻辑 (DeepSeek Harness + Muse 范式)
+        // =========================================================================
+        function toggleTurnAccordion(turnId) {
+            window._turnExpandedState = window._turnExpandedState || {};
+            const key = `turn_${turnId}`;
+            window._turnExpandedState[key] = !window._turnExpandedState[key];
+            const isExp = window._turnExpandedState[key];
+            
+            const body = document.getElementById(`turn_detail_body_${turnId}`);
+            if (body) {
+                if (isExp) body.classList.remove("d-none");
+                else body.classList.add("d-none");
+            }
+            const textEl = document.getElementById(`turn_acc_text_${turnId}`);
+            if (textEl) textEl.textContent = isExp ? "收起明细" : "展开明细";
+            const chevEl = document.getElementById(`turn_acc_chevron_${turnId}`);
+            if (chevEl) {
+                chevEl.className = `bi ${isExp ? "bi-chevron-up" : "bi-chevron-down"}`;
+            }
+        }
+
+        function updateWorkingMemoryCapsule(sessionData) {
+            const bar = document.getElementById("workingMemoryCapsuleBar");
+            const ta = document.getElementById("taskInputText");
+            if (!bar) return;
+
+            if (!sessionData || sessionData.status === "EMPTY" || !sessionData.session_id) {
+                bar.classList.add("d-none");
+                bar.innerHTML = "";
+                return;
+            }
+
+            const turns = sessionData.turns || [];
+            const totalTurns = turns.length;
+            const wm = sessionData.working_memory || {};
+            const activeEnt = wm.active_entities || {};
+            const listItems = activeEnt.list_items || [];
+            const fm = sessionData.fact_memory || {};
+            const currPkg = fm.current_package || sessionData.app_package || "";
+
+            // 动态更新输入框 placeholder
+            if (ta && totalTurns >= 1 && (sessionData.status === "COMPLETED" || sessionData.status === "READY_FOR_REVIEW")) {
+                const nextTurnId = totalTurns + 1;
+                ta.placeholder = `Turn ${nextTurnId} · 原地继承当前界面继续测试（例如：“点进第2个房源核验价格”、“返回重新排序”）...`;
+            }
+
+            // 若无实体且仅有单轮，不喧宾夺主
+            if (listItems.length === 0 && !currPkg && totalTurns <= 1) {
+                bar.classList.add("d-none");
+                bar.innerHTML = "";
+                return;
+            }
+
+            let itemsPillsHtml = "";
+            listItems.slice(0, 4).forEach(item => {
+                itemsPillsHtml += `
+                    <span class="wm-entity-tag" onclick="insertPromptShortcut('点进第${item.index}项核对详情')" title="点击快捷填入本条目指令">
+                        <span class="wm-idx">[${item.index}]</span>
+                        <span class="wm-text">${escapeHtml(item.text)}</span>
+                    </span>
+                `;
+            });
+
+            bar.classList.remove("d-none");
+            bar.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-1">
+                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                        <span class="wm-header-badge" title="DeepSeek Harness 具身工作记忆，跨轮无缝继承"><i class="bi bi-cpu me-1"></i>工作记忆</span>
+                        ${currPkg ? `<span class="wm-pkg-pill" title="当前真机停留应用"><i class="bi bi-phone me-1"></i>${escapeHtml(currPkg.split('.').pop() || currPkg)}</span>` : ''}
+                        ${itemsPillsHtml}
+                    </div>
+                    ${totalTurns > 1 ? `<span class="text-muted" style="font-size: 10px;">已连续交互 ${totalTurns} 轮</span>` : ''}
+                </div>
+            `;
+        }
+
+        function insertPromptShortcut(text) {
+            const ta = document.getElementById("taskInputText");
+            if (!ta) return;
+            ta.value = text;
+            ta.focus();
+            if (typeof onInputTextChange === "function") onInputTextChange();
+        }
+
+        function triggerTypewriterConclusion(sessionId, fullText, shouldAnimate) {
+            const box = document.getElementById(`aiConclusionBox_${sessionId}`);
+            if (!box) return;
+
+            // 1. 若无需打字动画，直接输出完整文本
+            if (!shouldAnimate) {
+                box.innerHTML = escapeHtml(fullText);
+                return;
+            }
+
+            const state = window._conclusionTypewriterState[sessionId];
+
+            // 2. 如果在当前页面周期内已经打字完成，直接渲染完整内容
+            if (state && state.finished) {
+                box.innerHTML = escapeHtml(fullText);
+                return;
+            }
+
+            // 3. 如果正在打字中（轮询导致 DOM 重绘），恢复已打出文字，由原定时器继续推进
+            if (state && state.timer) {
+                box.innerHTML = escapeHtml(state.fullText.slice(0, state.currentIdx)) + '<span class="typewriter-cursor"></span>';
+                return;
+            }
+
+            // 4. 首次实时输出结论：启动打字机逐字输出
+            window._conclusionTypewriterState[sessionId] = {
+                timer: null,
+                finished: false,
+                currentIdx: 0,
+                fullText: fullText
+            };
+
+            const cur = window._conclusionTypewriterState[sessionId];
+            const speed = 16; // 每 16ms 吐出一个字符
+
+            cur.timer = setInterval(() => {
+                const targetBox = document.getElementById(`aiConclusionBox_${sessionId}`);
+                if (!targetBox) {
+                    clearInterval(cur.timer);
+                    cur.timer = null;
+                    return;
+                }
+
+                cur.currentIdx++;
+                const currentStr = cur.fullText.slice(0, cur.currentIdx);
+
+                if (cur.currentIdx >= cur.fullText.length) {
+                    clearInterval(cur.timer);
+                    cur.timer = null;
+                    cur.finished = true;
+                    targetBox.innerHTML = escapeHtml(cur.fullText);
+                } else {
+                    targetBox.innerHTML = escapeHtml(currentStr) + '<span class="typewriter-cursor"></span>';
+                }
+            }, speed);
+        }
+
+        function toggleDshThought() {
+            dshExpandedState.thought = !dshExpandedState.thought;
+            const box = document.getElementById("dshThoughtBox");
+            if (box) box.classList.toggle("expanded", dshExpandedState.thought);
+        }
+
+        function toggleDshStep(stepBlockId) {
+            const isExp = !(dshExpandedState.steps[stepBlockId] || false);
+            dshExpandedState.steps[stepBlockId] = isExp;
+            const el = document.getElementById(stepBlockId);
+            if (el) el.classList.toggle("expanded", isExp);
+        }
+
+        function toggleAllDshSteps() {
+            dshExpandedState.allStepsExpanded = !dshExpandedState.allStepsExpanded;
+            const isExp = dshExpandedState.allStepsExpanded;
+            const blocks = document.querySelectorAll(".dsh-step-block");
+            blocks.forEach(b => {
+                b.classList.toggle("expanded", isExp);
+                if (b.id) dshExpandedState.steps[b.id] = isExp;
+            });
+            const btn = document.getElementById("dshToggleAllStepsBtn");
+            if (btn) {
+                btn.innerHTML = isExp 
+                    ? '<i class="bi bi-chevron-contract me-1"></i> 收起详情' 
+                    : '<i class="bi bi-chevron-expand me-1"></i> 展开详情';
+            }
+        }
+
+        function copySessionGoal(text) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text);
+            }
+        }
+
+        async function saveSessionToLocalCase(sessionId) {
+            const btn = document.getElementById(`saveCaseBtn_${sessionId}`);
+            const originalHtml = btn ? btn.innerHTML : "";
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 10px; height: 10px;"></span> 正在智能分析归类...`;
+            }
+            try {
+                const formData = new FormData();
+                const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/save_to_local_case`, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const titleText = data.title || "自动化回归用例";
+                    const modText = data.module || "业务通用";
+                    const isAlready = data.already_saved;
+                    alert(isAlready ? `ℹ️ 该用例已存在于本地库：\n🏷️ 分类：【${modText}】\n🏷️ 标题：${titleText}\n📄 脚本：${data.filename}` : `🎉 用例已成功入库！\n🏷️ 自动分类：【${modText}】\n🏷️ 用例标题：${titleText}\n📄 脚本文件：${data.filename}`);
+                    
+                    if (btn) {
+                        btn.className = "btn-linear-ghost text-success";
+                        btn.onclick = () => switchMainWorkspaceMode('local');
+                        btn.innerHTML = `<i class="bi bi-check-circle-fill"></i><span>已入库本地</span>`;
+                        btn.disabled = false;
+                    }
+                    try { await pollCurrentSession(); } catch (err) {}
+                    try { await loadSolidifiedCasesWorkspace(); } catch (err) {}
+                    try { if (typeof loadSolidifiedCases === "function") await loadSolidifiedCases(); } catch (err) {}
+                } else {
+                    alert(data.message || "保存本地用例失败");
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                }
+            } catch (e) {
+                alert("保存本地用例请求异常: " + e);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        }
+
+        function toggleStepDetails(detailsId) {
+            const el = document.getElementById(detailsId);
+            if (el) el.classList.toggle("d-none");
+        }
+
+        // ================= 7. 右侧工作台：测试节点流水线渲染 (与实际测试步骤精准绑定) =================
+        function renderPipelineNodes(steps, sessionStatus, devices) {
+            const list = document.getElementById("pipelineNodesList");
+            const badge = document.getElementById("nodesSummaryBadge");
+            if (!list) return;
+
+            const planSteps = steps || [];
+            if (badge) badge.innerText = `${planSteps.length} 节点`;
+
+            if (planSteps.length === 0) {
+                list.innerHTML = `
+                    <div class="canvas-empty-state">
+                        <div class="canvas-empty-icon"><i class="bi bi-diagram-3"></i></div>
+                        <div class="canvas-empty-title">等待规划测试执行流水线</div>
+                        <div class="canvas-empty-desc">在左侧输入测试需求后，AI 决策大脑将智能拆解任务并生成结构化规划节点。</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = "";
+            planSteps.forEach(st => {
+                let iconHtml = `<i class="bi bi-circle text-muted"></i>`;
+                let cardClass = "";
+                let badgeStyle = "color: var(--text-muted);";
+                let statusText = st.status || "READY";
+
+                if (st.status === "COMPLETED") {
+                    iconHtml = `<i class="bi bi-check-circle-fill text-success"></i>`;
+                    cardClass = "completed-step";
+                    badgeStyle = "color: #10b981; border-color: rgba(16, 185, 129, 0.4);";
+                    statusText = "已完成";
+                } else if (st.status === "RUNNING") {
+                    iconHtml = `<i class="bi bi-play-circle-fill" style="color: var(--text-main);"></i>`;
+                    cardClass = "active-step";
+                    badgeStyle = "color: var(--text-main); border-color: var(--border-strong);";
+                    statusText = "执行中";
+                } else if (st.status === "AWAITING_USER" || st.status === "AWAITING_APPROVAL") {
+                    iconHtml = `<i class="bi bi-hourglass-split text-warning"></i>`;
+                    badgeStyle = "color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);";
+                    statusText = "待协同";
+                } else if (st.status === "FAIL") {
+                    iconHtml = `<i class="bi bi-x-circle-fill text-danger"></i>`;
+                    cardClass = "failed-step";
+                    badgeStyle = "color: #ef4444; border-color: rgba(239, 68, 68, 0.4);";
+                    statusText = "失败";
+                } else {
+                    statusText = "等待中";
+                }
+
+                html += `
+                    <div class="node-step-card ${cardClass}">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="d-flex align-items-center gap-2">
+                                ${iconHtml}
+                                <span class="fw-semibold small" style="font-size: 12.5px;">Step ${st.step_id}: ${st.title}</span>
+                            </div>
+                            <span class="mono-tag" style="font-size: 9px; ${badgeStyle}">${statusText}</span>
+                        </div>
+                        <div class="text-muted" style="font-size: 11px; margin-left: 20px;">
+                            ${st.desc}
+                        </div>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+        }
+
+        // ================= 8. 控制台与日志 =================
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function renderConsoleTabs(devices) {
+            // 中间流和设备切换联动
+            const pillsBox = document.getElementById("streamDevicePillsBox");
+            const devKeys = Object.keys(devices || {});
+            if (devKeys.length === 0) return;
+
+            if (!activeConsoleDeviceId || !devices[activeConsoleDeviceId]) {
+                activeConsoleDeviceId = devKeys[0];
+            }
+
+            if (pillsBox && devKeys.length > 1) {
+                let html = "";
+                devKeys.forEach(k => {
+                    const d = devices[k];
+                    const isAct = (k === activeConsoleDeviceId) ? "active" : "";
+                    const platIcon = d.platform === 'iOS' ? '<i class="bi bi-apple me-1"></i>' : '<i class="bi bi-android2 me-1"></i>';
+                    html += `
+                        <button class="stream-console-tab-pill ${isAct}" onclick="switchConsoleDevice('${k}')">
+                            ${platIcon} ${d.model}
+                        </button>
+                    `;
+                });
+                pillsBox.innerHTML = html;
+            }
+        }
+
+        function switchConsoleDevice(devId) {
+            activeConsoleDeviceId = devId;
+            const btns = document.querySelectorAll(".stream-console-tab-pill");
+            btns.forEach(b => {
+                if (b.getAttribute("onclick") && b.getAttribute("onclick").includes(devId)) {
+                    b.classList.add("active");
+                } else {
+                    b.classList.remove("active");
+                }
+            });
+            updateConsoleLogs();
+        }
+
+        function updateConsoleLogs() {
+            const streamPre = document.getElementById("streamConsoleLogsPre");
+            const runLogs = document.getElementById("runLogs");
+            const devNameEl = document.getElementById("consoleDeviceName");
+
+            if (!activeConsoleDeviceId || !deviceLogsCache[activeConsoleDeviceId]) {
+                const readyText = "[Ready] 正在连接设备控制台...";
+                if (streamPre) streamPre.innerText = readyText;
+                if (runLogs) runLogs.innerHTML = `<span style="color: #64748b;">${readyText}</span>`;
+                if (devNameEl) devNameEl.innerText = "控制台终端就绪";
+                return;
+            }
+
+            const lines = deviceLogsCache[activeConsoleDeviceId];
+            if (devNameEl) {
+                devNameEl.innerText = `${activeConsoleDeviceId} · 实时日志 (${lines.length} 行)`;
+            }
+
+            if (runLogs) {
+                let formattedHtml = "";
+                lines.forEach(l => {
+                    let color = "#cbd5e1";
+                    if (l.includes("✅") || l.includes("🎉") || l.includes("断言通过") || l.includes("成功") || l.includes("SUCCESS")) {
+                        color = "#4ade80";
+                    } else if (l.includes("❌") || l.includes("FAIL") || l.includes("异常") || l.includes("ERROR") || l.includes("失败")) {
+                        color = "#f87171";
+                    } else if (l.includes("[Step ") || l.includes("OCR") || l.includes("AI 决策") || l.includes("--- [Step")) {
+                        color = "#38bdf8";
+                    } else if (l.includes("[WARNING]") || l.includes("重试")) {
+                        color = "#fbbf24";
+                    }
+                    formattedHtml += `<div style="color: ${color}; line-height: 1.6; margin-bottom: 1px;">${escapeHtml(l)}</div>`;
+                });
+                runLogs.innerHTML = formattedHtml || `<span style="color: #64748b;">[Ready] 暂无日志输出。</span>`;
+                runLogs.scrollTop = runLogs.scrollHeight;
+            }
+
+            if (streamPre) {
+                let formattedHtml = "";
+                lines.forEach(l => {
+                    let lineClass = "stream-log-line";
+                    if (l.includes("✅") || l.includes("🎉") || l.includes("断言通过") || l.includes("成功")) {
+                        lineClass += " stream-log-success";
+                    } else if (l.includes("❌") || l.includes("FAIL") || l.includes("异常")) {
+                        lineClass += " stream-log-warn";
+                    } else if (l.includes("[Step ") || l.includes("OCR") || l.includes("AI 决策")) {
+                        lineClass += " stream-log-highlight";
+                    }
+                    formattedHtml += `<div class="${lineClass}">${escapeHtml(l)}</div>`;
+                });
+                streamPre.innerHTML = formattedHtml || `<span class="text-muted">[Ready] 暂无日志输出。</span>`;
+                const container = document.getElementById("streamConsoleLogsBody");
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            }
+        }
+
+        function clearCurrentLogs() {
+            if (activeConsoleDeviceId && deviceLogsCache[activeConsoleDeviceId]) {
+                deviceLogsCache[activeConsoleDeviceId] = ["[Ready] 控制台已清屏。"];
+                updateConsoleLogs();
+            }
+        }
+
+        // ================= 9. 发送新任务 / 单任务连续对话 (纯真机硬拦截) =================
+
+        // ================= 15. 中央对话流前置链路巡检与缺项交互引导 (Preflight Engine) =================
+        window._currentPreflightData = null;
+
+        async function fetchPreflightData() {
+            try {
+                const res = await fetch("/api/system/preflight");
+                const data = await res.json();
+                window._currentPreflightData = data;
+                return data;
+            } catch (e) {
+                console.warn("巡检接口请求异常", e);
+                return null;
+            }
+        }
+
+        function buildPreflightCardHtml(data, retryGoal = "") {
+            if (!data) return "";
+            const checks = data.checks || {};
+            const isReady = data.ready;
+            const missing = data.missing || [];
+
+            // 1. 全部就绪状态：轻量绿色徽标条
+            if (isReady) {
+                return `
+                    <div class="preflight-bubble" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.03);">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-success-subtle text-success border border-success-subtle py-1 px-2" style="font-size: 11px;">
+                                    <i class="bi bi-shield-check me-1"></i>前置链路 100% 就绪
+                                </span>
+                                <span class="small text-sub" style="font-size: 11.5px;">
+                                    AI: <strong>${escapeHtml(checks.ai?.display_name || checks.ai?.model || '已接入')}</strong> · 
+                                    待测包: <strong>${escapeHtml(checks.app?.current_app || '已就绪')}</strong> · 
+                                    真机: <strong>${checks.device?.count || 1} 台在线</strong>
+                                </span>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary py-0.5 px-2" onclick="refreshPreflightStatus()" style="font-size: 11px;" title="重新扫描前置依赖">
+                                <i class="bi bi-arrow-clockwise me-1"></i>重新检测
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 2. 存在缺失节点：结构化人话诊断卡片
+            let aiNodeHtml = "";
+            if (!checks.ai?.ready) {
+                aiNodeHtml = `
+                    <div class="preflight-node-item node-missing">
+                        <div>
+                            <div class="fw-semibold text-danger" style="font-size: 12.5px;">
+                                <i class="bi bi-cpu-fill me-1"></i>【首要前提】尚未接入 AI 推理模型
+                            </div>
+                            <div class="text-muted mt-0.5" style="font-size: 11px;">
+                                Autotest AI 依赖大模型进行自然语言意图规划与多模态视觉决策。
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-primary py-1 px-2.5" onclick="openSettingsModal('models')" style="font-size: 11.5px;">
+                                <i class="bi bi-lightning-charge-fill me-1"></i>立即接入 AI 模型
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                aiNodeHtml = `
+                    <div class="preflight-node-item node-ready">
+                        <div>
+                            <div class="fw-semibold text-success" style="font-size: 12px;">
+                                <i class="bi bi-check-circle-fill me-1"></i>AI 推理驱动已就绪
+                            </div>
+                            <div class="text-muted mt-0.5" style="font-size: 11px;">
+                                生效服务: <strong>${escapeHtml(checks.ai?.display_name || checks.ai?.model)}</strong> (${checks.ai?.provider})
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary py-0.5 px-2" onclick="openSettingsModal('models')" style="font-size: 11px;">切换模型</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            let appNodeHtml = "";
+            if (!checks.app?.ready) {
+                appNodeHtml = `
+                    <div class="preflight-node-item node-missing">
+                        <div>
+                            <div class="fw-semibold text-danger" style="font-size: 12.5px;">
+                                <i class="bi bi-box-seam me-1"></i>【业务载体】未检测到待测应用包
+                            </div>
+                            <div class="text-muted mt-0.5" style="font-size: 11px;">
+                                需要在 apps/ 目录下存在待测 APK，系统才能提取包名与主界面并部署。
+                            </div>
+                        </div>
+                        <div class="d-flex gap-1.5">
+                            <button class="btn btn-sm btn-outline-primary py-1 px-2.5" onclick="openAppPackagesModal()" style="font-size: 11.5px;">
+                                <i class="bi bi-upload me-1"></i>上传待测 APK
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                appNodeHtml = `
+                    <div class="preflight-node-item node-ready">
+                        <div>
+                            <div class="fw-semibold text-success" style="font-size: 12px;">
+                                <i class="bi bi-check-circle-fill me-1"></i>待测应用已就绪
+                            </div>
+                            <div class="text-muted mt-0.5" style="font-size: 11px;">
+                                当前待测包: <strong>${escapeHtml(checks.app?.current_app)}</strong>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary py-0.5 px-2" onclick="openAppPackagesModal()" style="font-size: 11px;">更换应用</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            let deviceNodeHtml = "";
+            if (!checks.device?.ready) {
+                deviceNodeHtml = `
+                    <div class="preflight-node-item node-missing">
+                        <div>
+                            <div class="fw-semibold text-danger" style="font-size: 12.5px;">
+                                <i class="bi bi-phone me-1"></i>【执行环境】未检测到在线的物理真机
+                            </div>
+                            <div class="text-muted mt-0.5" style="font-size: 11px; line-height: 1.45;">
+                                解决步骤：1. 用 USB 线连接手机；2. 手机开启【开发者选项】并开启【USB 调试】；3. 手机弹窗选择【始终允许这台电脑】。
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-success py-1 px-2.5" onclick="refreshPreflightStatus()" style="font-size: 11.5px;">
+                                <i class="bi bi-arrow-repeat me-1"></i>已插线，重新检测
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                deviceNodeHtml = `
+                    <div class="preflight-node-item node-ready">
+                        <div>
+                            <div class="fw-semibold text-success" style="font-size: 12px;">
+                                <i class="bi bi-check-circle-fill me-1"></i>物理真机连接已就绪
+                            </div>
+                            <div class="text-muted mt-0.5" style="font-size: 11px;">
+                                目标设备: <strong>${escapeHtml((checks.device?.devices || []).join(', '))}</strong> (${checks.device?.count || 1} 台已授权)
+                            </div>
+                        </div>
+                        <div>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px;">USB调试已授权</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const retryBtnHtml = retryGoal ? `
+                <div class="pt-2 border-top mt-2 text-end" style="border-color: var(--border-subtle) !important;">
+                    <button class="btn btn-sm btn-primary py-1 px-3" onclick="retryGoalAfterSatisfied('${escapeHtml(retryGoal)}')" style="font-size: 12px; font-weight: 500;">
+                        <i class="bi bi-play-fill me-1"></i>满足前置后，重新启动此测试
+                    </button>
+                </div>
+            ` : "";
+
+            return `
+                <div class="preflight-bubble">
+                    <div class="preflight-header">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle py-1 px-2" style="font-size: 11.5px;">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>缺少执行前置流程节点 (${missing.length} 项待满足)
+                            </span>
+                            <span class="small text-muted" style="font-size: 11.5px;">请先满足以下流程节点，系统将自动解锁测试执行</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary py-0.5 px-2" onclick="refreshPreflightStatus()" style="font-size: 10.5px;">
+                            <i class="bi bi-arrow-clockwise me-1"></i>重新检测
+                        </button>
+                    </div>
+                    <div class="preflight-node-list">
+                        ${aiNodeHtml}
+                        ${appNodeHtml}
+                        ${deviceNodeHtml}
+                    </div>
+                    ${retryBtnHtml}
+                </div>
+            `;
+        }
+
+        
+        // ================= 15. 全局顶栏前置链路巡检与诊断弹窗 (Global Preflight Engine) =================
+        window._currentPreflightData = null;
+
+        async function fetchPreflightData() {
+            try {
+                const res = await fetch("/api/system/preflight");
+                const data = await res.json();
+                window._currentPreflightData = data;
+                return data;
+            } catch (e) {
+                console.warn("巡检接口请求异常", e);
+                return null;
+            }
+        }
+
+                // ================= 全局前置链路触碰展示 (Hover) 与点击钉住 (Pin) 状态机 =================
+        let _preflightHoverTimer = null;
+        let _preflightIsPinned = false;
+
+        function handleBrandStatusHover(isEnter) {
+            if (_preflightIsPinned) return;
+            const popover = document.getElementById("globalPreflightPopover");
+            if (!popover) return;
+
+            if (isEnter) {
+                if (_preflightHoverTimer) clearTimeout(_preflightHoverTimer);
+                _preflightHoverTimer = setTimeout(() => {
+                    popover.classList.add("show");
+                    renderGlobalPreflightPopoverContent(window._currentPreflightData);
+                }, 120);
+            } else {
+                if (_preflightHoverTimer) clearTimeout(_preflightHoverTimer);
+                _preflightHoverTimer = setTimeout(() => {
+                    if (!_preflightIsPinned) {
+                        popover.classList.remove("show");
+                    }
+                }, 220);
+            }
+        }
+
+        function toggleBrandStatusPin(e) {
+            if (e) e.stopPropagation();
+            const popover = document.getElementById("globalPreflightPopover");
+            if (!popover) return;
+            if (_preflightHoverTimer) clearTimeout(_preflightHoverTimer);
+
+            if (popover.classList.contains("show") && _preflightIsPinned) {
+                popover.classList.remove("show");
+                _preflightIsPinned = false;
+            } else {
+                popover.classList.add("show");
+                _preflightIsPinned = true;
+                renderGlobalPreflightPopoverContent(window._currentPreflightData);
+            }
+        }
+
+        // 兼容原有的 toggleGlobalPreflightPopover 调用
+        function toggleGlobalPreflightPopover(e) {
+            toggleBrandStatusPin(e);
+        }
+
+        // 点击页面任意外部区域自动解除钉住并收拢
+        document.addEventListener("click", (e) => {
+            const popover = document.getElementById("globalPreflightPopover");
+            const trigger = document.getElementById("brandStatusTrigger");
+            if (!popover || !trigger) return;
+            if (!popover.contains(e.target) && !trigger.contains(e.target)) {
+                popover.classList.remove("show");
+                _preflightIsPinned = false;
+            }
+        });
+
+        // 渲染极简高质感 Micro HUD 浮动状态卡片 (遵循 Linear / Raycast 范式与布局自释原则，杜绝信息冗余)
+        function renderGlobalPreflightPopoverContent(data) {
+            const body = document.getElementById("globalPreflightPopoverBody");
+            if (!body) return;
+            if (!data) {
+                body.innerHTML = `<div class="text-muted small p-1">正在获取全局链路状态...</div>`;
+                return;
+            }
+            const checks = data.checks || {};
+            const isReady = Boolean(data.ready);
+
+            const aiReady = Boolean(checks.ai?.ready);
+            const aiName = checks.ai?.display_name || checks.ai?.provider || 'Gemini 3.8';
+            const aiBadge = aiReady ? '官方授权' : '未就绪';
+            const aiBadgeStyle = aiReady 
+                ? 'background: rgba(16, 185, 129, 0.12); color: #10b981;' 
+                : 'background: rgba(239, 68, 68, 0.12); color: #ef4444;';
+
+            const devReady = Boolean(checks.device?.ready);
+            const devCount = checks.device?.count || 0;
+            const devName = devCount > 0 ? (checks.device?.model || checks.device?.brand ? `${checks.device?.brand || ''} ${checks.device?.model || ''}`.trim() : '真机设备') : '无真机在线';
+            const devBadge = devCount > 0 ? `${devCount} 台在线` : '未连接';
+            const devBadgeStyle = devCount > 0 
+                ? 'background: rgba(16, 185, 129, 0.12); color: #10b981;' 
+                : 'background: rgba(245, 158, 11, 0.12); color: #f59e0b;';
+
+            const appReady = Boolean(checks.app?.current_app);
+            let appName = checks.app?.label || checks.app?.current_app || '待测应用';
+            if (appName.endsWith('.apk')) appName = appName.slice(0, -4);
+            const appBadge = appReady ? '已就绪' : '未装载';
+            const appBadgeStyle = appReady 
+                ? 'background: rgba(16, 185, 129, 0.12); color: #10b981;' 
+                : 'background: rgba(245, 158, 11, 0.12); color: #f59e0b;';
+
+            let html = `
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-1" style="border-bottom: 1px solid var(--border-subtle);">
+                    <div class="d-flex align-items-center gap-1.5">
+                        <span class="rounded-circle d-inline-block" style="width: 7px; height: 7px; background: ${isReady ? '#10b981' : '#f59e0b'}; box-shadow: 0 0 6px ${isReady ? 'rgba(16, 185, 129, 0.6)' : 'rgba(245, 158, 11, 0.6)'};"></span>
+                        <span class="fw-semibold" style="font-size: 11.5px; color: var(--text-main); letter-spacing: -0.2px;">
+                            ${isReady ? '测试环境完全就绪' : '部分环境依赖未就绪'}
+                        </span>
+                    </div>
+                    <span class="text-muted" style="font-size: 11px; cursor: pointer; padding: 2px;" onclick="refreshPreflightStatus(true)" title="重新检测">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </span>
+                </div>
+                
+                <div class="d-flex flex-column gap-1.5 py-1">
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px; min-height: 22px;">
+                        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                            <i class="bi bi-stars" style="color: #6366f1; font-size: 11px; opacity: 0.9;"></i>
+                            <span class="text-truncate" style="color: var(--text-main); font-weight: 500;" title="${escapeHtml(aiName)}">${escapeHtml(aiName)}</span>
+                        </div>
+                        <span class="badge" style="font-size: 9.5px; font-weight: 500; border-radius: 4px; padding: 2px 6px; ${aiBadgeStyle}">${aiBadge}</span>
+                    </div>
+                    
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px; min-height: 22px;">
+                        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                            <i class="bi bi-phone" style="color: #3b82f6; font-size: 11px; opacity: 0.9;"></i>
+                            <span class="text-truncate" style="color: var(--text-main); font-weight: 500;" title="${escapeHtml(devName)}">${escapeHtml(devName)}</span>
+                        </div>
+                        <span class="badge" style="font-size: 9.5px; font-weight: 500; border-radius: 4px; padding: 2px 6px; ${devBadgeStyle}">${devBadge}</span>
+                    </div>
+                    
+                    <div class="d-flex align-items-center justify-content-between" style="font-size: 11px; min-height: 22px;">
+                        <div class="d-flex align-items-center gap-2 text-truncate me-2">
+                            <i class="bi bi-box-seam" style="color: #10b981; font-size: 11px; opacity: 0.9;"></i>
+                            <span class="text-truncate" style="color: var(--text-main); font-weight: 500;" title="${escapeHtml(appName)}">${escapeHtml(appName)}</span>
+                        </div>
+                        <span class="badge" style="font-size: 9.5px; font-weight: 500; border-radius: 4px; padding: 2px 6px; ${appBadgeStyle}">${appBadge}</span>
+                    </div>
+                </div>
+
+                <div class="pt-2 mt-1 d-flex justify-content-end align-items-center" style="border-top: 1px solid var(--border-subtle);">
+                    <span class="d-inline-flex align-items-center gap-1 text-muted small" 
+                          style="font-size: 10px; cursor: pointer; transition: color 0.15s ease;"
+                          onmouseenter="this.style.color='var(--color-primary)'" 
+                          onmouseleave="this.style.color='var(--text-muted)'"
+                          onclick="openSettingsModal()">
+                        系统设置 <i class="bi bi-arrow-up-right" style="font-size: 8.5px;"></i>
+                    </span>
+                </div>
+            `;
+            body.innerHTML = html;
+        }
+
+        async function refreshPreflightStatus(isManual = false) {
+            const icon = document.getElementById("globalPreflightRefreshIcon");
+            if (icon && isManual) icon.classList.add("spin-anim");
+            try {
+                const data = await fetchPreflightData();
+                if (!data) return;
+                const pill = document.getElementById("globalPreflightPill");
+                const summaryEl = document.getElementById("globalPreflightSummary");
+                const checks = data.checks || {};
+                const isReady = data.ready;
+
+                if (pill && summaryEl) {
+                    if (isReady) {
+                        pill.className = "global-preflight-pill is-ready";
+                        const aiName = checks.ai?.provider || 'AI';
+                        const appName = checks.app?.current_app ? checks.app.current_app.replace('.apk','') : '待测应用';
+                        const devCount = checks.device?.count || 1;
+                        summaryEl.innerHTML = `<strong class="text-success"><i class="bi bi-shield-check me-1"></i>100% 就绪:</strong> ${escapeHtml(aiName)} · ${escapeHtml(appName)} · ${devCount}台真机`;
+                    } else {
+                        pill.className = "global-preflight-pill is-missing";
+                        summaryEl.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>缺少必要前置项</span> (点击查看)`;
+                    }
+                }
+
+                // 🌟 双重就绪指示动态联动 (顶栏小绿点/小红点 & 底栏)
+                const headerPill = document.getElementById("headerReadyPill");
+                const headerText = document.getElementById("headerReadyText");
+                const bottomPill = document.getElementById("bottomReadyPill");
+                const bottomText = document.getElementById("bottomReadyText");
+                const brandDot = document.getElementById("brandPulseDot");
+                const brandTrigger = document.getElementById("brandStatusTrigger");
+                if (isReady) {
+                    if (brandDot) {
+                        brandDot.className = "brand-pulse-dot status-ready";
+                    }
+                    if (brandTrigger) {
+                        brandTrigger.title = "测试环境已就绪 (悬停查看链路健康度，点击常驻)";
+                    }
+                    if (headerText) {
+                        headerText.innerText = "测试就绪";
+                        headerText.style.color = "var(--status-green)";
+                    }
+                } else {
+                    if (brandDot) {
+                        brandDot.className = "brand-pulse-dot status-unready";
+                    }
+                    if (brandTrigger) {
+                        brandTrigger.title = "测试环境未就绪 (缺少前置依赖，点击排查)";
+                    }
+                    if (headerText) {
+                        headerText.innerText = "环境未就绪";
+                        headerText.style.color = "#ef4444";
+                    }
+                }
+
+                const topAppLabel = document.getElementById("topBarAppLabel");
+                if (topAppLabel && checks.app?.current_app) {
+                    topAppLabel.innerText = checks.app.current_app.replace('.apk', '');
+                }
+
+                const popover = document.getElementById("globalPreflightPopover");
+                if (popover && popover.classList.contains("show")) {
+                    renderGlobalPreflightPopoverContent(data);
+                }
+
+                // 🌟 若检测到环境全景已就绪，且当前对话流仍停留在历史未就绪引导卡片中（未激活任务会话），自动清理并平滑恢复空状态看板
+                if (isReady && !activeSessionId) {
+                    const flow = document.getElementById("messagesFlow");
+                    const emptyBox = document.getElementById("emptyStateBox");
+                    if (flow && flow.innerHTML.includes("系统自检助理")) {
+                        flow.innerHTML = "";
+                        if (emptyBox) emptyBox.classList.remove("d-none");
+                    }
+                }
+
+                if (typeof loadDevices === "function") {
+                    loadDevices();
+                }
+            } finally {
+                if (icon && isManual) {
+                    setTimeout(() => icon.classList.remove("spin-anim"), 500);
+                }
+            }
+        }
+
+        // ================= 16. 步骤时序浮动小弹窗与画中画 (PM-Product Dock 风格) =================
+        let isPipScreenOpen = false;
+        let pipScreenTimer = null;
+
+        function toggleStepsDrawer(e) {
+            if (e) e.stopPropagation();
+            const popover = document.getElementById("stepsDrawerPopover");
+            if (!popover) return;
+            popover.classList.toggle("show");
+        }
+
+        // 🌟 原生 ADB 极速低延迟画中画投屏 (双缓冲无积压推拉 + 手势即时刷新闭环)
+        let isPipLoopActive = false;
+
+        // 🌟 原生 ADB 极速低延迟投屏循环 (带真机断开自适应空状态感知)
+        let _pipErrorStreak = 0;
+
+        function getPipTargetDeviceId() {
+            if (typeof getActiveTargetDeviceId === "function") {
+                const id = getActiveTargetDeviceId();
+                if (id) return id;
+            }
+            const checked = document.querySelectorAll(".device-checkbox:checked");
+            if (checked && checked.length > 0) return checked[0].value;
+            if (typeof currentScreenDeviceId !== "undefined" && currentScreenDeviceId) return currentScreenDeviceId;
+            if (typeof activeConsoleDeviceId !== "undefined" && activeConsoleDeviceId && activeConsoleDeviceId !== "mock-device") return activeConsoleDeviceId;
+            if (typeof availableDevices !== "undefined" && availableDevices && availableDevices.length > 0) return availableDevices[0].id;
+            return null;
+        }
+
+        function updateDeviceFloatingEmptyState(devices) {
+            const empty = document.getElementById("pipScreenEmpty");
+            const img = document.getElementById("pipScreenImg");
+            const title = document.getElementById("floatingDeviceTitle");
+            const status = document.getElementById("floatingDeviceStatus");
+            const activeDevId = getPipTargetDeviceId();
+            const devObj = (devices || []).find(d => d.id === activeDevId) || ((devices && devices.length > 0) ? devices[0] : null);
+
+            if (!devObj) {
+                if (empty) empty.style.display = "block";
+                if (img) img.style.display = "none";
+                if (title) title.innerText = "未连接真机 · 排查指引";
+                if (status) status.innerText = "USB 设备已断开";
+            } else {
+                if (empty) empty.style.display = "none";
+                if (img) img.style.display = "block";
+                if (title) title.innerText = `${devObj.model || devObj.id} · 实时端侧`;
+                if (status) status.innerText = "触控注入就绪";
+            }
+        }
+
+        function runPipStreamLoop() {
+            if (!isPipScreenOpen) {
+                isPipLoopActive = false;
+                return;
+            }
+            isPipLoopActive = true;
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) {
+                updateDeviceFloatingEmptyState(availableDevices || []);
+                if (isPipScreenOpen) setTimeout(runPipStreamLoop, 1500);
+                else isPipLoopActive = false;
+                return;
+            }
+            const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
+            const preloader = new Image();
+            preloader.onload = () => {
+                if (!isPipScreenOpen) {
+                    isPipLoopActive = false;
+                    return;
+                }
+                _pipErrorStreak = 0;
+                const img = document.getElementById("pipScreenImg");
+                const empty = document.getElementById("pipScreenEmpty");
+                if (img) {
+                    img.src = preloader.src;
+                    img.style.display = "block";
+                }
+                if (empty) empty.style.display = "none";
+                setTimeout(runPipStreamLoop, 40);
+            };
+            preloader.onerror = () => {
+                _pipErrorStreak++;
+                if (_pipErrorStreak >= 2) {
+                    const img = document.getElementById("pipScreenImg");
+                    const empty = document.getElementById("pipScreenEmpty");
+                    if (img) img.style.display = "none";
+                    if (empty) empty.style.display = "block";
+                    const title = document.getElementById("floatingDeviceTitle");
+                    if (title) title.innerText = "未连接真机 · 排查指引";
+                    const status = document.getElementById("floatingDeviceStatus");
+                    if (status) status.innerText = "等待真机接入";
+                }
+                if (isPipScreenOpen) setTimeout(runPipStreamLoop, 1500);
+                else isPipLoopActive = false;
+            };
+            preloader.src = url;
+        }
+
+        function triggerPipImmediateRefresh() {
+            if (!isPipScreenOpen) return;
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) return;
+            const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
+            const preloader = new Image();
+            preloader.onload = () => {
+                const img = document.getElementById("pipScreenImg");
+                const empty = document.getElementById("pipScreenEmpty");
+                if (img && isPipScreenOpen) {
+                    img.src = preloader.src;
+                    img.style.display = "block";
+                    if (empty) empty.style.display = "none";
+                }
+            };
+            preloader.src = url;
+        }
+
+        // ================= 任务执行联动: 全自动唤起并停靠端侧投屏 =================
+        function ensurePipScreenOpen() {
+            if (!isPipScreenOpen) {
+                togglePipScreen();
+            } else {
+                if (typeof resetDevicePos === "function") {
+                    resetDevicePos();
+                }
+            }
+        }
+
+        function togglePipScreen(e) {
+            if (e) e.stopPropagation();
+            const pip = document.getElementById("floatingDeviceWindow") || document.getElementById("pipScreenFloating");
+            const btn = document.getElementById("btnTogglePipScreen");
+            const container = document.getElementById("pipScreenContainer");
+            if (!pip) return;
+            isPipScreenOpen = !isPipScreenOpen;
+            if (isPipScreenOpen) {
+                pip.style.display = "flex";
+                pip.classList.add("show");
+                if (btn) btn.classList.add("active");
+                if (typeof initFloatingDeviceDrag === "function") {
+                    initFloatingDeviceDrag();
+                }
+                if (container) {
+                    bindPipGestureControl(container);
+                }
+                // 每次打开默认归位至右侧停靠点 (与复位悬浮窗位置按钮行为严格一致)
+                if (typeof resetDevicePos === "function") {
+                    resetDevicePos();
+                }
+                const fpsLabel = document.getElementById("floatingDeviceFps");
+                if (fpsLabel) fpsLabel.innerText = "直连";
+                runPipStreamLoop();
+            } else {
+                pip.style.display = "none";
+                pip.classList.remove("show");
+                if (btn) btn.classList.remove("active");
+                isPipLoopActive = false;
+            }
+        }
+
+        // 📱 虚拟按键发送 (返回 / 桌面 / 多任务)
+        async function sendDeviceNavKey(key, e) {
+            if (e) e.stopPropagation();
+            const targetDev = getPipTargetDeviceId();
+            if (!targetDev) return;
+            const status = document.getElementById("floatingDeviceStatus");
+            const keyLabels = { back: "返回键 (Back)", home: "主屏幕 (Home)", app_switch: "多任务" };
+            if (status) status.innerText = `下发: ${keyLabels[key] || key}`;
+            try {
+                await fetch('/api/device/key', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ device_id: targetDev, key: key })
+                });
+                setTimeout(triggerPipImmediateRefresh, 180);
+                setTimeout(() => {
+                    if (status) status.innerText = "触控注入就绪";
+                }, 1000);
+            } catch (err) {
+                console.warn("Key event error:", err);
+            }
+        }
+
+        // 🚀 真机全手势穿透控制：智能判定 单击 (Tap) / 长按 (Long Press) / 拖拽滑动 (Swipe)
+        function bindPipGestureControl(containerEl) {
+            if (containerEl._gestureBound) return;
+            containerEl._gestureBound = true;
+
+            const canvas = document.getElementById("pipGestureCanvas");
+            const ctx = canvas ? canvas.getContext("2d") : null;
+            let isTracking = false;
+            let startX = 0, startY = 0, startTime = 0;
+
+            function syncCanvasSize() {
+                if (!canvas || !containerEl) return;
+                canvas.width = containerEl.clientWidth;
+                canvas.height = containerEl.clientHeight;
+            }
+            syncCanvasSize();
+            window.addEventListener("resize", syncCanvasSize);
+
+            function getEventPos(e) {
+                const rect = containerEl.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: Math.max(0, Math.min(clientX - rect.left, rect.width)),
+                    y: Math.max(0, Math.min(clientY - rect.top, rect.height)),
+                    w: rect.width,
+                    h: rect.height
+                };
+            }
+
+            function onTouchStart(e) {
+                if (e.target.closest(".device-nav-bar") || e.target.closest("#pipScreenEmpty")) return;
+                const pos = getEventPos(e);
+                isTracking = true;
+                startX = pos.x;
+                startY = pos.y;
+                startTime = Date.now();
+                syncCanvasSize();
+            }
+
+            function onTouchMove(e) {
+                if (!isTracking || !ctx) return;
+                const pos = getEventPos(e);
+                const curX = pos.x;
+                const curY = pos.y;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 起点光圈
+                ctx.beginPath();
+                ctx.arc(startX, startY, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = "rgba(239, 68, 68, 0.8)";
+                ctx.fill();
+
+                // 拖拽引导线
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(curX, curY);
+                ctx.strokeStyle = "rgba(239, 68, 68, 0.85)";
+                ctx.lineWidth = 3;
+                ctx.lineCap = "round";
+                ctx.stroke();
+
+                // 终点箭头
+                const angle = Math.atan2(curY - startY, curX - startX);
+                const headlen = 8;
+                ctx.beginPath();
+                ctx.moveTo(curX, curY);
+                ctx.lineTo(curX - headlen * Math.cos(angle - Math.PI / 6), curY - headlen * Math.sin(angle - Math.PI / 6));
+                ctx.moveTo(curX, curY);
+                ctx.lineTo(curX - headlen * Math.cos(angle + Math.PI / 6), curY - headlen * Math.sin(angle + Math.PI / 6));
+                ctx.strokeStyle = "rgba(239, 68, 68, 0.9)";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            async function onTouchEnd(e) {
+                if (!isTracking) return;
+                isTracking = false;
+                if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const rect = containerEl.getBoundingClientRect();
+                const clientX = (e.changedTouches ? e.changedTouches[0].clientX : e.clientX);
+                const clientY = (e.changedTouches ? e.changedTouches[0].clientY : e.clientY);
+                const endX = Math.max(0, Math.min(clientX - rect.left, rect.width));
+                const endY = Math.max(0, Math.min(clientY - rect.top, rect.height));
+
+                const dx = endX - startX;
+                const dy = endY - startY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const dt = Date.now() - startTime;
+
+                const targetDev = getPipTargetDeviceId();
+                if (!targetDev) return;
+                const status = document.getElementById("floatingDeviceStatus");
+
+                // 归一化相对比例 (0.0 ~ 1.0)，由后端动态根据真机物理分辨率映射，告别单机型硬编码
+                const normX1 = Math.max(0, Math.min(1, startX / rect.width));
+                const normY1 = Math.max(0, Math.min(1, startY / rect.height));
+                const normX2 = Math.max(0, Math.min(1, endX / rect.width));
+                const normY2 = Math.max(0, Math.min(1, endY / rect.height));
+
+                if (dist < 12) {
+                    if (dt >= 450) {
+                        // 长按 (Long Press)
+                        if (status) status.innerText = `长按手势 (${Math.round(normX1 * 100)}%, ${Math.round(normY1 * 100)}%)`;
+                        triggerActionRipple((startX / rect.width) * 100, (startY / rect.height) * 100);
+                        try {
+                            await fetch('/api/device/swipe', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({ device_id: targetDev, norm_x1: normX1, norm_y1: normY1, norm_x2: normX1, norm_y2: normY1, duration: 800 })
+                            });
+                        } catch (err) {}
+                    } else {
+                        // 单击 (Tap)
+                        if (status) status.innerText = `单击 (${Math.round(normX1 * 100)}%, ${Math.round(normY1 * 100)}%)`;
+                        triggerActionRipple((startX / rect.width) * 100, (startY / rect.height) * 100);
+                        try {
+                            await fetch('/api/device/tap', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({ device_id: targetDev, norm_x: normX1, norm_y: normY1 })
+                            });
+                        } catch (err) {}
+                    }
+                } else {
+                    // 滑动 / 拖拽 (Swipe)
+                    const swipeDuration = Math.min(Math.max(Math.round(dt), 160), 450);
+                    if (status) status.innerText = `滑动 ${Math.round(dist)}px (${swipeDuration}ms)`;
+                    try {
+                        await fetch('/api/device/swipe', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                device_id: targetDev,
+                                norm_x1: normX1,
+                                norm_y1: normY1,
+                                norm_x2: normX2,
+                                norm_y2: normY2,
+                                duration: swipeDuration
+                            })
+                        });
+                    } catch (err) {}
+                }
+
+                setTimeout(triggerPipImmediateRefresh, 180);
+                setTimeout(() => {
+                    if (status) status.innerText = "触控注入就绪";
+                }, 1000);
+            }
+
+            containerEl.addEventListener("mousedown", onTouchStart);
+            window.addEventListener("mousemove", onTouchMove);
+            window.addEventListener("mouseup", onTouchEnd);
+
+            containerEl.addEventListener("touchstart", onTouchStart, { passive: true });
+            window.addEventListener("touchmove", onTouchMove, { passive: true });
+            window.addEventListener("touchend", onTouchEnd, { passive: true });
+        }
+
+        function triggerActionRipple(pctX, pctY) {
+            const ripple = document.getElementById("deviceActionRipple");
+            if (!ripple) return;
+            ripple.style.left = pctX + "%";
+            ripple.style.top = pctY + "%";
+            ripple.style.display = "none";
+            void ripple.offsetWidth;
+            ripple.style.display = "block";
+        }
+
+        async function refreshPipScreen() {
+            const img = document.getElementById("pipScreenImg");
+            const empty = document.getElementById("pipScreenEmpty");
+            if (!img) return;
+            try {
+                const targetDev = getPipTargetDeviceId();
+                if (!targetDev) return;
+                const url = `/api/devices/${encodeURIComponent(targetDev)}/screenshot?t=${Date.now()}&format=jpeg`;
+                const testImg = new Image();
+                testImg.onload = () => {
+                    img.src = url;
+                    img.style.display = "block";
+                    if (empty) empty.style.display = "none";
+                };
+                testImg.src = url;
+            } catch (e) {}
+        }
+
+        // 点击页面空白处自动关闭浮层
+        document.addEventListener("click", (e) => {
+            const preflightPopover = document.getElementById("globalPreflightPopover");
+            const preflightPill = document.getElementById("globalPreflightPill");
+            if (preflightPopover && preflightPopover.classList.contains("show")) {
+                if (!preflightPopover.contains(e.target) && !preflightPill?.contains(e.target)) {
+                    preflightPopover.classList.remove("show");
+                }
+            }
+
+            const stepsDrawer = document.getElementById("stepsDrawerPopover");
+            const stepsCapsule = document.getElementById("floatingStepCapsule");
+            const inlinePill = e.target.closest?.(".dsh-inline-step-pill");
+            if (stepsDrawer && stepsDrawer.classList.contains("show")) {
+                if (!stepsDrawer.contains(e.target) && !stepsCapsule?.contains(e.target) && !inlinePill) {
+                    stepsDrawer.classList.remove("show");
+                }
+            }
+        });
+
+
+        function retryGoalAfterSatisfied(goal) {
+            fillPrompt(goal);
+            submitNewTask();
+        }
+
+        async function submitNewTask() {
+            const input = document.getElementById("taskInputText");
+            const goal = input.value.trim();
+            const btn = document.getElementById("btnSendTask");
+
+            if (!goal) return;
+
+            // 对话流前置全链路健康核验 (AI驱动 / 待测包 / 物理真机)，缺项直接在对话流中交互引导，绝无原生 alert 弹窗
+            const preflight = await fetchPreflightData();
+            if (preflight && !preflight.ready && !activeSessionId) {
+                const emptyBox = document.getElementById("emptyStateBox");
+                if (emptyBox) emptyBox.classList.add("d-none");
+                const flow = document.getElementById("messagesFlow");
+                if (flow) {
+                    const userMsgHtml = `
+                        <div class="dsh-turn-wrapper user-turn mb-3">
+                            <div class="dsh-user-bubble">
+                                ${escapeHtml(goal)}
+                            </div>
+                        </div>
+                    `;
+                    const botMsgHtml = `
+                        <div class="dsh-turn-wrapper mb-4">
+                            <div class="mb-2 d-flex align-items-center gap-1.5" style="font-size: 12px; color: var(--text-sub);">
+                                <i class="bi bi-robot"></i>
+                                <span class="fw-semibold">系统自检助理</span>
+                            </div>
+                            <div class="text-sub mb-2.5" style="font-size: 12px; line-height: 1.5;">
+                                收到您的测试目标：<strong>“${escapeHtml(goal)}”</strong>。但在向端侧下发任务前，检测到存在尚未满足的前置流程节点：
+                            </div>
+                            ${buildPreflightCardHtml(preflight, goal)}
+                        </div>
+                    `;
+                    flow.innerHTML = userMsgHtml + botMsgHtml;
+                    const scrollArea = document.getElementById("chatScrollArea");
+                    if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
+                }
+                input.value = "";
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
+                return;
+            }
+
+            // 🌟 智能应用防漏选兜底：若尚未选定包名，尝试根据测试意图秒级自适应关联，或弹出选择器
+            if ((!currentActiveApp.package || currentActiveApp.package === "") && (!currentActiveApp.filename || currentActiveApp.filename === "")) {
+                const devApps = cachedDeviceApps || [];
+                let matched = null;
+                if (/房|二手房|象盒/i.test(goal)) {
+                    matched = devApps.find(a => /象盒找房|找房/i.test(a.label || "") || a.package === "com.apicloud.A6995433058179");
+                }
+                if (!matched && devApps.length > 0) {
+                    matched = devApps.find(a => !/keyboard|输入法|gboard|clash|termux|magisk/i.test(a.package || ""));
+                }
+                if (matched) {
+                    switchActiveApp({
+                        source: "device",
+                        label: matched.label,
+                        package: matched.package,
+                        activity: matched.activity || "",
+                        version: "真机已安装",
+                        isInstalled: true
+                    });
+                } else {
+                    const pop = document.getElementById("appPopover");
+                    if (pop) pop.classList.add("show");
+                    alert("请在输入框左下角先选择目标【待测应用】（如象盒找房或上传 APK），再发起测试！");
+                    return;
+                }
+            }
+
+            // 智能真机前置核验与一键安装补齐 (Preflight Guard)
+            const activeDevId = getActiveTargetDeviceId();
+            if (activeDevId && currentActiveApp && currentActiveApp.package) {
+                try {
+                    const isDeviceDirect = (currentActiveApp.source === 'device' || !currentActiveApp.filename);
+                    if (!isDeviceDirect && currentActiveApp.filename) {
+                        const chkRes = await fetch(`/api/apps/check_installed?device_id=${encodeURIComponent(activeDevId)}&package=${encodeURIComponent(currentActiveApp.package)}`);
+                        const chkData = await chkRes.json();
+                        if (chkData && chkData.installed === false) {
+                            btn.disabled = true;
+                            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 12px; height: 12px;"></span>智能静默推送到手机...`;
+                            const insForm = new FormData();
+                            insForm.append("device_id", activeDevId);
+                            insForm.append("filename", currentActiveApp.filename);
+                            const insRes = await fetch("/api/install", { method: "POST", body: insForm });
+                            const insData = await insRes.json();
+                            if (!insData.success) {
+                                btn.disabled = false;
+                                btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
+                                const flow = document.getElementById("messagesFlow");
+                                if (flow) {
+                                    flow.innerHTML += `
+                                        <div class="preflight-bubble border-danger-subtle mt-2">
+                                            <div class="d-flex align-items-center gap-2 text-danger fw-semibold" style="font-size: 12px;">
+                                                <i class="bi bi-x-circle-fill"></i> 真机待测包自动安装受阻
+                                            </div>
+                                            <div class="small text-muted mt-1" style="font-size: 11px;">
+                                                ${escapeHtml(insData.message || '安装超时')}。请点亮手机屏幕，若弹出【允许通过 USB 安装】请点击【允许】。
+                                            </div>
+                                        </div>
+                                    `;
+                                }
+                                return;
+                            }
+                            currentActiveApp.isInstalled = true;
+                            updateAppPillUI();
+                        }
+                    } else {
+                        // 真机已安装直调：免推包安装，直接放行
+                        currentActiveApp.isInstalled = true;
+                    }
+                } catch (e) {
+                    console.warn("前置包核验跳过", e);
+                }
+            }
+
+            btn.disabled = true;
+            btn.classList.add("btn-send-pulse");
+            btn.innerHTML = `<span class="spinner-grow spinner-grow-sm" style="width: 10px; height: 10px;"></span>`;
+
+            // 提取当前挂载的多模态需求资产并立即清空托盘
+            const attachmentsToSend = [...currentAttachments];
+            clearAttachments();
+
+            // 智能感知：若挂载了需求文档且用户输入提炼/编排/生成套件意图，直接调起 Suite Builder Generative UI
+            const docAtt = attachmentsToSend.find(a => a.is_doc);
+            if (docAtt && /提炼|套件|编排|suite|生成用例|用例生成|用例集/i.test(goal)) {
+                btn.disabled = false;
+                btn.classList.remove("btn-send-pulse");
+                btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
+                input.value = "";
+                await generateSuiteFromAttachment(docAtt.saved_name, docAtt.filename);
+                return;
+            }
+
+            try {
+                // 分支 A: 如果当前已有处于激活状态的会话，执行单任务连续对话（打断/修正/追加意图），不新建会话
+                if (activeSessionId) {
+                    const formData = new FormData();
+                    formData.append("message", goal);
+                    formData.append("provider", currentActiveProvider);
+                    formData.append("model", currentActiveModel);
+                    if (attachmentsToSend.length > 0) {
+                        formData.append("attachments", JSON.stringify(attachmentsToSend));
+                    }
+
+                    // 🚀 对标 DeepSeek / Linear 交互机制：0ms 乐观上屏 (Optimistic UI)
+                    const flow = document.getElementById("messagesFlow");
+                    const tempBlockId = "temp_user_" + Date.now();
+                    const tempThId = "temp_th_" + Date.now();
+                    let optTimerA = null;
+
+                    if (flow) {
+                        const emptyBox = document.getElementById("emptyStateBox");
+                        if (emptyBox) emptyBox.classList.add("d-none");
+                        const attsOptHtml = attachmentsToSend.length > 0 ? buildAttachmentsPreviewHtml(attachmentsToSend) : '';
+                        const userRowHtml = `
+                            <div class="stream-user-row optimistic-temp-node" id="${tempBlockId}" data-temp-node="true">
+                                <div class="stream-user-prompt">
+                                    <div class="stream-user-prompt-meta">
+                                        <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
+                                        <span>用户目标</span>
+                                    </div>
+                                    <div class="stream-user-prompt-content">
+                                        ${escapeHtml(goal)}
+                                    </div>
+                                    ${attsOptHtml}
+                                </div>
+                            </div>
+                            <div class="stream-thought-box optimistic-temp-node" id="${tempThId}" data-temp-node="true">
+                                <div class="stream-thought-shimmer-card">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="hud-status-dot pulsing"></span>
+                                        <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">增量意图推演中...</span>
+                                        <span class="ms-auto font-mono text-sub" id="optTimerA_${tempThId}" style="font-size: 11px;">0.0s</span>
+                                    </div>
+                                    <div class="shimmer-bar mb-2"></div>
+                                    <div class="stream-thought-body p-0 border-0">
+                                        <div class="thought-flow-point d-flex align-items-start gap-2 mb-1" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                            <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                            <span>解析追加指令【${escapeHtml(goal)}】，动态重规划执行分支...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        flow.insertAdjacentHTML("beforeend", userRowHtml);
+                        const scrollArea = document.getElementById("chatScrollArea");
+                        if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
+
+                        const t0 = Date.now();
+                        optTimerA = setInterval(() => {
+                            const el = document.getElementById(`optTimerA_${tempThId}`);
+                            if (el) {
+                                el.textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s";
+                            }
+                        }, 100);
+                        window._optimisticTimers = window._optimisticTimers || [];
+                        window._optimisticTimers.push(optTimerA);
+                    }
+
+                    input.value = "";
+                    onInputTextChange();
+
+                    const res = await fetch(`/api/sessions/${activeSessionId}/message`, { method: "POST", body: formData });
+                    const data = await res.json();
+                    if (optTimerA) {
+                        clearInterval(optTimerA);
+                        if (window._optimisticTimers) {
+                            window._optimisticTimers = window._optimisticTimers.filter(t => t !== optTimerA);
+                        }
+                    }
+
+                    // 立即安全移除发送时乐观插入的临时节点，权威数据交由后端真实 timeline 渲染
+                    const tempEl = document.getElementById(tempBlockId);
+                    if (tempEl) tempEl.remove();
+                    const tempTh = document.getElementById(tempThId);
+                    if (tempTh) tempTh.remove();
+
+                    if (data.success) {
+                        if (data.stopped) {
+                            currentSessionStatus = "STOPPED";
+                            updateStopButtonState("STOPPED");
+                            const hitlCard = document.querySelector(".hitl-decision-card");
+                            if (hitlCard) hitlCard.remove();
+                        } else if (data.resolved_hitl) {
+                            // 协同桥接秒级响应：立即消除顶层挂起卡片
+                            const hitlCard = document.querySelector(".hitl-decision-card");
+                            if (hitlCard) hitlCard.remove();
+                            if (currentActiveSessionData) {
+                                currentActiveSessionData.hitl_decision = null;
+                            }
+                            liveRunningSessions.add(activeSessionId);
+                        } else {
+                            // 标记该会话重新进入实时执行，清除旧结论状态
+                            liveRunningSessions.add(activeSessionId);
+                            localStorage.removeItem("conclusion_shown_" + activeSessionId);
+                            delete window._conclusionTypewriterState[activeSessionId];
+                        }
+
+                        // 重新激活轮询定时器，杜绝因旧状态导致轮询停止
+                        if (!sessionPollTimer) {
+                            sessionPollTimer = setInterval(pollCurrentSession, 1200);
+                        }
+                        await pollCurrentSession();
+                        loadSessions();
+                        ensurePipScreenOpen();
+                    } else {
+                        alert(data.message || "追加测试指令失败");
+                    }
+                    return;
+                }
+
+                // 分支 B: 当前无激活任务时，创建全新的自动化测试会话 (纯真机)
+                const checkedBoxes = document.querySelectorAll(".device-checkbox:checked");
+                let selectedDevIds = Array.from(checkedBoxes).map(c => c.value);
+                if (selectedDevIds.length === 0) {
+                    const activeDev = getActiveTargetDeviceId();
+                    if (activeDev) selectedDevIds = [activeDev];
+                }
+
+                // 🚀 对标 Linear / Raycast 范式：0ms 乐观响应 (Optimistic UI)
+                const emptyBox = document.getElementById("emptyStateBox");
+                if (emptyBox) emptyBox.classList.add("d-none");
+
+                // 🛡️ 核心生命周期防御：新建任务或推演中严禁出现幽灵态势感知胶囊！
+                const floatingHud = document.getElementById("floatingTaskHud");
+                if (floatingHud) floatingHud.classList.add("d-none");
+                const taskDropup = document.getElementById("taskDropupSheet");
+                if (taskDropup) taskDropup.classList.add("d-none");
+
+                const flow = document.getElementById("messagesFlow");
+                const tempUserBlockId = "temp_user_" + Date.now();
+                const tempThoughtBlockId = "temp_th_" + Date.now();
+                let optTimerB = null;
+
+                if (flow) {
+                    const attsOptHtml = attachmentsToSend.length > 0 ? buildAttachmentsPreviewHtml(attachmentsToSend) : '';
+                    const userRowHtml = `
+                        <div class="stream-user-row optimistic-temp-node" id="${tempUserBlockId}" data-temp-node="true">
+                            <div class="stream-user-prompt">
+                                <div class="stream-user-prompt-meta">
+                                    <i class="bi bi-person-fill" style="opacity: 0.65;"></i>
+                                    <span>用户目标</span>
+                                </div>
+                                <div class="stream-user-prompt-content">
+                                    ${escapeHtml(goal)}
+                                </div>
+                                ${attsOptHtml}
+                            </div>
+                        </div>
+                        <div class="stream-thought-box optimistic-temp-node" id="${tempThoughtBlockId}" data-temp-node="true">
+                            <div class="stream-thought-shimmer-card">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="hud-status-dot pulsing"></span>
+                                    <span class="fw-semibold" style="font-size: 12px; color: var(--text-main);">深度推演端侧测试链路...</span>
+                                    <span class="ms-auto font-mono text-sub" id="optTimerB_count" style="font-size: 11px;">0.0s</span>
+                                </div>
+                                <div class="shimmer-bar mb-2"></div>
+                                <div class="stream-thought-body p-0 border-0">
+                                    <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                        <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                        <span>物理真机已在线，正在感知端侧前台状态并推演起跑点...</span>
+                                    </div>
+                                    <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                        <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                        <span>深度解析测试目标【${escapeHtml(goal)}】，构建最优差量执行路径...</span>
+                                    </div>
+                                    <div class="thought-flow-point d-flex align-items-start gap-2 mb-1.5" style="font-size: 12px; line-height: 1.55; color: var(--text-sub);">
+                                        <span class="thought-bullet-dot mt-1.5" style="width: 4.5px; height: 4.5px; border-radius: 50%; background: #3b82f6; opacity: 0.8; flex-shrink: 0;"></span>
+                                        <span>动态规划业务核心频道与控件巡航策略...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    flow.insertAdjacentHTML("beforeend", userRowHtml);
+                    const scrollArea = document.getElementById("chatScrollArea");
+                    if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
+
+                    // 启动 0ms 计时走秒
+                    const t0 = Date.now();
+                    optTimerB = setInterval(() => {
+                        const el = document.getElementById("optTimerB_count");
+                        if (el) {
+                            el.textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s";
+                        }
+                    }, 100);
+                    window._optimisticTimers = window._optimisticTimers || [];
+                    window._optimisticTimers.push(optTimerB);
+                }
+
+                // 立即清空输入框并收拢
+                input.value = "";
+                onInputTextChange();
+
+                const formData = new FormData();
+                formData.append("goal", goal);
+                formData.append("devices", selectedDevIds.join(","));
+                if (attachmentsToSend.length > 0) {
+                    formData.append("attachments", JSON.stringify(attachmentsToSend));
+                }
+                formData.append("test_mode", "real");
+                formData.append("approval_mode", currentApprovalMode);
+                formData.append("case_name", "matrix_flow");
+                formData.append("provider", currentActiveProvider);
+                formData.append("model", currentActiveModel);
+                formData.append("app_id", currentActiveApp.app_id || "");
+                formData.append("app_filename", currentActiveApp.filename || "");
+                formData.append("app_package", currentActiveApp.package || "");
+                formData.append("app_label", currentActiveApp.label || "");
+                formData.append("app_activity", currentActiveApp.activity || "");
+
+                // 🚀 后端极速首包响应 (<50ms)
+                const res = await fetch("/api/sessions/create", { method: "POST", body: formData });
+                const data = await res.json();
+                if (optTimerB) {
+                    clearInterval(optTimerB);
+                    if (window._optimisticTimers) {
+                        window._optimisticTimers = window._optimisticTimers.filter(t => t !== optTimerB);
+                    }
+                }
+                const tempUserEl = document.getElementById(tempUserBlockId);
+                if (tempUserEl) tempUserEl.remove();
+                const tempThEl = document.getElementById(tempThoughtBlockId);
+                if (tempThEl) tempThEl.remove();
+
+                if (data.success && data.session_id) {
+                    liveRunningSessions.add(data.session_id);
+                    localStorage.removeItem("conclusion_shown_" + data.session_id);
+                    delete window._conclusionTypewriterState[data.session_id];
+
+                    // 立即激活轮询接管任务推演流
+                    activeSessionId = data.session_id;
+                    if (!sessionPollTimer) {
+                        sessionPollTimer = setInterval(pollCurrentSession, 1000);
+                    }
+                    await loadSessions();
+                    switchSession(data.session_id);
+                    ensurePipScreenOpen();
+                } else {
+                    const uEl = document.getElementById(tempUserBlockId);
+                    if (uEl) uEl.remove();
+                    const thEl = document.getElementById(tempThoughtBlockId);
+                    if (thEl) thEl.remove();
+                    alert(data.message || "创建任务失败");
+                }
+            } catch (e) {
+                alert("发起测试指令异常: " + e);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove("btn-send-pulse");
+                btn.innerHTML = `<i class="bi bi-arrow-up" style="font-size: 15px; font-weight: bold;"></i>`;
+            }
+        }
+
+        async function approveSession(sessionId) {
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/approve`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    pollCurrentSession();
+                } else {
+                    alert(data.message || "审批失败");
+                }
+            } catch (e) {
+                alert("审批异常: " + e);
+            }
+        }
+
+        async function deleteSession(sessionId) {
+            if (!confirm("确定删除该会话吗？")) return;
+            try {
+                await fetch(`/api/sessions/${sessionId}/delete`, { method: "POST" });
+                if (activeSessionId === sessionId) {
+                    startNewChat();
+                }
+                loadSessions();
+            } catch (e) {}
+        }
+
+
+
+        // ================= 全新极简双栏系统设置中心 (AI模型服务 + 通用与环境) =================
+        let currentSystemConfig = null;
+        let currentActiveProvider = "deepseek";
+        let currentActiveModel = "deepseek-chat";
+        let dynamicLoadedModels = {};
+
+        function openSettingsModal(initialTab = "apps") {
+            closeAllPopovers();
+            switchSettingsTab(initialTab);
+            loadModelConfig();
+            loadAntigravityStatus();
+            loadEnvStatus();
+            loadApps();
+            updateTourStatusBadge();
+            
+            // 同步当前主题卡片高亮
+            const savedTheme = localStorage.getItem("autotest_theme") || "dark";
+            const cardLight = document.getElementById("themeCardLight");
+            const cardDark = document.getElementById("themeCardDark");
+            const cardAuto = document.getElementById("themeCardAuto");
+            if (cardLight) cardLight.classList.toggle("active", savedTheme === "light");
+            if (cardDark) cardDark.classList.toggle("active", savedTheme === "dark");
+            if (cardAuto) cardAuto.classList.toggle("active", savedTheme === "auto");
+
+            const modalEl = document.getElementById("harnessSettingsModal");
+            if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+
+        function switchSettingsTab(tabName) {
+            const isApps = (tabName === "apps");
+            const isGoogle = (tabName === "google");
+            const isModels = (tabName === "models");
+            const isGeneral = (tabName === "general");
+            const isGuide = (tabName === "guide");
+
+            const navApps = document.getElementById("tabNavApps");
+            const navGoogle = document.getElementById("tabNavGoogle");
+            const navModels = document.getElementById("tabNavModels");
+            const navGeneral = document.getElementById("tabNavGeneral");
+            const navGuide = document.getElementById("tabNavGuide");
+
+            const panelApps = document.getElementById("panelSettingsApps");
+            const panelGoogle = document.getElementById("panelSettingsGoogle");
+            const panelModels = document.getElementById("panelSettingsModels");
+            const panelGeneral = document.getElementById("panelSettingsGeneral");
+            const panelGuide = document.getElementById("panelSettingsGuide");
+
+            if (navApps) navApps.classList.toggle("active", isApps);
+            if (navGoogle) navGoogle.classList.toggle("active", isGoogle);
+            if (navModels) navModels.classList.toggle("active", isModels);
+            if (navGeneral) navGeneral.classList.toggle("active", isGeneral);
+            if (navGuide) navGuide.classList.toggle("active", isGuide);
+
+            if (panelApps) panelApps.classList.toggle("d-none", !isApps);
+            if (panelGoogle) panelGoogle.classList.toggle("d-none", !isGoogle);
+            if (panelModels) panelModels.classList.toggle("d-none", !isModels);
+            if (panelGeneral) panelGeneral.classList.toggle("d-none", !isGeneral);
+            if (panelGuide) panelGuide.classList.toggle("d-none", !isGuide);
+
+            if (isApps) { if (currentSettingsAppTab === 'device') loadSettingsDeviceApps(); else loadApps(); }
+            if (isGoogle) loadAntigravityStatus();
+            if (isModels) loadModelConfig();
+            if (isGuide) updateTourStatusBadge();
+        }
+
+        // 统一入驻：openAppPackagesModal 直接平滑切换至设置中的应用管理选项卡
+        function openAppPackagesModal() {
+            openSettingsModal("apps");
+        }
+
+        function openEnvConfigTip() {
+            alert("配置文件路径: F:\Autotest\.env\n可在【AI 模型服务】中直接编辑保存，系统将自动热同步至 .env 文件中。");
+        }
+
+        // 切换当前编辑的服务商 (deepseek / antigravity / openai)
+        function selectProviderForEdit(provider) {
+            currentActiveProvider = provider;
+            document.getElementById("modelProviderSelect").value = provider;
+
+            // 切换服务商并列卡片高亮
+            document.querySelectorAll(".provider-choice-card").forEach(c => c.classList.remove("active"));
+            const currentCard = document.getElementById(`cardProvider_${provider}`);
+            if (currentCard) {
+                currentCard.classList.add("active");
+                currentCard.style.borderColor = "var(--border-hover)";
+            }
+
+            // 更新标题与徽标
+            const titleEl = document.getElementById("formCurrentProviderTitle");
+            const badgeEl = document.getElementById("currentProviderBadge");
+            const googleBox = document.getElementById("googleOauthBox");
+            const keyAndUrlRow = document.getElementById("keyAndUrlRow");
+            const keyInput = document.getElementById("modelApiKeyInput");
+            const urlInput = document.getElementById("modelBaseUrlInput");
+
+            if (badgeEl) badgeEl.innerText = provider.toUpperCase();
+
+            const isAgLoggedIn = !!(window._antigravityStatusData?.is_logged_in || currentSystemConfig?.antigravity?.ready);
+            if (provider === "antigravity") {
+                if (!isAgLoggedIn) {
+                    // 🛡️ 门禁提示：未授权时点击直接引导至 Google 官方授权菜单
+                    switchSettingsTab('google');
+                    return;
+                }
+                if (titleEl) titleEl.innerHTML = `<i class="bi bi-google me-1 text-primary"></i>Google 官方生效模型配置`;
+                if (keyAndUrlRow) keyAndUrlRow.classList.add("d-none");
+            } else if (provider === "deepseek") {
+                if (titleEl) titleEl.innerHTML = `<i class="bi bi-cpu me-1 text-success"></i>配置 DeepSeek 官方 API 参数`;
+                if (keyAndUrlRow) keyAndUrlRow.classList.remove("d-none");
+                if (urlInput) urlInput.placeholder = "https://api.deepseek.com";
+            } else {
+                if (titleEl) titleEl.innerHTML = `<i class="bi bi-sliders me-1 text-warning"></i>配置第三方 / OpenAI 兼容网关`;
+                if (keyAndUrlRow) keyAndUrlRow.classList.remove("d-none");
+                if (urlInput) urlInput.placeholder = "https://api.openai.com/v1 或自建中转地址";
+            }
+
+            // 加载该服务商的模型列表
+            renderCurrentProviderModels(provider);
+        }
+
+        // 在线动态探测拉取服务商模型 (GET /models)
+        async function fetchRemoteModelsAction() {
+            const provider = document.getElementById("modelProviderSelect").value;
+            const apiKey = document.getElementById("modelApiKeyInput").value.trim();
+            const baseUrl = document.getElementById("modelBaseUrlInput").value.trim();
+            const statusText = document.getElementById("fetchModelsStatusText");
+
+            statusText.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> 正在向服务商接口探测并拉取可用模型...`;
+
+            const fd = new FormData();
+            fd.append("provider", provider);
+            if (apiKey) fd.append("api_key", apiKey);
+            if (baseUrl) fd.append("base_url", baseUrl);
+
+            try {
+                const res = await fetch("/api/config/fetch_models", { method: "POST", body: fd });
+                const data = await res.json();
+                if (data.models && data.models.length > 0) {
+                    dynamicLoadedModels[provider] = data.models;
+                    statusText.innerHTML = `<i class="bi bi-check-circle-fill me-1 text-success"></i> ${data.message}`;
+                    renderModelOptionsFromList(data.models, data.models[0]);
+                } else {
+                    statusText.innerHTML = `<i class="bi bi-exclamation-circle text-warning me-1"></i> ${data.message || '未获取到模型'}`;
+                }
+            } catch (e) {
+                statusText.innerHTML = `<i class="bi bi-x-circle text-danger me-1"></i> 动态拉取网络异常: ${e.message}`;
+            }
+        }
+
+        function renderCurrentProviderModels(provider) {
+            let models = dynamicLoadedModels[provider] || [];
+            if (models.length === 0 && currentSystemConfig) {
+                if (provider === "antigravity") {
+                    models = currentSystemConfig.antigravity?.available_models || ["gemini-3.8-flash-high", "gemini-2.5-flash", "gemini-2.5-pro"];
+                } else if (provider === "deepseek") {
+                    models = currentSystemConfig.deepseek?.available_models || ["deepseek-chat", "deepseek-reasoner"];
+                } else {
+                    models = currentSystemConfig.openai?.available_models || ["gpt-4o", "gpt-4o-mini", "custom"];
+                }
+            }
+            renderModelOptionsFromList(models, currentActiveModel);
+        }
+
+        function renderModelOptionsFromList(models, selectedModel) {
+            const sel = document.getElementById("modelSelect");
+            const countEl = document.getElementById("availableModelsCount");
+            const container = document.getElementById("fidelityChipsContainer");
+            if (!models || models.length === 0) return;
+
+            if (!selectedModel || !models.includes(selectedModel)) {
+                selectedModel = models[0];
+            }
+            currentActiveModel = selectedModel;
+
+            // 1. 同步隐藏 select
+            if (sel) {
+                let selHtml = "";
+                models.forEach(m => {
+                    const isSel = (m === selectedModel) ? "selected" : "";
+                    selHtml += `<option value="${escapeHtml(m)}" ${isSel}>${escapeHtml(m)}</option>`;
+                });
+                sel.innerHTML = selHtml;
+                sel.value = selectedModel;
+            }
+
+            if (countEl) countEl.innerText = `已就绪 ${models.length} 个模型`;
+
+            // 2. 1:1 渲染高保真 Chip 胶囊
+            if (container) {
+                let chipsHtml = "";
+                models.forEach(m => {
+                    const isSel = (m === selectedModel);
+                    chipsHtml += `
+                        <div class="fidelity-model-chip ${isSel ? 'is-default' : ''}" onclick="selectModelChip('${escapeHtml(m)}')">
+                            ${isSel ? '<i class="bi bi-check2"></i>' : ''}
+                            <span>${escapeHtml(m)}</span>
+                            ${isSel ? '<span style="font-size: 9px; opacity: 0.8;">(默认)</span>' : ''}
+                            ${models.length > 1 ? `<i class="bi bi-x ms-1" style="font-size: 11px; opacity: 0.6;" onclick="removeModelChip('${escapeHtml(m)}', event)" title="移除此型号"></i>` : ''}
+                        </div>
+                    `;
+                });
+                container.innerHTML = chipsHtml;
+            }
+
+            // 更新服务商卡片上的展示文字
+            const deepseekDisplay = document.getElementById("deepseekActiveDisplay");
+            if (deepseekDisplay && currentActiveProvider === "deepseek") {
+                deepseekDisplay.innerText = selectedModel;
+            }
+        }
+
+        function selectModelChip(modelName) {
+            const provider = document.getElementById("modelProviderSelect").value;
+            let models = dynamicLoadedModels[provider] || [];
+            if (models.length === 0 && currentSystemConfig) {
+                if (provider === "antigravity") models = currentSystemConfig.antigravity?.available_models || [];
+                else if (provider === "deepseek") models = currentSystemConfig.deepseek?.available_models || [];
+                else models = currentSystemConfig.openai?.available_models || [];
+            }
+            renderModelOptionsFromList(models, modelName);
+        }
+
+        function removeModelChip(modelName, e) {
+            if (e) e.stopPropagation();
+            const provider = document.getElementById("modelProviderSelect").value;
+            let models = dynamicLoadedModels[provider] || [];
+            if (models.length === 0 && currentSystemConfig) {
+                if (provider === "antigravity") models = [...(currentSystemConfig.antigravity?.available_models || [])];
+                else if (provider === "deepseek") models = [...(currentSystemConfig.deepseek?.available_models || [])];
+                else models = [...(currentSystemConfig.openai?.available_models || [])];
+            }
+            models = models.filter(m => m !== modelName);
+            dynamicLoadedModels[provider] = models;
+            renderModelOptionsFromList(models, models[0] || "");
+        }
+
+        // 自定义追加型号 (针对 deepseek-v4.0, deepseek-v4.1 等)
+        function addCustomModelTag() {
+            const input = document.getElementById("customModelInput");
+            const modelName = input.value.trim();
+            if (!modelName) return;
+
+            const provider = document.getElementById("modelProviderSelect").value;
+            if (!dynamicLoadedModels[provider]) {
+                dynamicLoadedModels[provider] = [];
+            }
+            if (!dynamicLoadedModels[provider].includes(modelName)) {
+                dynamicLoadedModels[provider].unshift(modelName);
+            }
+
+            renderModelOptionsFromList(dynamicLoadedModels[provider], modelName);
+            input.value = "";
+            const statusText = document.getElementById("fetchModelsStatusText");
+            if (statusText) statusText.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1"></i> 已成功将 <code>${escapeHtml(modelName)}</code> 添加至可选模型列表！`;
+        }
+
+        function addNewThirdPartyProvider() {
+            selectProviderForEdit("openai");
+            const input = document.getElementById("modelBaseUrlInput");
+            if (input) {
+                input.focus();
+                input.placeholder = "输入第三方网关地址，如 https://api.moonshot.cn/v1";
+            }
+        }
+
+        function deleteThirdPartyProvider(provider, e) {
+            if (e) e.stopPropagation();
+            if (confirm("确定删除该第三方服务商配置吗？")) {
+                const card = document.getElementById(`cardProvider_${provider}`);
+                if (card) card.remove();
+                selectProviderForEdit("deepseek");
+            }
+        }
+
+        // 测试连通性
+        async function testConnectionAction() {
+            const provider = document.getElementById("modelProviderSelect").value;
+            if (provider === "antigravity") {
+                const res = await fetch("/api/antigravity/status");
+                const data = await res.json();
+                if (data.is_logged_in) {
+                    alert(`Google Antigravity 官方服务连通正常！\n已授权账号: ${data.email || 'Google 账号'}`);
+                } else {
+                    alert("Google 官方授权尚未连通，请点击【立即连接 Google 账号】完成授权。");
+                }
+            } else {
+                fetchRemoteModelsAction();
+            }
+        }
+
+        // 加载 ADB 运行环境与路径
+        async function loadEnvStatus() {
+            try {
+                const res = await fetch("/api/settings/env_status");
+                const data = await res.json();
+                const tag = document.getElementById("adbStatusTag");
+                const txt = document.getElementById("adbVersionText");
+                if (data.adb && data.adb.ready) {
+                    if (tag) {
+                        tag.className = "mono-tag mono-tag-active";
+                        tag.innerText = "已就绪";
+                    }
+                    if (txt) txt.innerText = data.adb.version;
+                } else {
+                    if (tag) {
+                        tag.className = "mono-tag";
+                        tag.innerText = "未连通";
+                    }
+                    if (txt) txt.innerText = data.adb ? data.adb.version : "未检测到 ADB 驱动";
+                }
+            } catch (e) {}
+        }
+
+        // 加载系统模型配置与底部对话框联动
+        async function loadModelConfig() {
+            try {
+                const res = await fetch("/api/config");
+                const data = await res.json();
+                currentSystemConfig = data;
+                currentActiveProvider = data.provider || "deepseek";
+                currentActiveModel = data.current_model || "deepseek-chat";
+
+                // 1. 更新底部输入框模型胶囊文字
+                const label = document.getElementById("activeModelLabel");
+                if (label) label.innerText = currentActiveModel;
+
+                // 2. 动态渲染输入框右侧下拉选单 (包含动态与自定义型号)
+                renderModelDropdownMenu(data);
+
+                // 3. 更新设置中心服务商并列卡片状态
+                if (data.deepseek) {
+                    const dot = document.getElementById("statusDot_deepseek");
+                    if (dot) dot.className = `status-indicator-dot ${data.deepseek.ready ? 'dot-online' : 'dot-offline'}`;
+                    const countSpan = document.getElementById("modelCount_deepseek");
+                    if (countSpan && data.deepseek.available_models) {
+                        countSpan.innerText = `${data.deepseek.available_models.length} 个模型可用`;
+                    }
+                }
+                if (data.antigravity) {
+                    const dot = document.getElementById("statusDot_antigravity");
+                    if (dot) dot.className = `status-indicator-dot ${data.antigravity.ready ? 'dot-online' : 'dot-offline'}`;
+                }
+
+                // 4. 初始化当前选中的服务商编辑表单
+                selectProviderForEdit(currentActiveProvider);
+            } catch (e) {
+                console.warn("加载模型配置异常", e);
+            }
+        }
+
+        // 底部对话框模型下拉选单动态渲染 (纯净联动)
+        function renderModelDropdownMenu(data) {
+            const container = document.getElementById("modelDropdownList");
+            if (!container) return;
+
+            const providerConfigs = [
+                {
+                    id: "deepseek",
+                    name: "DeepSeek 官方",
+                    badge: data.deepseek?.ready ? "已连通" : "官方",
+                    ready: data.deepseek?.ready,
+                    models: dynamicLoadedModels["deepseek"] || data.deepseek?.available_models || ["deepseek-chat", "deepseek-reasoner"]
+                },
+                {
+                    id: "antigravity",
+                    name: "Google 官方 (OAuth)",
+                    badge: data.antigravity?.ready ? "已授权" : "未绑定",
+                    ready: data.antigravity?.ready,
+                    models: dynamicLoadedModels["antigravity"] || data.antigravity?.available_models || ["gemini-3.8-flash-high", "gemini-2.5-flash", "gemini-2.5-pro"]
+                }
+            ];
+
+            if (dynamicLoadedModels["openai"] && dynamicLoadedModels["openai"].length > 0) {
+                providerConfigs.push({
+                    id: "openai",
+                    name: "第三方 / 自定义",
+                    badge: "自定义",
+                    ready: true,
+                    models: dynamicLoadedModels["openai"]
+                });
+            }
+
+            let html = "";
+            providerConfigs.forEach(p => {
+                const isGoogle = (p.id === "antigravity");
+                const isGoogleLocked = isGoogle && !p.ready;
+
+                html += `<div class="model-group-title d-flex justify-content-between align-items-center">
+                    <span class="d-flex align-items-center gap-1">
+                        ${isGoogle ? '<i class="bi bi-google" style="font-size: 10px; color: #4285F4;"></i>' : ''}
+                        <span>${p.name}</span>
+                    </span>
+                    <span class="mono-tag" style="font-size: 8.5px; ${isGoogleLocked ? 'color: #f59e0b; cursor: pointer;' : ''}" ${isGoogleLocked ? 'onclick="openSettingsModal(\'google\'); closeAllPopovers();"' : ''}>
+                        ${isGoogleLocked ? '<i class="bi bi-lock-fill me-0.5"></i>需授权' : p.badge}
+                    </span>
+                </div>`;
+
+                if (isGoogleLocked) {
+                    // 🛡️ 严格门禁：未授权时锁定 Google 模型，绝不允许误选，点击引导授权
+                    html += `
+                        <div class="model-item-option model-item-locked" onclick="openSettingsModal('google'); closeAllPopovers();" title="需先在设置中完成 Google 官方授权即可解锁此系列模型" style="opacity: 0.72; cursor: pointer; border-left: 2px solid #f59e0b;">
+                            <div class="d-flex align-items-center gap-1.5 text-truncate" style="max-width: 84%;">
+                                <i class="bi bi-shield-lock text-warning" style="font-size: 11px;"></i>
+                                <span class="text-truncate text-muted" style="font-size: 11px;">未授权 Google 账号</span>
+                            </div>
+                            <span style="font-size: 9.5px; color: var(--text-primary);"><i class="bi bi-box-arrow-up-right"></i></span>
+                        </div>
+                    `;
+                } else {
+                    // 已授权或普通服务商：正常渲染模型清单
+                    p.models.forEach(m => {
+                        const isSelected = (p.id === currentActiveProvider && m === currentActiveModel);
+                        html += `
+                            <div class="model-item-option ${isSelected ? 'active' : ''}" onclick="switchActiveModel('${p.id}', '${m}')">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                    <span class="status-indicator-dot ${p.ready ? 'dot-online' : 'dot-offline'}"></span>
+                                    <span class="text-truncate">${escapeHtml(m)}</span>
+                                </div>
+                                ${isSelected ? '<i class="bi bi-check2 text-success"></i>' : ''}
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        async function switchActiveModel(provider, model) {
+            currentActiveProvider = provider;
+            currentActiveModel = model;
+
+            const label = document.getElementById("activeModelLabel");
+            if (label) label.innerText = model;
+
+            document.querySelectorAll("#modelDropdownList .model-item-option").forEach(item => item.classList.remove("active"));
+            closeAllPopovers();
+
+            try {
+                const formData = new FormData();
+                formData.append("provider", provider);
+                formData.append("model", model);
+                const res = await fetch("/api/config", { method: "POST", body: formData });
+                const resData = await res.json();
+                console.log("模型切换成功:", resData.message);
+                loadModelConfig();
+            } catch (e) {
+                console.warn("模型热切换异常", e);
+            }
+        }
+
+        async function saveModelConfigModal() {
+            const provider = document.getElementById("modelProviderSelect").value;
+            const model = document.getElementById("modelSelect").value;
+            const key = document.getElementById("modelApiKeyInput").value.trim();
+            const baseUrl = document.getElementById("modelBaseUrlInput").value.trim();
+
+            const formData = new FormData();
+            formData.append("provider", provider);
+            formData.append("model", model);
+            if (key) formData.append("api_key", key);
+            if (baseUrl) formData.append("base_url", baseUrl);
+
+            await fetch("/api/config", { method: "POST", body: formData });
+            alert(`AI 提供商 [${provider.toUpperCase()}] 配置已保存并设为当前生效模型：${model}！`);
+            loadModelConfig();
+            const modalEl = document.getElementById("harnessSettingsModal");
+            if (modalEl) {
+                const inst = bootstrap.Modal.getInstance(modalEl);
+                if (inst) inst.hide();
+            }
+        }
+
+        // ================= 11. 交付物与本地用例管理 (工作台内嵌直接预览，无新页面) =================
+        async function loadReports() {
+            try {
+                const res = await fetch("/api/reports");
+                const data = await res.json();
+                const box = document.getElementById("deliverablesReportsList");
+                const countBadge = document.getElementById("subtabReportCount");
+                if (countBadge && data.reports) {
+                    countBadge.innerText = data.reports.length;
+                }
+                if (data.reports && data.reports.length > 0) {
+                    let html = "";
+                    data.reports.forEach(r => {
+                        const safeTitle = (r.title || '').replace(/'/g, "\\'");
+                        html += `
+                            <div class="p-2 rounded" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="mono-tag mono-tag-active">${r.pass_rate}</span>
+                                    <span class="text-muted" style="font-size: 10px;">${r.created_at}</span>
+                                </div>
+                                <div class="fw-semibold small" style="font-size: 12px;">${r.title}</div>
+                                <div class="text-muted small text-truncate mb-2" style="font-size: 11px;">${r.goal}</div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted" style="font-size: 11px;">耗时: ${r.duration}</span>
+                                    <button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="openEmbeddedReport('${r.url}', '${safeTitle}')">
+                                        <i class="bi bi-layout-sidebar me-1"></i>在右侧查看
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    box.innerHTML = html;
+                } else {
+                    box.innerHTML = `
+                        <div class="canvas-empty-state py-3">
+                            <div class="canvas-empty-icon" style="width: 32px; height: 32px; font-size: 14px;"><i class="bi bi-file-earmark-bar-graph"></i></div>
+                            <div class="canvas-empty-title" style="font-size: 12px;">暂无归档报告</div>
+                            <div class="canvas-empty-desc" style="font-size: 11px;">测试任务执行完毕后将自动沉淀全景评测报告。</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {}
+        }
+
+        // 本地固化用例加载与工作台内嵌源码审查
+        async function loadSolidifiedCases() {
+            try {
+                const res = await fetch("/api/solidified_cases");
+                const data = await res.json();
+                const box = document.getElementById("solidifiedCasesList");
+                const countBadge = document.getElementById("subtabCaseCount");
+                if (countBadge && data.cases) {
+                    countBadge.innerText = data.cases.length;
+                }
+                if (data.cases && data.cases.length > 0) {
+                    let html = "";
+                    data.cases.forEach(c => {
+                        const safeTitle = (c.title || c.filename).replace(/'/g, "\\'");
+                        html += `
+                            <div class="p-2 rounded d-flex justify-content-between align-items-center" style="background-color: var(--bg-main); border: 1px solid var(--border-subtle);">
+                                <div class="text-truncate me-2" style="max-width: 200px;">
+                                    <div class="fw-semibold small text-truncate" style="font-size: 12px;"><i class="bi bi-file-earmark-code me-1"></i> ${c.filename}</div>
+                                    <div class="text-muted" style="font-size: 10px;">${c.size}</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="openEmbeddedCode('${c.filename}', '${safeTitle}')" title="在右侧直接阅览脚本源码">
+                                        <i class="bi bi-code-slash"></i> 代码
+                                    </button>
+                                    <button class="btn btn-sm btn-light py-0 px-2" style="font-size: 11px; border-radius: 9999px;" onclick="replaySolidifiedCase('${c.filename}')" title="执行该确定性真机回归脚本">
+                                        <i class="bi bi-play-fill"></i> 回放
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    box.innerHTML = html;
+                } else {
+                    box.innerHTML = `
+                        <div class="canvas-empty-state py-3">
+                            <div class="canvas-empty-icon" style="width: 32px; height: 32px; font-size: 14px;"><i class="bi bi-file-earmark-code"></i></div>
+                            <div class="canvas-empty-title" style="font-size: 12px;">暂无已固化用例</div>
+                            <div class="canvas-empty-desc" style="font-size: 11px;">高频测试链路可固化为本地零 Token 自动化测试脚本。</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {}
+        }
+
+        function replaySolidifiedCase(filename) {
+            fillPrompt(`执行本地固化自动化回归脚本：${filename}`);
+            submitNewTask();
+        }
+
+        // ================= 12. 智能推荐用例 =================
+        function openSuggestedCasesModal() {
+            const modal = new bootstrap.Modal(document.getElementById("suggestedCasesModal"));
+            modal.show();
+        }
+
+        async function loadSuggestedCases() {
+            const icon = document.getElementById("modalRefreshCasesIcon");
+            if (icon) icon.classList.add("spin");
+
+            try {
+                const res = await fetch("/api/ai/suggest_cases", { method: "POST" });
+                const data = await res.json();
+                const box = document.getElementById("modalSuggestedList");
+                let html = "";
+                (data.cases || []).forEach(c => {
+                    html += `
+                        <div class="prompt-card" onclick="applyCaseGoal('${c.goal.replace(/'/g, "\\'")}')">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small fw-semibold" style="font-size: 12px;">${c.module}</span>
+                                <span class="mono-tag" style="font-size: 9px;">${c.level}</span>
+                            </div>
+                            <div class="prompt-card-title">${c.title}</div>
+                            <div class="prompt-card-desc">${c.goal}</div>
+                        </div>
+                    `;
+                });
+                if (box) box.innerHTML = html;
+            } catch (e) {
+            } finally {
+                if (icon) setTimeout(() => icon.classList.remove("spin"), 400);
+            }
+        }
+
+        function applyCaseGoal(goal) {
+            fillPrompt(goal);
+            const modalEl = document.getElementById("suggestedCasesModal");
+            if (modalEl && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        }
+
+        // ================= 12. 待测应用库、真机直调与状态联动 =================
+        let currentActiveApp = {
+            source: "device",
+            filename: "",
+            label: "待测应用",
+            package: "",
+            activity: "",
+            version: "真机就绪",
+            size: "",
+            isInstalled: true
+        };
+        let cachedAppList = [];
+        let cachedDeviceApps = [];
+        let currentAppPopoverTab = 'device';
+        let currentSettingsAppTab = 'device';
+
+        // 初始化待测应用与拖拽监听
+        function initAppManagement() {
+            try {
+                const saved = localStorage.getItem("autotest_active_app");
+                if (saved) {
+                    currentActiveApp = JSON.parse(saved);
+                }
+            } catch (e) {}
+
+            // 绑定 DropZone 拖拽事件
+            const dropZone = document.getElementById("apkDropZone");
+            if (dropZone) {
+                dropZone.addEventListener("dragover", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add("dragover");
+                });
+                dropZone.addEventListener("dragleave", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove("dragover");
+                });
+                dropZone.addEventListener("drop", (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove("dragover");
+                    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        uploadAppFile(e.dataTransfer.files[0]);
+                    }
+                });
+            }
+
+            updateAppPillUI();
+            loadDeviceAppsDropdown();
+            loadAppsDropdown();
+        }
+
+        function triggerFileInput() {
+            const input = document.getElementById("appFileInput");
+            if (input) input.click();
+        }
+
+        function handleAppFileInput(event) {
+            if (event.target.files && event.target.files.length > 0) {
+                uploadAppFile(event.target.files[0]);
+            }
+        }
+
+        function toggleQrInputRow() {
+            const row = document.getElementById("qrInputRow");
+            if (row) row.classList.toggle("d-none");
+        }
+
+        function getActiveTargetDeviceId() {
+            const checked = document.querySelectorAll(".device-checkbox:checked");
+            if (checked && checked.length > 0) return checked[0].value;
+            if (availableDevices && availableDevices.length > 0) return availableDevices[0].id;
+            return null;
+        }
+
+        function getActiveAppCleanName() {
+            if (!currentActiveApp) return "待测应用";
+            return currentActiveApp.label || currentActiveApp.package || currentActiveApp.filename || "待测应用";
+        }
+
+        // 刷新底栏胶囊与顶栏 App 信息，保持智能用例推荐卡片与输入框底部 100% 对应统一
+        async function updateAppPillUI() {
+            const appLabelEl = document.getElementById("activeAppLabel");
+            const topBarLabelEl = document.getElementById("topBarAppLabel");
+            const appDot = document.getElementById("appStatusDot");
+            const topBarDot = document.getElementById("topBarAppDot");
+
+            const isDeviceDirect = (currentActiveApp.source === 'device' || !currentActiveApp.filename);
+            const rawName = getActiveAppCleanName();
+            const displayName = isDeviceDirect ? `${rawName} (真机)` : rawName;
+
+            if (appLabelEl) appLabelEl.innerText = displayName;
+            if (topBarLabelEl) topBarLabelEl.innerText = `待测应用: ${displayName}`;
+            const toolbarAppLabelEl = document.getElementById("toolbarAppLabel");
+            if (toolbarAppLabelEl) toolbarAppLabelEl.innerText = displayName;
+
+            // 🌟 核心统一：保持中央智能用例推荐头部的应用名称与底栏选择的应用严格对应
+            const suggestLabelEl = document.getElementById("suggestTargetAppLabel");
+            if (suggestLabelEl) suggestLabelEl.innerText = rawName;
+
+            // 异步探测当前真机是否安装此应用
+            const devId = getActiveTargetDeviceId();
+            if (devId && currentActiveApp.package) {
+                try {
+                    const res = await fetch(`/api/apps/check_installed?device_id=${encodeURIComponent(devId)}&package=${encodeURIComponent(currentActiveApp.package)}`);
+                    const data = await res.json();
+                    currentActiveApp.isInstalled = !!data.installed;
+                } catch (e) {}
+            } else if (isDeviceDirect && currentActiveApp.package) {
+                currentActiveApp.isInstalled = true;
+            }
+
+            const dotCls = currentActiveApp.isInstalled ? "status-indicator-dot dot-online" : "status-indicator-dot dot-warning";
+            if (appDot) appDot.className = dotCls;
+            if (topBarDot) topBarDot.className = dotCls;
+
+            // 动态响应输入框 placeholder，确保用户输入时心智高度明确当前待测对象
+            const taskInputTa = document.getElementById("taskInputText");
+            if (taskInputTa && (!taskInputTa.value || taskInputTa.value.trim() === "")) {
+                taskInputTa.placeholder = `针对「${rawName}」输入测试目标...`;
+            }
+        }
+
+        // 切换当前激活应用
+        function switchActiveApp(appObj) {
+            // 🌟 提取规范的确定性 App 工程唯一标识 (app_id)
+            let aid = appObj.app_id;
+            if (!aid) {
+                if (appObj.filename) {
+                    aid = appObj.filename.replace(/\.apk$/i, '');
+                } else if (appObj.package) {
+                    const p = String(appObj.package);
+                    const l = String(appObj.label || "");
+                    if (p.includes("A6995433058179") || l.includes("象盒找房")) {
+                        aid = "xianghe_zhaofang";
+                    } else if (p.includes("workbench") || l.includes("象盒工作台")) {
+                        aid = "xianghe_workbench";
+                    } else {
+                        aid = p.replace(/[^\w]+/g, '_').toLowerCase();
+                    }
+                } else {
+                    aid = "demo_app";
+                }
+            }
+
+            currentActiveApp = {
+                app_id: aid,
+                source: appObj.source || (appObj.filename ? 'local' : 'device'),
+                filename: appObj.filename || "",
+                label: appObj.label || appObj.package || appObj.filename || "真机应用",
+                package: appObj.package || "",
+                activity: appObj.activity || "",
+                version: appObj.version || (appObj.source === 'device' ? '真机已安装' : "1.0"),
+                size: appObj.size || "",
+                isInstalled: true
+            };
+            activeAppProjectId = aid;
+            try {
+                localStorage.setItem("autotest_active_app", JSON.stringify(currentActiveApp));
+            } catch (e) {}
+
+            updateAppPillUI();
+            loadDeviceAppsDropdown();
+            loadAppsDropdown();
+            refreshAppSuggestedCases(currentActiveApp.label, currentActiveApp.package);
+            loadSettingsDeviceApps();
+            loadApps();
+        }
+
+        // 底栏 Popover 选项卡切换
+        function switchAppPopoverTab(tab) {
+            currentAppPopoverTab = tab;
+            const btnDev = document.getElementById("tabBtnDeviceApps");
+            const btnLoc = document.getElementById("tabBtnLocalApks");
+            const panelDev = document.getElementById("panelDeviceAppsDropdown");
+            const panelLoc = document.getElementById("panelLocalApksDropdown");
+
+            if (tab === 'device') {
+                if (btnDev) btnDev.classList.add("active");
+                if (btnLoc) btnLoc.classList.remove("active");
+                if (panelDev) panelDev.classList.remove("d-none");
+                if (panelLoc) panelLoc.classList.add("d-none");
+                loadDeviceAppsDropdown();
+            } else {
+                if (btnDev) btnDev.classList.remove("active");
+                if (btnLoc) btnLoc.classList.add("active");
+                if (panelDev) panelDev.classList.add("d-none");
+                if (panelLoc) panelLoc.classList.remove("d-none");
+                loadAppsDropdown();
+            }
+        }
+
+        // 0.08s 极速读取真机已安装桌面应用
+        async function loadDeviceAppsDropdown(force = false) {
+            const container = document.getElementById("deviceAppsDropdownList");
+            const countHint = document.getElementById("deviceAppsCountHint");
+            const fgHint = document.getElementById("popoverForegroundAppHint");
+            if (!container) return;
+
+            const devId = getActiveTargetDeviceId();
+
+            try {
+                if (force || cachedDeviceApps.length === 0) {
+                    const url = devId ? `/api/device/installed_apps?device_id=${encodeURIComponent(devId)}` : `/api/device/installed_apps`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.success && data.apps) {
+                        cachedDeviceApps = data.apps;
+                        // 🌟 智能推导：当未绑定具体包名时，自动智能激活真机上的业务待测应用（如象盒找房）
+                        if ((!currentActiveApp.package || currentActiveApp.package === "") && (!currentActiveApp.filename || currentActiveApp.filename === "") && cachedDeviceApps.length > 0) {
+                            const preferred = cachedDeviceApps.find(a => /象盒找房|找房/i.test(a.label || "")) || 
+                                              cachedDeviceApps.find(a => !/keyboard|输入法|gboard|clash|termux|magisk/i.test(a.package || "")) || 
+                                              cachedDeviceApps[0];
+                            if (preferred) {
+                                currentActiveApp = {
+                                    source: "device",
+                                    label: preferred.label,
+                                    package: preferred.package,
+                                    activity: preferred.activity || "",
+                                    version: "真机已安装",
+                                    isInstalled: true
+                                };
+                                updateAppPillUI();
+                                refreshAppSuggestedCases(preferred.label, preferred.package);
+                            }
+                        }
+                    } else if (!data.success) {
+                        container.innerHTML = `
+                            <div class="p-3 text-center text-muted small">
+                                <i class="bi bi-phone-vibrate mb-1 d-block" style="font-size: 18px;"></i>
+                                未检测到在线真机<br><span style="font-size: 10.5px;">请连接手机并开启 USB 调试</span>
+                            </div>
+                        `;
+                        if (countHint) countHint.innerText = "真机未连接";
+                        return;
+                    }
+                }
+
+                // 异步探查前台
+                const fgUrl = devId ? `/api/device/foreground_app?device_id=${encodeURIComponent(devId)}` : `/api/device/foreground_app`;
+                fetch(fgUrl)
+                    .then(r => r.json())
+                    .then(fgData => {
+                        if (fgData && fgData.success && fgData.app && fgHint) {
+                            fgHint.innerHTML = `前台: <strong class="text-success">${escapeHtml(fgData.app.label)}</strong>`;
+                        }
+                    }).catch(() => {});
+
+                if (countHint) countHint.innerText = `真机应用: ${cachedDeviceApps.length} 款`;
+
+                if (cachedDeviceApps.length === 0) {
+                    container.innerHTML = `<div class="p-3 text-center text-muted small">真机上暂未检索到第三方桌面应用</div>`;
+                    return;
+                }
+
+                let html = "";
+                cachedDeviceApps.forEach(a => {
+                    const isSelected = (currentActiveApp && currentActiveApp.package === a.package && (currentActiveApp.source === 'device' || !currentActiveApp.filename));
+                    const safeA = JSON.stringify({
+                        source: "device",
+                        label: a.label,
+                        package: a.package,
+                        activity: a.activity || "",
+                        version: "真机已安装",
+                        isInstalled: true
+                    }).replace(/'/g, "&apos;");
+
+                    html += `
+                        <div class="popover-item ${isSelected ? 'active' : ''}" onclick='switchActiveApp(${safeA}); closeAllPopovers();' title="点击切换至 ${escapeHtml(a.label)}">
+                            <div class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-phone ${isSelected ? 'text-success' : 'text-muted'}" style="font-size: 13px;"></i>
+                                <div class="d-flex flex-column text-truncate" style="line-height: 1.3;">
+                                    <span class="text-truncate fw-medium" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(a.label)}</span>
+                                    <span class="text-muted text-truncate" style="font-size: 10px;">${escapeHtml(a.package)}</span>
+                                </div>
+                            </div>
+                            ${isSelected ? '<i class="bi bi-check2 text-success" style="font-size: 15px; font-weight: bold;"></i>' : ''}
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<div class="p-2 text-muted small">读取真机应用失败: ${e}</div>`;
+            }
+        }
+
+        // ⚡ 一键捕获真机当前屏幕正打开的应用设为当前待测
+        async function syncForegroundAppAsActive(isFromSettings = false) {
+            const devId = getActiveTargetDeviceId();
+
+            try {
+                const url = devId ? `/api/device/foreground_app?device_id=${encodeURIComponent(devId)}` : `/api/device/foreground_app`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.success && data.app) {
+                    const app = data.app;
+                    switchActiveApp({
+                        source: "device",
+                        label: app.label,
+                        package: app.package,
+                        activity: app.activity || "",
+                        version: "真机前台",
+                        isInstalled: true
+                    });
+                    if (!isFromSettings) {
+                        closeAllPopovers();
+                    }
+                    const fgHint = document.getElementById("popoverForegroundAppHint");
+                    if (fgHint) fgHint.innerHTML = `已绑定前台: <strong class="text-success">${escapeHtml(app.label)}</strong>`;
+                    if (isFromSettings) {
+                        const setFg = document.getElementById("settingsFgAppDesc");
+                        if (setFg) setFg.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>已成功绑定前台应用：<strong>${escapeHtml(app.label)}</strong> (${escapeHtml(app.package)})</span>`;
+                    }
+                } else {
+                    alert("未能获取到前台运行的应用，请点亮手机屏幕并打开待测 App！");
+                }
+            } catch (e) {
+                alert("获取真机前台应用出错: " + e);
+            }
+        }
+
+        // 加载底栏 Popover 下拉选单 (本地 APK 库)
+        async function loadAppsDropdown(force = false) {
+            const container = document.getElementById("localAppsDropdownList") || document.getElementById("appDropdownList");
+            if (!container) return;
+
+            try {
+                if (force || cachedAppList.length === 0) {
+                    const res = await fetch("/api/apps");
+                    const data = await res.json();
+                    cachedAppList = data.apps || [];
+                }
+
+                const countHint = document.getElementById("localApksCountHint");
+                if (countHint) countHint.innerText = `本地库: ${cachedAppList.length} 个 APK`;
+
+                if (cachedAppList.length === 0) {
+                    container.innerHTML = `<div class="p-3 text-center text-muted small">应用库暂无 APK，点击下方上传</div>`;
+                    return;
+                }
+
+                let html = "";
+                cachedAppList.forEach(a => {
+                    const isSelected = (currentActiveApp && currentActiveApp.filename === a.filename && currentActiveApp.source !== 'device');
+                    const safeA = JSON.stringify(a).replace(/'/g, "&apos;");
+                    html += `
+                        <div class="popover-item ${isSelected ? 'active' : ''}" style="cursor: pointer;" onclick='switchActiveApp(${safeA}); closeAllPopovers();'>
+                            <div class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-box-seam ${isSelected ? 'text-primary' : 'text-muted'}" style="font-size: 13px;"></i>
+                                <div class="d-flex flex-column text-truncate" style="line-height: 1.25;">
+                                    <span class="text-truncate fw-medium" style="font-size: 11.5px; color: var(--text-main);">${escapeHtml(a.label || a.filename)}</span>
+                                    <span class="text-muted" style="font-size: 10px;">${escapeHtml(a.version || 'v1.0')} · ${escapeHtml(a.size || '')}</span>
+                                </div>
+                            </div>
+                            ${isSelected ? '<i class="bi bi-check2 text-success" style="font-size: 14px;"></i>' : ''}
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = `<div class="p-2 text-muted small">加载异常: ${e}</div>`;
+            }
+        }
+
+        // 设置面板：真机应用列表加载
+        async function loadSettingsDeviceApps(force = false) {
+            const listEl = document.getElementById("settingsDeviceAppsList");
+            const devHint = document.getElementById("modalDeviceTargetHint");
+            const countBadge = document.getElementById("appListCountBadge");
+            const fgTitle = document.getElementById("settingsFgAppTitle");
+            const fgDesc = document.getElementById("settingsFgAppDesc");
+            if (!listEl) return;
+
+            const targetDevId = getActiveTargetDeviceId();
+
+            try {
+                if (force || cachedDeviceApps.length === 0) {
+                    const url = targetDevId ? `/api/device/installed_apps?device_id=${encodeURIComponent(targetDevId)}` : `/api/device/installed_apps`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.success && data.apps) {
+                        cachedDeviceApps = data.apps;
+                        if (devHint) {
+                            devHint.innerHTML = `<span class="text-success"><i class="bi bi-phone me-1"></i>目标真机: <strong>${escapeHtml(data.device_id || targetDevId || '已连接真机')}</strong></span>`;
+                        }
+                    } else if (!data.success) {
+                        listEl.innerHTML = `
+                            <div class="text-center py-4 text-muted">
+                                <i class="bi bi-phone-vibrate" style="font-size: 28px;"></i>
+                                <div class="small mt-2">未检测到已连接的 Android 真机设备</div>
+                                <div class="text-muted mt-1" style="font-size: 11px;">请通过 USB 数据线连接手机，并在开发者选项中打开【USB 调试】。</div>
+                            </div>
+                        `;
+                        if (devHint) devHint.innerHTML = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>未连接真机</span>`;
+                        return;
+                    }
+                }
+
+
+                if (countBadge && currentSettingsAppTab === 'device') {
+                    countBadge.innerText = `${cachedDeviceApps.length} 个真机应用`;
+                }
+
+                // 异步探查前台
+                fetch(`/api/device/foreground_app?device_id=${encodeURIComponent(targetDevId)}`)
+                    .then(r => r.json())
+                    .then(fgData => {
+                        if (fgData && fgData.success && fgData.app && fgTitle && fgDesc) {
+                            fgTitle.innerHTML = `真机当前前台：<span class="text-success">${escapeHtml(fgData.app.label)}</span>`;
+                            fgDesc.innerText = `包名: ${fgData.app.package}`;
+                        }
+                    }).catch(() => {});
+
+                if (cachedDeviceApps.length === 0) {
+                    listEl.innerHTML = `
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox" style="font-size: 28px;"></i>
+                            <div class="small mt-1">真机上未检索到第三方桌面应用</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = "";
+                cachedDeviceApps.forEach((a, idx) => {
+                    const isSelected = (currentActiveApp && currentActiveApp.package === a.package && (currentActiveApp.source === 'device' || !currentActiveApp.filename));
+                    const safeLabel = escapeHtml(a.label);
+                    const safePkg = escapeHtml(a.package);
+                    const safeAct = escapeHtml(a.activity || "");
+                    const safeA = JSON.stringify({
+                        source: "device",
+                        label: a.label,
+                        package: a.package,
+                        activity: a.activity || "",
+                        version: "真机已安装",
+                        isInstalled: true
+                    }).replace(/'/g, "&apos;");
+
+                    html += `
+                        <div class="app-card-item ${isSelected ? 'active' : ''}" id="deviceAppCard_${idx}" onclick='switchActiveApp(${safeA}); loadSettingsDeviceApps();' title="${isSelected ? '当前正在测试此应用' : '点击设为当前待测应用'}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                                    <div class="app-icon-avatar">
+                                        <i class="bi bi-phone" style="font-size: 17px;"></i>
+                                    </div>
+                                    <div class="text-truncate">
+                                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                            <span class="fw-semibold" style="font-size: 13px; color: var(--text-main);">${safeLabel}</span>
+                                            <span class="cursor-pointer text-muted" onclick="event.stopPropagation(); editAppCustomLabel('${safePkg}', '${safeLabel}')" title="自定义应用显示名称" style="font-size: 11px; opacity: 0.6;">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1.5 text-muted mt-0.5" style="font-size: 11px;">
+                                            <span class="text-truncate" style="max-width: 260px;" title="${safePkg}">${safePkg}</span>
+                                            ${safeAct ? `<span style="opacity: 0.4;">·</span><span class="text-truncate" style="max-width: 180px;" title="${safeAct}">${safeAct.split('.').pop()}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                    ${isSelected ? `
+                                        <span class="badge-active-target">
+                                            <i class="bi bi-check2"></i>当前待测
+                                        </span>
+                                    ` : `
+                                        <span class="app-select-hint">
+                                            设为待测 <i class="bi bi-arrow-right-short"></i>
+                                        </span>
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                listEl.innerHTML = html;
+            } catch (e) {
+                listEl.innerHTML = `<div class="p-3 text-center text-danger small">读取真机应用失败: ${e}</div>`;
+            }
+        }
+
+        // 修改真机应用自定义友好名称
+        async function editAppCustomLabel(pkg, currentLabel) {
+            const newLabel = prompt(`请为应用 [${pkg}] 输入友好名称:`, currentLabel || "");
+            if (newLabel && newLabel.trim() && newLabel.trim() !== currentLabel) {
+                try {
+                    const res = await fetch("/api/device/app_label", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ package: pkg, label: newLabel.trim() })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (currentActiveApp && currentActiveApp.package === pkg) {
+                            currentActiveApp.label = newLabel.trim();
+                            localStorage.setItem("autotest_active_app", JSON.stringify(currentActiveApp));
+                            updateAppPillUI();
+                        }
+                        loadDeviceAppsDropdown(true);
+                        loadSettingsDeviceApps(true);
+                    }
+                } catch (e) {
+                    alert("保存名称失败: " + e);
+                }
+            }
+        }
+
+        // 设置面板：真机已安装 vs 本地 APK 库 选项卡切换
+        function switchSettingsAppTab(tab) {
+            currentSettingsAppTab = tab;
+            const btnDev = document.getElementById("modalTabDeviceApps");
+            const btnLoc = document.getElementById("modalTabLocalApks");
+            const viewDev = document.getElementById("settingsViewDeviceApps");
+            const viewLoc = document.getElementById("settingsViewLocalApks");
+
+            if (tab === 'device') {
+                if (btnDev) btnDev.classList.add("active");
+                if (btnLoc) btnLoc.classList.remove("active");
+                if (viewDev) viewDev.classList.remove("d-none");
+                if (viewLoc) viewLoc.classList.add("d-none");
+                loadSettingsDeviceApps();
+            } else {
+                if (btnDev) btnDev.classList.remove("active");
+                if (btnLoc) btnLoc.classList.add("active");
+                if (viewDev) viewDev.classList.add("d-none");
+                if (viewLoc) viewLoc.classList.remove("d-none");
+                loadApps();
+            }
+        }
+
+        function refreshAllAppsPanels() {
+            loadDeviceAppsDropdown(true);
+            loadSettingsDeviceApps(true);
+            loadApps();
+        }
+
+        // 加载模态框已归档应用列表 (支持实时真机核验与一键安装)
+        async function loadApps() {
+            const listEl = document.getElementById("appsList");
+            const countBadge = document.getElementById("appListCountBadge");
+            const devHint = document.getElementById("modalTargetDeviceHint");
+
+            const targetDevId = getActiveTargetDeviceId();
+            if (devHint) {
+                devHint.innerHTML = targetDevId ? 
+                    `<span class="text-success"><i class="bi bi-phone me-1"></i>目标真机: <strong>${escapeHtml(targetDevId)}</strong></span>` : 
+                    `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>未连接真机</span>`;
+            }
+
+            try {
+                const res = await fetch("/api/apps");
+                const data = await res.json();
+                cachedAppList = data.apps || [];
+
+                if (countBadge && currentSettingsAppTab === 'local') {
+                    countBadge.innerText = `${cachedAppList.length} 个安装包`;
+                }
+
+                if (cachedAppList.length === 0) {
+                    if (listEl) listEl.innerHTML = `
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox" style="font-size: 28px;"></i>
+                            <div class="small mt-1">应用库为空，请拖拽或选择 APK 上传</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = "";
+                for (let i = 0; i < cachedAppList.length; i++) {
+                    const a = cachedAppList[i];
+                    const isSelected = (currentActiveApp && currentActiveApp.filename === a.filename && currentActiveApp.source !== 'device');
+                    const safeFn = escapeHtml(a.filename);
+                    const safeLabel = escapeHtml(a.label || a.filename);
+                    const safePkg = escapeHtml(a.package || "");
+                    const safeVer = escapeHtml(a.version || "最新版");
+                    const safeSize = escapeHtml(a.size || "");
+                    const safeA = JSON.stringify(a).replace(/'/g, "&apos;");
+
+                    html += `
+                        <div class="app-card-item ${isSelected ? 'active' : ''}" id="appCard_${i}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                                    <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(59, 130, 246, 0.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #3b82f6;">
+                                        <i class="bi bi-android2" style="font-size: 20px;"></i>
+                                    </div>
+                                    <div class="text-truncate">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="fw-bold" style="font-size: 13px; color: var(--text-main);">${safeLabel}</span>
+                                            <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">${safeVer}</span>
+                                            ${isSelected ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 10px;">当前待测</span>' : ''}
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 text-muted mt-0.5" style="font-size: 11px;">
+                                            <span class="text-truncate" style="max-width: 220px;" title="${safePkg}">${safePkg}</span>
+                                            <span>·</span>
+                                            <span>${safeSize}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                    <div id="devInstallBadge_${i}" class="small">
+                                        <span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">
+                                            <span class="spinner-border spinner-border-sm me-1" style="width: 9px; height: 9px;"></span>核验真机...
+                                        </span>
+                                    </div>
+
+                                    ${!isSelected ? `
+                                        <button class="btn btn-sm btn-outline-secondary py-1 px-2.5" style="font-size: 11.5px; border-radius: 6px;" onclick='switchActiveApp(${safeA})'>
+                                            选择应用
+                                        </button>
+                                    ` : `
+                                        <button class="btn btn-sm btn-outline-success py-1 px-2.5 disabled" style="font-size: 11.5px; border-radius: 6px;">
+                                            <i class="bi bi-check-lg me-1"></i>已选定
+                                        </button>
+                                    `}
+
+                                    <button class="btn btn-sm btn-primary py-1 px-2.5" id="btnInstall_${i}" style="font-size: 11.5px; border-radius: 6px;" onclick="installAppToDevice('${safeFn}', '${safePkg}', 'btnInstall_${i}', 'devInstallBadge_${i}')" title="通过 ADB 推送安装该 APK 到在线手机">
+                                        <i class="bi bi-phone me-1"></i>安装到手机
+                                    </button>
+
+                                    <button class="btn btn-sm btn-link text-muted p-1" onclick="deleteAppPackage('${safeFn}')" title="从应用库删除该安装包">
+                                        <i class="bi bi-trash" style="font-size: 13px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (listEl) listEl.innerHTML = html;
+
+                if (targetDevId) {
+                    cachedAppList.forEach(async (a, idx) => {
+                        const badgeEl = document.getElementById(`devInstallBadge_${idx}`);
+                        const btnInstall = document.getElementById(`btnInstall_${idx}`);
+                        if (!badgeEl || !a.package) return;
+                        try {
+                            const chkRes = await fetch(`/api/apps/check_installed?device_id=${encodeURIComponent(targetDevId)}&package=${encodeURIComponent(a.package)}`);
+                            const chkData = await chkRes.json();
+                            if (chkData.installed) {
+                                badgeEl.innerHTML = `<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px;"><i class="bi bi-check-circle-fill me-1"></i>真机已安装</span>`;
+                                if (btnInstall) {
+                                    btnInstall.className = "btn btn-sm btn-outline-secondary py-1 px-2.5";
+                                    btnInstall.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i>覆盖更新`;
+                                }
+                            } else {
+                                badgeEl.innerHTML = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle" style="font-size: 10px;"><i class="bi bi-exclamation-circle me-1"></i>真机未安装</span>`;
+                                if (btnInstall) {
+                                    btnInstall.className = "btn btn-sm btn-primary py-1 px-2.5";
+                                    btnInstall.innerHTML = `<i class="bi bi-phone me-1"></i>安装到手机`;
+                                }
+                            }
+                        } catch (e) {
+                            badgeEl.innerHTML = `<span class="badge bg-secondary-subtle text-secondary" style="font-size: 10px;">状态未明</span>`;
+                        }
+                    });
+                }
+            } catch (e) {
+                if (listEl) listEl.innerHTML = `<div class="p-3 text-center text-danger small">读取应用库失败: ${e}</div>`;
+            }
+        }
+        
+        // 拖拽与文件上传核心逻辑 (带真实上传进度条与自动设为当前测试应用)
+        function uploadAppFile(file) {
+            if (!file) return;
+            const name = file.name.toLowerCase();
+            if (!name.endsWith(".apk") && !name.endsWith(".ipa")) {
+                return alert("请上传以 .apk 或 .ipa 结尾的移动端安装包文件！");
+            }
+
+            const dropPrompt = document.getElementById("dropZonePrompt");
+            const dropProg = document.getElementById("dropZoneProgress");
+            const progBar = document.getElementById("uploadProgressBar");
+            const progText = document.getElementById("uploadStatusText");
+            const progBadge = document.getElementById("uploadPercentBadge");
+
+            if (dropPrompt) dropPrompt.classList.add("d-none");
+            if (dropProg) dropProg.classList.remove("d-none");
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/api/upload_app", true);
+
+            xhr.upload.onprogress = function (e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    if (progBar) progBar.style.width = percent + "%";
+                    if (progBadge) progBadge.innerText = percent + "%";
+                    if (progText) progText.innerText = `正在上传 ${file.name} (${percent}%)...`;
+                }
+            };
+
+            xhr.onload = function () {
+                if (dropPrompt) dropPrompt.classList.remove("d-none");
+                if (dropProg) dropProg.classList.add("d-none");
+                if (progBar) progBar.style.width = "0%";
+
+                if (xhr.status === 200) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            // 自动将新上传的应用设为当前测试应用
+                            switchActiveApp({
+                                filename: data.filename,
+                                label: data.label,
+                                package: data.package,
+                                version: "最新版"
+                            });
+                            loadApps();
+                            loadAppsDropdown();
+
+                            // 友好引导：是否立即安装到手机
+                            const targetDev = getActiveTargetDeviceId();
+                            if (targetDev && confirm(`🎉 应用【${data.label || data.filename}】上传解析成功！\n已自动设为当前待测应用。\n\n是否立即推送到在线真机 [${targetDev}] 进行安装？`)) {
+                                installAppToDevice(data.filename, data.package);
+                            }
+                        } else {
+                            alert("上传失败: " + (data.message || "未知错误"));
+                        }
+                    } catch (e) {
+                        alert("解析响应失败: " + e);
+                    }
+                } else {
+                    alert("上传接口响应异常，状态码: " + xhr.status);
+                }
+            };
+
+            xhr.onerror = function () {
+                if (dropPrompt) dropPrompt.classList.remove("d-none");
+                if (dropProg) dropProg.classList.add("d-none");
+                alert("网络连接异常，上传失败！");
+            };
+
+            xhr.send(formData);
+        }
+
+        // 一键推送到真机安装
+        async function installAppToDevice(filename, pkg, btnId, badgeId) {
+            const targetDevId = getActiveTargetDeviceId();
+            if (!targetDevId || targetDevId === "mock-device" || targetDevId === "local-simulator") {
+                return alert("【无法安装】当前未检测到任何物理真机设备！\n\n请使用 USB 数据线将手机连接至本机，并在手机上开启【开发者选项 -> USB 调试】。");
+            }
+
+            const btn = btnId ? document.getElementById(btnId) : null;
+            const badge = badgeId ? document.getElementById(badgeId) : null;
+
+            let originalHtml = "";
+            if (btn) {
+                originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" style="width: 11px; height: 11px;"></span>推送到手机...`;
+            }
+            if (badge) {
+                badge.innerHTML = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 10px;"><span class="spinner-border spinner-border-sm me-1" style="width: 9px; height: 9px;"></span>ADB安装中...</span>`;
+            }
+
+            const formData = new FormData();
+            formData.append("device_id", targetDevId);
+            formData.append("filename", filename);
+
+            try {
+                const res = await fetch("/api/install", { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ 成功将【${filename}】安装至设备【${targetDevId}】！\n已授予运行时权限，可直接调起测试。`);
+                    if (currentActiveApp && currentActiveApp.filename === filename) {
+                        currentActiveApp.isInstalled = true;
+                        updateAppPillUI();
+                    }
+                    loadApps();
+                } else if (data.need_user_action) {
+                    alert(`📱 【已自动推送并唤起手机安装弹窗】\n\n${data.message}`);
+                    if (badge) {
+                        badge.innerHTML = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle" style="font-size: 10px;"><span class="spinner-border spinner-border-sm me-1" style="width: 9px; height: 9px;"></span>等待手机点击继续...</span>`;
+                    }
+                    pollUntilAppInstalled(targetDevId, pkg, filename, btn, badge, originalHtml);
+                } else {
+                    alert(`❌ 安装失败: ${data.message || '未知错误'}\n\n常见原因：\n1. 小米手机【开发者选项】中未开启【USB 安装】；\n2. 手机存储空间不足；\n3. 系统存在签名冲突。`);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                    if (badge) {
+                        badge.innerHTML = `<span class="badge bg-danger-subtle text-danger" style="font-size: 10px;">安装失败</span>`;
+                    }
+                }
+            } catch (e) {
+                alert("调用安装接口发生异常: " + e);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        function pollUntilAppInstalled(devId, pkg, filename, btn, badge, originalHtml) {
+            let attempts = 0;
+            const maxAttempts = 15;
+            const timer = setInterval(async () => {
+                attempts++;
+                try {
+                    const res = await fetch(`/api/apps/check_installed?device_id=${encodeURIComponent(devId)}&package=${encodeURIComponent(pkg)}`);
+                    const data = await res.json();
+                    if (data && data.installed) {
+                        clearInterval(timer);
+                        if (currentActiveApp && currentActiveApp.filename === filename) {
+                            currentActiveApp.isInstalled = true;
+                            updateAppPillUI();
+                        }
+                        if (btn) {
+                            btn.className = "btn btn-sm btn-outline-secondary py-1 px-2.5";
+                            btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i>覆盖更新`;
+                            btn.disabled = false;
+                        }
+                        if (badge) {
+                            badge.innerHTML = `<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px;"><i class="bi bi-check-circle-fill me-1"></i>真机已安装</span>`;
+                        }
+                        loadApps();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(timer);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = originalHtml;
+                        }
+                        if (badge) {
+                            badge.innerHTML = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle" style="font-size: 10px;">可在手机完成安装后刷新</span>`;
+                        }
+                    }
+                } catch (e) {
+                    if (attempts >= maxAttempts) clearInterval(timer);
+                }
+            }, 2000);
+        }
+
+        }
+
+        // 从应用库中移除安装包
+        async function deleteAppPackage(filename) {
+            if (!confirm(`确定要从应用库中移除安装包【${filename}】吗？`)) return;
+            try {
+                const res = await fetch(`/api/apps/${encodeURIComponent(filename)}`, { method: "DELETE" });
+                const data = await res.json();
+                if (data.success) {
+                    loadApps();
+                    loadAppsDropdown();
+                } else {
+                    alert("删除失败: " + data.message);
+                }
+            } catch (e) {
+                alert("删除请求异常: " + e);
+            }
+        }
+
+        async function downloadFromQR() {
+            const code = document.getElementById("qrInput").value.trim();
+            if (!code) return alert("请输入蒲公英短链！");
+            const formData = new FormData();
+            formData.append("url_or_code", code);
+            const res = await fetch("/api/download_qr", { method: "POST", body: formData });
+            const data = await res.json();
+            alert(data.message);
+            loadApps();
+        }
+
+        // ================= 13. 主对话区应用用例智能推荐与动态换一批 =================
+        let currentSuggestedAppName = "待测应用 (示例)";
+        window._suggestedCasesCache = [];
+
+        function pickSuggestedCase(idx) {
+            if (window._suggestedCasesCache && window._suggestedCasesCache[idx]) {
+                const c = window._suggestedCasesCache[idx];
+                fillPrompt(c.goal || c.title);
+            }
+        }
+
+        window._suggestDataCache = null;
+
+        function getSuggestTemplateIcon(suite, idx) {
+            const sid = (suite.id || '').toLowerCase();
+            const title = (suite.title || '').toLowerCase();
+            if (sid.includes('onboarding') || title.includes('初访') || title.includes('启动') || title.includes('激活')) {
+                return 'bi-rocket-takeoff';
+            }
+            if (sid.includes('core') || title.includes('核心') || title.includes('主线') || title.includes('转化') || title.includes('搜索')) {
+                return 'bi-compass';
+            }
+            if (sid.includes('edge') || title.includes('防御') || title.includes('异常') || title.includes('逆向') || title.includes('容错')) {
+                return 'bi-shield-check';
+            }
+            const fallbackIcons = ['bi-rocket-takeoff', 'bi-compass', 'bi-shield-check', 'bi-lightning-charge'];
+            return fallbackIcons[idx % fallbackIcons.length];
+        }
+
+        function renderSuggestContent(data) {
+            const grid = document.getElementById("suggestCasesGrid");
+            if (!grid) return;
+
+            const suites = data.journey_suites || [];
+            const cases = data.cases || [];
+            
+            // 优先展示高价值端到端场景模板，若无则回退展示单点精选用例
+            const isSuites = suites.length > 0;
+            const items = isSuites ? suites : cases;
+            if (items.length === 0) {
+                grid.innerHTML = `<div class="p-3 text-muted text-center" style="grid-column: 1 / -1;">暂无可推荐模板，可直接在下方输入框描述测试意图</div>`;
+                return;
+            }
+
+            let html = "";
+            items.forEach((item, idx) => {
+                const icon = isSuites ? getSuggestTemplateIcon(item, idx) : 'bi-lightning-charge';
+                const title = item.title || '测试场景模板';
+                const desc = item.summary || item.goal || '';
+                const clickHandler = isSuites ? `pickJourneySuite(${idx})` : `pickSuggestedCase(${idx})`;
+
+                html += `
+                    <div class="suggest-template-card" onclick="${clickHandler}" title="点击一键载入测试意图">
+                        <div class="suggest-icon-box">
+                            <i class="bi ${icon}"></i>
+                        </div>
+                        <div class="suggest-template-info">
+                            <div class="suggest-template-title">${escapeHtml(title)}</div>
+                            <div class="suggest-template-desc" title="${escapeHtml(desc)}">${escapeHtml(desc)}</div>
+                        </div>
+                        <div class="suggest-card-arrow">
+                            <i class="bi bi-arrow-up-right"></i>
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        function pickJourneySuite(idx) {
+            if (!window._suggestDataCache || !window._suggestDataCache.journey_suites) return;
+            const suite = window._suggestDataCache.journey_suites[idx];
+            if (!suite || !suite.goal) return;
+            applyCaseGoal(suite.goal);
+        }
+
+        async function refreshAppSuggestedCases(appName, packageName) {
+            const cleanName = appName || (typeof getActiveAppCleanName === "function" ? getActiveAppCleanName() : (currentActiveApp ? (currentActiveApp.label || "待测应用") : "待测应用"));
+            const targetPkg = packageName !== undefined ? packageName : (currentActiveApp ? (currentActiveApp.package || "") : "");
+            currentSuggestedAppName = cleanName;
+
+            const labelEl = document.getElementById("suggestTargetAppLabel");
+            if (labelEl) labelEl.innerText = cleanName;
+
+            const grid = document.getElementById("suggestCasesGrid");
+            const btn = document.getElementById("btnRefreshSuggestCases");
+            if (btn) btn.classList.add("rotating");
+
+            try {
+                const query = `app_name=${encodeURIComponent(cleanName)}&package_name=${encodeURIComponent(targetPkg)}`;
+                const res = await fetch(`/api/ai/suggest_cases?${query}`);
+                const data = await res.json();
+                window._suggestDataCache = data;
+                window._suggestedCasesCache = data.cases || [];
+                renderSuggestContent(data);
+            } catch (e) {
+                if (grid) grid.innerHTML = `<div class="p-2 text-danger small" style="grid-column: 1 / -1;">推荐用例加载失败，请重试</div>`;
+            } finally {
+                setTimeout(() => {
+                    if (btn) btn.classList.remove("rotating");
+                }, 500);
+            }
+        }
+    

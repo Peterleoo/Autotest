@@ -214,9 +214,8 @@ class TestAgenticSessionIntentGate(unittest.TestCase):
 
     def test_07_frontend_contract_integrity(self):
         """测试 7: 前端契约完整性（临时乐观节点清理标记、终止任务按钮、Notice组件及sendMessage/handleChatKey）"""
-        index_html_path = ROOT / "web" / "templates" / "index.html"
-        self.assertTrue(index_html_path.exists())
-        html_content = index_html_path.read_text(encoding="utf-8")
+        from tests.frontend_source import read_frontend_source
+        html_content = read_frontend_source()
 
         # 1. 临时节点必须标记 .optimistic-temp-node 与 data-temp-node
         self.assertIn(".optimistic-temp-node", html_content)

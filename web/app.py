@@ -25,9 +25,15 @@ for _router_module in (devices, apps, sessions, cases, reports, system):
     app.include_router(_router_module.router)
 
 
+def _static_asset_version() -> str:
+    """前端静态资源版本号（最新修改时间），用于 URL 缓存失效：资源一改，浏览器即拉取新版本"""
+    mtimes = [p.stat().st_mtime_ns for p in STATIC_DIR.glob("*/*") if p.suffix in (".css", ".js")]
+    return str(max(mtimes, default=0))
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    response = templates.TemplateResponse("index.html", {"request": request})
+    response = templates.TemplateResponse("index.html", {"request": request, "asset_version": _static_asset_version()})
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
