@@ -20,6 +20,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from web.path_safety import safe_path
+from web.csrf import CSRFOriginMiddleware, allowed_origins_from_env
 
 # 添加工程根目录到 sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -42,6 +43,7 @@ UPLOADS_DIR = BASE_DIR / "data" / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Autotest Web Console", description="移动端 AI 自动化测试操作平台")
+app.add_middleware(CSRFOriginMiddleware, extra_allowed_origins=allowed_origins_from_env())
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
 
 # 挂载测试报告静态目录
@@ -330,7 +332,7 @@ async def get_deliverables_list():
     return JSONResponse({"deliverables": deliverables_mgr.list_deliverables()})
 
 @app.post("/api/deliverables/replay")
-async def replay_deliverable(payload: Dict[str, Any] = Body(...)):
+def replay_deliverable(payload: Dict[str, Any] = Body(...)):
     """⚡ 0 Token 毫秒级原生用例回放：多级智能寻址并直接通过 Pytest 执行固化脚本"""
     safe_ref = payload.get("safeRef") or payload.get("script_path", "")
     device_id = resolve_target_device_id(payload.get("device_id"))
@@ -612,7 +614,7 @@ async def delete_app_package(filename: str):
     return JSONResponse(status_code=404, content={"success": False, "message": "文件不存在"})
 
 @app.post("/api/install")
-async def install_app_to_device(device_id: Optional[str] = Form(None), filename: str = Form(...)):
+def install_app_to_device(device_id: Optional[str] = Form(None), filename: str = Form(...)):
     """安装指定 APK 到设备，支持针对小米 MIUI / 国内厂商安全限制的自适应降级与通道兜底"""
     apk_path = safe_path(settings.APPS_DIR, filename)
     if not apk_path.exists():
@@ -1630,7 +1632,7 @@ async def update_config(
     return {"success": True, "message": f"成功切换为 [{provider.upper()}] 模型: {current_m}"}
 
 @app.post("/api/config/fetch_models")
-async def fetch_remote_models(
+def fetch_remote_models(
     provider: str = Form(...),
     api_key: Optional[str] = Form(None),
     base_url: Optional[str] = Form(None)
@@ -1704,7 +1706,7 @@ async def fetch_remote_models(
     }
 
 @app.get("/api/settings/env_status")
-async def get_env_status():
+def get_env_status():
     """获取本地 ADB 与运行环境状态"""
     import subprocess, shutil
     adb_path = shutil.which("adb")
@@ -2849,7 +2851,7 @@ def run_real_test(goal: str = Form(...), case_name: str = Form("auto_flow"), tes
             }
 
 @app.post("/api/run_pytest")
-async def run_pytest(filename: str = Form(...)):
+def run_pytest(filename: str = Form(...)):
     """以原生 Pytest 模式独立执行已固化的本地测试脚本"""
     start_t = time.time()
     script_path = safe_path(settings.SOLIDIFIED_DIR, filename)
