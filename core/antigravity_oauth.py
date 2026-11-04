@@ -24,10 +24,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/experimentsandconfigs"
 ]
 
-CONFIG_PATHS = [
-    Path(__file__).resolve().parent.parent / "config" / "antigravity_oauth.json",
-    Path(r"F:\PM-product\data\desktop-home\gemini-oauth-bridge.json")
-]
+# 首项为本地可写配置；可选通过 ANTIGRAVITY_OAUTH_BRIDGE_FILE 指定只读的外部 OAuth 桥接文件作为回退
+CONFIG_PATHS = [Path(__file__).resolve().parent.parent / "config" / "antigravity_oauth.json"]
+if os.environ.get("ANTIGRAVITY_OAUTH_BRIDGE_FILE"):
+    CONFIG_PATHS.append(Path(os.environ["ANTIGRAVITY_OAUTH_BRIDGE_FILE"]).expanduser())
 
 class _OAuthCallbackHandler(BaseHTTPRequestHandler):
     oauth_instance = None
