@@ -1467,6 +1467,8 @@ class AITestAgent:
 
                 # 仅当独立 Verifier 审核通过，才批准完成
                 logger.info(f"🎉 目标完成并通过 DSH 独立核验门禁: {decision.get('reason')}")
+                anchors = TaskVerifier.extract_final_anchor_texts(screen_info)
+                logger.info(f"🎯 终态界面锚点: {json.dumps(anchors, ensure_ascii=False)}")
                 self._notify_status({
                     "step": step_count,
                     "action": "完成",

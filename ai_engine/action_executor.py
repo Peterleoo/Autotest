@@ -203,7 +203,8 @@ class ActionExecutor:
             t0 = time.perf_counter()
             self.driver.execute_adb(["shell", "input", "tap", str(x), str(y)])
             cost_ms = int((time.perf_counter() - t0) * 1000)
-            logger.info(f"原生 ADB 物理手势精准点击完成: ({x}, {y}) [{name}] (用时 {cost_ms}ms)")
+            res_id = el_info.get("resource_id", "") if el_info else ""
+            logger.info(f"原生 ADB 物理手势精准点击完成: ({x}, {y}) [{name}] (用时 {cost_ms}ms)" + (f" <id={res_id}>" if res_id else ""))
             return {
                 "by": "coordinates",
                 "value": f"{x},{y}",

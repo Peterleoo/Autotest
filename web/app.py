@@ -1340,11 +1340,20 @@ async def save_session_to_local_case(
                 param = act.get("param", "")
                 target_name = act.get("target") or "目标元素"
                 m = re.search(r"\((\d+),\s*(\d+)\)", param)
-                if m:
+                # 仅当 target 来自真实控件标签（而非 AI 动作描述）时才作为语义定位文字
+                el_text = act.get("element_text")
+                if el_text is None and act.get("target") != act.get("desc") and target_name not in ("目标位置", "坐标", "目标元素"):
+                    el_text = target_name
+                locator = {"by": "coordinates", "value": f"{m.group(1)},{m.group(2)}"} if m else {}
+                if el_text:
+                    locator["text"] = el_text
+                if act.get("element_id"):
+                    locator["res_id"] = act["element_id"]
+                if locator:
                     action_trace.append({
                         "action": "tap",
                         "reason": f"点击【{target_name}】",
-                        "locator": {"by": "coordinates", "value": f"{m.group(1)},{m.group(2)}"}
+                        "locator": locator
                     })
             elif atype in ["fast_forward_guide", "skip_guide"]:
                 action_trace.append({
@@ -1364,27 +1373,19 @@ async def save_session_to_local_case(
                     "text": act.get("text", "")
                 })
 
-    # 若未从执行流水中提取到动作，则降级为规划步骤与业务断言
+    # 未提取到任何真机动作：拒绝固化，避免生成只有等待与假断言的空壳脚本
     if not action_trace:
-        action_trace.append({"action": "wait", "reason": "应用冷启动与上下文感知", "seconds": 2})
-        for idx, s in enumerate(plan_steps, 1):
-            action_trace.append({
-                "action": "wait",
-                "reason": f"步骤 {idx}: {s.get('title', '')} - {s.get('desc', '')}",
-                "seconds": 1
-            })
+        return {"success": False, "message": "该会话未记录到可回放的真机动作，无法固化为用例"}
+
+    # 终态校验：仅使用 Verifier 批准时真机界面上实际观察到的稳定文字
+    anchors = [a for a in session.get("final_anchor_texts") or [] if isinstance(a, str) and a]
+    for anchor in anchors:
         action_trace.append({
             "action": "assert_text",
-            "reason": "业务目标端侧断言",
-            "expected": goal[:12] if goal else "首页"
+            "reason": "终态界面锚点断言",
+            "expected": anchor
         })
-    else:
-        # 补充终态校验
-        action_trace.append({
-            "action": "assert_text",
-            "reason": "端侧业务闭环与界面渲染断言",
-            "expected": goal[:8] if goal else "首页"
-        })
+    missing_assertion = not anchors
 
     # 🌟 确定保存的目标 App 项目文件夹 (精准对齐待测 App，彻底杜绝全部堆入 demo_app)
     app_id = resolve_session_app_id(session)
@@ -1414,7 +1415,8 @@ async def save_session_to_local_case(
         "avg_duration": session.get("duration", "2.8s"),
         "session_id": session_id,
         "created_at": now_str,
-        "timestamp": now_dt.timestamp()
+        "timestamp": now_dt.timestamp(),
+        "missing_assertion": missing_assertion
     }
     metadata[solid_file.name] = meta_entry
     save_cases_metadata(metadata, target_app_dir)
@@ -1447,6 +1449,7 @@ async def save_session_to_local_case(
         "level": auto_level,
         "case_id": case_id,
         "created_at": now_str,
+        "missing_assertion": missing_assertion,
         "message": f"用例已成功保存至【{app_display_name}】专属用例工程库，自动归类至【{module}】"
     }
 

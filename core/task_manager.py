@@ -2482,6 +2482,11 @@ class TaskManager:
                     pending_act["summary_val"] = coords
                     if lbl:
                         pending_act["target"] = lbl
+                    if lbl and lbl not in ("目标位置", "坐标"):
+                        pending_act["element_text"] = lbl
+                    m_id = re.search(r"<id=([^>]+)>", line)
+                    if m_id:
+                        pending_act["element_id"] = m_id.group(1)
                     if cost_str:
                         pending_act["cost_time"] = cost_str
                     pending_act["code_snippet"] = f"# 端侧物理精准点击\ndriver.tap([{coords}])"
@@ -2582,6 +2587,14 @@ class TaskManager:
                     pending_act["observation"] = "连续翻页穿透引导层 · 直达应用首页"
                     pending_act["status"] = "COMPLETED"
                     self._append_action_to_session_step(session, cur_idx, pending_act)
+
+            # 7.1 捕获 Verifier 批准时的终态界面锚点（供固化断言使用）
+            elif "🎯 终态界面锚点:" in line:
+                try:
+                    anchors = json.loads(line.split("🎯 终态界面锚点:", 1)[1].strip())
+                    session["final_anchor_texts"] = [a for a in anchors if isinstance(a, str) and a]
+                except ValueError:
+                    logger.warning(f"终态界面锚点解析失败: {line}")
 
             # 8. 捕获测试目标达成断言
             elif "🎉 目标完成" in line or "固化成功" in line:

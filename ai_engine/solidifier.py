@@ -6,6 +6,16 @@ from config.settings import settings
 
 logger = logging.getLogger("Solidifier")
 
+
+def _one_line(value: Any) -> str:
+    """用于注释插值：去除换行，防止跳出注释注入代码"""
+    return str(value).replace("\r", " ").replace("\n", " ")
+
+
+def _docstring_safe(value: Any) -> str:
+    """用于三引号文档字符串插值：转义反斜杠与双引号"""
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
 ROBUST_HELPERS_CODE = '''
 def robust_click(driver, text=None, res_id=None, desc=None, rel_x=None, rel_y=None):
     """
@@ -138,7 +148,7 @@ class Solidifier:
         steps_code = []
         for i, step in enumerate(action_history, 1):
             action = step.get("action")
-            reason = step.get("reason", f"Step {i}")
+            reason = _one_line(step.get("reason", f"Step {i}"))
             loc = step.get("locator", {}) or {}
 
             # 提取语义属性
@@ -187,7 +197,7 @@ class Solidifier:
                 ry_arg = f"rel_y={rel_y}" if rel_y is not None else "rel_y=None"
 
                 steps_code.append(
-                    f"    # 步骤 {i}: {reason} (输入: {input_val})\n"
+                    f"    # 步骤 {i}: {reason} (输入: {_one_line(input_val)})\n"
                     f"    robust_type(driver, {text_arg}, {id_arg}, {desc_arg}, {rx_arg}, {ry_arg}, input_text={repr(input_val)})\n"
                     f"    time.sleep(1)"
                 )
@@ -196,8 +206,8 @@ class Solidifier:
                 direction = step.get("direction", "up").lower()
                 repeat = max(1, int(step.get("repeat", 1)))
                 steps_code.append(
-                    f"    # 步骤 {i}: 动态自适应滑动 [{direction}] ({repeat} 次)\n"
-                    f"    robust_swipe(driver, direction='{direction}', repeat={repeat})\n"
+                    f"    # 步骤 {i}: 动态自适应滑动 [{_one_line(direction)}] ({repeat} 次)\n"
+                    f"    robust_swipe(driver, direction={repr(direction)}, repeat={repeat})\n"
                     f"    time.sleep(1)"
                 )
 
@@ -217,33 +227,35 @@ class Solidifier:
                     steps_code.append(f"    # 步骤 {i}: 模拟返回键\n    driver.back()\n    time.sleep(1)")
 
             elif action == "wait":
-                secs = step.get("seconds", 2)
+                secs = float(step.get("seconds", 2))
                 steps_code.append(f"    # 步骤 {i}: 等待界面加载\n    time.sleep({secs})")
 
             elif action == "assert_text":
-                expected = step.get("expected", "")
+                expected = str(step.get("expected", ""))
+                fail_msg = f"业务断言失败：界面未出现预期内容 [{expected}]"
                 steps_code.append(
-                    f"    # 步骤 {i}: 校验界面是否包含预期内容 [{expected}]\n"
-                    f"    assert '{expected}' in driver.page_source, f'业务断言失败：界面未出现预期内容 [{expected}]'"
+                    f"    # 步骤 {i}: 校验界面是否包含预期内容 [{_one_line(expected)}]\n"
+                    f"    assert {repr(expected)} in driver.page_source, {repr(fail_msg)}"
                 )
 
             elif action == "call_api":
-                method = step.get("method", "GET")
-                endpoint = step.get("endpoint", "")
+                method = str(step.get("method", "GET"))
+                endpoint = str(step.get("endpoint", ""))
                 req_json = step.get("json")
-                status = step.get("expected_status", 200)
-                json_str = f", json={req_json}" if req_json else ""
+                status = int(step.get("expected_status", 200))
+                json_str = f", json={repr(req_json)}" if req_json else ""
                 steps_code.append(
-                    f"    # 步骤 {i}: 接口测试 [{method} {endpoint}]\n"
-                    f"    resp = api_client.request('{method}', '{endpoint}'{json_str})\n"
+                    f"    # 步骤 {i}: 接口测试 [{_one_line(method)} {_one_line(endpoint)}]\n"
+                    f"    resp = api_client.request({repr(method)}, {repr(endpoint)}{json_str})\n"
                     f"    assert resp.status_code == {status}, f'接口状态码断言失败: {{resp.status_code}} != {status}'"
                 )
 
         formatted_steps = "\n\n".join(steps_code) if steps_code else "    pass"
+        goal_doc = _docstring_safe(goal)
 
         template = f'''"""
 由 AI 自动化测试智能体自动录制固化的跨端测试用例 (Dual-Mode Resilient Test Suite)
-测试目标: {goal}
+测试目标: {goal_doc}
 执行命令: pytest {file_path.name} -v -s
 特性优势:
   1. 语义优先 (Text / ID / Desc) 动态查找；
@@ -274,11 +286,11 @@ def api_client():
 
 
 @allure.feature("固化测试套件")
-@allure.story("{goal}")
+@allure.story({repr(goal)})
 def {clean_name}(driver, api_client):
     """
     自动化用例: {clean_name}
-    测试目标: {goal}
+    测试目标: {goal_doc}
     """
 {formatted_steps}
 '''
