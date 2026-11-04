@@ -803,8 +803,13 @@ class AITestAgent:
                         try: decision_file.unlink()
                         except Exception: pass
                         return True
+                except json.JSONDecodeError as e:
+                    logger.warning(f"人机协同决策文件尚未写完整，下一轮重读: {e}")
                 except Exception as e:
-                    logger.warning(f"读取人机协同决策文件异常: {e}")
+                    logger.error(f"执行人机协同决策失败，已消费该决策避免重放: {e}", exc_info=True)
+                    try: decision_file.unlink()
+                    except Exception: pass
+                    return False
             time.sleep(1.0)
 
         logger.warning("⚠️ 等待人机协同超时 (1800s)，安全退出挂起")
@@ -1060,8 +1065,13 @@ class AITestAgent:
                         try: decision_file.unlink()
                         except Exception: pass
                         return True
+                except json.JSONDecodeError as e:
+                    logger.warning(f"AI 协同决策文件尚未写完整，下一轮重读: {e}")
                 except Exception as e:
-                    logger.warning(f"读取 AI 协同决策文件异常: {e}")
+                    logger.error(f"执行AI 协同决策失败，已消费该决策避免重放: {e}", exc_info=True)
+                    try: decision_file.unlink()
+                    except Exception: pass
+                    return False
             time.sleep(1.0)
 
         logger.warning(f"⚠️ 等待 AI 人机协同超时 ({max_wait_seconds}s)")
