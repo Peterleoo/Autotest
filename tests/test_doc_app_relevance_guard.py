@@ -4,10 +4,12 @@ import time
 from pathlib import Path
 from core.test_spec_synthesizer import TestSpecSynthesizer
 from core.task_manager import TaskManager, SESSIONS_STORE_DIR
+from tests.doc_suite_stub import stub_doc_synthesizer
 
 
 class TestDocAppRelevanceGuard(unittest.TestCase):
     def setUp(self):
+        stub_doc_synthesizer(self)
         self.mgr = TaskManager()
         self.created_sessions = []
 

@@ -3,10 +3,12 @@ import unittest
 import time
 from pathlib import Path
 from core.task_manager import TaskManager, SESSIONS_STORE_DIR
+from tests.doc_suite_stub import stub_doc_synthesizer
 
 
 class TestDocDrivenSuiteExecution(unittest.TestCase):
     def setUp(self):
+        stub_doc_synthesizer(self)
         self.mgr = TaskManager()
         self.created_sessions = []
 
