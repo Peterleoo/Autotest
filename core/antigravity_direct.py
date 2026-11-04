@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 import requests
 
+from core.antigravity_credentials import get_client_credentials
+
 logger = logging.getLogger("AntigravityDirect")
 
-CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
-CLIENT_SECRET = "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"
 
 TOKEN_FILES = [
     Path(__file__).resolve().parent.parent / "config" / "antigravity_oauth.json"
@@ -95,12 +95,13 @@ class AntigravityDirectClient:
             raise RuntimeError("缺失 refresh_token，无法续期 Google 授权")
 
         logger.info("正在自动刷新 Google Antigravity Access Token...")
+        client_id, client_secret = get_client_credentials()
         try:
             resp = requests.post(
                 "https://oauth2.googleapis.com/token",
                 data={
-                    "client_id": CLIENT_ID,
-                    "client_secret": CLIENT_SECRET,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
                     "refresh_token": refresh_token,
                     "grant_type": "refresh_token"
                 },

@@ -18,23 +18,37 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 import uvicorn
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from core.antigravity_credentials import get_client_credentials  # noqa: E402
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [AntigravityBridge] %(message)s")
 logger = logging.getLogger("AntigravityBridge")
 
 app = FastAPI(title="Google Antigravity OpenAI Bridge", version="1.0.0")
 
-CONFIG_PATHS = [
-    Path(__file__).resolve().parent.parent / "config" / "antigravity_oauth.json",
-    Path(r"F:\PM-product\data\desktop-home\gemini-oauth-bridge.json")
-]
+
+@app.middleware("http")
+async def require_bridge_key(request: Request, call_next):
+    """设置了 ANTIGRAVITY_BRIDGE_KEY 时，拒绝未携带正确密钥的请求"""
+    if BRIDGE_KEY and request.headers.get("authorization", "") != f"Bearer {BRIDGE_KEY}":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return await call_next(request)
+
+CONFIG_PATHS = [Path(__file__).resolve().parent.parent / "config" / "antigravity_oauth.json"]
+if os.getenv("ANTIGRAVITY_OAUTH_BRIDGE_FILE"):
+    CONFIG_PATHS.append(Path(os.environ["ANTIGRAVITY_OAUTH_BRIDGE_FILE"]))
+
+# 默认只监听本机：绑定 0.0.0.0 会让局域网内任何人无鉴权调用你的模型额度
+BRIDGE_HOST = os.getenv("ANTIGRAVITY_BRIDGE_HOST", "127.0.0.1")
+BRIDGE_PORT = int(os.getenv("ANTIGRAVITY_BRIDGE_PORT", "19387"))
+# 可选访问密钥：设置后所有请求必须携带 Authorization: Bearer <密钥>
+BRIDGE_KEY = os.getenv("ANTIGRAVITY_BRIDGE_KEY", "").strip()
 
 PROXIES = {
     "http": os.getenv("ANTIGRAVITY_PROXY", "http://127.0.0.1:7897"),
     "https": os.getenv("ANTIGRAVITY_PROXY", "http://127.0.0.1:7897")
 }
 
-CLIENT_ID = base64.b64decode("MTA3MTAwNjA2MDU5MS10bWhzc2luMmgyMWxjcmUyMzV2dG9sb2poNGc0MDNlcC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbQ==").decode()
-CLIENT_SECRET = base64.b64decode("R09DU1BYLUs1OEZXUjQ4NkxkTEoxbUxCOHNYQzR6NnFEQWY=").decode()
 
 class TokenManager:
     _cached_token: Optional[str] = None
@@ -67,12 +81,13 @@ class TokenManager:
             return access_token, project
 
         # 通过代理向 Google 刷新 Token
+        client_id, client_secret = get_client_credentials()
         try:
             resp = requests.post(
                 "https://oauth2.googleapis.com/token",
                 data={
-                    "client_id": CLIENT_ID,
-                    "client_secret": CLIENT_SECRET,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
                     "refresh_token": refresh_token,
                     "grant_type": "refresh_token"
                 },
@@ -197,8 +212,9 @@ async def chat_completions(req: Request):
         )
 
 def main():
-    logger.info("正在启动 Google Antigravity 本地桥接服务 @ 0.0.0.0:19387")
-    uvicorn.run(app, host="0.0.0.0", port=19387, log_level="warning")
+    logger.info(f"正在启动 Google Antigravity 本地桥接服务 @ {BRIDGE_HOST}:{BRIDGE_PORT}"
+                + ("（已启用访问密钥）" if BRIDGE_KEY else ""))
+    uvicorn.run(app, host=BRIDGE_HOST, port=BRIDGE_PORT, log_level="warning")
 
 if __name__ == "__main__":
     main()

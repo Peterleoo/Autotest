@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import requests
 
+from core.antigravity_credentials import get_client_credentials
+
 logger = logging.getLogger("AntigravityOAuth")
 
-CLIENT_ID_B64 = "MTA3MTAwNjA2MDU5MS10bWhzc2luMmgyMWxjcmUyMzV2dG9sb2poNGc0MDNlcC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbQ=="
-CLIENT_SECRET_B64 = "R09DU1BYLUs1OEZXUjQ4NkxkTEoxbUxCOHNYQzR6NnFEQWY="
 
 SCOPES = [
     "https://www.googleapis.com/auth/cloud-platform",
@@ -71,8 +71,7 @@ class _OAuthCallbackHandler(BaseHTTPRequestHandler):
 
 class AntigravityOAuth:
     def __init__(self):
-        self.client_id = base64.b64decode(CLIENT_ID_B64).decode("utf-8")
-        self.client_secret = base64.b64decode(CLIENT_SECRET_B64).decode("utf-8")
+        self.client_id, self.client_secret = get_client_credentials()
         self.redirect_port = 51121
         self.redirect_uri = f"http://localhost:{self.redirect_port}/oauth-callback"
         self.proxies = {
