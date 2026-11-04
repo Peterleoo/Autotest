@@ -1,6 +1,6 @@
 # 🤖 Autotest AI - 移动端全自动化测试与用例固化工作台
 
-[![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/Python-3.14-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/Web-FastAPI%20%2B%20Bootstrap5-009688.svg)](https://fastapi.tiangolo.com/)
 [![ADB Driver](https://img.shields.io/badge/Driver-Native%20ADB%20Speed-success.svg)](https://developer.android.com/tools/adb)
 [![Zero Token Regression](https://img.shields.io/badge/Solidified-Zero%20Token%20Replay-orange.svg)](tests/solidified/)
@@ -176,12 +176,13 @@ f:\Autotest
 
 ### 1. 环境准备
 确保本机已安装：
-- **Python 3.10+**
+- **Python 3.14**（当前开发与测试所用版本；代码语法兼容 3.10+，但未在旧版本上实测）
 - **Android SDK Platform-Tools (ADB)**：确保终端执行 `adb devices` 能够正常输出设备列表。
 
 安装 Python 依赖：
 ```bash
 pip install -r requirements.txt
+python -m playwright install chromium   # 仅运行前端 UI 测试时需要
 ```
 
 ### 2. 物理真机准备（杜绝免机仿真）

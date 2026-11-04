@@ -1,8 +1,30 @@
+# Python 3.14（开发与测试环境）
+
+# Web 服务
+fastapi>=0.128.0
+uvicorn>=0.40.0
+python-multipart>=0.0.22
+jinja2>=3.1.6
+
+# 设备驱动与图像
 Appium-Python-Client>=4.0.0
-pytest>=8.0.0
-requests>=2.31.0
-allure-pytest>=2.13.0
+selenium>=4.40.0
+Pillow>=10.0.0
+numpy>=2.0.0
+opencv-python-headless>=4.9.0
+
+# AI 模型与文本处理
 anthropic>=0.30.0
 openai>=1.30.0
-Pillow>=10.0.0
+requests>=2.31.0
 python-dotenv>=1.0.0
+pypinyin>=0.55.0
+
+# 测试与报告
+pytest>=8.0.0
+pytest-html>=4.2.0
+allure-pytest>=2.13.0
+playwright>=1.64.0
+
+# 可选：PDF 需求文档文本提取（未安装时自动跳过）
+# pypdf>=5.0.0
