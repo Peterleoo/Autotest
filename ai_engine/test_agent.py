@@ -123,6 +123,22 @@ class AITestAgent:
         self._last_hitl_resolved_time = 0.0
         self._hitl_cooldown_steps = 0
 
+    UI_SETTLE_MIN_DWELL = 0.3  # 动作下发后 App 响应前的最短等待，避免在转场开始前误判"已稳定"
+
+    def _wait_ui_settled(self, max_wait: float) -> None:
+        """动作后等待界面视觉稳定：稳定即提前放行，最长不超过原固定等待时长；检测失败退化为固定等待"""
+        dwell = min(self.UI_SETTLE_MIN_DWELL, max_wait)
+        time.sleep(dwell)
+        remaining = max_wait - dwell
+        if remaining <= 0:
+            return
+        start = time.time()
+        try:
+            ScreenParser.wait_for_visual_settling(self.driver, max_wait=remaining)
+        except Exception as e:
+            logger.debug(f"视觉稳定检测失败，退化为固定等待: {e}")
+            time.sleep(max(0.0, remaining - (time.time() - start)))
+
     def _notify_status(self, data: Dict[str, Any]):
         if self.status_callback:
             try:
@@ -313,7 +329,7 @@ class AITestAgent:
         if get_code_btn:
             logger.info("点击【获取验证码】按钮")
             self.executor._locate_and_click(get_code_btn, None)
-            time.sleep(1.2)
+            self._wait_ui_settled(1.2)
             return True
         else:
             logger.warning("未找到明确的【获取验证码】按钮")
@@ -370,12 +386,12 @@ class AITestAgent:
         if login_btn:
             logger.info("点击登录提交按钮")
             self.executor._locate_and_click(login_btn, None)
-            time.sleep(1.8)
+            self._wait_ui_settled(1.8)
         else:
             logger.info("未检出登录按钮，发送回车键提交")
             try:
                 self.driver.press_keycode(66) # KEYCODE_ENTER
-                time.sleep(1.5)
+                self._wait_ui_settled(1.5)
             except Exception:
                 pass
 
@@ -428,7 +444,7 @@ class AITestAgent:
                 if any(k in t for k in ["用密码登录", "密码登录", "账号密码登录"]):
                     logger.info(f"点击切换到密码登录模式: {t}")
                     self.executor._locate_and_click(el, None)
-                    time.sleep(0.6)
+                    self._wait_ui_settled(0.6)
                     screen_info = ScreenParser.get_screen_summary(self.driver)
                     elements = screen_info.get("elements", [])
                     break
@@ -509,7 +525,7 @@ class AITestAgent:
         if company_el:
             logger.info("检测到公司选择下拉框，尝试轻触选定...")
             self.executor._locate_and_click(company_el, None)
-            time.sleep(0.6)
+            self._wait_ui_settled(0.6)
             post_company_screen = ScreenParser.get_screen_summary(self.driver)
             # 在弹出的选项中点击包含“象盒”或第一项列表
             for cand in post_company_screen.get("elements", []):
@@ -565,12 +581,12 @@ class AITestAgent:
         if login_btn:
             logger.info("点击登录提交按钮")
             self.executor._locate_and_click(login_btn, None)
-            time.sleep(1.8)
+            self._wait_ui_settled(1.8)
         else:
             logger.info("未明确检出登录按钮，尝试发送回车键提交")
             try:
                 self.driver.press_keycode(66) # KEYCODE_ENTER
-                time.sleep(1.5)
+                self._wait_ui_settled(1.5)
             except Exception:
                 pass
 
@@ -680,7 +696,7 @@ class AITestAgent:
                 logger.info(f"🔑 [预设手机号生效] 检测到验证码登录页，自动代填手机号 [{cred['account']}] 并点击获取验证码...")
                 sent = self._execute_phone_send_sms(cred["account"], screen_info)
                 if sent:
-                    time.sleep(1.5)
+                    self._wait_ui_settled(1.5)
                     new_screen = ScreenParser.get_screen_summary(self.driver)
                     new_state, _ = self._detect_login_screen_state(new_screen)
                     if new_state == "manual_takeover":
@@ -766,7 +782,7 @@ class AITestAgent:
                         elif decision_type == "inject_phone":
                             if acc_val:
                                 self._execute_phone_send_sms(acc_val, screen_info)
-                                time.sleep(1.5)
+                                self._wait_ui_settled(1.5)
                                 post_screen = ScreenParser.get_screen_summary(self.driver)
                                 post_state, _ = self._detect_login_screen_state(post_screen)
                                 if post_state == "manual_takeover":
@@ -787,12 +803,12 @@ class AITestAgent:
                             logger.info("✅ 用户已在投屏手动完成登录，重置人机协同计数器并恢复自动化")
                             self._hitl_attempts = 0
                             self._last_hitl_signature = None
-                            time.sleep(1.0)
+                            self._wait_ui_settled(1.0)
                         elif decision_type == "skip":
                             logger.info("⏩ 用户选择跳过登录，模拟返回键继续")
                             try: self.driver.back()
                             except Exception: pass
-                            time.sleep(1.0)
+                            self._wait_ui_settled(1.0)
 
                         self._last_hitl_resolved_time = time.time()
                         self._hitl_cooldown_steps = 3
@@ -910,12 +926,12 @@ class AITestAgent:
                         
                         if decision_type == "manual_done":
                             logger.info("✅ 用户已在投屏手动完成操作，继续自动化")
-                            time.sleep(1.0)
+                            self._wait_ui_settled(1.0)
                         elif decision_type == "skip":
                             logger.info("⏩ 用户选择跳过该步骤")
                             try: self.driver.back()
                             except Exception: pass
-                            time.sleep(1.0)
+                            self._wait_ui_settled(1.0)
                         else:
                             # 提取提交数据的所有输入项
                             inputs = data.get("inputs") or {}
@@ -941,7 +957,7 @@ class AITestAgent:
                                 logger.info(f"📱 [AI 协同合流] 命中手机发码阶段，自动填入手机号 [{acc_val}] 并点击获取验证码...")
                                 sent = self._execute_phone_send_sms(acc_val, screen_info)
                                 if sent:
-                                    time.sleep(1.5)
+                                    self._wait_ui_settled(1.5)
                                     post_screen = ScreenParser.get_screen_summary(self.driver)
                                     post_state, _ = self._detect_login_screen_state(post_screen)
                                     screen_info = post_screen
@@ -1031,7 +1047,7 @@ class AITestAgent:
                                     if selected_choice in el_t:
                                         logger.info(f"AI 协同点击选择项: {selected_choice}")
                                         self.executor._locate_and_click(el, None)
-                                        time.sleep(0.6)
+                                        self._wait_ui_settled(0.6)
                                         break
 
                             # 自动勾选协议并点击登录/提交按钮
@@ -1052,7 +1068,7 @@ class AITestAgent:
                                     if not any(k in el_t for k in ["手机号登录", "密码登录", "切换", "获取验证码", "验证码登录"]):
                                         logger.info(f"自动点击协同后提交按钮: {el_t}")
                                         self.executor._locate_and_click(el, None)
-                                        time.sleep(1.5)
+                                        self._wait_ui_settled(1.5)
                                         break
 
                         # 🛡️ 协同成功解除：激活冷却与事实记忆注入，彻底杜绝连续弹窗轰炸
@@ -1093,7 +1109,7 @@ class AITestAgent:
                 })
                 try:
                     self.driver.back()
-                    time.sleep(1.0)
+                    self._wait_ui_settled(1.0)
                 except Exception:
                     pass
 
@@ -1287,7 +1303,7 @@ class AITestAgent:
                     t = el.get("text", "")
                     if any(p in t for p in ["一键登录", "本机号码", "立即登录", "登录"]):
                         self.executor._locate_and_click(el, None)
-                        time.sleep(1.0)
+                        self._wait_ui_settled(1.0)
                         break
                 screen_info = ScreenParser.get_screen_summary(
                     self.driver,
@@ -1379,7 +1395,7 @@ class AITestAgent:
                     d_text = found_dismiss_el.get("text") or found_dismiss_el.get("content_desc") or "遮罩"
                     logger.info(f"🛡️ [步骤自愈] 探测到界面临时遮罩浮层【{d_text}】，派发轻量关闭手势原地恢复...")
                     self.executor.tap_element(found_dismiss_el)
-                    time.sleep(1.0)
+                    self._wait_ui_settled(1.0)
                     screen_info = ScreenParser.get_screen_summary(
                         self.driver,
                         skip_ocr_if_rich=True,
