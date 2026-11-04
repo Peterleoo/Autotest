@@ -454,6 +454,9 @@ class DevicePipelineMixin:
         proc.wait()
         self.session_procs.pop(session["session_id"], None)
         duration = time.time() - start_t
+        exit_line = f"[{datetime.now().strftime('%H:%M:%S')}] 🔚 测试子进程退出码: {proc.returncode}"
+        dev_state["logs"].append(exit_line)
+        logger.info(f"会话 [{session.get('session_id')}] 设备 [{device_id}] {exit_line}")
 
         # 🛡️ 状态核验：若用户已主动终止任务 (STOPPED)，坚决保持 STOPPED 状态，绝不覆写为 FAIL 或生成多余报告
         if session.get("status") == "STOPPED":
@@ -550,6 +553,11 @@ class DevicePipelineMixin:
                             clean_line = l.split("[ERROR]", 1)[-1].strip() if "[ERROR]" in l else l
                             fail_reason = clean_line
                             break
+
+            # 🛡️ 目标已达成且无致命阻断时，失败的唯一原因是子进程退出码非 0：如实写明，避免拾取已恢复的中途告警
+            if proc.returncode != 0 and has_goal_achieved and not has_fatal_block:
+                fail_reason = f"测试目标已达成，但测试子进程以非零退出码 {proc.returncode} 结束"
+                error_type = "CHILD_EXIT_NONZERO"
 
             session["error_type"] = error_type
             session["error_message"] = fail_reason or last_error_line or "测试前置检查未通过或执行中断"
