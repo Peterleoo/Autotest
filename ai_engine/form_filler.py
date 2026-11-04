@@ -42,7 +42,7 @@ class SmartFormFiller:
                 from core.credential_manager import CredentialManager
                 app_cred = CredentialManager.get_credential(app_identifier)
             except Exception:
-                pass
+                logger.debug("忽略异常 @ infer_value", exc_info=True)
         
         # 1. 手机号 / 联系方式 / 账号 / 登录码
         if re.search(r"手机|电话|联系方式|联系电话|mobile|phone|账号|用户名|登录码|工号|合伙人", context_str, re.I):

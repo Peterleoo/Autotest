@@ -127,5 +127,5 @@ class VisionOCR:
                 try:
                     os.remove(tmp_path)
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ recognize_elements", exc_info=True)
         return [], False

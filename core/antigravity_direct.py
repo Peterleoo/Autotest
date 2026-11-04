@@ -120,7 +120,7 @@ class AntigravityDirectClient:
                         try:
                             p.write_text(json.dumps(self.config_data, indent=2, ensure_ascii=False), encoding="utf-8")
                         except Exception:
-                            pass
+                            logger.debug("忽略异常 @ ensure_access_token", exc_info=True)
                 logger.info("Google Antigravity Access Token 自动刷新成功！")
                 return access_token
             else:

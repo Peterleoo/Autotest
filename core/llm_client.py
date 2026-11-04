@@ -233,7 +233,7 @@ class LLMClient:
                             res["_fallback_info"] = self.last_fallback_info
                         return res
                     except Exception:
-                        pass
+                        logger.debug("忽略异常 @ chat_decision", exc_info=True)
                 raise RuntimeError(f"调用模型 [{self.provider}] 异常: {e}")
 
         parsed_json = self._parse_json_response(raw_text)
@@ -262,5 +262,5 @@ class LLMClient:
                 try:
                     return json.loads(text[start:end+1])
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ _parse_json_response", exc_info=True)
             return {"status": "ok", "action": "step_inferred", "raw_content": text[:300]}

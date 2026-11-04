@@ -12,6 +12,7 @@ from config.ai_config import ai_config
 from core.auth_manager import AuthManager
 
 from web.shared import (
+    logger,
     BASE_DIR,
     app_mgr,
 )
@@ -253,7 +254,7 @@ def fetch_remote_models(
                     "message": f"成功在线探测并拉取到 {len(model_ids)} 个可用模型"
                 }
     except Exception as e:
-        pass
+        logger.debug("忽略异常 @ fetch_remote_models", exc_info=True)
         
     fallback = []
     if provider == "deepseek":
@@ -286,7 +287,7 @@ def get_env_status():
                 first_line = res.stdout.strip().split("\n")[0]
                 adb_version = first_line
         except Exception:
-            pass
+            logger.debug("忽略异常 @ get_env_status", exc_info=True)
             
     return {
         "adb": {

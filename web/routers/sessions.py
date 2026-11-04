@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from core.report_generator import ReportGenerator
 
 from web.shared import (
+    logger,
     task_mgr,
 )
 
@@ -110,7 +111,7 @@ async def get_session_detail(session_id: str, offsets: Optional[str] = None):
         try:
             offset_dict = json.loads(offsets)
         except Exception:
-            pass
+            logger.debug("忽略异常 @ get_session_detail", exc_info=True)
     detail = task_mgr.get_session(session_id, offset_dict)
     if detail:
         return detail

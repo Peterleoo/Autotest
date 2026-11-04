@@ -9,6 +9,7 @@ from web.path_safety import safe_path
 from config.settings import settings
 
 from web.shared import (
+    logger,
     KNOWN_APP_META,
     app_mgr,
 )
@@ -113,7 +114,7 @@ def install_app_to_device(device_id: Optional[str] = Form(None), filename: str =
                     "message": "已自动将安装包推送到手机并唤起安装弹窗！\n请在手机屏幕上点击【继续/允许安装】；\n或在手机【开发者选项】开启【USB 安装】与【USB 调试(安全设置)】。"
                 }
             except Exception as e_push:
-                pass
+                logger.debug("忽略异常 @ install_app_to_device", exc_info=True)
 
         return {"success": False, "message": f"安装失败: {err_msg}"}
     except Exception as e:

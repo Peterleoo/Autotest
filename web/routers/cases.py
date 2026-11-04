@@ -358,7 +358,7 @@ def load_cases_metadata(target_dir: Optional[Path] = None) -> Dict[str, Any]:
                 if isinstance(data, dict):
                     return data
         except Exception:
-            pass
+            logger.debug("忽略异常 @ load_cases_metadata", exc_info=True)
     return dict(DEFAULT_PRESET_METADATA)
 
 
@@ -451,7 +451,7 @@ def parse_case_timestamp(file_path: Path, meta: dict) -> tuple:
             dt = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
             return dt.timestamp(), dt.strftime("%Y-%m-%d %H:%M")
         except Exception:
-            pass
+            logger.debug("忽略异常 @ parse_case_timestamp", exc_info=True)
 
     m = re.search(r"(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})", file_path.name)
     if m:
@@ -460,7 +460,7 @@ def parse_case_timestamp(file_path: Path, meta: dict) -> tuple:
                           int(m.group(4)), int(m.group(5)), int(m.group(6)))
             return dt.timestamp(), dt.strftime("%Y-%m-%d %H:%M")
         except Exception:
-            pass
+            logger.debug("忽略异常 @ parse_case_timestamp", exc_info=True)
 
     mtime = file_path.stat().st_mtime
     dt = datetime.fromtimestamp(mtime)
@@ -539,7 +539,7 @@ async def save_session_to_local_case(
                     session = json.load(f)
                     task_mgr.sessions[session_id] = session
             except Exception:
-                pass
+                logger.debug("忽略异常 @ save_session_to_local_case", exc_info=True)
     if not session:
         return {"success": False, "message": f"未找到对应测试会话: {session_id}"}
 
@@ -685,7 +685,7 @@ async def save_session_to_local_case(
         root_meta[solid_file.name] = meta_entry
         save_cases_metadata(root_meta, settings.SOLIDIFIED_DIR)
     except Exception:
-        pass
+        logger.debug("忽略异常 @ save_session_to_local_case", exc_info=True)
 
     # 5. 更新会话状态并持久化
     session["is_solidified"] = True

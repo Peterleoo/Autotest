@@ -221,7 +221,7 @@ class AppManager:
                             w_sz, h_sz = map(int, m_sz[-1])
                             btn_x, btn_y = w_sz // 2, int(h_sz * 0.92)
                     except Exception:
-                        pass
+                        logger.debug("忽略异常 @ ensure_uiautomator2_installed", exc_info=True)
                     subprocess.run([self.adb_bin, "shell", "input", "tap", str(btn_x), str(btn_y)], capture_output=True)
                 p.wait()
                 subprocess.run([self.adb_bin, "shell", "input", "tap", str(btn_x), str(btn_y)], capture_output=True)
@@ -246,7 +246,7 @@ class AppManager:
                             act = pkg + act
                         break
         except Exception:
-            pass
+            logger.debug("忽略异常 @ get_current_foreground_app", exc_info=True)
 
         if pkg:
             labels_map = self._get_app_labels_store()
@@ -281,7 +281,7 @@ class AppManager:
                 if isinstance(custom_labels, dict):
                     labels.update(custom_labels)
             except Exception:
-                pass
+                logger.debug("忽略异常 @ _get_app_labels_store", exc_info=True)
 
         # 扫描本地 apps/ 目录，将已有 APK 的解析名称补充进映射
         try:
@@ -290,7 +290,7 @@ class AppManager:
                 if info.get("package") and info.get("label"):
                     labels[info["package"]] = info["label"]
         except Exception:
-            pass
+            logger.debug("忽略异常 @ _get_app_labels_store", exc_info=True)
 
         return labels
 

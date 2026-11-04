@@ -35,7 +35,7 @@ class AuthManager:
             try:
                 return json.loads(AUTH_FILE.read_text(encoding="utf-8"))
             except Exception:
-                pass
+                logger.debug("忽略异常 @ _load_local_auth", exc_info=True)
         # 默认内置初始试用授权
         return {
             "is_activated": True,

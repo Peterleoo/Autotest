@@ -168,7 +168,7 @@ class AITestAgent:
                         lines.append(f"  {idx}. [{status_zh}] {st_name} (要求: {st_desc[:28]})")
                     return "\n".join(lines) + "\n\n"
         except Exception:
-            pass
+            logger.debug("忽略异常 @ _get_plan_steps_summary", exc_info=True)
         return ""
 
     def _sync_working_memory(self, screen_info: Dict[str, Any], decision: Optional[Dict[str, Any]] = None):
@@ -393,7 +393,7 @@ class AITestAgent:
                 self.driver.press_keycode(66) # KEYCODE_ENTER
                 self._wait_ui_settled(1.5)
             except Exception:
-                pass
+                logger.debug("忽略异常 @ _execute_sms_code_injection", exc_info=True)
 
         try:
             ScreenParser.wait_for_visual_settling(self.driver, max_wait=2.5)
@@ -560,7 +560,7 @@ class AITestAgent:
                                     logger.info(f"精准命中协议左侧单选框: {b}")
                                     break
                         except Exception:
-                            pass
+                            logger.debug("忽略异常 @ _execute_credential_injection", exc_info=True)
             if not checkbox_clicked:
                 self.executor._locate_and_click(agree_el, None)
             time.sleep(0.3)
@@ -588,7 +588,7 @@ class AITestAgent:
                 self.driver.press_keycode(66) # KEYCODE_ENTER
                 self._wait_ui_settled(1.5)
             except Exception:
-                pass
+                logger.debug("忽略异常 @ _execute_credential_injection", exc_info=True)
 
         # 8. 自适应等待画面转场静止
         try:
@@ -747,7 +747,7 @@ class AITestAgent:
         decision_file = Path(__file__).resolve().parent.parent / "scratch" / f"decision_{session_id}.json"
         if decision_file.exists():
             try: decision_file.unlink()
-            except Exception: pass
+            except Exception: logger.debug("忽略异常 @ _check_and_prompt_hitl_credential", exc_info=True)
 
         # 🚀 对标 DeepSeek Harness: 深度安全挂起（支持长达 1800 秒人工响应，或直到外部终止）
         wait_start = time.time()
@@ -762,7 +762,7 @@ class AITestAgent:
                     if data.get("status") in ["CANCELLED", "STOPPED"] or data.get("decision_type") in ["cancel", "stop", "abort"]:
                         logger.info("🛑 [人机协同响应] 收到用户终止指令，立即退出人机协同等待")
                         try: decision_file.unlink()
-                        except Exception: pass
+                        except Exception: logger.debug("忽略异常 @ _check_and_prompt_hitl_credential", exc_info=True)
                         return False
                     if data.get("status") == "RESOLVED":
                         decision_type = data.get("decision_type", "inject")
@@ -807,7 +807,7 @@ class AITestAgent:
                         elif decision_type == "skip":
                             logger.info("⏩ 用户选择跳过登录，模拟返回键继续")
                             try: self.driver.back()
-                            except Exception: pass
+                            except Exception: logger.debug("忽略异常 @ _check_and_prompt_hitl_credential", exc_info=True)
                             self._wait_ui_settled(1.0)
 
                         self._last_hitl_resolved_time = time.time()
@@ -817,14 +817,14 @@ class AITestAgent:
                         self.memory_context.append("【人机协同已完成】：用户刚刚已协助提交凭证/短信验证码（或已在投屏手动完成），当前处于提交转场期。请重点观察界面跳转与业务主页，严禁立即重复发起协助请求！")
 
                         try: decision_file.unlink()
-                        except Exception: pass
+                        except Exception: logger.debug("忽略异常 @ _check_and_prompt_hitl_credential", exc_info=True)
                         return True
                 except json.JSONDecodeError as e:
                     logger.warning(f"人机协同决策文件尚未写完整，下一轮重读: {e}")
                 except Exception as e:
                     logger.error(f"执行人机协同决策失败，已消费该决策避免重放: {e}", exc_info=True)
                     try: decision_file.unlink()
-                    except Exception: pass
+                    except Exception: logger.debug("忽略异常 @ _check_and_prompt_hitl_credential", exc_info=True)
                     return False
             time.sleep(1.0)
 
@@ -902,7 +902,7 @@ class AITestAgent:
         decision_file = Path(__file__).resolve().parent.parent / "scratch" / f"decision_{session_id}.json"
         if decision_file.exists():
             try: decision_file.unlink()
-            except Exception: pass
+            except Exception: logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
 
         # 深度安全挂起等待人工决策
         wait_start = time.time()
@@ -917,7 +917,7 @@ class AITestAgent:
                     if data.get("status") in ["CANCELLED", "STOPPED"] or data.get("decision_type") in ["cancel", "stop", "abort"]:
                         logger.info("🛑 [AI 协同响应] 收到用户终止指令，立即退出协同等待")
                         try: decision_file.unlink()
-                        except Exception: pass
+                        except Exception: logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
                         return False
 
                     if data.get("status") == "RESOLVED":
@@ -930,7 +930,7 @@ class AITestAgent:
                         elif decision_type == "skip":
                             logger.info("⏩ 用户选择跳过该步骤")
                             try: self.driver.back()
-                            except Exception: pass
+                            except Exception: logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
                             self._wait_ui_settled(1.0)
                         else:
                             # 提取提交数据的所有输入项
@@ -964,7 +964,7 @@ class AITestAgent:
                                     
                                     # 删除当前已解决的决策文件，平滑转入第二阶段
                                     try: decision_file.unlink()
-                                    except Exception: pass
+                                    except Exception: logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
 
                                     if post_state == "manual_takeover":
                                         logger.info("🛡️ 发码后触发图形滑块验证，唤起投屏接管...")
@@ -1025,7 +1025,7 @@ class AITestAgent:
                                             self.driver.execute_adb(["shell", "input", "text", val])
                                             time.sleep(0.4)
                                         except Exception:
-                                            pass
+                                            logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
 
                             # 分支 5: 通用兜底映射（枚举屏幕上所有的输入控件，将已有值逐个填入）
                             else:
@@ -1060,7 +1060,7 @@ class AITestAgent:
                                         time.sleep(0.3)
                                         break
                                     except Exception:
-                                        pass
+                                        logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
 
                             for el in screen_info.get("elements", []):
                                 el_t = (el.get("text") or el.get("content_desc") or "").strip()
@@ -1079,14 +1079,14 @@ class AITestAgent:
                         self.memory_context.append("【人机协同已完成】：用户刚刚已协助提交凭证/短信验证码（或已在投屏手动完成），当前处于提交转场期。请重点观察界面跳转与业务主页，严禁立即重复发起协助请求！")
 
                         try: decision_file.unlink()
-                        except Exception: pass
+                        except Exception: logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
                         return True
                 except json.JSONDecodeError as e:
                     logger.warning(f"AI 协同决策文件尚未写完整，下一轮重读: {e}")
                 except Exception as e:
                     logger.error(f"执行AI 协同决策失败，已消费该决策避免重放: {e}", exc_info=True)
                     try: decision_file.unlink()
-                    except Exception: pass
+                    except Exception: logger.debug("忽略异常 @ _handle_ai_requested_human_help", exc_info=True)
                     return False
             time.sleep(1.0)
 
@@ -1111,7 +1111,7 @@ class AITestAgent:
                     self.driver.back()
                     self._wait_ui_settled(1.0)
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ _ensure_home_context_if_needed", exc_info=True)
 
     def run_goal(self, goal: str, max_steps: int = 15, memory_context: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -1349,7 +1349,7 @@ class AITestAgent:
                         if hint:
                             coref_hint = f"\n{hint}\n"
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ run_goal", exc_info=True)
 
             # 🚀 动态业务技能按需评估 (借鉴 Vercel Labs vercel-labs/skills 规范)
             from core.skills.skill_registry import SkillRegistry

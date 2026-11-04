@@ -66,7 +66,7 @@ class DeviceContextInspector:
                 if f_data and f_data.get("jpeg"):
                     screen_bytes = f_data["jpeg"]
             except Exception:
-                pass
+                logger.debug("忽略异常 @ inspect", exc_info=True)
 
             if not screen_bytes:
                 res_cap = subprocess.run([adb_bin, "-s", device_id, "exec-out", "screencap", "-p"], capture_output=True, timeout=3)

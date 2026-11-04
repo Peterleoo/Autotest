@@ -165,7 +165,7 @@ class Solidifier:
                     parts = str(coord_val).split(",")
                     center = [int(parts[0]), int(parts[1])]
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ solidify_test_case", exc_info=True)
 
             win_size = step.get("screen_size") or {"width": 1080, "height": 2160}
             w_base = win_size.get("width", 1080)

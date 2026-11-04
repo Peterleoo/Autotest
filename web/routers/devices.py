@@ -126,7 +126,7 @@ def _get_device_screen_dimensions(device_id: str) -> Tuple[int, int]:
             _DEVICE_DIMENSIONS_CACHE[device_id] = (w, h)
             return (w, h)
     except Exception:
-        pass
+        logger.debug("忽略异常 @ _get_device_screen_dimensions", exc_info=True)
 
     return (1080, 2400)
 

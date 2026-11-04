@@ -110,7 +110,7 @@ class AntigravityOAuth:
                         "expires_at": tokens.get("expiresAt")
                     }
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ get_state", exc_info=True)
         return {
             "is_logged_in": False,
             "email": "未登录",

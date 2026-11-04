@@ -124,7 +124,7 @@ class DeviceWatchdog:
                             self.last_heartbeat = time.time()
                         continue
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ _monitor_loop", exc_info=True)
 
             # 检查子进程是否已自然退出
             if self.supervised_proc and self.supervised_proc.poll() is not None:

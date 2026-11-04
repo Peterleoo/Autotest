@@ -615,6 +615,6 @@ class TaskManager(TimelineViewMixin, ConversationMixin, PlanningMixin, RuntimeMi
             if res.stdout.strip():
                 return res.stdout.strip()
         except Exception:
-            pass
+            logger.debug("忽略异常 @ _resolve_device_label", exc_info=True)
         return f"Android 真机 ({device_id[:8]})"
 

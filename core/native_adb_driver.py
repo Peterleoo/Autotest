@@ -96,7 +96,7 @@ class NativeADBDriver:
                             logger.info(f"设备 [{self.device_id}] 自动重连成功！")
                             return
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ _detect_device", exc_info=True)
                 raise ConnectionError(f"目标真机 [{self.device_id}] 处于离线状态 (offline)。请重新插拔 USB 数据线或重启手机开发者选项中的【USB 调试】。")
             elif status == "unauthorized":
                 raise ConnectionError(f"目标真机 [{self.device_id}] 未获得 USB 调试授权 (unauthorized)。请点亮手机屏幕并在弹出授权提示框中勾选【始终允许这台电脑调试】。")
@@ -206,7 +206,7 @@ class NativeADBDriver:
                 elif frame_data.get("jpeg"):
                     return frame_data["jpeg"]
         except Exception:
-            pass
+            logger.debug("忽略异常 @ get_screenshot_as_png", exc_info=True)
 
         full_cmd = [self.adb_bin]
         if self.device_id:
@@ -267,7 +267,7 @@ class NativeADBDriver:
                 if ("mCurrentFocus" in line or "mFocusedApp" in line) and f"{package}/" in line:
                     return True
         except Exception:
-            pass
+            logger.debug("忽略异常 @ is_app_foreground", exc_info=True)
         return False
 
     def launch_app(self, package: str, activity: Optional[str] = None):
@@ -289,7 +289,7 @@ class NativeADBDriver:
                         activity = line.strip().split("/", 1)[1]
                         break
             except Exception:
-                pass
+                logger.debug("忽略异常 @ launch_app", exc_info=True)
 
         if activity:
             act_target = activity if "/" in activity else f"{package}/{activity}"
@@ -313,7 +313,7 @@ class NativeADBDriver:
             if m:
                 return {"width": int(m.group(1)), "height": int(m.group(2))}
         except Exception:
-            pass
+            logger.debug("忽略异常 @ get_window_size", exc_info=True)
         return {"width": 1080, "height": 2160}
 
     def swipe(self, start_x: int, start_y: int, end_x: int, end_y: int, duration: int = 500):
@@ -348,7 +348,7 @@ class NativeADBDriver:
                 if "mCurrentFocus" in line or "mFocusedApp" in line:
                     return line.strip()
         except Exception:
-            pass
+            logger.debug("忽略异常 @ get_current_app", exc_info=True)
         return ""
 
     def execute_shell(self, command: str) -> str:
