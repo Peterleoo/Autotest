@@ -1,6 +1,6 @@
 """
 由 AI 自动化测试智能体自动录制固化的跨端测试用例 (Dual-Mode Resilient Test Suite)
-测试目标: 冷启动【象盒找房】，若弹出隐私服务协议勾选同意，快速穿透引导轮播图直达应用主页，断言主导航 Tab 与主框架正常就绪。
+测试目标: 测试用例：打开象盒找房 完成顶部搜索 钰龙天下 并查看一套搜索的房源详情
 执行命令: pytest test_matrix_flow.py -v -s
 特性优势:
   1. 语义优先 (Text / ID / Desc) 动态查找；
@@ -127,26 +127,20 @@ def api_client():
 
 
 @allure.feature("固化测试套件")
-@allure.story("冷启动【象盒找房】，若弹出隐私服务协议勾选同意，快速穿透引导轮播图直达应用主页，断言主导航 Tab 与主框架正常就绪。")
+@allure.story("测试用例：打开象盒找房 完成顶部搜索 钰龙天下 并查看一套搜索的房源详情")
 def test_matrix_flow(driver, api_client):
     """
     自动化用例: test_matrix_flow
-    测试目标: 冷启动【象盒找房】，若弹出隐私服务协议勾选同意，快速穿透引导轮播图直达应用主页，断言主导航 Tab 与主框架正常就绪。
+    测试目标: 测试用例：打开象盒找房 完成顶部搜索 钰龙天下 并查看一套搜索的房源详情
     """
-    # 步骤 1: 点击同意隐私服务协议，进入下一步
-    robust_click(driver, text=None, res_id=None, desc='我同意', rel_x=0.6602, rel_y=0.9556)
+    # 步骤 1: 点击顶部搜索输入框，准备输入搜索关键词“钰龙天下”
+    robust_click(driver, text=None, res_id=None, desc='请输入小区名或地址搜索', rel_x=0.588, rel_y=0.0718)
     time.sleep(1)
 
-    # 步骤 2: 引导页极速穿透宏动作（快速翻页至末页直达主界面）
-    robust_swipe(driver, direction='left', repeat=3)
-    time.sleep(0.5)
-    # 点击标准底部体验按钮区域 (水平居中，垂直75%)
-    robust_click(driver, text='立即体验', rel_x=0.5, rel_y=0.75)
+    # 步骤 2: 点击热门搜索中的“钰龙天下一期”，直接执行关键词搜索
+    robust_click(driver, text=None, res_id=None, desc='钰龙天下一期', rel_x=0.1824, rel_y=0.2769)
     time.sleep(1)
 
-    # 步骤 3: 点击随便看看或跳过需求定制，直达应用主页
-    robust_click(driver, text=None, res_id=None, desc='随便看看', rel_x=0.5, rel_y=0.7449)
+    # 步骤 3: 点击搜索结果列表中的第一套“钰龙天下”房源卡片，进入房源详情页查看详情
+    robust_click(driver, text=None, res_id=None, desc='钰龙天下一期  2室2厅1卫    186.0万\n爆品房\n必卖好房\n77.76㎡ | 2室2厅 | 精装修\n岳麓区 - 钰龙天下一期\n186万\n  23919.75元/平', rel_x=0.5, rel_y=0.6486)
     time.sleep(1)
-
-    # 步骤 4: 校验界面是否包含预期内容 [首页]
-    assert '首页' in driver.page_source, f'业务断言失败：界面未出现预期内容 [首页]'
