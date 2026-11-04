@@ -560,7 +560,7 @@
                 if (sData.markdown_report) {
                     reportContent = sData.markdown_report;
                 } else if (sData.timeline_blocks) {
-                    const blk = sData.timeline_blocks.find(b => b.type === "final_report");
+                    const blk = sData.timeline_blocks.find(b => b.type === "report" || b.type === "final_report");
                     if (blk && blk.content) reportContent = blk.content;
                 }
             }
@@ -4551,7 +4551,7 @@
                 `;
             }
             
-            if (blk.type === "final_report") {
+            if (blk.type === "report" || blk.type === "final_report") {
                 // 若 timeline 中已经存在 test_summary 总结卡片，由 test_summary 统一收敛；否则作为报告卡片兜底展现！
                 const hasSummaryBlk = (sessionData.timeline_blocks || []).some(b => b.type === "test_summary");
                 if (hasSummaryBlk) {

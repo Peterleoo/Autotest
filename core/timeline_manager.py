@@ -4,6 +4,9 @@ import uuid
 from typing import Dict, Any, List, Optional, Set
 from datetime import datetime
 
+# 报告块类型：当前创建为 "report"，历史会话中仍存在旧名 "final_report"
+REPORT_BLOCK_TYPES = frozenset({"report", "final_report"})
+
 class TimelineManager:
     """
     负责维护与组装移动端 AI 测试的主流 Stream Timeline Block 事件模型

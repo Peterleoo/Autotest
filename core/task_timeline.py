@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any, Optional
 from core.report_generator import ReportGenerator
-from core.timeline_manager import TimelineManager
+from core.timeline_manager import TimelineManager, REPORT_BLOCK_TYPES
 from core.task_common import SESSIONS_STORE_DIR
 
 
@@ -171,7 +171,15 @@ class TimelineViewMixin:
         else:
             # 🚀 自动对齐机制：若 messages 中有生成好的 assistant 报告，而 timeline_blocks 中缺失，自动同步补齐！
             tb = s["timeline_blocks"]
-            existing_report_texts = set(b.get("content", "")[:100] for b in tb if b.get("type") == "final_report")
+            # 报告块类型已由 final_report 更名为 report，两者都需识别；同时自愈历史轮询产生的重复报告块（同内容仅保留首个）
+            existing_report_texts = set()
+            for b in list(tb):
+                if b.get("type") in REPORT_BLOCK_TYPES:
+                    key = b.get("content", "")[:100]
+                    if key in existing_report_texts:
+                        tb.remove(b)
+                    else:
+                        existing_report_texts.add(key)
             for m in s.get("messages", []):
                 if m.get("role") == "assistant" and (m.get("is_report") or "自动化测试交付物报告" in m.get("content", "")):
                     content = m.get("content", "")
