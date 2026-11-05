@@ -76,6 +76,32 @@ class TaskVerifier:
 
         return None
 
+    @staticmethod
+    def extract_final_anchor_texts(screen_info: Dict[str, Any], limit: int = 3) -> List[str]:
+        """
+        从终态原生 UI 树提取可用于固化断言的稳定文字（优先底部区域，如底部 Tab 名）。
+        仅取原生控件（带 bounds），OCR 文字不会出现在 page_source 中。
+        """
+        candidates = []
+        for el in screen_info.get("elements", []):
+            if not el.get("bounds"):
+                continue
+            text = (el.get("text") or "").strip()
+            center = el.get("center")
+            if not (2 <= len(text) <= 12) or not center:
+                continue
+            if re.fullmatch(r"[\d\s:：.%/\-]+", text):
+                continue
+            candidates.append((center[1], text))
+
+        anchors: List[str] = []
+        for _, text in sorted(candidates, key=lambda c: -c[0]):
+            if text not in anchors:
+                anchors.append(text)
+            if len(anchors) >= limit:
+                break
+        return anchors
+
     @classmethod
     def verify_finish_claim(
         cls,

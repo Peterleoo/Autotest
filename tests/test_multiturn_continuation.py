@@ -40,7 +40,8 @@ class TestMultiTurnContinuation(unittest.TestCase):
             },
             "timeline_blocks": [
                 TimelineManager.create_user_block("进入首页，查看精选房源", turn_id=1),
-                TimelineManager.create_test_summary_block(session_id=sess_id, goal="进入首页", is_success=True)
+                TimelineManager.create_test_summary_block(
+                    session_id=sess_id, goal="进入首页", is_success=True, duration="1s", steps_summary="")
             ],
             "turns": []
         }

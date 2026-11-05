@@ -13,12 +13,6 @@ echo 服务访问地址: http://127.0.0.1:8000
 echo 按 Ctrl + C 可终止服务。
 echo.
 
-if exist ".venv\Scripts\python.exe" (
-    set "PYTHON_EXE=.venv\Scripts\python.exe"
-) else (
-    set "PYTHON_EXE=python"
-)
-echo 使用解释器: %PYTHON_EXE%
-"%PYTHON_EXE%" -m uvicorn web.app:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn web.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir core --reload-dir web --reload-dir ai_engine --reload-dir config
 
 pause

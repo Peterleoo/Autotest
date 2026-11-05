@@ -73,7 +73,10 @@ class TestAIGeneratedHITL(unittest.TestCase):
         agent.executor._locate_and_type = lambda el, val: typed_entries.append((el.get("index"), val))
         agent.executor._locate_and_click = lambda el, c: clicked_entries.append(el.get("text"))
 
-        res = agent._handle_ai_requested_human_help(ai_decision, mock_screen, "登录测试")
+        home_screen = {"elements": [{"index": 1, "text": "首页"}]}
+        with patch("ai_engine.test_agent.ScreenParser.wait_for_visual_settling", return_value=("", b"")), \
+             patch("ai_engine.test_agent.ScreenParser.get_screen_summary", return_value=home_screen):
+            res = agent._handle_ai_requested_human_help(ai_decision, mock_screen, "登录测试", max_wait_seconds=10)
         t.join()
 
         self.assertTrue(res, "AI 人机协同处理流程必须顺利返回 True！")

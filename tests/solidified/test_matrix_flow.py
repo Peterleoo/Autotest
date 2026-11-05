@@ -1,6 +1,6 @@
 """
 由 AI 自动化测试智能体自动录制固化的跨端测试用例 (Dual-Mode Resilient Test Suite)
-测试目标: 在【待测应用 (示例)】搜索框输入测试关键词触发搜索，验证结果列表正常展示，返回后核对搜索历史标签生成
+测试目标: 测试用例：打开象盒找房 完成顶部搜索 钰龙天下 并查看一套搜索的房源详情
 执行命令: pytest test_matrix_flow.py -v -s
 特性优势:
   1. 语义优先 (Text / ID / Desc) 动态查找；
@@ -127,36 +127,20 @@ def api_client():
 
 
 @allure.feature("固化测试套件")
-@allure.story("在【待测应用 (示例)】搜索框输入测试关键词触发搜索，验证结果列表正常展示，返回后核对搜索历史标签生成")
+@allure.story("测试用例：打开象盒找房 完成顶部搜索 钰龙天下 并查看一套搜索的房源详情")
 def test_matrix_flow(driver, api_client):
     """
     自动化用例: test_matrix_flow
-    测试目标: 在【待测应用 (示例)】搜索框输入测试关键词触发搜索，验证结果列表正常展示，返回后核对搜索历史标签生成
+    测试目标: 测试用例：打开象盒找房 完成顶部搜索 钰龙天下 并查看一套搜索的房源详情
     """
-    # 步骤 1: 点击返回按钮退出房源详情页
-    robust_click(driver, text=None, res_id=None, desc=None, rel_x=0.075, rel_y=0.0736)
-    time.sleep(1)
-
-    # 步骤 2: 点击首页顶部搜索框进入搜索界面
+    # 步骤 1: 点击顶部搜索输入框，准备输入搜索关键词“钰龙天下”
     robust_click(driver, text=None, res_id=None, desc='请输入小区名或地址搜索', rel_x=0.588, rel_y=0.0718)
     time.sleep(1)
 
-    # 步骤 3: 在搜索框中输入测试关键词'星城国际'触发搜索 (输入: 星城国际)
-    robust_type(driver, text=None, res_id=None, desc=None, rel_x=0.4815, rel_y=0.1403, input_text='星城国际')
+    # 步骤 2: 点击热门搜索中的“钰龙天下一期”，直接执行关键词搜索
+    robust_click(driver, text=None, res_id=None, desc='钰龙天下一期', rel_x=0.1824, rel_y=0.2769)
     time.sleep(1)
 
-    # 步骤 4: 点击清除按钮清空输入框中的乱码
-    robust_click(driver, text=None, res_id=None, desc=None, rel_x=0.8231, rel_y=0.1403)
-    time.sleep(1)
-
-    # 步骤 5: 点击热门搜索中的'星城国际'触发搜索进入结果列表
-    robust_click(driver, text=None, res_id=None, desc='4\n星城国际', rel_x=0.2731, rel_y=0.4935)
-    time.sleep(1)
-
-    # 步骤 6: 点击左上角返回按钮回到搜索页以核对搜索历史标签生成
-    robust_click(driver, text=None, res_id=None, desc=None, rel_x=0.0787, rel_y=0.0648)
-    time.sleep(1)
-
-    # 步骤 7: 点击首页顶部搜索框进入搜索页
-    robust_click(driver, text=None, res_id=None, desc='请输入小区名或地址搜索', rel_x=0.588, rel_y=0.0718)
+    # 步骤 3: 点击搜索结果列表中的第一套“钰龙天下”房源卡片，进入房源详情页查看详情
+    robust_click(driver, text=None, res_id=None, desc='钰龙天下一期  2室2厅1卫    186.0万\n爆品房\n必卖好房\n77.76㎡ | 2室2厅 | 精装修\n岳麓区 - 钰龙天下一期\n186万\n  23919.75元/平', rel_x=0.5, rel_y=0.6486)
     time.sleep(1)

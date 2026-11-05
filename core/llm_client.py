@@ -3,6 +3,7 @@ import logging
 import base64
 from typing import Dict, Any, List, Optional
 from config.ai_config import ai_config
+from core.token_usage import TokenUsage, format_usage_line
 
 logger = logging.getLogger("LLMClient")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -12,6 +13,7 @@ class LLMClient:
     统一多模型客户端：支持 Antigravity / DeepSeek / Claude / OpenAI 等
     """
     def __init__(self, provider: Optional[str] = None, model: Optional[str] = None):
+        self.last_usage: TokenUsage = TokenUsage()
         self.provider = (provider or ai_config.PROVIDER).lower()
         self.override_model = model
         self.model_name = model or "default"
@@ -141,6 +143,7 @@ class LLMClient:
                 direct_client = AntigravityDirectClient(model_name=self.model_name)
                 res = direct_client.generate_content(system_prompt, user_prompt, image_base64)
                 logger.info(f"✨ Google Antigravity [{self.model_name}] 原生官方授权调用成功！")
+                self._report_usage(direct_client.last_usage)
                 return res
             except Exception as e:
                 logger.warning(
@@ -188,6 +191,7 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"调用模型失败: {e}")
                 raise e
+            self._report_usage(TokenUsage.from_anthropic(getattr(response, "usage", None), self.model_name))
 
             # 遍历 content 取出 text（过滤 thinking block）
             raw_text = ""
@@ -220,6 +224,7 @@ class LLMClient:
                     response_format={"type": "json_object"} if (json_mode and "deepseek" not in self.model_name) else None
                 )
                 raw_text = response.choices[0].message.content
+                self._report_usage(TokenUsage.from_openai(getattr(response, "usage", None), self.model_name))
             except Exception as e:
                 logger.warning(f"调用 [{self.provider}] 异常: {e}，自动尝试 fallback 到 Hermes 企业网关...")
                 if self.provider != "hermes":
@@ -237,13 +242,19 @@ class LLMClient:
                             res["_fallback_info"] = self.last_fallback_info
                         return res
                     except Exception:
-                        pass
+                        logger.debug("忽略异常 @ chat_decision", exc_info=True)
                 raise RuntimeError(f"调用模型 [{self.provider}] 异常: {e}")
 
         parsed_json = self._parse_json_response(raw_text)
         if self.last_fallback_info and isinstance(parsed_json, dict):
             parsed_json["_fallback_info"] = self.last_fallback_info
         return parsed_json
+
+    def _report_usage(self, usage: TokenUsage) -> None:
+        """记录本次调用的真实用量，并输出 [TOKEN_USAGE] 行供父进程累加到会话"""
+        self.last_usage = usage
+        if not usage.is_empty:
+            logger.info(format_usage_line(usage))
 
     def _parse_json_response(self, text: str) -> Dict[str, Any]:
         text = text.strip()
@@ -266,5 +277,5 @@ class LLMClient:
                 try:
                     return json.loads(text[start:end+1])
                 except Exception:
-                    pass
+                    logger.debug("忽略异常 @ _parse_json_response", exc_info=True)
             return {"status": "ok", "action": "step_inferred", "raw_content": text[:300]}

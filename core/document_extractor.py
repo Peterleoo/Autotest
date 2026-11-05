@@ -6,6 +6,9 @@ import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+import logging
+
+logger = logging.getLogger("document_extractor")
 
 class DocumentExtractor:
     """
@@ -99,7 +102,7 @@ class DocumentExtractor:
                     extracted = [m.decode("utf-8", errors="ignore") for m in matches if len(m) > 1]
                     return "\n".join(extracted[:200]).strip()
             except Exception:
-                pass
+                logger.debug("忽略异常 @ _extract_pdf", exc_info=True)
             return "[PDF 需求文档已挂载]"
 
     @classmethod
@@ -142,7 +145,7 @@ class DocumentExtractor:
                     meta["width"] = img.width
                     meta["height"] = img.height
             except Exception:
-                pass
+                logger.debug("忽略异常 @ get_file_metadata", exc_info=True)
 
         if is_doc:
             full_text = cls.extract_text(str(p))

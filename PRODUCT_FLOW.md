@@ -4,14 +4,14 @@ project_name: "Autotest AI (移动端全自动化测试与用例固化工作台)
 workflow_mode: "B"
 mode_name: "模式 B · 中型特性流"
 current_focus: "refinement"
-focus_name: "全景产品定义与基线梳理"
-current_stage: "吸收重大工程落地升级，确立物理真机优先与七大护城河能力"
+focus_name: "全景产品定义与系统级架构演进"
+current_stage: "吸收需求编排Suite Builder、分层感知火箭、HITL协同与时间线契约等重大工程升级"
 progress_percentage: 100
 health_score: 100
 health_level: "卓越 (Excellent)"
 status: "active"
 created_at: "2026-10-20"
-updated_at: "2026-10-22"
+updated_at: "2026-11-04"
 owner: "Product Manager"
 ---
 
@@ -45,6 +45,10 @@ owner: "Product Manager"
 - [x] 5. 交互原型与体验走查 (复用工程页面 web/templates/index.html，产出 docs/engineering-page-audit.md)
 - [x] 6. 验收自检与用户确认评审 (用户正式确认采纳，研发团队已对接优化)
 - [x] 7. 吸收工程调整成果，完成全景产品定义与基线重梳理 (docs/product-definition.md)
+- [x] 8. 落地需求驱动用例智能生成与自由编排系统 (Suite Builder) 与现场上下文继承 (keep_state)
+- [x] 9. 落地文档与应用语义相关性校验门禁 (Doc Mismatch Guard) 阻断无关盲测
+- [x] 10. 落地分层感知三级火箭架构 (UI树极速短路 ➔ 本地OCR兜底 ➔ 视觉大模型攻坚)
+- [x] 11. 落地 HITL 人机协同挂起、连续对话控制指令拦截中枢 (Intent Gate) 与标准化时间线 Block Catalog
 
 ---
 
@@ -52,15 +56,15 @@ owner: "Product Manager"
 
 | 序号 | 交付物名称 | 所属业务焦点 | 物理文件路径 / 访问链接 | 交付日期 | 状态 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| + | Autotest AI 产品全景梳理与业务规格说明书 | 功能方案推进 (solution) | [Autotest AI 产品全景梳理与业务规格说明书](file:///F:/Autotest) | 2026-10-22 | 已交付 |
-| + | 现有工程页面产品体验走查与对齐优化清单 | 功能方案推进 (solution) | [现有工程页面产品体验走查与对齐优化清单](file:///F:/Autotest) | 2026-10-22 | 已交付 |
-| + | 非专业人员团队自测工作台轻量规格说明书 | 功能方案推进 (solution) | [非专业人员团队自测工作台轻量规格说明书](file:///F:/Autotest) | 2026-10-22 | 已交付 |
-| + | Autotest 产品规划与路线图方案 (v1.1) | 功能方案推进 (solution) | [Autotest 产品规划与路线图方案 (v1.1)](file:///F:/Autotest) | 2026-10-22 | 已交付 |
+| + | 需求驱动智能用例生成与自由编排套件 | 功能方案推进 (suite) | [core/test_spec_synthesizer.py](file:///F:/Autotest/core/test_spec_synthesizer.py) | 2026-10-31 | 已交付 |
+| + | 分层感知三级火箭评估与分流器 | 引擎性能优化 (perception) | [ai_engine/screen_parser.py](file:///F:/Autotest/ai_engine/screen_parser.py) | 2026-11-01 | 已交付 |
+| + | 统一时间线标准事件流管理器 (Catalog) | 架构规范推进 (timeline) | [core/timeline_manager.py](file:///F:/Autotest/core/timeline_manager.py) | 2026-11-03 | 已交付 |
+| + | 控制指令意图拦截中枢 (Intent Gate) | 交互闭环 (hitl) | [core/task_manager.py](file:///F:/Autotest/core/task_manager.py) | 2026-11-02 | 已交付 |
 | 1 | 初始项目工程骨架 | 基础 | [README.md](README.md) | 2026-10-20 | 已存在 |
 | 2 | 产品规划与路线图方案 (v1.1) | roadmap | [docs/roadmap.md](docs/roadmap.md) | 2026-10-20 | 已验收 |
 | 3 | 团队自测工作台功能规格说明 | spec | [specs/spec-team-self-test-console.md](specs/spec-team-self-test-console.md) | 2026-10-20 | 已验收 |
 | 4 | 工程活原型体验走查与优化清单 | audit | [docs/engineering-page-audit.md](docs/engineering-page-audit.md) | 2026-10-20 | 已验收并指导研发 |
-| 5 | **Autotest AI 产品全景梳理与业务规格** | definition | [docs/product-definition.md](docs/product-definition.md) | 2026-10-20 | **最新基准 (已落盘)** |
+| 5 | **Autotest AI 产品全景梳理与业务规格** | definition | [docs/product-definition.md](docs/product-definition.md) | 2026-11-04 | **最新基准 (v2.5已落盘)** |
 
 ---
 
@@ -73,6 +77,16 @@ owner: "Product Manager"
 - **[2026-10-20] 吸收最新工程优化成果，重塑真机实测优先与 7 大核心能力**:
   - 确立“真机实测优先、坚决杜绝免机仿真”原则；
   - 固化手势探针硬拦截、设备画像自进化知识库、三栏桌面级工作台、单会话多轮纠偏、物理级一键强杀制动、用例推荐与新手向导等 7 大核心产品能力。
+- **[2026-10-31] 落地 Suite Builder：从“单点单步”走向“系统级套件端到端探索”**:
+  - 解决需求文档到测试执行的手工鸿沟，支持通过 Generative UI 进行用例自由重组、增删与原位修改；
+  - 确立“用例间保持应用现场状态（`keep_state: true`）”，实现单次会话执行整套端到端业务流。
+- **[2026-11-01] 构筑分层感知三级火箭架构，彻底破解高昂延迟与 Token 消耗**:
+  - 确立“UIAutomator 丰富原生树优先毫秒级纯文本决策，自绘稀疏界面本地 OCR 兜底，复杂无字图形/阻断重试升级多模态 Vision”的三层分流机制。
+- **[2026-11-02] 重塑交互中枢：意图拦截中枢 (Intent Gate) 与人机协同 (HITL)**:
+  - 彻底终结把控制指令（“停止”、“终止”）误当测试业务 Prompt 的逻辑缺陷；
+  - 解决前端双重乐观节点的脏渲染问题，实现 DOM 脏检查与防抖防闪烁。
+- **[2026-11-03] 借鉴 Vercel Labs json-render 契约护栏，规范时间线事件流**:
+  - 确立强类型 Block Catalog 白名单，杜绝未定义类型导致的界面渲染白屏与崩溃，双向兼容 `todo_list` 与 `todo_plan`。
 
 ---
 

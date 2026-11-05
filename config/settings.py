@@ -72,4 +72,9 @@ class Settings:
     ELEMENT_WAIT_TIMEOUT: int = int(os.getenv("ELEMENT_WAIT_TIMEOUT", "10"))
     ACTION_INTERVAL: float = float(os.getenv("ACTION_INTERVAL", "1.0"))
 
+    # 数据保留策略（天，0 表示不清理）；每个目录始终保留最新的 RETENTION_KEEP_LATEST 个文件
+    REPORTS_RETENTION_DAYS: int = int(os.getenv("REPORTS_RETENTION_DAYS", "30"))
+    SESSIONS_RETENTION_DAYS: int = int(os.getenv("SESSIONS_RETENTION_DAYS", "90"))
+    RETENTION_KEEP_LATEST: int = int(os.getenv("RETENTION_KEEP_LATEST", "50"))
+
 settings = Settings()

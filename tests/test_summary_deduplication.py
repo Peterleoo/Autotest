@@ -14,8 +14,10 @@ def test_backend_summary_deterministic_id_and_singleton():
     print("--- 1. 后端单元测试：测试总结卡片确定性 ID 与单例幂等 ---")
     
     # 验证 block_id 不再含有 uuid
-    b1 = TimelineManager.create_test_summary_block(session_id="sess_test_123", turn_id=0)
-    b2 = TimelineManager.create_test_summary_block(session_id="sess_test_123", turn_id=0)
+    b1 = TimelineManager.create_test_summary_block(
+        session_id="sess_test_123", goal="g", is_success=True, duration="1s", steps_summary="", turn_id=0)
+    b2 = TimelineManager.create_test_summary_block(
+        session_id="sess_test_123", goal="g", is_success=True, duration="1s", steps_summary="", turn_id=0)
     
     print(f"b1 block_id: {b1['block_id']}")
     print(f"b2 block_id: {b2['block_id']}")

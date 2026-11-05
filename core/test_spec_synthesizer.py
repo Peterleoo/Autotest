@@ -315,3 +315,103 @@ class TestSpecSynthesizer:
             "doc_filename": doc_name,
             "cases": cases
         }
+
+
+    @classmethod
+    def check_doc_app_relevance(
+        cls,
+        doc_text: str,
+        app_name: str,
+        app_package: str = "",
+        app_label: str = "",
+        provider: Optional[str] = None,
+        model: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        研判需求文档与当前目标待测应用的业务契合度 (Doc-App Relevance Guard)
+        采用确定性行业特征指纹毫秒级研判，防止上传无关文档导致真机盲测跑飞。
+        """
+        app_full = f"{app_name} {app_package} {app_label}".lower()
+        doc_clean = (doc_text or "").strip()
+        doc_lower = doc_clean[:4000].lower()
+
+        # 1. 行业特征关键词画像
+        domain_definitions = [
+            {
+                "domain": "房产租售与中介服务",
+                "app_keywords": ["象盒", "找房", "房产", "二手房", "租房", "安居", "贝壳", "链家", "中原", "房东", "卖房", "新房", "商圈", "小区", "经纪人", "微聊", "委托", "合租", "整租", "a6995433058179"],
+                "doc_keywords": ["房源", "找房", "二手房", "租房", "合租", "整租", "小区", "商圈", "委托", "经纪人", "卖房", "出租", "看房", "户型", "楼层"]
+            },
+            {
+                "domain": "AI自动化测试平台与桌面工具",
+                "app_keywords": ["autotest", "自动化测试", "测试平台", "测试框架", "pytest", "appium", "adb"],
+                "doc_keywords": ["autotest", "自动化测试", "测试平台", "adb", "手势探针", "真机调试", "固化脚本", "pytest", "token", "多模态驱动", "截屏", "推演", "知识库"]
+            },
+            {
+                "domain": "电商与在线购物",
+                "app_keywords": ["商城", "电商", "淘宝", "京东", "拼多多", "购物", "买家", "买菜"],
+                "doc_keywords": ["商品", "购物车", "下单", "支付", "物流", "优惠券", "规格", "sku", "收货地址"]
+            },
+            {
+                "domain": "社交即时通讯",
+                "app_keywords": ["社交", "聊天", "微信", "qq", "通讯录", "朋友圈", "即时通讯"],
+                "doc_keywords": ["好友", "聊天记录", "发消息", "语音", "表情包", "群聊", "朋友圈", "点赞"]
+            }
+        ]
+
+        # 匹配 App 所属领域
+        app_domain_info = None
+        for d in domain_definitions:
+            if any(k in app_full for k in d["app_keywords"]):
+                app_domain_info = d
+                break
+
+        # 匹配 Document 所属领域
+        doc_domain_info = None
+        for d in domain_definitions:
+            hit_count = sum(1 for k in d["doc_keywords"] if k in doc_lower)
+            if hit_count >= 3:
+                doc_domain_info = d
+                break
+
+        # 启发式决策 1: 命中两个截然不同的领域
+        if app_domain_info and doc_domain_info:
+            if app_domain_info["domain"] != doc_domain_info["domain"]:
+                app_dom = app_domain_info["domain"]
+                doc_dom = doc_domain_info["domain"]
+                return {
+                    "is_relevant": False,
+                    "relevance_score": 15,
+                    "app_domain": app_dom,
+                    "doc_domain": doc_dom,
+                    "reason": f"当前待测应用【{app_name}】归属于「{app_dom}」，而上传的需求文档核心内容涉及「{doc_dom}」，两者业务场景与功能无交集。"
+                }
+            else:
+                return {
+                    "is_relevant": True,
+                    "relevance_score": 92,
+                    "app_domain": app_domain_info["domain"],
+                    "doc_domain": doc_domain_info["domain"],
+                    "reason": f"文档业务领域（{doc_domain_info['domain']}）与当前待测应用高度契合。"
+                }
+
+        # 启发式决策 2: App 业务词在文档中几乎无出现
+        if app_domain_info:
+            hits = sum(1 for k in app_domain_info["doc_keywords"] if k in doc_lower)
+            if hits == 0 and len(doc_lower) > 300:
+                return {
+                    "is_relevant": False,
+                    "relevance_score": 20,
+                    "app_domain": app_domain_info["domain"],
+                    "doc_domain": "外部其他业务领域",
+                    "reason": f"上传文档未包含任何与「{app_domain_info['domain']}」相关的业务词汇，可能与待测应用无关。"
+                }
+
+        # 兜底默认：若 App 是通用示例应用 (demo_app)，或者文档与 App 弱相关
+        return {
+            "is_relevant": True,
+            "relevance_score": 75,
+            "app_domain": "通用移动应用",
+            "doc_domain": "业务规约",
+            "reason": "文档语义与应用基础测试场景兼容。"
+        }
