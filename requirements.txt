@@ -12,6 +12,7 @@ selenium>=4.40.0
 Pillow>=10.0.0
 numpy>=2.0.0
 opencv-python-headless>=4.9.0
+av>=19.0.0  # 投屏 scrcpy H.264 解码；未安装时自动回退 screencap 截屏
 
 # AI 模型与文本处理
 anthropic>=0.30.0

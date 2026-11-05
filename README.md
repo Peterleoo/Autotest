@@ -194,6 +194,8 @@ python -m playwright install chromium   # 仅运行前端 UI 测试时需要
    - **OPPO/一加（ColorOS）**：开启【禁止权限监控】；
    - **华为（HarmonyOS）**：退出【纯净模式】。
 
+4. **投屏推流（推荐，显著降低真机耗电）**：执行 `python tools/fetch_scrcpy_server.py` 下载并校验 scrcpy-server（Apache-2.0），并确保已安装 `av`。就绪后投屏与 AI 取帧自动改用真机硬件 H.264 推流；未就绪时自动回退截屏。相关配置见 `.env.example` 中「投屏与真机取帧」一节。
+
 ### 3. 配置 AI 模型（以 Google Antigravity 为例）
 每位部署者都使用**自己的** Google 账号与额度，凭据只保存在本机，绝不提交到仓库：
 
