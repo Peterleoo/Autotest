@@ -9,15 +9,31 @@ from typing import Optional, Dict, Any, Tuple
 from fastapi import Request, Body
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from config.settings import settings
-from core.screen_stream_hub import screen_stream_hub, STREAM_FRAME_INTERVAL, STREAM_POLL_SLEEP
+from core.screen_stream_hub import screen_stream_hub, STREAM_FRAME_INTERVAL, STREAM_IDLE_FRAME_INTERVAL, STREAM_POLL_SLEEP
 
 from web.shared import (
     app_mgr,
+    task_mgr,
     logger,
     resolve_target_device_id,
 )
 
 router = APIRouter()
+
+
+# 投屏期间需要实时画面的会话状态（运行中 / 人机协同等待用户在投屏上操作）
+_LIVE_STREAM_STATUSES = {"RUNNING", "WAITING_USER_INPUT", "AWAITING_USER_INPUT"}
+
+
+def _stream_interval_for(device_id: str) -> float:
+    """设备上有测试运行时实时采集，否则降频：每帧都是真机端满分辨率截屏，空闲高频采集徒增耗电发热"""
+    for sess in list(task_mgr.sessions.values()):
+        if sess.get("status") not in _LIVE_STREAM_STATUSES:
+            continue
+        devices = set(sess.get("target_devices") or []) | set((sess.get("devices") or {}).keys())
+        if device_id in devices:
+            return STREAM_FRAME_INTERVAL
+    return STREAM_IDLE_FRAME_INTERVAL
 
 
 # ================= 优化：设备列表内存级低开销缓存 (5秒 TTL，杜绝高频 ADB 子进程与物理点击探针) =================
@@ -142,11 +158,11 @@ async def get_device_screenshot(device_id: Optional[str] = None, format: str = "
     try:
         # 1. 优先通过极速屏幕采集分发中枢获取；帧在 STREAM_FRAME_INTERVAL 内复用，任何前端轮询都无法把 ADB 通道打满
         if format.lower() == "png":
-            png_bytes = await screen_stream_hub.get_png_bytes(target_dev, max_age=STREAM_FRAME_INTERVAL)
+            png_bytes = await screen_stream_hub.get_png_bytes(target_dev, max_age=_stream_interval_for(target_dev))
             if png_bytes:
                 return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
         else:
-            jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=STREAM_FRAME_INTERVAL)
+            jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=_stream_interval_for(target_dev))
             if jpeg_bytes:
                 return Response(content=jpeg_bytes, media_type="image/jpeg", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     except Exception as e:
@@ -177,7 +193,7 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
                 break
             try:
                 # 限流：同一帧在 STREAM_FRAME_INTERVAL 内复用，给测试 ADB 指令留出通道空闲窗口
-                jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=STREAM_FRAME_INTERVAL)
+                jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=_stream_interval_for(target_dev))
                 if jpeg_bytes and jpeg_bytes is not last_sent:
                     last_sent = jpeg_bytes
                     yield (b"--frame\r\n"

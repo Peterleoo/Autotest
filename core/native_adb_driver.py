@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from config.settings import settings
+from core import frame_cache
 
 logger = logging.getLogger("NativeADBDriver")
 
@@ -153,6 +154,8 @@ class NativeADBDriver:
             logger.debug(f"保活探针跳过: {e}")
 
     def execute_adb(self, cmd_args: List[str], timeout: int = 15) -> subprocess.CompletedProcess:
+        if frame_cache.is_input_command(cmd_args):
+            frame_cache.invalidate(self)  # 界面即将变化：作废稳定帧与 UI 树缓存
         full_cmd = [self.adb_bin]
         if self.device_id:
             full_cmd.extend(["-s", self.device_id])

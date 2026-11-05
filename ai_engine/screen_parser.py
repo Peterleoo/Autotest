@@ -1,8 +1,15 @@
 import base64
+import logging
 import re
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Tuple, Optional
 from appium import webdriver
+from core import frame_cache
+
+logger = logging.getLogger("ScreenParser")
+
+SETTLE_SAMPLE_INTERVAL = 0.4  # 视觉稳定检测采样间隔（秒）
+SETTLE_MAX_FRAMES = 3         # 单次稳定检测最多截屏帧数
 
 class PerceptionMode:
     """
@@ -39,12 +46,14 @@ class ScreenParser:
         return model_b64, raw_bytes
 
     @staticmethod
-    def wait_for_visual_settling(driver: webdriver.Remote, max_wait: float = 2.5, interval: float = 0.15) -> Tuple[str, bytes]:
+    def wait_for_visual_settling(driver: webdriver.Remote, max_wait: float = 2.5, interval: float = SETTLE_SAMPLE_INTERVAL,
+                                 max_frames: int = SETTLE_MAX_FRAMES) -> Tuple[str, bytes]:
         """
         自适应视觉静默检测门禁 (Visual Settling Guard)
         在动作派发后，智能探测屏幕帧指纹变动率；
         一旦画面连续两次变动率低于 2.5%（转场或数据已渲染稳定），提前极速放行（通常仅需 200~400ms）；
-        若页面存在持续动画或慢请求，最多等待 max_wait 秒，彻底消灭白屏/半加载导致的假阴性决策。
+        若页面存在持续动画或慢请求，最多等待 max_wait 秒、最多采样 max_frames 帧（每帧均为真机满分辨率截屏，限帧以省电）；
+        最后一帧写入感知缓存，紧随其后的感知直接复用，不再重复截屏。
         """
         import time
         from PIL import Image
@@ -53,10 +62,12 @@ class ScreenParser:
         last_sample = None
         start_time = time.time()
         last_b64, last_bytes = None, None
+        frames = 0
 
         while True:
             b64_img, raw_bytes = ScreenParser.capture_screen(driver)
             last_b64, last_bytes = b64_img, raw_bytes
+            frames += 1
 
             # 极速生成 32x32 灰度指纹
             try:
@@ -72,10 +83,11 @@ class ScreenParser:
                     break
 
             last_sample = current_sample
-            if time.time() - start_time >= max_wait:
+            if frames >= max_frames or time.time() - start_time >= max_wait:
                 break
             time.sleep(interval)
 
+        frame_cache.remember_settled_frame(driver, last_b64, last_bytes)
         return last_b64, last_bytes
 
     @staticmethod
@@ -233,7 +245,19 @@ class ScreenParser:
         force_vision: bool = False
     ) -> Dict[str, Any]:
         """组合截图、原生控件树与分层感知三级火箭架构，生成供 AI 极速决策的页面概览"""
-        elements = ScreenParser.parse_elements(driver)
+        # 先取画面：优先复用紧邻的视觉稳定帧，省一次真机满分辨率截屏
+        settled = frame_cache.consume_settled_frame(driver)
+        b64_img, raw_bytes = settled if settled else ScreenParser.capture_screen(driver)
+
+        # 严格屏幕指纹不变且期间无输入动作时复用上次 UI 树，省一次 uiautomator dump
+        # 仅原生 ADB 驱动可在下发输入动作时作废缓存，其他驱动不复用
+        fingerprint = frame_cache.strict_fingerprint(raw_bytes) if hasattr(driver, "execute_adb") else None
+        elements = frame_cache.lookup_ui_tree(driver, fingerprint)
+        if elements is None:
+            elements = ScreenParser.parse_elements(driver)
+            frame_cache.remember_ui_tree(driver, fingerprint, elements)
+        else:
+            logger.info(f"⚡ [UI树复用] 屏幕严格指纹未变化，复用上次控件树 ({len(elements)} 个控件)，跳过 uiautomator dump")
 
         # Level 1: 评估原生 UI 树是否足够充沛
         is_rich = ScreenParser.is_hierarchy_rich(elements, goal=goal)
@@ -241,8 +265,7 @@ class ScreenParser:
         ocr_cached = False
 
         if skip_ocr_if_rich and is_rich and not force_vision:
-            # 原生 UI 树丰富，直接短路跳过端侧 OCR 与多帧视觉防抖，执行单次极速截屏保持现场
-            b64_img, raw_bytes = ScreenParser.capture_screen(driver)
+            # 原生 UI 树丰富，直接短路跳过端侧 OCR 与多帧视觉防抖，沿用上方已取得的画面
             mode, confidence, reason = ScreenParser.evaluate_perception_mode(
                 hierarchy_elements=elements,
                 ocr_elements=[],
@@ -253,8 +276,7 @@ class ScreenParser:
             # Level 2 / Level 3: 原生稀疏或强制视觉，执行端侧本地 OCR 补齐与多帧防抖
             if wait_settling:
                 b64_img, raw_bytes = ScreenParser.wait_for_visual_settling(driver)
-            else:
-                b64_img, raw_bytes = ScreenParser.capture_screen(driver)
+                frame_cache.consume_settled_frame(driver)  # 本次已直接使用，避免下一步误复用
 
             try:
                 from core.vision_ocr import VisionOCR

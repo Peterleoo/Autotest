@@ -6,6 +6,7 @@ ScreenStreamHub: 极速真机屏幕采集与流分发中枢 (KISS 原则 · 零�
 3. 单例常驻帧分发与防并发互锁：双重检查锁防多端争抢 ADB 通道，内存零延迟复用新鲜帧，彻底杜绝画中画与右侧抽屉同时打开时的通道阻塞。
 """
 
+import os
 import gzip
 import time
 import struct
@@ -33,7 +34,10 @@ logger = logging.getLogger("ScreenStreamHub")
 RAW_CAPTURE_TIMEOUT = 6.0       # RAW 帧约 10MB，3s 在 USB 繁忙时极易超时并中途杀进程，诱发 offline 抖动
 PNG_CAPTURE_TIMEOUT = 8.0
 STREAM_FRAME_INTERVAL = 0.8     # MJPEG 帧流最小采集间隔：给测试指令留出 ADB 通道空闲窗口，杜绝通道被投屏占满
+STREAM_IDLE_FRAME_INTERVAL = 3.0  # 设备无测试运行时的采集间隔：每帧都是真机端满分辨率截屏，空闲降频以省电降温
 STREAM_POLL_SLEEP = 0.1
+# 端侧 gzip 压缩截屏：减少 USB 传输量，但压缩消耗真机 CPU；老机型可设 DEVICE_GZIP_CAPTURE=0 关闭以省电
+DEVICE_GZIP_CAPTURE = os.getenv("DEVICE_GZIP_CAPTURE", "1").strip().lower() not in ("0", "false", "no", "off")
 FAILURE_THRESHOLD = 3           # 连续失败 N 次才判定断连，单次抖动继续展示上一帧
 FAILURE_COOLDOWN = 2.0          # 判定断连后的熔断冷却时间
 
@@ -43,7 +47,8 @@ _GZIP_UNSUPPORTED: set = set()  # 端侧无 gzip 的设备，后续直接走原�
 
 
 def _raw_capture_variants(device_id: str) -> List[Tuple[str, str]]:
-    variants = [] if device_id in _GZIP_UNSUPPORTED else [("raw_gzip_cv2", "screencap | gzip -1")]
+    use_gzip = DEVICE_GZIP_CAPTURE and device_id not in _GZIP_UNSUPPORTED
+    variants = [("raw_gzip_cv2", "screencap | gzip -1")] if use_gzip else []
     return variants + [("raw_cv2", "screencap")]
 
 

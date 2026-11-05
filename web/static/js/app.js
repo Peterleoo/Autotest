@@ -893,6 +893,7 @@
 
             if (isScreenAutoSyncEnabled && isScreenTabActive && isCanvasOpen) {
                 screenAutoSyncTimer = setInterval(() => {
+                    if (document.hidden || isScreenIdlePaused()) return;
                     refreshDeviceScreen(false);
                 }, 1800);
             }
@@ -6088,6 +6089,17 @@ function renderChatStream(sessionData) {
         // 投屏限流：与后端 STREAM_FRAME_INTERVAL(0.8s) 对齐，40ms 连拉会让旧真机 USB 链路频繁重新枚举掉线
         const PIP_FRAME_INTERVAL_MS = 800;
         const PIP_HIDDEN_POLL_MS = 1500;
+        // 无测试运行且长时间无操作时暂停投屏抓帧（每帧都是真机满分辨率截屏，空闲持续抓帧耗电发热）
+        const SCREEN_IDLE_PAUSE_MS = 5 * 60 * 1000;
+        const LIVE_SESSION_STATUSES = ["RUNNING", "WAITING_USER_INPUT", "AWAITING_USER_INPUT"];
+        let _lastUserActivityAt = Date.now();
+        ["pointerdown", "pointermove", "keydown", "wheel"].forEach(evt =>
+            document.addEventListener(evt, () => { _lastUserActivityAt = Date.now(); }, { passive: true }));
+
+        function isScreenIdlePaused() {
+            const hasLiveSession = (currentSessions || []).some(s => LIVE_SESSION_STATUSES.includes(s.status));
+            return !hasLiveSession && (Date.now() - _lastUserActivityAt > SCREEN_IDLE_PAUSE_MS);
+        }
 
         function runPipStreamLoop() {
             if (!isPipScreenOpen) {
@@ -6099,6 +6111,20 @@ function renderChatStream(sessionData) {
             if (document.hidden) {
                 setTimeout(runPipStreamLoop, PIP_HIDDEN_POLL_MS);
                 return;
+            }
+            // 空闲暂停：画面变暗提示，有任何操作或测试开始后自动恢复
+            const pipImg = document.getElementById("pipScreenImg");
+            if (isScreenIdlePaused()) {
+                if (pipImg) {
+                    pipImg.style.opacity = "0.45";
+                    pipImg.title = "空闲已暂停投屏，移动鼠标或开始测试即恢复";
+                }
+                setTimeout(runPipStreamLoop, PIP_HIDDEN_POLL_MS);
+                return;
+            }
+            if (pipImg && pipImg.style.opacity) {
+                pipImg.style.opacity = "";
+                pipImg.title = "";
             }
             const targetDev = getPipTargetDeviceId();
             if (!targetDev) {
