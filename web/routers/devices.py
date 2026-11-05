@@ -23,6 +23,7 @@ router = APIRouter()
 
 # 投屏期间需要实时画面的会话状态（运行中 / 人机协同等待用户在投屏上操作）
 _LIVE_STREAM_STATUSES = {"RUNNING", "WAITING_USER_INPUT", "AWAITING_USER_INPUT"}
+MJPEG_KEEPALIVE_SECONDS = 1.0  # MJPEG 画面静止时重发上一帧的间隔
 
 
 def _stream_interval_for(device_id: str) -> float:
@@ -187,15 +188,17 @@ async def stream_device_screen(request: Request, device_id: Optional[str] = None
         return Response(status_code=404, content=b"No online device connected", media_type="text/plain")
 
     async def frame_generator():
-        last_sent = None
+        last_sent, last_sent_at = None, 0.0
         while True:
             if await request.is_disconnected():
                 break
             try:
                 # 限流：同一帧在 STREAM_FRAME_INTERVAL 内复用，给测试 ADB 指令留出通道空闲窗口
                 jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=_stream_interval_for(target_dev))
-                if jpeg_bytes and jpeg_bytes is not last_sent:
-                    last_sent = jpeg_bytes
+                # 画面静止时（scrcpy 推流不出新帧）按保活间隔重发上一帧，维持流活性，不增加真机负载
+                is_new = jpeg_bytes is not last_sent
+                if jpeg_bytes and (is_new or time.time() - last_sent_at >= MJPEG_KEEPALIVE_SECONDS):
+                    last_sent, last_sent_at = jpeg_bytes, time.time()
                     yield (b"--frame\r\n"
                            b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n")
                 await asyncio.sleep(STREAM_POLL_SLEEP)

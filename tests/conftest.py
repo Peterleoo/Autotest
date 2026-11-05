@@ -27,3 +27,5 @@ _purge_stale_dirs()
 _TEST_DATA_ROOT = Path(tempfile.mkdtemp(prefix=_PREFIX))
 os.environ["AUTOTEST_SESSIONS_DIR"] = str(_TEST_DATA_ROOT / "sessions")
 os.environ["AUTOTEST_TEST_SUITES_DIR"] = str(_TEST_DATA_ROOT / "test_suites")
+# 测试默认不拉起真机 scrcpy 推流（单测通过 monkeypatch 显式启用）
+os.environ.setdefault("SCREEN_STREAM_BACKEND", "screencap")

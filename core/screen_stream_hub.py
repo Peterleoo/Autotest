@@ -15,6 +15,8 @@ import asyncio
 import subprocess
 from typing import Optional, Dict, Any, List, Tuple
 
+from core.scrcpy_stream import scrcpy_manager
+
 try:
     import cv2
     import numpy as np
@@ -212,7 +214,11 @@ class ScreenStreamHub:
                 return cached
 
             adb_bin = self._get_adb_bin()
-            frame_data = await asyncio.to_thread(_capture_raw_and_encode_sync, adb_bin, device_id)
+            # 优先 scrcpy 硬件 H.264 推流（真机端负载远低于全分辨率 screencap）；不可用时回退截屏
+            live = max_age <= STREAM_FRAME_INTERVAL
+            frame_data = await asyncio.to_thread(scrcpy_manager.get_frame, adb_bin, device_id, live)
+            if not frame_data:
+                frame_data = await asyncio.to_thread(_capture_raw_and_encode_sync, adb_bin, device_id)
             if frame_data:
                 self._failure_timestamps.pop(device_id, None)
                 self._failure_counts.pop(device_id, None)
