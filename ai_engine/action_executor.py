@@ -3,6 +3,8 @@ import logging
 from typing import Dict, Any, List, Optional
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
+
+from ai_engine.chinese_input import contains_non_ascii, type_chinese_text
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions import interaction
 from selenium.webdriver.common.actions.action_builder import ActionBuilder
@@ -265,48 +267,9 @@ class ActionExecutor:
 
             time.sleep(0.2)
 
-            # 判断是否包含中文汉字
-            if any(ord(c) > 127 for c in text):
-                try:
-                    import base64
-                    import re
-
-                    def _encode_imap_utf7(s: str) -> str:
-                        def _chunk(c: str) -> str:
-                            b = c.encode("utf-16be")
-                            return base64.b64encode(b).decode("ascii").rstrip("=").replace("/", ",")
-                        parts = re.split(r"([^\x20-\x7e]+)", s)
-                        res = []
-                        for p in parts:
-                            if not p: continue
-                            if all(0x20 <= ord(ch) <= 0x7e for ch in p):
-                                res.append(p.replace("&", "&-"))
-                            else:
-                                res.append(f"&{_chunk(p)}-")
-                        return "".join(res)
-
-                    # 激活免权限 UnicodeIME 输入法（真机已就绪）
-                    self.driver.execute_adb(["shell", "ime", "enable", "io.appium.settings/.UnicodeIME"])
-                    self.driver.execute_adb(["shell", "ime", "set", "io.appium.settings/.UnicodeIME"])
-                    # 等待 IME 切换完成，最多 3 秒
-                    timeout = time.time() + 3
-                    while time.time() < timeout:
-                        ime_res = self.driver.execute_adb(["shell", "ime", "list", "-s"])
-                        ime_status = ime_res.decode("utf-8") if isinstance(ime_res, bytes) else str(ime_res)
-                        if "io.appium.settings/.UnicodeIME" in ime_status:
-                            break
-                        time.sleep(0.2)
-                    else:
-                        raise RuntimeError("UnicodeIME 激活超时，输入中文失败")
-                    utf7_encoded = _encode_imap_utf7(text)
-                    logger.info(f"原生 ADB UnicodeIME 中文汉字极速上屏: '{text}' (RFC3501: {utf7_encoded})")
-                    # 使用单引号包裹，防止 Android /system/bin/sh 将 & 误判为后台任务
-                    self.driver.execute_adb(["shell", "input", "text", f"'{utf7_encoded}'"])
-                except Exception as e:
-                    logger.warning(f"UnicodeIME 输入汉字异常，回退拼音: {e}")
-                    from pypinyin import lazy_pinyin
-                    pinyin_str = "".join(lazy_pinyin(text)[:2])
-                    self.driver.execute_adb(["shell", "input", "text", pinyin_str])
+            # 中文走 UnicodeIME（缺失自动安装、输入后恢复原输入法并核对），失败即明确报错，绝不截断成拼音
+            if contains_non_ascii(text):
+                type_chinese_text(self.driver, text)
             else:
                 logger.info(f"原生 ADB 直接输入文本: '{text}'")
                 self.driver.execute_adb(["shell", "input", "text", text])
