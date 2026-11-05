@@ -89,3 +89,6 @@ apps/credentials.json
 
 data/uploads/*
 !data/uploads/.gitkeep
+
+# scrcpy-server 二进制（原型用，按需从 GitHub Releases 下载，不入库）
+tools/scrcpy/
