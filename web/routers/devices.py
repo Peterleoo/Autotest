@@ -150,20 +150,22 @@ def _get_device_screen_dimensions(device_id: str) -> Tuple[int, int]:
 
 @router.get("/api/devices/{device_id}/screenshot")
 @router.get("/api/device/screenshot")
-async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70):
+async def get_device_screenshot(device_id: Optional[str] = None, format: str = "jpeg", quality: int = 70, fresh: bool = False):
     """获取指定真机设备的实时屏幕截图 (依托显存 RAW 直读与 PC 端 SIMD 硬件级转码，耗时压缩至 0.6s，内存 0ms 秒回)"""
     target_dev = resolve_target_device_id(device_id)
     if not target_dev:
         return Response(status_code=404, content=b"No device connected", media_type="text/plain")
+    # fresh=1：AI 测试子进程感知取帧，跳过帧缓存直接取最新画面（推流下几乎零成本）
+    max_age = 0.0 if fresh else _stream_interval_for(target_dev)
 
     try:
         # 1. 优先通过极速屏幕采集分发中枢获取；帧在 STREAM_FRAME_INTERVAL 内复用，任何前端轮询都无法把 ADB 通道打满
         if format.lower() == "png":
-            png_bytes = await screen_stream_hub.get_png_bytes(target_dev, max_age=_stream_interval_for(target_dev))
+            png_bytes = await screen_stream_hub.get_png_bytes(target_dev, max_age=max_age)
             if png_bytes:
                 return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
         else:
-            jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=_stream_interval_for(target_dev))
+            jpeg_bytes = await screen_stream_hub.get_jpeg_bytes(target_dev, max_age=max_age)
             if jpeg_bytes:
                 return Response(content=jpeg_bytes, media_type="image/jpeg", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     except Exception as e:

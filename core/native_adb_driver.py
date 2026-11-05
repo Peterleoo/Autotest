@@ -1,13 +1,18 @@
 import base64
+import os
 import re
 import subprocess
 import time
 import logging
+import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from config.settings import settings
 from core import frame_cache
+
+SCREEN_SERVER_TIMEOUT = 6.0  # 首次取帧需启动推流(约 1.5s)；超时即回退本地截屏
 
 logger = logging.getLogger("NativeADBDriver")
 
@@ -191,8 +196,30 @@ class NativeADBDriver:
         raw_bytes = self.get_screenshot_as_png()
         return base64.b64encode(raw_bytes).decode("utf-8")
 
+    def _screenshot_from_screen_server(self) -> Optional[bytes]:
+        """优先从 Web 服务取 scrcpy 推流最新帧（真机端零截屏）；服务不可达时本驱动后续直接回退本地截屏"""
+        if getattr(self, "_screen_server_disabled", False):
+            return None
+        base = os.getenv("AUTOTEST_SCREEN_SERVER", "http://127.0.0.1:8000").strip().rstrip("/")
+        if not base or base.lower() in ("0", "off", "false") or not self.device_id:
+            self._screen_server_disabled = True
+            return None
+        url = f"{base}/api/devices/{urllib.parse.quote(self.device_id)}/screenshot?format=png&fresh=1"
+        try:
+            with urllib.request.urlopen(url, timeout=SCREEN_SERVER_TIMEOUT) as resp:
+                data = resp.read()
+            if data.startswith(b"\x89PNG"):
+                return data
+        except Exception as e:
+            logger.info(f"投屏服务取帧不可用，本次测试改用本地截屏: {e}")
+        self._screen_server_disabled = True
+        return None
+
     def get_screenshot_as_png(self) -> bytes:
-        """通过 adb exec-out screencap 获取物理屏幕原图二进制字节 (优先使用显存 RAW 直读 + PC 端硬件加速)"""
+        """优先取 scrcpy 推流帧；否则 adb exec-out screencap 获取物理屏幕 (显存 RAW 直读 + PC 端硬件加速)"""
+        png = self._screenshot_from_screen_server()
+        if png:
+            return png
         try:
             from core.screen_stream_hub import _capture_raw_and_encode_sync, HAS_OPENCV
             import cv2
