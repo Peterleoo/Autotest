@@ -1086,7 +1086,19 @@
                     tagAntigravity.innerText = isLoggedIn ? "已授权" : "需授权";
                 }
                 if (subtitleAntigravity) {
-                    subtitleAntigravity.innerText = isLoggedIn ? `已授权 · 原生视觉 (${data.email || 'Google 账号'})` : "未授权 · 点击前往完成授权";
+                    subtitleAntigravity.innerText = isLoggedIn ? `已授权 · 原生视觉 (${data.email || 'Google 账号'})` : (data.disabled ? "已停用 · 暂不允许使用" : "未授权 · 点击前往完成授权");
+                }
+                // 已停用：不展示账号、禁用登录入口
+                if (data.disabled) {
+                    if (tagAntigravity) tagAntigravity.innerText = "已停用";
+                    if (statusBadge) {
+                        statusBadge.className = "mono-tag";
+                        statusBadge.style.color = "var(--text-sub)";
+                        statusBadge.innerHTML = '<i class="bi bi-slash-circle me-1"></i>已停用';
+                    }
+                    if (emailEl) emailEl.innerText = "Google 反代账号已停用，暂不允许使用";
+                    if (btnLogin) { btnLogin.disabled = true; btnLogin.innerHTML = '<span>已停用</span>'; }
+                    return;
                 }
 
                 if (isLoggedIn) {

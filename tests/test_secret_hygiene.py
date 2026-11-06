@@ -10,6 +10,12 @@ import asyncio
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture(autouse=True)
+def _enable_antigravity(monkeypatch):
+    """本文件测试凭据/桥接自身行为，需在开关开启的前提下运行"""
+    monkeypatch.setenv("ANTIGRAVITY_ENABLED", "true")
 SECRET_PATTERNS = [
     re.compile(r"GOCSPX-[A-Za-z0-9_-]{10,}"),            # Google OAuth client secret
     re.compile(r"ya29\.[A-Za-z0-9_-]{20,}"),             # Google access token

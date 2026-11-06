@@ -4,6 +4,7 @@ import base64
 from typing import Dict, Any, List, Optional
 from config.ai_config import ai_config
 from core.token_usage import TokenUsage, format_usage_line
+from core.antigravity_credentials import AntigravityDisabled
 
 logger = logging.getLogger("LLMClient")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -142,10 +143,13 @@ class LLMClient:
                 self._report_usage(direct_client.last_usage)
                 return res
             except Exception as e:
-                logger.warning(
-                    f"Google Antigravity 官方直连异常 ({e})，"
-                    f"自动平滑降级至 Hermes 企业网关保底保障测试..."
-                )
+                if isinstance(e, AntigravityDisabled):
+                    logger.info("Google 反代（Antigravity）账号已停用，本次改用 Hermes 企业网关")
+                else:
+                    logger.warning(
+                        f"Google Antigravity 官方直连异常 ({e})，"
+                        f"自动平滑降级至 Hermes 企业网关保底保障测试..."
+                    )
                 try:
                     fallback_client = LLMClient(provider="hermes")
                     res = fallback_client.chat_decision(system_prompt, user_prompt, image_base64)

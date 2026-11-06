@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """配置、模型、授权与环境自检接口"""
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 import os
 import json
 import shutil
@@ -16,6 +17,10 @@ from web.shared import (
     BASE_DIR,
     app_mgr,
 )
+
+from core.antigravity_credentials import is_antigravity_enabled
+
+ANTIGRAVITY_DISABLED_MSG = "Google 反代（Antigravity）账号已停用，暂不允许使用；请改用 Hermes 等其他模型"
 
 router = APIRouter()
 
@@ -34,12 +39,12 @@ async def system_preflight():
         ai_ready = bool(ai_config.HERMES_API_KEY)
         ai_msg = "Hermes 网关已连接" if ai_ready else "Hermes 未配置 API Key"
     elif provider == "antigravity":
-        try:
+        if not is_antigravity_enabled():
+            ai_ready, ai_msg = False, ANTIGRAVITY_DISABLED_MSG
+        else:
             from core.antigravity_oauth import AntigravityOAuth
-            ai_ready = AntigravityOAuth().is_logged_in() or bool(ai_config.ANTIGRAVITY_API_KEY)
-        except Exception:
-            ai_ready = bool(ai_config.ANTIGRAVITY_API_KEY)
-        ai_msg = "Google Antigravity 已就绪" if ai_ready else "Antigravity 未登录或未配置 API Key"
+            ai_ready = bool(AntigravityOAuth().get_state().get("is_logged_in"))
+            ai_msg = "Google Antigravity 已就绪" if ai_ready else "Antigravity 未登录"
     elif provider == "deepseek":
         ai_ready = bool(ai_config.DEEPSEEK_API_KEY)
         ai_msg = "DeepSeek 驱动已就绪" if ai_ready else "DeepSeek 未配置 API Key"
@@ -48,7 +53,7 @@ async def system_preflight():
         ai_ready = bool(key)
         ai_msg = f"{provider.upper()} 已就绪" if ai_ready else f"{provider.upper()} 未配置 API Key"
     else:
-        ai_ready = bool(ai_config.DEEPSEEK_API_KEY or ai_config.ANTIGRAVITY_API_KEY)
+        ai_ready = bool(ai_config.DEEPSEEK_API_KEY)
         ai_msg = "AI 模型已接入" if ai_ready else "未检测到有效 AI 提供商配置"
 
     model_info = ai_config.get_current_model_info()
@@ -119,6 +124,7 @@ async def get_config():
         },
         "antigravity": {
             "ready": ag_state["is_logged_in"],
+            "disabled": not is_antigravity_enabled(),
             "email": ag_state["email"],
             "model": ag_state["current_model"],
             "available_models": ag_state["models"]
@@ -159,6 +165,8 @@ async def update_config(
         if api_key: keys_to_set["HERMES_API_KEY"] = api_key
         if base_url: keys_to_set["HERMES_BASE_URL"] = base_url
     elif provider == "antigravity":
+        if not is_antigravity_enabled():
+            return JSONResponse({"success": False, "message": ANTIGRAVITY_DISABLED_MSG}, status_code=403)
         if model:
             keys_to_set["ANTIGRAVITY_MODEL"] = model
             from core.antigravity_oauth import AntigravityOAuth
@@ -314,6 +322,8 @@ async def get_antigravity_status():
 @router.post("/api/antigravity/login")
 async def start_antigravity_login():
     """发起 Google OAuth 重新登录"""
+    if not is_antigravity_enabled():
+        return JSONResponse({"success": False, "message": ANTIGRAVITY_DISABLED_MSG}, status_code=403)
     from core.antigravity_oauth import AntigravityOAuth
     oauth = AntigravityOAuth()
     url = oauth.start_login()
@@ -323,6 +333,8 @@ async def start_antigravity_login():
 @router.post("/api/antigravity/switch_model")
 async def switch_antigravity_model(model: str = Form(...)):
     """切换 Google Antigravity 的具体模型"""
+    if not is_antigravity_enabled():
+        return JSONResponse({"success": False, "message": ANTIGRAVITY_DISABLED_MSG}, status_code=403)
     from core.antigravity_oauth import AntigravityOAuth
     oauth = AntigravityOAuth()
     oauth.set_current_model(model)

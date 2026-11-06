@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 import requests
 
-from core.antigravity_credentials import get_client_credentials
+from core.antigravity_credentials import ensure_antigravity_enabled, get_client_credentials
 from core.token_usage import TokenUsage
 
 logger = logging.getLogger("AntigravityDirect")
@@ -30,6 +30,7 @@ class AntigravityDirectClient:
     4. 原生支持 Gemini 3.8 / 3.7 / 2.5 多模态视觉（图片理解）与推理决策。
     """
     def __init__(self, model_name: Optional[str] = None):
+        ensure_antigravity_enabled()  # 停用时不读取任何个人令牌
         self.model_name = model_name or os.getenv("ANTIGRAVITY_MODEL", "gemini-2.5-flash")
         self.last_usage: TokenUsage = TokenUsage()
         self.proxy = self._detect_proxy()
@@ -140,6 +141,7 @@ class AntigravityDirectClient:
         image_base64: Optional[str] = None
     ) -> Dict[str, Any]:
         """直连 Google Antigravity 端点进行生成决策"""
+        ensure_antigravity_enabled()
         token = self.ensure_access_token()
         url = "https://daily-cloudcode-pa.googleapis.com/v1internal:generateContent"
         

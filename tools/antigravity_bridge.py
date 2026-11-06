@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from core.antigravity_credentials import get_client_credentials  # noqa: E402
+from core.antigravity_credentials import get_client_credentials, is_antigravity_enabled  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [AntigravityBridge] %(message)s")
 logger = logging.getLogger("AntigravityBridge")
@@ -30,6 +30,9 @@ app = FastAPI(title="Google Antigravity OpenAI Bridge", version="1.0.0")
 @app.middleware("http")
 async def require_bridge_key(request: Request, call_next):
     """设置了 ANTIGRAVITY_BRIDGE_KEY 时，拒绝未携带正确密钥的请求"""
+    if not is_antigravity_enabled():
+        return JSONResponse({"error": "antigravity_disabled",
+                             "message": "Google 反代账号已停用，暂不允许使用"}, status_code=403)
     if BRIDGE_KEY and request.headers.get("authorization", "") != f"Bearer {BRIDGE_KEY}":
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     return await call_next(request)
@@ -212,6 +215,9 @@ async def chat_completions(req: Request):
         )
 
 def main():
+    if not is_antigravity_enabled():
+        logger.error("Google 反代账号已停用（ANTIGRAVITY_ENABLED 未开启），桥接服务不启动")
+        sys.exit(1)
     logger.info(f"正在启动 Google Antigravity 本地桥接服务 @ {BRIDGE_HOST}:{BRIDGE_PORT}"
                 + ("（已启用访问密钥）" if BRIDGE_KEY else ""))
     uvicorn.run(app, host=BRIDGE_HOST, port=BRIDGE_PORT, log_level="warning")

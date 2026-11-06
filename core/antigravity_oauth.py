@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import requests
 
-from core.antigravity_credentials import get_client_credentials
+from core.antigravity_credentials import ensure_antigravity_enabled, get_client_credentials, is_antigravity_enabled
 
 logger = logging.getLogger("AntigravityOAuth")
 
@@ -90,6 +90,10 @@ class AntigravityOAuth:
 
     def get_state(self) -> Dict[str, Any]:
         """读取当前的 OAuth 授权状态与可用模型"""
+        if not is_antigravity_enabled():
+            # 已停用：不读取本地令牌文件，也不暴露绑定账号信息
+            return {"is_logged_in": False, "disabled": True, "email": "已停用", "project": "",
+                    "tier": "", "current_model": "", "models": [], "expires_at": None}
         current_model = os.environ.get("ANTIGRAVITY_MODEL", "gemini-3.8-flash-high")
         for p in CONFIG_PATHS:
             if p.exists():
@@ -153,6 +157,7 @@ class AntigravityOAuth:
 
     def start_login(self) -> str:
         """生成授权链接、启动本地监听并在浏览器中打开"""
+        ensure_antigravity_enabled()
         # 启动后台监听线程
         threading.Thread(target=self._start_callback_server, daemon=True).start()
 
