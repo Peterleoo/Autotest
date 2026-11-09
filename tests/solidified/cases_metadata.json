@@ -37,5 +37,32 @@
     "session_id": "sess_1103_202458_af29",
     "created_at": "2026-11-03 20:26:30",
     "timestamp": 1793708790.329221
+  },
+  "test_search_20261104_113717.py": {
+    "id": "CASE-04",
+    "title": "测试用例：打开象盒找房 完成顶部搜索 钰...",
+    "module": "房源搜索",
+    "level": "P0",
+    "desc": "针对【测试用例：打开象盒找房 完成顶部搜索 钰龙天下 并查看一套搜索的房源详情】的自动化回归测试用例，包含 5 个校验步骤。",
+    "precondition": "待测 App 启动就绪。",
+    "pass_rate": "100%",
+    "avg_duration": "2.8s",
+    "session_id": "sess_1104_112433_db85",
+    "created_at": "2026-11-04 11:37:17",
+    "timestamp": 1793763437.925897
+  },
+  "test_search_20261104_170950.py": {
+    "id": "CASE-07",
+    "title": "在【象盒找房】首页点击顶部搜索框，输入'...",
+    "module": "房源搜索",
+    "level": "P0",
+    "desc": "针对【在【象盒找房】首页点击顶部搜索框，输入'精装两居'，触发搜索进入列表页滑动加载，点击首项房】的自动化回归测试用例，包含 5 个校验步骤。",
+    "precondition": "待测 App 启动就绪。",
+    "pass_rate": "100%",
+    "avg_duration": "2.8s",
+    "session_id": "sess_1104_170759_bfe8",
+    "created_at": "2026-11-04 17:09:50",
+    "timestamp": 1793783390.478853,
+    "missing_assertion": false
   }
 }
